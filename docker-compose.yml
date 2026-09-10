@@ -1,0 +1,123 @@
+x-repo-volumes: &repo-volumes
+  - .:/repo
+  - /repo/node_modules
+  - /repo/apps/api/node_modules
+  - /repo/apps/mcp/node_modules
+  - /repo/apps/web/node_modules
+  - /repo/packages/core/node_modules
+
+x-database-url: &database-url postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-job_search_copilot}
+
+# Bind-mount file change events don't reliably reach containers on Windows/Docker Desktop,
+# so file watchers (tsc --watch, nest start --watch, tsx watch) are told to poll instead.
+x-watch-env: &watch-env
+  CHOKIDAR_USEPOLLING: 'true'
+  CHOKIDAR_INTERVAL: '300'
+
+# This file is for LOCAL DEV ONLY. The postgres credentials default to postgres/postgres
+# and are passed as plain env vars — fine on a laptop, not for a deployed environment.
+# A real deployment should supply secrets via Docker/Compose secrets or the platform's
+# secret manager, and never bake them into an image or commit them.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-job_search_copilot}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-job_search_copilot}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Rebuilds packages/core into dist/ whenever its source changes, so api/mcp
+  # (which depend on the compiled output, not the TS source) stay in sync.
+  # NOTE: api/mcp's own watchers don't react to dist/ changing — after editing
+  # packages/core, `docker compose restart api mcp` if the change doesn't show up.
+  # See packages/core/README.md ("Build strategy") for why and the deferred fix.
+  core:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    restart: unless-stopped
+    working_dir: /repo/packages/core
+    command: npm run watch
+    environment:
+      <<: *watch-env
+      DATABASE_URL: *database-url
+    volumes: *repo-volumes
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core:
+        condition: service_started
+    environment:
+      <<: *watch-env
+      DATABASE_URL: *database-url
+      API_PORT: 3000
+    ports:
+      - '3000:3000'
+    volumes: *repo-volumes
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://localhost:3000/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Stays up idling (`sleep infinity`) so Claude can `docker exec` into it per
+  # session instead of `docker compose run`. On Docker Desktop/Windows, creating
+  # a brand-new container takes 15-20s — too close to Claude's 30s MCP connect
+  # timeout. `docker exec` into an already-running container takes ~2-3s instead.
+  # Each session gets its own `npm run dev` process via exec; requires this
+  # container (and thus `docker compose up`) to already be running.
+  mcp:
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core:
+        condition: service_started
+    environment:
+      <<: *watch-env
+      DATABASE_URL: *database-url
+    volumes: *repo-volumes
+    command: sleep infinity
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      <<: *watch-env
+    ports:
+      - '5173:5173'
+    volumes: *repo-volumes
+
+volumes:
+  postgres_data:

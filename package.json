@@ -1,0 +1,35 @@
+{
+  "name": "job-search-copilot",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "generate": "npm run generate --workspace=@job-search-copilot/core",
+    "migrate:dev": "npm run migrate:dev --workspace=@job-search-copilot/core",
+    "studio": "npm run studio --workspace=@job-search-copilot/core",
+    "build": "npm run build --workspaces --if-present",
+    "dev:api": "npm run start:dev --workspace=@job-search-copilot/api",
+    "dev:mcp": "npm run dev --workspace=@job-search-copilot/mcp",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:db:migrate": "dotenv -e .env.test -- npm run migrate:deploy --workspace=@job-search-copilot/core",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "npm run build --workspace=@job-search-copilot/core && tsc -p apps/api/tsconfig.build.json --noEmit && tsc -p apps/mcp/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.0": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.0": true,
+    "@swc/core@1.16.2": true,
+    "msw": false
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.12",
+    "vitest": "^5.0.0"
+  }
+}
