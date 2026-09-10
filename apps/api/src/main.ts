@@ -1,3 +1,4 @@
+import './load-env';
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -8,11 +9,11 @@ import { configureApp } from './setup-app';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  configureApp(app);
   const config = app.get<ConfigService<Env, true>>(ConfigService);
+  configureApp(app, config);
   const port = config.get('API_PORT', { infer: true });
   await app.listen(port);
-  Logger.log(`API listening on http://localhost:${port}`, 'Bootstrap');
+  Logger.log(`API listening on port ${port}`, 'Bootstrap');
 }
 
 bootstrap().catch((err: unknown) => {

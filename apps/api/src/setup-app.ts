@@ -1,5 +1,5 @@
 import { type INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigService } from '@nestjs/config';
 import { DomainExceptionFilter } from './common/domain-exception.filter';
 import type { Env } from './config/env.validation';
 
@@ -7,9 +7,7 @@ import type { Env } from './config/env.validation';
  * App-wide wiring shared by main.ts (real boot) and the e2e suite, so the tests
  * exercise the same pipes/filters/routing the deployed app runs and the two can't drift.
  */
-export function configureApp(app: INestApplication): void {
-  const config = app.get<ConfigService<Env, true>>(ConfigService);
-
+export function configureApp(app: INestApplication, config: ConfigService<Env, true>): void {
   const allowlist = config
     .get('CORS_ORIGINS', { infer: true })
     .split(',')

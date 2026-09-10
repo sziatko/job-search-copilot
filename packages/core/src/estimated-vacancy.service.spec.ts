@@ -23,9 +23,10 @@ function input(overrides: Partial<SaveEstimatedVacancyInput> = {}): SaveEstimate
 describe('EstimatedVacancyService', () => {
   describe('save', () => {
     it('creates a new vacancy with the recommendation normalized to English', async () => {
-      const saved = await service.save(input({ recommendation: 'ПОДАВАТИСЯ' }));
-      expect(saved.recommendation).toBe('APPLY');
-      expect(saved.userAction).toBe('NOT_REVIEWED');
+      const { created, vacancy } = await service.save(input({ recommendation: 'ПОДАВАТИСЯ' }));
+      expect(created).toBe(true);
+      expect(vacancy.recommendation).toBe('APPLY');
+      expect(vacancy.userAction).toBe('NOT_REVIEWED');
     });
 
     it('leaves an already-saved vacancy untouched on a second save (same applyUrl)', async () => {
@@ -36,19 +37,22 @@ describe('EstimatedVacancyService', () => {
 
       const all = await service.list();
       expect(all.total).toBe(1);
-      expect(second.id).toBe(first.id);
-      expect(second.matchScore).toBe(60);
-      expect(second.estimationComment).toBe('First pass.');
+      expect(first.created).toBe(true);
+      expect(second.created).toBe(false);
+      expect(second.vacancy.id).toBe(first.vacancy.id);
+      expect(second.vacancy.matchScore).toBe(60);
+      expect(second.vacancy.estimationComment).toBe('First pass.');
     });
 
     it('a second save does not disturb a userAction set in between', async () => {
       const first = await service.save(input());
-      await service.updateUserAction(first.id, 'READY_TO_APPLY');
+      await service.updateUserAction(first.vacancy.id, 'READY_TO_APPLY');
 
       const resaved = await service.save(input({ matchScore: 50 }));
 
-      expect(resaved.id).toBe(first.id);
-      expect(resaved.userAction).toBe('READY_TO_APPLY');
+      expect(resaved.created).toBe(false);
+      expect(resaved.vacancy.id).toBe(first.vacancy.id);
+      expect(resaved.vacancy.userAction).toBe('READY_TO_APPLY');
     });
   });
 
@@ -58,9 +62,9 @@ describe('EstimatedVacancyService', () => {
     });
 
     it('returns the full record including fullText', async () => {
-      const saved = await service.save(input());
-      const found = await service.getById(saved.id);
-      expect(found?.fullText).toBe(saved.fullText);
+      const { vacancy } = await service.save(input());
+      const found = await service.getById(vacancy.id);
+      expect(found?.fullText).toBe(vacancy.fullText);
     });
   });
 
@@ -108,8 +112,8 @@ describe('EstimatedVacancyService', () => {
     });
 
     it('sets userAction and stamps userActionUpdatedAt', async () => {
-      const saved = await service.save(input());
-      const updated = await service.updateUserAction(saved.id, 'DECLINED');
+      const { vacancy } = await service.save(input());
+      const updated = await service.updateUserAction(vacancy.id, 'DECLINED');
       expect(updated?.userAction).toBe('DECLINED');
       expect(updated?.userActionUpdatedAt).toBeInstanceOf(Date);
     });

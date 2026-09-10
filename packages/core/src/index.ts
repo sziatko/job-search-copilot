@@ -7,6 +7,7 @@ export type {
   ListEstimatedVacanciesFilters,
   ListEstimatedVacanciesResult,
   SaveEstimatedVacancyInput,
+  SaveEstimatedVacancyResult,
 } from './estimated-vacancy.types';
 export { createPrismaClient, getPrisma } from './prisma-client';
 export { normalizeRecommendation, RECOMMENDATION_INPUT_VALUES } from './recommendation';

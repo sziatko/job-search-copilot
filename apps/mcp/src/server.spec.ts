@@ -46,15 +46,30 @@ describe('job-search-copilot MCP server', () => {
       name: 'save_estimated_vacancy',
       arguments: validArgs,
     });
-    const saved = JSON.parse(textOf(saveResult));
-    expect(saved.recommendation).toBe('APPLY');
-    expect(saved.userAction).toBe('NOT_REVIEWED');
+    const { created, vacancy } = JSON.parse(textOf(saveResult));
+    expect(created).toBe(true);
+    expect(vacancy.recommendation).toBe('APPLY');
+    expect(vacancy.userAction).toBe('NOT_REVIEWED');
 
     const getResult = await client.callTool({
       name: 'get_estimated_vacancy',
-      arguments: { id: saved.id },
+      arguments: { id: vacancy.id },
     });
     expect(JSON.parse(textOf(getResult)).applyUrl).toBe(validArgs.applyUrl);
+  });
+
+  it('save_estimated_vacancy reports created:false and drops the analysis on a re-save', async () => {
+    const client = await connectedClient();
+    await client.callTool({ name: 'save_estimated_vacancy', arguments: validArgs });
+
+    const again = await client.callTool({
+      name: 'save_estimated_vacancy',
+      arguments: { ...validArgs, matchScore: 5, estimationComment: 'changed' },
+    });
+    const { created, vacancy } = JSON.parse(textOf(again));
+    expect(created).toBe(false);
+    expect(vacancy.matchScore).toBe(80);
+    expect(vacancy.estimationComment).toBe('Strong match.');
   });
 
   it('get_estimated_vacancy reports isError for an unknown id', async () => {
@@ -82,11 +97,11 @@ describe('job-search-copilot MCP server', () => {
       name: 'save_estimated_vacancy',
       arguments: validArgs,
     });
-    const saved = JSON.parse(textOf(saveResult));
+    const { vacancy } = JSON.parse(textOf(saveResult));
 
     const updateResult = await client.callTool({
       name: 'update_estimated_vacancy_user_action',
-      arguments: { id: saved.id, userAction: 'DECLINED' },
+      arguments: { id: vacancy.id, userAction: 'DECLINED' },
     });
     expect(JSON.parse(textOf(updateResult)).userAction).toBe('DECLINED');
   });

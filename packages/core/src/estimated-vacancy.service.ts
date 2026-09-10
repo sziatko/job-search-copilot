@@ -4,6 +4,7 @@ import type {
   ListEstimatedVacanciesFilters,
   ListEstimatedVacanciesResult,
   SaveEstimatedVacancyInput,
+  SaveEstimatedVacancyResult,
 } from './estimated-vacancy.types';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
@@ -34,20 +35,21 @@ export class EstimatedVacancyService {
    * Persist a freshly analyzed vacancy, keyed by applyUrl. A vacancy is analyzed
    * once: if a row with this applyUrl already exists it is returned untouched and
    * the incoming analysis is discarded (re-analysis is not a supported flow — see
-   * the T6 decision). The unique constraint on applyUrl is the real guard; the
-   * pre-check just avoids a guaranteed-failing insert on the common path.
+   * the T6 decision). `created` tells the caller which happened. The unique
+   * constraint on applyUrl is the real guard; the pre-check just avoids a
+   * guaranteed-failing insert on the common path.
    */
-  async save(input: SaveEstimatedVacancyInput): Promise<EstimatedVacancy> {
+  async save(input: SaveEstimatedVacancyInput): Promise<SaveEstimatedVacancyResult> {
     const existing = await this.db.estimatedVacancy.findUnique({
       where: { applyUrl: input.applyUrl },
     });
     if (existing) {
-      return existing;
+      return { created: false, vacancy: existing };
     }
 
     const recommendation = normalizeRecommendation(input.recommendation);
     try {
-      return await this.db.estimatedVacancy.create({
+      const vacancy = await this.db.estimatedVacancy.create({
         data: {
           company: input.company,
           title: input.title,
@@ -58,12 +60,16 @@ export class EstimatedVacancyService {
           estimationComment: input.estimationComment,
         },
       });
+      return { created: true, vacancy };
     } catch (err) {
       // Lost a race with a concurrent save of the same applyUrl — the other write won.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        return this.db.estimatedVacancy.findUniqueOrThrow({
+        const raced = await this.db.estimatedVacancy.findUnique({
           where: { applyUrl: input.applyUrl },
         });
+        if (raced) {
+          return { created: false, vacancy: raced };
+        }
       }
       throw err;
     }

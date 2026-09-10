@@ -31,8 +31,9 @@ export function createServer(
       title: 'Save analyzed vacancy',
       description:
         'Save a vacancy analyzed by vacancy-match-analyzer, keyed by applyUrl. ' +
-        'If a vacancy with this applyUrl already exists it is returned unchanged and ' +
-        'the incoming analysis is discarded — a vacancy is analyzed once.',
+        'A vacancy is analyzed once: if one with this applyUrl already exists the ' +
+        'incoming analysis is discarded. Returns { created, vacancy } — check ' +
+        '`created` to know whether this analysis was stored (true) or dropped (false).',
       inputSchema: {
         company: z.string(),
         title: z.string(),
@@ -45,8 +46,8 @@ export function createServer(
     },
     async (input) => {
       try {
-        const vacancy = await vacancies.save(input);
-        return { content: [{ type: 'text', text: JSON.stringify(vacancy, null, 2) }] };
+        const result = await vacancies.save(input);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         // A caller mistake (e.g. an unrecognized recommendation) — report it as a
         // tool error like the not-found cases below, not a thrown protocol error.

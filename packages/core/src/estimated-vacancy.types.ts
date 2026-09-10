@@ -1,4 +1,10 @@
-import type { Recommendation, UserAction } from '@prisma/client';
+import type { EstimatedVacancy, Recommendation, UserAction } from '@prisma/client';
+
+export interface SaveEstimatedVacancyResult {
+  /** false when a vacancy with this applyUrl already existed and was returned untouched. */
+  created: boolean;
+  vacancy: EstimatedVacancy;
+}
 
 export interface SaveEstimatedVacancyInput {
   company: string;

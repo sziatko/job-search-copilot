@@ -1,4 +1,4 @@
-import { createPrismaClient } from '@job-search-copilot/core';
+import { createPrismaClient, type PrismaClient } from '@job-search-copilot/core';
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../config/env.validation';
@@ -10,7 +10,7 @@ import type { Env } from '../config/env.validation';
  */
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  readonly client;
+  readonly client: PrismaClient;
 
   constructor(config: ConfigService<Env, true>) {
     this.client = createPrismaClient(config.get('DATABASE_URL', { infer: true }));

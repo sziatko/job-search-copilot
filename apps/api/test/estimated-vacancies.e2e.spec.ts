@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { getPrisma } from '@job-search-copilot/core';
 import type { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -28,7 +29,7 @@ describe('EstimatedVacancies (e2e)', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
-    configureApp(app);
+    configureApp(app, app.get(ConfigService));
     await app.init();
   });
 
@@ -49,13 +50,30 @@ describe('EstimatedVacancies (e2e)', () => {
   });
 
   describe('POST /api/v1/estimated-vacancies', () => {
-    it('saves a vacancy and normalizes the Ukrainian recommendation to English', async () => {
+    it('creates a vacancy (201 + Location) and normalizes the Ukrainian recommendation', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/estimated-vacancies')
         .send(validPayload)
         .expect(201);
       expect(res.body.recommendation).toBe('APPLY');
       expect(res.body.userAction).toBe('NOT_REVIEWED');
+      expect(res.headers.location).toBe(`/api/v1/estimated-vacancies/${res.body.id}`);
+    });
+
+    it('returns 200 (not 201) when the applyUrl already exists, leaving it untouched', async () => {
+      const first = await request(app.getHttpServer())
+        .post('/api/v1/estimated-vacancies')
+        .send({ ...validPayload, matchScore: 60 })
+        .expect(201);
+
+      const second = await request(app.getHttpServer())
+        .post('/api/v1/estimated-vacancies')
+        .send({ ...validPayload, matchScore: 95 })
+        .expect(200);
+
+      expect(second.body.id).toBe(first.body.id);
+      expect(second.body.matchScore).toBe(60);
+      expect(second.headers.location).toBeUndefined();
     });
 
     it('rejects an unknown recommendation with 400', async () => {
