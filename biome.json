@@ -19,12 +19,7 @@
   },
   "linter": {
     "enabled": true,
-    "rules": {
-      "preset": "recommended",
-      "a11y": {
-        "noAutofocus": "warn"
-      }
-    }
+    "rules": { "preset": "recommended" }
   },
   "javascript": {
     "parser": { "unsafeParameterDecoratorsEnabled": true },

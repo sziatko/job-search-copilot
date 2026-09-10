@@ -1,4 +1,4 @@
-import { Tooltip } from '@/components/ui/Tooltip';
+import { ExpandableText } from '@/components/ui/ExpandableText';
 import type { EstimatedVacancyListItem, UserAction } from '../types';
 import { MatchScoreBadge } from './MatchScoreBadge';
 import { RecommendationBadge } from './RecommendationBadge';
@@ -65,10 +65,8 @@ export function VacancyTable({
               <td className="px-4 py-3 align-top">
                 <RecommendationBadge recommendation={item.recommendation} />
               </td>
-              <td className="max-w-md px-4 py-3 align-top text-sm text-slate-600">
-                <Tooltip content={item.estimationComment}>
-                  <span className="line-clamp-3">{item.estimationComment}</span>
-                </Tooltip>
+              <td className="max-w-md px-4 py-3 align-top">
+                <ExpandableText text={item.estimationComment} />
               </td>
               <td className="px-4 py-3 align-top">
                 <UserActionSelect

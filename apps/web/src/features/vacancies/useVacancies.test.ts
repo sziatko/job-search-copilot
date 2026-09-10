@@ -141,4 +141,16 @@ describe('useVacancies', () => {
     expect(view.result.current.savingIds.has(1)).toBe(false);
     expect(view.result.current.visibleItems[0].userAction).toBe('NOT_REVIEWED');
   });
+
+  it('surfaces a friendly loadError when the list response has the wrong shape', async () => {
+    mswServer.use(
+      http.get('http://localhost:3000/api/v1/estimated-vacancies', () =>
+        HttpResponse.json({ items: 'not-an-array' }),
+      ),
+    );
+    const view = renderHook(() => useVacancies(), { wrapper: withQueryClient() });
+
+    await waitFor(() => expect(view.result.current.loading).toBe(false));
+    expect(view.result.current.loadError).toMatch(/unexpected format/i);
+  });
 });

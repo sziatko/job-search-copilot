@@ -22,6 +22,10 @@ export function Modal({
     const dialog = dialogRef.current;
     dialog?.focus();
 
+    // Lock background scroll while the modal is open.
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         onClose();
@@ -47,6 +51,7 @@ export function Modal({
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
       previouslyFocused?.focus?.();
     };
   }, [onClose]);

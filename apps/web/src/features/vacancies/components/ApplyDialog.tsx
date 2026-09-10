@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useId, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 
 export interface ApplyDetails {
@@ -21,6 +21,7 @@ export function ApplyDialog({
   const [salary, setSalary] = useState('');
   const [usedTailoredResume, setUsedTailoredResume] = useState(false);
   const [comment, setComment] = useState('');
+  const titleId = useId();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -28,9 +29,11 @@ export function ApplyDialog({
   }
 
   return (
-    <Modal onClose={onCancel} maxWidthClassName="max-w-md">
+    <Modal onClose={onCancel} labelledBy={titleId} maxWidthClassName="max-w-md">
       <form onSubmit={handleSubmit}>
-        <h2 className="text-lg font-semibold text-slate-900">Mark as applied</h2>
+        <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+          Mark as applied
+        </h2>
         <p className="mt-1 text-sm text-slate-600">
           {title} — {company}
         </p>
@@ -43,7 +46,6 @@ export function ApplyDialog({
             <input
               id="apply-salary"
               type="text"
-              autoFocus
               value={salary}
               onChange={(e) => setSalary(e.target.value)}
               placeholder="e.g. 130 PLN/hour"
