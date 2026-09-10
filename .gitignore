@@ -141,3 +141,8 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Stray tsc output emitted next to *.mts config files
+*.config.mjs
+*.config.mjs.map
+*.config.d.mts

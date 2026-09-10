@@ -1,0 +1,32 @@
+import { type INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DomainExceptionFilter } from './common/domain-exception.filter';
+import type { Env } from './config/env.validation';
+
+/**
+ * App-wide wiring shared by main.ts (real boot) and the e2e suite, so the tests
+ * exercise the same pipes/filters/routing the deployed app runs and the two can't drift.
+ */
+export function configureApp(app: INestApplication): void {
+  const config = app.get<ConfigService<Env, true>>(ConfigService);
+
+  const allowlist = config
+    .get('CORS_ORIGINS', { infer: true })
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  // Empty allowlist → reflect any origin (local dev). Set CORS_ORIGINS before deploy.
+  app.enableCors({ origin: allowlist.length > 0 ? allowlist : true });
+
+  // Everything lives under /api except /health, which infra (docker-compose,
+  // load balancers) expects at the root.
+  app.setGlobalPrefix('api', { exclude: ['health'] });
+  // URI versioning: /api/v1/... . New breaking shapes get a v2 controller instead
+  // of mutating v1 under clients' feet.
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalFilters(new DomainExceptionFilter());
+  // Forward SIGTERM/SIGINT to onModuleDestroy hooks (PrismaService.$disconnect).
+  app.enableShutdownHooks();
+}
