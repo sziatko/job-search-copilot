@@ -37,7 +37,7 @@ export function createServer(
       inputSchema: {
         company: z.string(),
         title: z.string(),
-        applyUrl: z.string().url(),
+        applyUrl: z.url(),
         fullText: z.string(),
         matchScore: z.number().int().min(0).max(100),
         recommendation: RecommendationInputEnum,
