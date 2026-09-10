@@ -74,6 +74,13 @@ into it and running `npm run dev:mcp`.
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
 Postgres service on every push and PR.
 
+## Design docs
+
+[`docs/`](docs/) holds the **why**: the architecture map, the domain model, the
+API/MCP contracts, and an ADR per load-bearing decision — each with a "what breaks
+if you change it" note. Start at [`docs/README.md`](docs/README.md);
+[`docs/phases/phase-1.md`](docs/phases/phase-1.md) is the Phase 1 ledger.
+
 Database and migration conventions: [`packages/core/prisma/README.md`](packages/core/prisma/README.md).
 
 ## License

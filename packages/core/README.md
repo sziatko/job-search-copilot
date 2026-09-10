@@ -23,3 +23,6 @@ need `docker compose restart api mcp` for the change to take effect.
 runner (removes the rebuild/restart step but means dropping `nest start --watch`),
 or adopt TS project references (fixes cross-package typecheck staleness but not the
 runtime rebuild). Revisit when the dev-loop friction actually starts to bite.
+
+Full rationale and the "breaks if you change it" notes:
+[`docs/decisions/0003-core-consumed-as-dist.md`](../../docs/decisions/0003-core-consumed-as-dist.md).
