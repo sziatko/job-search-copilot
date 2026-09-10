@@ -1,3 +1,4 @@
+import { RECOMMENDATION_LABELS } from '../constants';
 import type { Recommendation } from '../types';
 
 const STYLES: Record<Recommendation, string> = {
@@ -6,18 +7,12 @@ const STYLES: Record<Recommendation, string> = {
   SKIP: 'bg-slate-100 text-slate-600 ring-slate-500/20',
 };
 
-const LABELS: Record<Recommendation, string> = {
-  APPLY: 'Apply',
-  APPLY_WITH_CAVEATS: 'Apply with caveats',
-  SKIP: 'Skip',
-};
-
 export function RecommendationBadge({ recommendation }: { recommendation: Recommendation }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${STYLES[recommendation]}`}
     >
-      {LABELS[recommendation]}
+      {RECOMMENDATION_LABELS[recommendation]}
     </span>
   );
 }

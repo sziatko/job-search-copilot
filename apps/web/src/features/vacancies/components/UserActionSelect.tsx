@@ -1,12 +1,11 @@
 import { Select, type SelectOption } from '@/components/ui/Select';
-import type { UserAction } from '../types';
+import { USER_ACTION_LABELS } from '../constants';
+import { type UserAction, userActionSchema } from '../types';
 
-const OPTIONS: SelectOption<UserAction>[] = [
-  { value: 'NOT_REVIEWED', label: 'Not reviewed' },
-  { value: 'READY_TO_APPLY', label: 'Ready to apply' },
-  { value: 'APPLIED', label: 'Applied' },
-  { value: 'DECLINED', label: 'Declined' },
-];
+const OPTIONS: SelectOption<UserAction>[] = userActionSchema.options.map((value) => ({
+  value,
+  label: USER_ACTION_LABELS[value],
+}));
 
 export function UserActionSelect({
   value,

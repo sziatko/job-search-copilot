@@ -1,18 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { listEstimatedVacancies, updateUserAction } from './api';
-import type {
-  EstimatedVacancyListItem,
-  Recommendation,
-  StatusFilterValue,
-  UserAction,
+import { RECOMMENDATION_ORDER } from './constants';
+import {
+  type EstimatedVacancyListItem,
+  STATUS_FILTER_ALL,
+  type StatusFilterValue,
+  USER_ACTION,
+  type UserAction,
 } from './types';
-
-const RECOMMENDATION_ORDER: Record<Recommendation, number> = {
-  APPLY: 0,
-  APPLY_WITH_CAVEATS: 1,
-  SKIP: 2,
-};
 
 const VACANCIES_KEY = ['vacancies'] as const;
 
@@ -47,11 +43,11 @@ export function useVacancies() {
   const [rowErrors, setRowErrors] = useState<Map<number, string>>(new Map());
   const [pendingDecline, setPendingDecline] = useState<PendingVacancy | null>(null);
   const [pendingApply, setPendingApply] = useState<PendingVacancy | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('NOT_REVIEWED');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(USER_ACTION.NOT_REVIEWED);
 
   const visibleItems = useMemo(() => {
     return items
-      .filter((item) => statusFilter === 'ALL' || item.userAction === statusFilter)
+      .filter((item) => statusFilter === STATUS_FILTER_ALL || item.userAction === statusFilter)
       .sort((a, b) => {
         const byRecommendation =
           RECOMMENDATION_ORDER[a.recommendation] - RECOMMENDATION_ORDER[b.recommendation];
@@ -98,12 +94,12 @@ export function useVacancies() {
   function requestActionChange(id: number, userAction: UserAction) {
     // Declining/applying are a bit more consequential, so confirm first instead of
     // saving straight away like the other actions.
-    if (userAction === 'DECLINED') {
+    if (userAction === USER_ACTION.DECLINED) {
       const item = items.find((i) => i.id === id);
       if (item) setPendingDecline({ id, company: item.company, title: item.title });
       return;
     }
-    if (userAction === 'APPLIED') {
+    if (userAction === USER_ACTION.APPLIED) {
       const item = items.find((i) => i.id === id);
       if (item) setPendingApply({ id, company: item.company, title: item.title });
       return;
@@ -113,14 +109,14 @@ export function useVacancies() {
 
   function confirmDecline() {
     if (!pendingDecline) return;
-    actionMutation.mutate({ id: pendingDecline.id, userAction: 'DECLINED' });
+    actionMutation.mutate({ id: pendingDecline.id, userAction: USER_ACTION.DECLINED });
     setPendingDecline(null);
   }
 
   function confirmApply() {
     if (!pendingApply) return;
     // salary / usedTailoredResume / comment aren't persisted yet — that's a later step.
-    actionMutation.mutate({ id: pendingApply.id, userAction: 'APPLIED' });
+    actionMutation.mutate({ id: pendingApply.id, userAction: USER_ACTION.APPLIED });
     setPendingApply(null);
   }
 

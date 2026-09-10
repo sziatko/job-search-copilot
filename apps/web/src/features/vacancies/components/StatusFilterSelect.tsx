@@ -1,14 +1,17 @@
 import { useId } from 'react';
 import { Select, type SelectOption } from '@/components/ui/Select';
-import type { StatusFilterValue } from '../types';
+import { USER_ACTION_LABELS } from '../constants';
+import { STATUS_FILTER_ALL, type StatusFilterValue, statusFilterValues } from '../types';
 
-const OPTIONS: SelectOption<StatusFilterValue>[] = [
-  { value: 'NOT_REVIEWED', label: 'Not reviewed' },
-  { value: 'READY_TO_APPLY', label: 'Ready to apply' },
-  { value: 'APPLIED', label: 'Applied' },
-  { value: 'DECLINED', label: 'Declined' },
-  { value: 'ALL', label: 'All' },
-];
+const LABELS: Record<StatusFilterValue, string> = {
+  ...USER_ACTION_LABELS,
+  [STATUS_FILTER_ALL]: 'All',
+};
+
+const OPTIONS: SelectOption<StatusFilterValue>[] = statusFilterValues.map((value) => ({
+  value,
+  label: LABELS[value],
+}));
 
 export function StatusFilterSelect({
   value,
