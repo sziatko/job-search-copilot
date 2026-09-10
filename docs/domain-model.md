@@ -57,8 +57,9 @@ The web app's default filter is `NOT_REVIEWED`; the list sorts by `recommendatio
 > - Adding a `Recommendation` or `UserAction` enum value → touches: the Prisma
 >   enum (migration), `RECOMMENDATION_INPUT_VALUES` + `RECOMMENDATION_ALIASES` in
 >   [`recommendation.ts`](../packages/core/src/recommendation.ts), the MCP `zod`
->   enums in [`server.ts`](../apps/mcp/src/server.ts), the DTO `@IsEnum` in
->   `apps/api`, and the web `recommendationSchema` / `userActionSchema` +
+>   enums in [`server.ts`](../apps/mcp/src/server.ts), the `apps/api` DTOs
+>   (`@IsIn(RECOMMENDATION_INPUT_VALUES)` on the save DTO, `@IsEnum` on the
+>   list-query DTO), and the web `recommendationSchema` / `userActionSchema` +
 >   `RECOMMENDATION_ORDER` + the status-filter options in `apps/web`. There is no
 >   single source — see [ADR-0012](decisions/0012-web-hand-written-contract.md).
 

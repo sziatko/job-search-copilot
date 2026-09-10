@@ -19,9 +19,11 @@ and *what a change here breaks over there*.
 - **ADRs are numbered globally** (`0001`, `0002`, …) and never renumbered. Each is
   tagged with the `Phase:` it was decided in. A superseded ADR keeps its file and
   its `Status:` line points at the replacement.
-- Every ADR and every overview-doc section ends with a **"What this constrains —
-  breaks if you change it"** block. That block names real files and behaviours:
-  it's the spec-driven part — read it before touching the area.
+- Every ADR ends with a **"What this constrains — breaks if you change it"**
+  block; the overview docs carry the same block on the sections where a boundary
+  or contract is actually at stake (not on every section). That block names real
+  files and behaviours: it's the spec-driven part — read it before touching the
+  area.
 - A claim that couldn't be verified from the code alone (rationale that lived only
   in a chat transcript) is flagged inline as `> inferred from code — confirm`.
 

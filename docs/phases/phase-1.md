@@ -8,7 +8,7 @@ accessibility), not a prototype bar.
 
 ## Scope delivered
 
-On `main`, commits `8e2c717`..`7efcba8`:
+On `main`, commits `8ef089d` … `006f8bb` (this docs commit included):
 
 | Commit | What landed |
 | --- | --- |

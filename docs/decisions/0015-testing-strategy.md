@@ -1,12 +1,7 @@
-# 0015 — Integration tests over mocked Prisma; real test DB; Vitest workspace projects
+# 0015 — Integration tests, not mocked Prisma; real test DB; Vitest workspace projects
 
 - Status: Accepted
 - Phase: 1 · Date: 2026-09
-
-> Parts of this ADR are reconstructed from the test code and config — the infra
-> was built in a parallel session. Rationale statements that came from that
-> session's discussion rather than a code comment are flagged
-> `> inferred from code — confirm`.
 
 ## Context
 The domain layer is almost entirely Prisma queries and a few pure functions. What
@@ -16,7 +11,10 @@ should the tests actually exercise, and against what?
 - **Vitest** with a root `vitest.config.mts` that fans out to per-workspace
   `projects` (`packages/core`, `apps/api`, `apps/mcp`, `apps/web`), each keeping
   its own environment and setup: `node` for core/api/mcp, `jsdom` for web; `api`
-  uses the `unplugin-swc` transform so `emitDecoratorMetadata` works.
+  uses the `unplugin-swc` transform so `emitDecoratorMetadata` works. The config
+  files are `.mts`, not `.ts`: the repo root has no `"type": "module"`, so a
+  `.ts` Vitest config loads as CommonJS and Vite 8 warns; `.mts` opts that one
+  file into ESM without forcing `"type": "module"` on the Nest / `tsc` builds.
 - **Integration, not mocks.** The core service spec runs against a **real**
   Postgres database — the separate `job_search_copilot_test` DB (`.env.test`).
   Its own comment: *"A mocked Prisma client would just re-assert our own query
@@ -33,9 +31,11 @@ should the tests actually exercise, and against what?
   `env: loadEnv('test', rootDir, '')`, so `.env.test`'s `DATABASE_URL` (the test
   DB) is what the tests see; `process.env` still passes through, which is how CI
   supplies it with no `.env.test` file present.
-- **File-name convention:** `*.spec.ts` for the node/DB-backed suites,
-  `*.test.ts(x)` for the web/jsdom suites.
-  > inferred from code — confirm the split is deliberate and not incidental.
+- **File-name convention:** core/api/mcp use `*.spec.ts`, web uses `*.test.ts(x)`
+  — each follows its ecosystem's default (Nest scaffolds `*.spec.ts`, Vitest +
+  React examples `*.test.tsx`). The split is incidental, not a designed
+  cross-cutting rule; nothing depends on it beyond each project's own `include`
+  glob.
 - **web** tests use MSW (`apps/web/src/test/msw/`) as a fake API server, not a
   fetch mock.
 
@@ -67,6 +67,10 @@ Phase 1 ends at **48 tests / 6 files**, all green.
   `prisma migrate deploy` itself, so CI would still pass while local fails.
 - Renaming test files away from the `*.spec.ts` / `*.test.ts(x)` convention →
   the project `include` globs stop matching them.
+- Removing `apps/api/tsconfig.build.json` (or its `test` / `*.spec.ts` /
+  `vitest.config.mts` excludes) → `nest build` falls back to `tsconfig.json`,
+  pulls in `test/**` and the Vitest config, and fails on the `rootDir: ./src`
+  constraint. `nest build` auto-selects `tsconfig.build.json` when it exists.
 
 ## Related
 [ADR-0010](0010-mcp-server-factory.md), [ADR-0016](0016-docker-dev-stack-and-ci.md),

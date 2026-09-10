@@ -3,9 +3,6 @@
 - Status: Accepted
 - Phase: 1 · Date: 2026-09
 
-> The Docker stack was largely in place before this session; some rationale is
-> `> inferred from code — confirm` from `docker-compose.yml` and the Dockerfiles.
-
 ## Context
 Local development needs Postgres plus the three apps and the `core` build, with
 live reload, on a Windows/Docker Desktop host. CI needs to prove a change is

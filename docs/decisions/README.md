@@ -23,7 +23,7 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0012](0012-web-hand-written-contract.md) | Web keeps a hand-written zod API contract (no `core` import) | Accepted |
 | [0013](0013-accessible-ui-primitives.md) | Accessible UI primitives: `Modal`, `ExpandableText` | Accepted |
 | [0014](0014-biome-and-nest-di-import-type.md) | Biome + the `apps/api` `useImportType` override | Accepted |
-| [0015](0015-testing-strategy.md) | Integration tests over mocked Prisma; real test DB | Accepted |
+| [0015](0015-testing-strategy.md) | Integration tests, not mocked Prisma; real test DB | Accepted |
 | [0016](0016-docker-dev-stack-and-ci.md) | Docker Compose dev stack + CI pipeline | Accepted |
 
 ## Template
