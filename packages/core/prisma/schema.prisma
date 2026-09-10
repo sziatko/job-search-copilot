@@ -1,0 +1,46 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  // company is only ever queried as ILIKE '%term%' (see EstimatedVacancyService.list),
+  // which a plain b-tree index can't serve — pg_trgm + a GIN index below can.
+  extensions = [pg_trgm]
+}
+
+model EstimatedVacancy {
+  id                  Int             @id @default(autoincrement())
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @default(now()) @updatedAt
+  company             String
+  title               String
+  applyUrl            String          @unique
+  // Can be large. Kept on the row rather than a 1:1 side table on purpose: Postgres
+  // TOASTs large TEXT out-of-line, and every read path except getById projects it
+  // out (see LIST_SELECT), so queries that don't need it already don't pay for it.
+  fullText            String          @db.Text
+  matchScore          Int
+  recommendation      Recommendation
+  estimationComment   String          @db.Text
+  userAction          UserAction      @default(NOT_REVIEWED)
+  userActionUpdatedAt DateTime?
+
+  @@index([recommendation])
+  @@index([userAction])
+  @@index([company(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+enum Recommendation {
+  APPLY
+  APPLY_WITH_CAVEATS
+  SKIP
+}
+
+enum UserAction {
+  NOT_REVIEWED
+  READY_TO_APPLY
+  APPLIED
+  DECLINED
+}
