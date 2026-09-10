@@ -61,9 +61,8 @@ All 16 ADRs are Phase 1:
 | Item | Why deferred | Tracked in |
 | --- | --- | --- |
 | **`core` dev-loop friction** — apps consume `core` via `dist/`, so a `core` edit needs a rebuild + `restart api mcp`. Candidate fixes: tsconfig `paths` → `src` + swc/tsx runner, or TS project references. | User hasn't evaluated the tradeoffs; didn't want to commit mid-phase. | [ADR-0003](../decisions/0003-core-consumed-as-dist.md), memory `project_core_dist_open_question`, `packages/core/README.md` |
-| **`ApplyDialog` form fields** — `salary` / `usedTailoredResume` / `comment` are collected by the dialog and then discarded by `confirmApply()`. Wire them (schema + endpoint) or remove them. | User said skip for now. | this table; `apps/web/.../ApplyDialog.tsx` + `useVacancies.ts` (`confirmApply` comment) |
+| **`ApplyDialog` form fields** — `salary` / `usedTailoredResume` / `comment` are collected by the dialog and then discarded by `confirmApply()`. Wire them (schema + endpoint). | Decided: implement in Phase 2, not remove. | this table; `apps/web/.../ApplyDialog.tsx` + `useVacancies.ts` (`confirmApply` comment) |
 | **CI `docker build` step** — build the production Dockerfile stages in CI to catch `COPY`/dependency regressions. | Low payoff at the scaffold stage; adds minutes/run. | [ADR-0016](../decisions/0016-docker-dev-stack-and-ci.md) |
-| **`z.string().url()` in `apps/mcp/src/server.ts`** — the `env.validation.ts` nit switched to `z.url()`; the MCP `save` input schema still uses the deprecated form. | Out of the Round 2 nit's scope; harmless. | this table |
 | **`applyUrl` not URL-validated at the API layer** — the `save` DTO uses `@IsString @IsNotEmpty`, not `@IsUrl` (the MCP schema does validate it). | Not raised as a problem; the analyzer always sends a real URL. | [`../contracts.md`](../contracts.md) |
 
 ## Explicitly decided *against* (not deferred)
