@@ -32,3 +32,15 @@ export function normalizeRecommendation(input: string): Recommendation {
   }
   return normalized;
 }
+
+/**
+ * Score → verdict, using the same thresholds the web MatchScoreBadge paints with
+ * (>=70 green, >=50 amber, else slate). Used when an application is recorded against
+ * a vacancy that was never analyzed, so there's no analyzer verdict to store — see
+ * ApplicationService.record / ADR-0019.
+ */
+export function deriveRecommendationFromScore(score: number): Recommendation {
+  if (score >= 70) return 'APPLY';
+  if (score >= 50) return 'APPLY_WITH_CAVEATS';
+  return 'SKIP';
+}

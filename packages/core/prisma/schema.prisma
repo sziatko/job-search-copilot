@@ -27,9 +27,44 @@ model EstimatedVacancy {
   userAction          UserAction      @default(NOT_REVIEWED)
   userActionUpdatedAt DateTime?
 
+  // Phase 2: the delta recorded when the user actually applied. Absent until then.
+  application         Application?
+
   @@index([recommendation])
   @@index([userAction])
   @@index([company(ops: raw("gin_trgm_ops"))], type: Gin)
+  // /tracker searches company OR title as ILIKE '%term%' via this relation — same
+  // reason company has a trigram GIN index, title now needs one too.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+// One row per submitted application. Deliberately minimal: it stores only what the
+// analyzer's row can't (status, salary in the listing, whether a tailored CV was
+// used, the user's own comment). Company / title / applyUrl / matchScore /
+// recommendation / analyzer comment are read from the linked EstimatedVacancy — see
+// ADR-0017. Strict 1:1: estimatedVacancyId is unique. A never-analyzed application
+// still gets a real EstimatedVacancy row (placeholder analyzer fields) — ADR-0019.
+model Application {
+  id                 Int               @id @default(autoincrement())
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @default(now()) @updatedAt
+
+  estimatedVacancyId Int               @unique
+  estimatedVacancy   EstimatedVacancy  @relation(fields: [estimatedVacancyId], references: [id], onDelete: Cascade)
+
+  // The real submission date. Distinct from EstimatedVacancy.createdAt (date analyzed);
+  // the tracker import backfills historical values here.
+  appliedAt          DateTime          @default(now())
+  status             ApplicationStatus @default(APPLIED)
+  // "When I last moved this in the pipeline" — mirrors userActionUpdatedAt's semantics.
+  statusUpdatedAt    DateTime?
+
+  salaryInListing    String?
+  usedTailoredResume Boolean           @default(false)
+  userComment        String?           @db.Text
+
+  @@index([status])
+  @@index([appliedAt])
 }
 
 enum Recommendation {
@@ -43,4 +78,17 @@ enum UserAction {
   READY_TO_APPLY
   APPLIED
   DECLINED
+}
+
+// The pipeline stage of a submitted application. Separate axis from UserAction (which
+// is triage on an analyzed vacancy) — see ADR-0018. REJECTED = the company said no,
+// which is a different thing from UserAction.DECLINED ("I chose not to apply").
+enum ApplicationStatus {
+  APPLIED
+  RECRUITER_SCREEN
+  REPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+  NO_RESPONSE
 }

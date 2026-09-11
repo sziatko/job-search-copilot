@@ -13,3 +13,12 @@ export class DomainError extends Error {
 
 /** The `recommendation` input isn't one of the accepted spellings — see recommendation.ts. */
 export class InvalidRecommendationError extends DomainError {}
+
+/** company/title blank, or an explicit estimatedVacancyId that doesn't exist. */
+export class InvalidApplicationInputError extends DomainError {}
+
+/** (company, title) matched more than one EstimatedVacancy — the caller must pick one. */
+export class AmbiguousVacancyMatchError extends DomainError {}
+
+/** That EstimatedVacancy already has an Application (strict 1:1 — see ADR-0017). */
+export class ApplicationAlreadyExistsError extends DomainError {}

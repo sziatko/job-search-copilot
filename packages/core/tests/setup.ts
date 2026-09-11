@@ -6,6 +6,9 @@ import { getPrisma } from '../src/prisma-client';
 const prisma = getPrisma();
 
 afterEach(async () => {
+  // Applications first — they FK into estimatedVacancy (ON DELETE CASCADE would
+  // handle it, but being explicit keeps the intent obvious).
+  await prisma.application.deleteMany();
   await prisma.estimatedVacancy.deleteMany();
 });
 
