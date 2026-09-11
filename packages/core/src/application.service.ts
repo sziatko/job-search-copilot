@@ -181,6 +181,62 @@ export class ApplicationService {
       throw err;
     }
   }
+
+  /**
+   * Same as updateStatus, but for a caller that only knows (company, title) — the
+   * natural shape for an agent reading e.g. a rejection/offer email, which has no
+   * internal Application id. Resolves the same way record()'s by-vacancy path does:
+   * a unique case-insensitive (company, title) match against EstimatedVacancy, then
+   * follows the 1:1 back-relation to its Application. Returns null when nothing
+   * matches, or when a matching vacancy exists but was never actually recorded as
+   * applied (call record_application first — this method never creates anything).
+   * Throws AmbiguousVacancyMatchError for 2+ matches, same as record().
+   */
+  async updateStatusByVacancy(
+    company: string,
+    title: string,
+    status: ApplicationStatus,
+    statusComment?: string,
+  ): Promise<ApplicationListItem | null> {
+    const trimmedCompany = company.trim();
+    const trimmedTitle = title.trim();
+    if (!trimmedCompany || !trimmedTitle) {
+      throw new InvalidApplicationInputError('company and title are required');
+    }
+
+    const matches = await findVacancyMatches(this.db, trimmedCompany, trimmedTitle);
+    if (matches.length > 1) {
+      throw new AmbiguousVacancyMatchError(
+        `"${trimmedCompany}" / "${trimmedTitle}" matches ${matches.length} analyzed vacancies ` +
+          `(ids: ${matches.map((m) => m.id).join(', ')}). Pass id to disambiguate.`,
+      );
+    }
+    if (matches.length === 0) {
+      return null;
+    }
+
+    const application = await this.db.application.findUnique({
+      where: { estimatedVacancyId: matches[0].id },
+      select: { id: true },
+    });
+    if (!application) {
+      return null;
+    }
+
+    return this.updateStatus(application.id, status, statusComment);
+  }
+}
+
+/** Case-insensitive (company, title) match against EstimatedVacancy — shared by the
+ * record-or-create path and updateStatusByVacancy. */
+function findVacancyMatches(db: Db, company: string, title: string): Promise<{ id: number }[]> {
+  return db.estimatedVacancy.findMany({
+    where: {
+      company: { equals: company, mode: 'insensitive' },
+      title: { equals: title, mode: 'insensitive' },
+    },
+    select: { id: true },
+  });
 }
 
 async function resolveVacancyId(
@@ -207,13 +263,7 @@ async function resolveVacancyId(
     throw new InvalidApplicationInputError('company and title are required');
   }
 
-  const matches = await db.estimatedVacancy.findMany({
-    where: {
-      company: { equals: company, mode: 'insensitive' },
-      title: { equals: title, mode: 'insensitive' },
-    },
-    select: { id: true },
-  });
+  const matches = await findVacancyMatches(db, company, title);
 
   if (matches.length === 1) {
     return { vacancyId: matches[0].id, resolution: 'linked-existing', vacancyCreated: false };

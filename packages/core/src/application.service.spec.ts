@@ -241,6 +241,62 @@ describe('ApplicationService', () => {
     });
   });
 
+  describe('updateStatusByVacancy', () => {
+    it('resolves a unique (company, title) match and updates it', async () => {
+      const vacancy = await seedVacancy({ company: 'Delta Co', title: 'Dev' });
+      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+
+      const updated = await applications.updateStatusByVacancy(
+        'delta co',
+        'DEV',
+        'REJECTED',
+        'Rejection email received.',
+      );
+      expect(updated?.id).toBe(application.id);
+      expect(updated?.status).toBe('REJECTED');
+      expect(updated?.statusComment).toBe('Rejection email received.');
+    });
+
+    it('appends across calls, same as updateStatus by id', async () => {
+      const vacancy = await seedVacancy({ company: 'Echo Co', title: 'Dev' });
+      await applications.record({ estimatedVacancyId: vacancy.id });
+
+      await applications.updateStatusByVacancy('Echo Co', 'Dev', 'RECRUITER_SCREEN', 'Called.');
+      const second = await applications.updateStatusByVacancy(
+        'Echo Co',
+        'Dev',
+        'INTERVIEW',
+        'Interview scheduled.',
+      );
+      expect(second?.statusComment).toBe('Called. / Interview scheduled.');
+    });
+
+    it('returns null when no vacancy matches', async () => {
+      expect(
+        await applications.updateStatusByVacancy('Nobody Inc', 'Ghost Role', 'REJECTED'),
+      ).toBeNull();
+    });
+
+    it('returns null when the vacancy exists but has no recorded application', async () => {
+      await seedVacancy({ company: 'Foxtrot Co', title: 'Dev' });
+      expect(await applications.updateStatusByVacancy('Foxtrot Co', 'Dev', 'REJECTED')).toBeNull();
+    });
+
+    it('throws AmbiguousVacancyMatchError for two vacancies with the same (company, title)', async () => {
+      await seedVacancy({ company: 'Golf Co', title: 'Dev' });
+      await seedVacancy({ company: 'Golf Co', title: 'Dev' });
+      await expect(
+        applications.updateStatusByVacancy('Golf Co', 'Dev', 'REJECTED'),
+      ).rejects.toThrow(AmbiguousVacancyMatchError);
+    });
+
+    it('throws InvalidApplicationInputError for blank company/title', async () => {
+      await expect(applications.updateStatusByVacancy('  ', 'Dev', 'REJECTED')).rejects.toThrow(
+        InvalidApplicationInputError,
+      );
+    });
+  });
+
   describe('recordMany', () => {
     it('records a mixed batch in one call', async () => {
       const existing = await seedVacancy({ company: 'Batch Co', title: 'Dev' });
