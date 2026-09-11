@@ -45,6 +45,7 @@ function flatten(row: ApplicationRow): ApplicationListItem {
     appliedAt: row.appliedAt,
     status: row.status,
     statusUpdatedAt: row.statusUpdatedAt,
+    statusComment: row.statusComment,
     salaryInListing: row.salaryInListing,
     usedTailoredResume: row.usedTailoredResume,
     userComment: row.userComment,
@@ -145,12 +146,31 @@ export class ApplicationService {
     return { items: rows.map(flatten), total };
   }
 
-  /** Returns null when no application has this id (P2025 — same pattern as updateUserAction). */
-  async updateStatus(id: number, status: ApplicationStatus): Promise<ApplicationListItem | null> {
+  /**
+   * Returns null when no application has this id (P2025 — same pattern as
+   * updateUserAction). `statusComment`, when given, is *appended* to whatever is
+   * already stored — joined with " / " — not overwritten; a plain single column
+   * standing in for a history table until one is actually needed.
+   */
+  async updateStatus(
+    id: number,
+    status: ApplicationStatus,
+    statusComment?: string,
+  ): Promise<ApplicationListItem | null> {
     try {
+      const data: Prisma.ApplicationUpdateInput = { status, statusUpdatedAt: new Date() };
+      const note = statusComment?.trim();
+      if (note) {
+        const current = await this.db.application.findUnique({
+          where: { id },
+          select: { statusComment: true },
+        });
+        if (!current) return null;
+        data.statusComment = current.statusComment ? `${current.statusComment} / ${note}` : note;
+      }
       const row = await this.db.application.update({
         where: { id },
-        data: { status, statusUpdatedAt: new Date() },
+        data,
         include: APPLICATION_INCLUDE,
       });
       return flatten(row);

@@ -58,6 +58,11 @@ model Application {
   status             ApplicationStatus @default(APPLIED)
   // "When I last moved this in the pipeline" — mirrors userActionUpdatedAt's semantics.
   statusUpdatedAt    DateTime?
+  // Accumulated notes about pipeline movement (one per updateStatus() call that
+  // passes a comment), appended to the existing value with " / " — not a history
+  // table. Simplest thing that works; revisit as a real history if that's ever
+  // not enough.
+  statusComment      String?           @db.Text
 
   salaryInListing    String?
   usedTailoredResume Boolean           @default(false)

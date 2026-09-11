@@ -192,6 +192,52 @@ describe('ApplicationService', () => {
       const updated = await applications.updateStatus(application.id, 'INTERVIEW');
       expect(updated?.status).toBe('INTERVIEW');
       expect(updated?.statusUpdatedAt).toBeInstanceOf(Date);
+      expect(updated?.statusComment).toBeNull();
+    });
+
+    it('leaves statusComment untouched when none is given', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+      await applications.updateStatus(application.id, 'INTERVIEW', 'Recruiter called.');
+      const updated = await applications.updateStatus(application.id, 'OFFER');
+      expect(updated?.statusComment).toBe('Recruiter called.');
+    });
+
+    it('appends a new statusComment to the existing one, joined with " / "', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+
+      const first = await applications.updateStatus(
+        application.id,
+        'RECRUITER_SCREEN',
+        'Recruiter called.',
+      );
+      expect(first?.statusComment).toBe('Recruiter called.');
+
+      const second = await applications.updateStatus(
+        application.id,
+        'INTERVIEW',
+        'Interview on 20.09.',
+      );
+      expect(second?.statusComment).toBe('Recruiter called. / Interview on 20.09.');
+
+      const third = await applications.updateStatus(application.id, 'OFFER', 'Offer received!');
+      expect(third?.statusComment).toBe(
+        'Recruiter called. / Interview on 20.09. / Offer received!',
+      );
+    });
+
+    it('trims the comment and ignores a blank one', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+      const withSpaces = await applications.updateStatus(application.id, 'INTERVIEW', '  padded  ');
+      expect(withSpaces?.statusComment).toBe('padded');
+      const unchanged = await applications.updateStatus(application.id, 'OFFER', '   ');
+      expect(unchanged?.statusComment).toBe('padded');
+    });
+
+    it('returns null for an unknown id even when a comment is given', async () => {
+      expect(await applications.updateStatus(999_999, 'INTERVIEW', 'note')).toBeNull();
     });
   });
 

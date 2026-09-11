@@ -82,6 +82,8 @@ export interface ApplicationListItem {
   appliedAt: Date;
   status: ApplicationStatus;
   statusUpdatedAt: Date | null;
+  /** Accumulated pipeline notes — see ApplicationService.updateStatus. */
+  statusComment: string | null;
   salaryInListing: string | null;
   usedTailoredResume: boolean;
   userComment: string | null;
