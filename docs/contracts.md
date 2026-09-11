@@ -28,7 +28,7 @@ fields are stripped; type coercion is on.
 | `POST /api/v1/applications` | `RecordApplicationDto`: `estimatedVacancyId` (`@IsInt @Min(1)`, **required**), `salaryInListing?`, `userComment?` (`@IsString`), `usedTailoredResume?` (`@IsBoolean`), `status?` (`@IsEnum(ApplicationStatus)`). No `appliedAt` — server uses `now()`. | **always `201`** + `Location: /api/v1/applications/{id}`. Body = `{ application: ApplicationListItem, resolution: 'linked-by-id' \| 'linked-existing' \| 'created-vacancy', vacancyCreated: boolean }`. | `400` DTO; `422` `InvalidApplicationInputError` (unknown id) / `ApplicationAlreadyExistsError` (that vacancy already has one) |
 | `GET /api/v1/applications` | query: `status?` (enum), `search?` (string — vacancy `company` OR `title`, ILIKE), `limit?` (1–500, default 50 in core), `offset?` (≥0) | `200 { items: ApplicationListItem[], total: number }` — each item is the `Application` fields **flattened with** `company` / `title` / `applyUrl` / `matchScore` / `recommendation` / `estimationComment` from the linked vacancy | `400` bad query (e.g. `limit=1000`) |
 | `GET /api/v1/applications/:id` | — | `200` `ApplicationListItem` | `404` unknown id; `400` non-integer id |
-| `PATCH /api/v1/applications/:id/status` | `{ status: ApplicationStatus }` | `200` `ApplicationListItem` | `404` unknown id; `400` bad `status` |
+| `PATCH /api/v1/applications/:id/status` | `{ status: ApplicationStatus, statusComment?: string }` — `statusComment` is **appended** to the existing value joined by `" / "`, never overwritten | `200` `ApplicationListItem` | `404` unknown id; `400` bad `status` |
 
 The API exposes only `POST`'s by-id path; the by-`(company, title)` find-or-create
 path is MCP / import only. `resolution` rides in the JSON envelope (not a header) —
@@ -82,7 +82,7 @@ success outputs are `JSON.stringify(result, null, 2)` as a single text block.
 | `update_estimated_vacancy_user_action` | `{ id: int, userAction }` | the full `EstimatedVacancy` | unknown id → `isError` result |
 | `record_application` | `company`, `title` (required), `applyUrl?` (`.url()`), `matchScore?` (int 0–100), `estimationComment?`, `salaryInListing?`, `usedTailoredResume?`, `userComment?`, `status?` | `{ application, resolution, vacancyCreated }` — find-or-creates the vacancy, marks it APPLIED | `DomainError` (blank input / ambiguous match / already recorded) → `{ isError: true, content: [message] }` |
 | `list_applications` | `status?`, `search?`, `limit?` (1–500), `offset?` (≥0) | `{ items: ApplicationListItem[], total }` (flattened join) | — |
-| `update_application_status` | `{ id: int, status }` | `ApplicationListItem` | unknown id → `isError` result |
+| `update_application_status` | `{ id: int, status, statusComment?: string }` — `statusComment` appended to the existing value joined by `" / "`, never overwritten | `ApplicationListItem` | unknown id → `isError` result |
 
 `stdout` is reserved for the MCP protocol — all logging goes to `stderr`
 (`console.error` in `apps/mcp/src/index.ts`).
