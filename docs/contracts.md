@@ -82,7 +82,7 @@ success outputs are `JSON.stringify(result, null, 2)` as a single text block.
 | `update_estimated_vacancy_user_action` | `{ id: int, userAction }` | the full `EstimatedVacancy` | unknown id → `isError` result |
 | `record_application` | `company`, `title` (required), `applyUrl?` (`.url()`), `matchScore?` (int 0–100), `estimationComment?`, `salaryInListing?`, `usedTailoredResume?`, `userComment?`, `status?` | `{ application, resolution, vacancyCreated }` — find-or-creates the vacancy, marks it APPLIED | `DomainError` (blank input / ambiguous match / already recorded) → `{ isError: true, content: [message] }` |
 | `list_applications` | `status?`, `search?`, `limit?` (1–500), `offset?` (≥0) | `{ items: ApplicationListItem[], total }` (flattened join) | — |
-| `update_application_status` | `{ id: int, status, statusComment?: string }` — `statusComment` appended to the existing value joined by `" / "`, never overwritten | `ApplicationListItem` | unknown id → `isError` result |
+| `update_application_status` | `{ id?: int, company?: string, title?: string, status, statusComment?: string }` — exactly one of `id` or `(company, title)` (case-insensitive match against the linked vacancy); `statusComment` appended to the existing value joined by `" / "`, never overwritten | `ApplicationListItem` | neither/both id-vs-company+title given, unknown id, unmatched `(company, title)`, or a matched vacancy with no recorded application → `isError` "not found"; 2+ vacancies matching `(company, title)` → `isError` listing candidate ids |
 
 `stdout` is reserved for the MCP protocol — all logging goes to `stderr`
 (`console.error` in `apps/mcp/src/index.ts`).

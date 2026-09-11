@@ -103,6 +103,13 @@ isn't `APPLIED` flips it to `APPLIED`. A second application for the same vacancy
 `ApplicationAlreadyExistsError`. Full rationale:
 [ADR-0019](decisions/0019-record-or-create-vacancy.md).
 
+**Update by (company, title)** (`ApplicationService.updateStatusByVacancy`): for a caller
+that has no `Application` id — e.g. an agent reading a rejection/offer email — the same
+case-insensitive `(company, title)` match resolves the vacancy, then its 1:1 back-relation
+resolves the `Application`. Unlike `record`, this path **never creates** anything: no
+match, or a matched vacancy with no recorded application yet, both return `null` (call
+`record_application` first); 2+ matches still throw `AmbiguousVacancyMatchError`.
+
 > **What this constrains — breaks if you change it**
 > - Dropping `@unique` on `estimatedVacancyId` → the `ApplicationAlreadyExistsError`
 >   guard and the flatten-a-1:1-join assumption in `ApplicationListItem` are gone.
