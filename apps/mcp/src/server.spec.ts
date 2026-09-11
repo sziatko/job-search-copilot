@@ -217,4 +217,66 @@ describe('job-search-copilot MCP server', () => {
       'Recruiter called. / Interview on 20.09.',
     );
   });
+
+  it('update_application_status matches by company + title, e.g. from a rejection email', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Epsilon Co', title: 'Dev' },
+    });
+
+    const updated = await client.callTool({
+      name: 'update_application_status',
+      arguments: {
+        company: 'epsilon co',
+        title: 'DEV',
+        status: 'REJECTED',
+        statusComment: 'Rejection email received.',
+      },
+    });
+    const parsed = JSON.parse(textOf(updated));
+    expect(parsed.status).toBe('REJECTED');
+    expect(parsed.statusComment).toBe('Rejection email received.');
+  });
+
+  it('update_application_status isError for an unmatched company/title', async () => {
+    const client = await connectedClient();
+    const result = await client.callTool({
+      name: 'update_application_status',
+      arguments: { company: 'Nobody Inc', title: 'Ghost Role', status: 'REJECTED' },
+    });
+    expect(result.isError).toBe(true);
+  });
+
+  it('update_application_status isError for two vacancies matching the same company/title', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Zeta Co', title: 'Dev' },
+    });
+    await client.callTool({
+      name: 'save_estimated_vacancy',
+      arguments: {
+        ...validArgs,
+        company: 'Zeta Co',
+        title: 'Dev',
+        applyUrl: 'https://example.com/z2',
+      },
+    });
+
+    const result = await client.callTool({
+      name: 'update_application_status',
+      arguments: { company: 'Zeta Co', title: 'Dev', status: 'REJECTED' },
+    });
+    expect(result.isError).toBe(true);
+  });
+
+  it('update_application_status isError when neither id nor company+title is given', async () => {
+    const client = await connectedClient();
+    const result = await client.callTool({
+      name: 'update_application_status',
+      arguments: { status: 'REJECTED' },
+    });
+    expect(result.isError).toBe(true);
+  });
 });

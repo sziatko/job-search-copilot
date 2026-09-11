@@ -195,25 +195,59 @@ export function createServer(
     {
       title: 'Update an application status',
       description:
-        'Move a recorded application to a new pipeline stage. `statusComment` is optional ' +
-        "and APPENDED to whatever is already stored there (joined with ' / '), not " +
-        'overwritten — e.g. "Recruiter called." then later "Interview on 20.09." become ' +
-        '"Recruiter called. / Interview on 20.09."',
+        'Move a recorded application to a new pipeline stage. Identify it either by `id` ' +
+        '(from list_applications), or by `company` + `title` — the latter is for a caller ' +
+        'that only knows the company/role (e.g. an agent reading a rejection/offer email) ' +
+        'and matches case-insensitively against the analyzed vacancy the application is ' +
+        'linked to. Exactly one of the two must be given. A (company, title) match with ' +
+        'more than one candidate is an error listing the ids to disambiguate with `id`; an ' +
+        'unknown id, an unmatched (company, title), or a vacancy that was analyzed but ' +
+        'never actually recorded as applied (call record_application first — this tool ' +
+        'never creates anything) all report "not found". `statusComment` is optional and ' +
+        "APPENDED to whatever is already stored there (joined with ' / '), not overwritten " +
+        '— e.g. "Recruiter called." then later "Interview on 20.09." become "Recruiter ' +
+        'called. / Interview on 20.09."',
       inputSchema: {
-        id: z.number().int(),
+        id: z.number().int().optional(),
+        company: z.string().min(1).optional(),
+        title: z.string().min(1).optional(),
         status: ApplicationStatusEnum,
         statusComment: z.string().optional(),
       },
     },
-    async ({ id, status, statusComment }) => {
-      const application = await applications.updateStatus(id, status, statusComment);
-      if (!application) {
+    async ({ id, company, title, status, statusComment }) => {
+      if (id == null && (!company || !title)) {
         return {
           isError: true,
-          content: [{ type: 'text', text: `Application ${id} not found` }],
+          content: [{ type: 'text', text: 'Provide either `id`, or both `company` and `title`.' }],
         };
       }
-      return { content: [{ type: 'text', text: JSON.stringify(application, null, 2) }] };
+      try {
+        const application =
+          id != null
+            ? await applications.updateStatus(id, status, statusComment)
+            : await applications.updateStatusByVacancy(
+                // biome-ignore lint/style/noNonNullAssertion: guarded above
+                company!,
+                // biome-ignore lint/style/noNonNullAssertion: guarded above
+                title!,
+                status,
+                statusComment,
+              );
+        if (!application) {
+          const target = id != null ? `Application ${id}` : `"${company}" / "${title}"`;
+          return {
+            isError: true,
+            content: [{ type: 'text', text: `${target} not found` }],
+          };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(application, null, 2) }] };
+      } catch (err) {
+        if (err instanceof DomainError) {
+          return { isError: true, content: [{ type: 'text', text: err.message }] };
+        }
+        throw err;
+      }
     },
   );
 
