@@ -53,7 +53,7 @@ export class ApplicationsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateApplicationStatusDto,
   ) {
-    const application = await this.applications.updateStatus(id, dto.status);
+    const application = await this.applications.updateStatus(id, dto.status, dto.statusComment);
     if (!application) {
       throw new NotFoundException(`Application ${id} not found`);
     }

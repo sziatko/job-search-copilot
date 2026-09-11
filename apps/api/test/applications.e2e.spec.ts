@@ -160,6 +160,33 @@ describe('Applications (e2e)', () => {
         .expect(200);
       expect(res.body.status).toBe('INTERVIEW');
       expect(res.body.statusUpdatedAt).not.toBeNull();
+      expect(res.body.statusComment).toBeNull();
+    });
+
+    it('appends statusComment across calls, joined with " / "', async () => {
+      const vacancyId = await seedVacancy();
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/applications')
+        .send({ estimatedVacancyId: vacancyId });
+      const id = created.body.application.id;
+
+      const first = await request(app.getHttpServer())
+        .patch(`/api/v1/applications/${id}/status`)
+        .send({ status: 'RECRUITER_SCREEN', statusComment: 'Recruiter called.' })
+        .expect(200);
+      expect(first.body.statusComment).toBe('Recruiter called.');
+
+      const second = await request(app.getHttpServer())
+        .patch(`/api/v1/applications/${id}/status`)
+        .send({ status: 'INTERVIEW', statusComment: 'Interview on 20.09.' })
+        .expect(200);
+      expect(second.body.statusComment).toBe('Recruiter called. / Interview on 20.09.');
+
+      const noComment = await request(app.getHttpServer())
+        .patch(`/api/v1/applications/${id}/status`)
+        .send({ status: 'OFFER' })
+        .expect(200);
+      expect(noComment.body.statusComment).toBe('Recruiter called. / Interview on 20.09.');
     });
 
     it('404s for an unknown id', async () => {
