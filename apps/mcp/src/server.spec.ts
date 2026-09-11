@@ -33,6 +33,7 @@ describe('job-search-copilot MCP server', () => {
   const prisma = getPrisma();
 
   afterEach(async () => {
+    await prisma.application.deleteMany();
     await prisma.estimatedVacancy.deleteMany();
   });
 
@@ -113,5 +114,80 @@ describe('job-search-copilot MCP server', () => {
       arguments: { id: 999_999, userAction: 'DECLINED' },
     });
     expect(result.isError).toBe(true);
+  });
+
+  it('record_application creates a placeholder vacancy when nothing matches', async () => {
+    const client = await connectedClient();
+    const result = await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Never Analyzed Co', title: 'Staff Engineer', matchScore: 72 },
+    });
+    const parsed = JSON.parse(textOf(result));
+    expect(parsed.resolution).toBe('created-vacancy');
+    expect(parsed.application.matchScore).toBe(72);
+    expect(parsed.application.recommendation).toBe('APPLY');
+  });
+
+  it('record_application links to an analyzed vacancy and marks it APPLIED', async () => {
+    const client = await connectedClient();
+    const saved = await client.callTool({ name: 'save_estimated_vacancy', arguments: validArgs });
+    const { vacancy } = JSON.parse(textOf(saved));
+
+    const recorded = await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'acme', title: 'backend engineer', salaryInListing: '130 PLN/h' },
+    });
+    expect(JSON.parse(textOf(recorded)).resolution).toBe('linked-existing');
+
+    const got = await client.callTool({
+      name: 'get_estimated_vacancy',
+      arguments: { id: vacancy.id },
+    });
+    expect(JSON.parse(textOf(got)).userAction).toBe('APPLIED');
+  });
+
+  it('list_applications filters by status and search', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Alpha Co', title: 'Dev', status: 'REJECTED' },
+    });
+    await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Beta Co', title: 'Dev' },
+    });
+
+    const rejected = await client.callTool({
+      name: 'list_applications',
+      arguments: { status: 'REJECTED' },
+    });
+    expect(JSON.parse(textOf(rejected)).total).toBe(1);
+
+    const searched = await client.callTool({
+      name: 'list_applications',
+      arguments: { search: 'beta' },
+    });
+    expect(JSON.parse(textOf(searched)).total).toBe(1);
+  });
+
+  it('update_application_status moves the pipeline stage; isError for an unknown id', async () => {
+    const client = await connectedClient();
+    const recorded = await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Gamma Co', title: 'Dev' },
+    });
+    const { application } = JSON.parse(textOf(recorded));
+
+    const updated = await client.callTool({
+      name: 'update_application_status',
+      arguments: { id: application.id, status: 'INTERVIEW' },
+    });
+    expect(JSON.parse(textOf(updated)).status).toBe('INTERVIEW');
+
+    const missing = await client.callTool({
+      name: 'update_application_status',
+      arguments: { id: 999_999, status: 'INTERVIEW' },
+    });
+    expect(missing.isError).toBe(true);
   });
 });

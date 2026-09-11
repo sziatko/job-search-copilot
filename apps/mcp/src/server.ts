@@ -1,4 +1,5 @@
 import {
+  ApplicationService,
   DomainError,
   EstimatedVacancyService,
   RECOMMENDATION_INPUT_VALUES,
@@ -12,6 +13,15 @@ const RecommendationInputEnum = z.enum(RECOMMENDATION_INPUT_VALUES);
 // Filtering only makes sense against the canonical value already stored in the DB.
 const RecommendationFilterEnum = z.enum(['APPLY', 'APPLY_WITH_CAVEATS', 'SKIP']);
 const UserActionEnum = z.enum(['NOT_REVIEWED', 'READY_TO_APPLY', 'APPLIED', 'DECLINED']);
+const ApplicationStatusEnum = z.enum([
+  'APPLIED',
+  'RECRUITER_SCREEN',
+  'REPLIED',
+  'INTERVIEW',
+  'OFFER',
+  'REJECTED',
+  'NO_RESPONSE',
+]);
 
 /** Builds the MCP server with all tools registered, without connecting a transport.
  * Kept separate from index.ts so tests can connect it to an in-memory transport
@@ -19,9 +29,11 @@ const UserActionEnum = z.enum(['NOT_REVIEWED', 'READY_TO_APPLY', 'APPLIED', 'DEC
  *
  * @param vacancies domain service to back the tools. Defaults to one on the shared
  *   lazy Prisma client; tests can pass their own.
+ * @param applications same, for the application-tracking tools.
  */
 export function createServer(
   vacancies: EstimatedVacancyService = new EstimatedVacancyService(),
+  applications: ApplicationService = new ApplicationService(),
 ): McpServer {
   const server = new McpServer({ name: 'job-search-copilot', version: '0.1.0' });
 
@@ -117,6 +129,83 @@ export function createServer(
         };
       }
       return { content: [{ type: 'text', text: JSON.stringify(vacancy, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'record_application',
+    {
+      title: 'Record a job application',
+      description:
+        'Log that the user applied to a role. `company` and `title` are required and are ' +
+        'looked up (case-insensitive) in the analyzed-vacancies table: a unique match ' +
+        'links the application to it and marks that vacancy APPLIED; no match creates a ' +
+        'minimal vacancy row (fullText "N/A", score/verdict from what you pass or a ' +
+        'placeholder) also marked APPLIED; more than one match is an error listing the ' +
+        "candidate ids. The result's `resolution` says which happened.",
+      inputSchema: {
+        company: z.string().min(1),
+        title: z.string().min(1),
+        applyUrl: z.url().optional(),
+        matchScore: z.number().int().min(0).max(100).optional(),
+        estimationComment: z.string().optional(),
+        salaryInListing: z.string().optional(),
+        usedTailoredResume: z.boolean().optional(),
+        userComment: z.string().optional(),
+        status: ApplicationStatusEnum.optional(),
+      },
+    },
+    async (input) => {
+      try {
+        const result = await applications.record(input);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        if (err instanceof DomainError) {
+          return { isError: true, content: [{ type: 'text', text: err.message }] };
+        }
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
+    'list_applications',
+    {
+      title: 'List / search applications',
+      description:
+        'List recorded applications with optional filters (status, or a search term ' +
+        'matched against company or role). Each item is flattened: the application ' +
+        'fields plus company / title / applyUrl / matchScore / recommendation / ' +
+        'estimationComment from the linked vacancy.',
+      inputSchema: {
+        status: ApplicationStatusEnum.optional(),
+        search: z.string().optional(),
+        limit: z.number().int().min(1).max(500).optional(),
+        offset: z.number().int().min(0).optional(),
+      },
+    },
+    async (filters) => {
+      const result = await applications.list(filters);
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'update_application_status',
+    {
+      title: 'Update an application status',
+      description: 'Move a recorded application to a new pipeline stage.',
+      inputSchema: { id: z.number().int(), status: ApplicationStatusEnum },
+    },
+    async ({ id, status }) => {
+      const application = await applications.updateStatus(id, status);
+      if (!application) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Application ${id} not found` }],
+        };
+      }
+      return { content: [{ type: 'text', text: JSON.stringify(application, null, 2) }] };
     },
   );
 
