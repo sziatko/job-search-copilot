@@ -10,7 +10,8 @@
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "build": "tsc -p tsconfig.json",
-    "watch": "tsc -p tsconfig.json --watch"
+    "watch": "tsc -p tsconfig.json --watch",
+    "import:tracker": "dotenv -e ../../.env -- tsx scripts/import-tracker.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -21,6 +22,7 @@
     "@types/pg": "^8.23.1",
     "dotenv-cli": "^11.0.0",
     "prisma": "^7.10.0",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3"
   }
 }
