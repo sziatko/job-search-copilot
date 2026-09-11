@@ -39,6 +39,8 @@ export const applicationListItemSchema = z.object({
   appliedAt: z.string(),
   status: applicationStatusSchema,
   statusUpdatedAt: z.string().nullable(),
+  /** Accumulated pipeline notes — see ApplicationService.updateStatus. Written via MCP/API only. */
+  statusComment: z.string().nullable(),
   salaryInListing: z.string().nullable(),
   usedTailoredResume: z.boolean(),
   userComment: z.string().nullable(),

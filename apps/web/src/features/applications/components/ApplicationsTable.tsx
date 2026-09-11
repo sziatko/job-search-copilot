@@ -104,6 +104,7 @@ export function ApplicationsTable({
                 <td className="px-4 py-3 align-top">
                   <MergedComment
                     userComment={item.userComment}
+                    statusComment={item.statusComment}
                     estimationComment={item.estimationComment}
                   />
                 </td>
