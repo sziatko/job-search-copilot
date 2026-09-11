@@ -13,6 +13,7 @@ and *what a change here breaks over there*.
 | [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the four MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
 | [`decisions/`](decisions/) | One Architecture Decision Record (ADR) per load-bearing choice — context, the decision, why not the alternatives, and what it constrains. |
 | [`phases/phase-1.md`](phases/phase-1.md) | What Phase 1 delivered, its status, and everything deliberately deferred. |
+| [`phases/phase-2.md`](phases/phase-2.md) | Application tracking: the `Application` model, the `/tracker` page, the router, and the one-off `tracker.md` import. |
 
 ## Conventions
 

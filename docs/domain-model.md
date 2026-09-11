@@ -53,7 +53,9 @@ The web app's default filter is `NOT_REVIEWED`; the list sorts by `recommendatio
 > **What this constrains — breaks if you change it**
 > - Making `save()` write `userAction`, or `updateUserAction()` write analysis
 >   fields → the analyzer would clobber the user's progress (or vice-versa). The
->   whole point of the model is that these two writers never overlap.
+>   whole point of the model is that these two writers never overlap. The one
+>   sanctioned crossing point is `ApplicationService.record()` setting a linked
+>   vacancy's `userAction = APPLIED` — [ADR-0019](decisions/0019-record-or-create-vacancy.md).
 > - Adding a `Recommendation` or `UserAction` enum value → touches: the Prisma
 >   enum (migration), `RECOMMENDATION_INPUT_VALUES` + `RECOMMENDATION_ALIASES` in
 >   [`recommendation.ts`](../packages/core/src/recommendation.ts), the MCP `zod`
@@ -62,6 +64,52 @@ The web app's default filter is `NOT_REVIEWED`; the list sorts by `recommendatio
 >   list-query DTO), and the web `recommendationSchema` / `userActionSchema` +
 >   `RECOMMENDATION_ORDER` + the status-filter options in `apps/web`. There is no
 >   single source — see [ADR-0012](decisions/0012-web-hand-written-contract.md).
+> - Adding an `ApplicationStatus` value → the Prisma enum (migration),
+>   `ApplicationStatusEnum` in [`server.ts`](../apps/mcp/src/server.ts), the
+>   `@IsEnum(ApplicationStatus)` DTOs in `apps/api`, `applicationStatusSchema` +
+>   the `APPLICATION_STATUS_LABELS` / `_ORDER` / `_BADGE_STYLES` maps in
+>   [`apps/web/src/features/applications`](../apps/web/src/features/applications),
+>   the `core` re-export, and the importer's `STATUS_ALIASES`. Same "no single
+>   source" trade-off.
+
+## `Application`
+
+One row per submitted application (Phase 2). Deliberately minimal — it stores only
+what the analyzer's row can't. See [ADR-0017](decisions/0017-application-1to1-delta.md).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `Int` autoincrement | Primary key. |
+| `createdAt` / `updatedAt` | `DateTime` | Row bookkeeping. |
+| `estimatedVacancyId` | `Int @unique` | **NOT NULL 1:1 FK** to `EstimatedVacancy` (`onDelete: Cascade`). |
+| `appliedAt` | `DateTime @default(now())` | The real submission date — distinct from `EstimatedVacancy.createdAt` (date analysed). The tracker import backfills historical values here; the REST API has no `appliedAt` field. |
+| `status` | `ApplicationStatus` enum, default `APPLIED` | `APPLIED` \| `RECRUITER_SCREEN` \| `REPLIED` \| `INTERVIEW` \| `OFFER` \| `REJECTED` \| `NO_RESPONSE`. A separate axis from `UserAction` — [ADR-0018](decisions/0018-application-status-separate-enum.md). |
+| `statusUpdatedAt` | `DateTime?` | Set by `updateStatus()` to `new Date()`. "When I last moved this in the pipeline" — mirrors `userActionUpdatedAt`. |
+| `salaryInListing` | `String?` | Free text ("130 PLN/h"). |
+| `usedTailoredResume` | `Boolean @default(false)` | |
+| `userComment` | `String? @db.Text` | The user's own note about this application. |
+
+Indexes: `@@index([status])`, `@@index([appliedAt])`. Search on `/tracker` hits the
+linked vacancy's `company` / `title` — both have trigram GIN indexes.
+
+**Record-or-link** (`ApplicationService.record`, one transaction): link by
+`estimatedVacancyId` (web), or by a unique case-insensitive `(company, title)`
+match (MCP / import); zero matches → **create** a placeholder `EstimatedVacancy`
+(`fullText:'N/A'`, `matchScore` from the tracker text or `0`, `recommendation`
+derived, `estimationComment` from notes or `'N/A'`, `userAction:'APPLIED'`); more
+than one → `AmbiguousVacancyMatchError`. Linking to a vacancy whose `userAction`
+isn't `APPLIED` flips it to `APPLIED`. A second application for the same vacancy →
+`ApplicationAlreadyExistsError`. Full rationale:
+[ADR-0019](decisions/0019-record-or-create-vacancy.md).
+
+> **What this constrains — breaks if you change it**
+> - Dropping `@unique` on `estimatedVacancyId` → the `ApplicationAlreadyExistsError`
+>   guard and the flatten-a-1:1-join assumption in `ApplicationListItem` are gone.
+> - Removing the `userAction = APPLIED` side-effect → the `/vacancies` page and the
+>   `save`-then-`record` MCP spec stop seeing applied vacancies as applied.
+> - Adding a field the `/tracker` page needs from the vacancy → `VACANCY_SELECT` +
+>   `flatten()` in `application.service.ts` **and** `applicationListItemSchema` in
+>   the web contract (parallel maintenance — [ADR-0012](decisions/0012-web-hand-written-contract.md)).
 
 ## Analyze-once
 

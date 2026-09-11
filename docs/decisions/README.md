@@ -25,6 +25,11 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0014](0014-biome-and-nest-di-import-type.md) | Biome + the `apps/api` `useImportType` override | Accepted |
 | [0015](0015-testing-strategy.md) | Integration tests, not mocked Prisma; real test DB | Accepted |
 | [0016](0016-docker-dev-stack-and-ci.md) | Docker Compose dev stack + CI pipeline | Accepted |
+| [0017](0017-application-1to1-delta.md) | `Application` is a minimal 1:1 delta on `EstimatedVacancy` | Accepted |
+| [0018](0018-application-status-separate-enum.md) | `ApplicationStatus` is a separate enum from `UserAction` | Accepted |
+| [0019](0019-record-or-create-vacancy.md) | Recording an application find-or-creates the `EstimatedVacancy` | Accepted |
+| [0020](0020-web-router-tanstack.md) | Web router: `@tanstack/react-router`; TanStack Form deferred | Accepted |
+| [0021](0021-tracker-import-script.md) | One-off `tracker.md` importer: dry-run default, typed `--commit` gate | Accepted |
 
 ## Template
 
