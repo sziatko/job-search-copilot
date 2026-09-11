@@ -1,5 +1,12 @@
-import { RECOMMENDATION_LABELS } from '../constants';
-import type { Recommendation } from '../types';
+// Self-contained so both features can use it without importing feature internals.
+// The three values match the analyzer's Recommendation enum.
+type Recommendation = 'APPLY' | 'APPLY_WITH_CAVEATS' | 'SKIP';
+
+const LABELS: Record<Recommendation, string> = {
+  APPLY: 'Apply',
+  APPLY_WITH_CAVEATS: 'Apply with caveats',
+  SKIP: 'Skip',
+};
 
 const STYLES: Record<Recommendation, string> = {
   APPLY: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
@@ -12,7 +19,7 @@ export function RecommendationBadge({ recommendation }: { recommendation: Recomm
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${STYLES[recommendation]}`}
     >
-      {RECOMMENDATION_LABELS[recommendation]}
+      {LABELS[recommendation]}
     </span>
   );
 }

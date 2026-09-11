@@ -110,15 +110,61 @@ describe('useVacancies', () => {
     expect(result.current.visibleItems[0].userAction).toBe('NOT_REVIEWED');
   });
 
-  it('requires confirmation before persisting APPLIED', async () => {
+  it('requires confirmation before persisting APPLIED, then records the application', async () => {
     const items = [vacancy({ id: 1 })];
     const { result } = await setUpWithItems(items);
+
+    // Registered after buildHandlers so this spy wins (MSW: newest handler first).
+    let recorded: unknown;
+    mswServer.use(
+      http.post('http://localhost:3000/api/v1/applications', async ({ request }) => {
+        recorded = await request.json();
+        items[0].userAction = 'APPLIED';
+        const now = new Date().toISOString();
+        return HttpResponse.json({
+          application: {
+            id: 1,
+            appliedAt: now,
+            status: 'APPLIED',
+            statusUpdatedAt: null,
+            salaryInListing: '130 PLN/h',
+            usedTailoredResume: true,
+            userComment: 'Adapted CV.',
+            createdAt: now,
+            updatedAt: now,
+            estimatedVacancyId: 1,
+            company: 'Acme',
+            title: 'Backend Engineer',
+            applyUrl: 'https://example.com/1',
+            matchScore: 80,
+            recommendation: 'APPLY',
+            estimationComment: 'Strong match.',
+          },
+          resolution: 'linked-by-id',
+          vacancyCreated: false,
+        });
+      }),
+    );
 
     act(() => result.current.requestActionChange(1, 'APPLIED'));
     expect(result.current.pendingApply?.id).toBe(1);
 
-    act(() => result.current.confirmApply());
+    act(() =>
+      result.current.confirmApply({
+        salary: '130 PLN/h',
+        usedTailoredResume: true,
+        comment: 'Adapted CV.',
+      }),
+    );
     expect(result.current.pendingApply).toBeNull();
+    await waitFor(() =>
+      expect(recorded).toMatchObject({
+        estimatedVacancyId: 1,
+        salaryInListing: '130 PLN/h',
+        usedTailoredResume: true,
+        userComment: 'Adapted CV.',
+      }),
+    );
     await waitFor(() => expect(result.current.visibleItems).toHaveLength(0));
   });
 

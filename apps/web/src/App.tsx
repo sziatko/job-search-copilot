@@ -1,5 +1,6 @@
-import { VacanciesPage } from './features/vacancies/VacanciesPage';
+import { RouterProvider } from '@tanstack/react-router';
+import { router } from './router';
 
 export function App() {
-  return <VacanciesPage />;
+  return <RouterProvider router={router} />;
 }

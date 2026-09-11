@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { ApplyDialog } from './components/ApplyDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { StatusFilterSelect } from './components/StatusFilterSelect';
@@ -27,7 +28,10 @@ export function VacanciesPage() {
       <div className="px-6 py-10">
         <header className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Job Search Copilot</h1>
+            <Link to="/" className="text-xs text-slate-400 hover:text-indigo-600">
+              ← Home
+            </Link>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-900">Analyzed vacancies</h1>
             <p className="mt-1 text-sm text-slate-500">
               {loading ? 'Loading…' : `${visibleItems.length} vacancies`}
             </p>

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { recordApplication } from '../applications/api';
 import { listEstimatedVacancies, updateUserAction } from './api';
+import type { ApplyDetails } from './components/ApplyDialog';
 import { RECOMMENDATION_ORDER } from './constants';
 import {
   type EstimatedVacancyListItem,
@@ -113,10 +115,55 @@ export function useVacancies() {
     setPendingDecline(null);
   }
 
-  function confirmApply() {
+  // Marking a vacancy APPLIED creates an Application (persisting the dialog's
+  // salary / tailored-resume / comment) and the server flips userAction to APPLIED
+  // in the same transaction — so this path no longer calls updateUserAction.
+  const applyMutation = useMutation({
+    mutationFn: ({ id, details }: { id: number; details: ApplyDetails }) =>
+      recordApplication({
+        estimatedVacancyId: id,
+        salaryInListing: details.salary || undefined,
+        usedTailoredResume: details.usedTailoredResume,
+        userComment: details.comment || undefined,
+      }),
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: VACANCIES_KEY });
+      setSavingIds((prev) => new Set(prev).add(id));
+      setRowErrors((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+      const previous = queryClient.getQueryData<EstimatedVacancyListItem[]>(VACANCIES_KEY);
+      queryClient.setQueryData<EstimatedVacancyListItem[]>(VACANCIES_KEY, (old) =>
+        (old ?? []).map((item) =>
+          item.id === id ? { ...item, userAction: USER_ACTION.APPLIED } : item,
+        ),
+      );
+      return { previous };
+    },
+    onError: (err, { id }, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(VACANCIES_KEY, context.previous);
+      }
+      setRowErrors((prev) =>
+        new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
+      );
+    },
+    onSettled: (_data, _err, { id }) => {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      void queryClient.invalidateQueries({ queryKey: VACANCIES_KEY });
+      void queryClient.invalidateQueries({ queryKey: ['applications'] });
+    },
+  });
+
+  function confirmApply(details: ApplyDetails) {
     if (!pendingApply) return;
-    // salary / usedTailoredResume / comment aren't persisted yet — that's a later step.
-    actionMutation.mutate({ id: pendingApply.id, userAction: USER_ACTION.APPLIED });
+    applyMutation.mutate({ id: pendingApply.id, details });
     setPendingApply(null);
   }
 
