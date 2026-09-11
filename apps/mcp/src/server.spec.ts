@@ -190,4 +190,31 @@ describe('job-search-copilot MCP server', () => {
     });
     expect(missing.isError).toBe(true);
   });
+
+  it('update_application_status appends statusComment across calls', async () => {
+    const client = await connectedClient();
+    const recorded = await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Delta Co', title: 'Dev' },
+    });
+    const { application } = JSON.parse(textOf(recorded));
+
+    const first = await client.callTool({
+      name: 'update_application_status',
+      arguments: {
+        id: application.id,
+        status: 'RECRUITER_SCREEN',
+        statusComment: 'Recruiter called.',
+      },
+    });
+    expect(JSON.parse(textOf(first)).statusComment).toBe('Recruiter called.');
+
+    const second = await client.callTool({
+      name: 'update_application_status',
+      arguments: { id: application.id, status: 'INTERVIEW', statusComment: 'Interview on 20.09.' },
+    });
+    expect(JSON.parse(textOf(second)).statusComment).toBe(
+      'Recruiter called. / Interview on 20.09.',
+    );
+  });
 });

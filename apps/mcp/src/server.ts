@@ -194,11 +194,19 @@ export function createServer(
     'update_application_status',
     {
       title: 'Update an application status',
-      description: 'Move a recorded application to a new pipeline stage.',
-      inputSchema: { id: z.number().int(), status: ApplicationStatusEnum },
+      description:
+        'Move a recorded application to a new pipeline stage. `statusComment` is optional ' +
+        "and APPENDED to whatever is already stored there (joined with ' / '), not " +
+        'overwritten — e.g. "Recruiter called." then later "Interview on 20.09." become ' +
+        '"Recruiter called. / Interview on 20.09."',
+      inputSchema: {
+        id: z.number().int(),
+        status: ApplicationStatusEnum,
+        statusComment: z.string().optional(),
+      },
     },
-    async ({ id, status }) => {
-      const application = await applications.updateStatus(id, status);
+    async ({ id, status, statusComment }) => {
+      const application = await applications.updateStatus(id, status, statusComment);
       if (!application) {
         return {
           isError: true,
