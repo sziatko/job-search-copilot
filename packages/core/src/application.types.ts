@@ -60,8 +60,14 @@ export interface RecordManyApplicationsResult {
 
 export interface ListApplicationsFilters {
   status?: ApplicationStatus;
-  /** Matches EstimatedVacancy.company OR .title, ILIKE '%term%', case-insensitive. */
+  /** Matches EstimatedVacancy.company OR .title, ILIKE '%term%', case-insensitive. For
+   * the /tracker page's single free-text search box. */
   search?: string;
+  /** Matches EstimatedVacancy.company, ILIKE '%term%', case-insensitive. Independent of
+   * `search` — combined with `title` (and `search`, if also given) via AND, not OR. */
+  company?: string;
+  /** Matches EstimatedVacancy.title, ILIKE '%term%', case-insensitive. See `company`. */
+  title?: string;
   /** Default 50, max 500. */
   limit?: number;
   offset?: number;

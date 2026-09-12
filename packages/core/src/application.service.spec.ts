@@ -174,6 +174,24 @@ describe('ApplicationService', () => {
       expect((await applications.list({ search: 'engineer' })).total).toBe(1);
     });
 
+    it('filters by company alone, case-insensitively', async () => {
+      const { items, total } = await applications.list({ company: 'acme' });
+      expect(total).toBe(1);
+      expect(items[0].company).toBe('Acme');
+    });
+
+    it('filters by title alone, case-insensitively', async () => {
+      const { items, total } = await applications.list({ title: 'lead' });
+      expect(total).toBe(1);
+      expect(items[0].title).toBe('Frontend Lead');
+    });
+
+    it('combines company and title via AND, not OR', async () => {
+      // Both fields exist, but only "Acme" / "Backend Engineer" satisfies both at once.
+      expect((await applications.list({ company: 'acme', title: 'backend' })).total).toBe(1);
+      expect((await applications.list({ company: 'acme', title: 'lead' })).total).toBe(0);
+    });
+
     it('respects limit/offset', async () => {
       const page = await applications.list({ limit: 1, offset: 1 });
       expect(page.items).toHaveLength(1);

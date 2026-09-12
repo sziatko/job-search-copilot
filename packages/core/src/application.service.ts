@@ -117,16 +117,29 @@ export class ApplicationService {
   }
 
   async list(filters: ListApplicationsFilters = {}): Promise<ListApplicationsResult> {
+    // search/company/title each contribute one clause against the linked vacancy;
+    // AND-ed together so giving more than one narrows (a caller normally gives just
+    // one — search is the /tracker free-text box, company/title are the MCP tool —
+    // but composing them via AND rather than clobbering keeps it well-defined either way).
+    const vacancyFilters: Prisma.EstimatedVacancyWhereInput[] = [];
+    if (filters.search) {
+      vacancyFilters.push({
+        OR: [
+          { company: { contains: filters.search, mode: 'insensitive' } },
+          { title: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      });
+    }
+    if (filters.company) {
+      vacancyFilters.push({ company: { contains: filters.company, mode: 'insensitive' } });
+    }
+    if (filters.title) {
+      vacancyFilters.push({ title: { contains: filters.title, mode: 'insensitive' } });
+    }
+
     const where: Prisma.ApplicationWhereInput = {
       ...(filters.status && { status: filters.status }),
-      ...(filters.search && {
-        estimatedVacancy: {
-          OR: [
-            { company: { contains: filters.search, mode: 'insensitive' } },
-            { title: { contains: filters.search, mode: 'insensitive' } },
-          ],
-        },
-      }),
+      ...(vacancyFilters.length > 0 && { estimatedVacancy: { AND: vacancyFilters } }),
     };
 
     const take = filters.limit ?? 50;
