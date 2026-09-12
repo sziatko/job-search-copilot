@@ -20,7 +20,10 @@ export interface SaveEstimatedVacancyInput {
 export interface ListEstimatedVacanciesFilters {
   recommendation?: Recommendation;
   userAction?: UserAction;
+  /** ILIKE '%term%', case-insensitive. */
   company?: string;
+  /** ILIKE '%term%', case-insensitive — mirrors `company`; both have a trigram GIN index. */
+  title?: string;
   limit?: number;
   offset?: number;
 }

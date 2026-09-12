@@ -87,6 +87,9 @@ export class EstimatedVacancyService {
       ...(filters.company && {
         company: { contains: filters.company, mode: 'insensitive' },
       }),
+      ...(filters.title && {
+        title: { contains: filters.title, mode: 'insensitive' },
+      }),
     };
 
     const take = filters.limit ?? 20;

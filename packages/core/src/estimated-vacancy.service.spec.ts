@@ -71,12 +71,18 @@ describe('EstimatedVacancyService', () => {
   describe('list', () => {
     beforeEach(async () => {
       await service.save(
-        input({ applyUrl: 'https://example.com/jobs/a', company: 'Acme', recommendation: 'APPLY' }),
+        input({
+          applyUrl: 'https://example.com/jobs/a',
+          company: 'Acme',
+          title: 'Backend Engineer',
+          recommendation: 'APPLY',
+        }),
       );
       await service.save(
         input({
           applyUrl: 'https://example.com/jobs/b',
           company: 'Beta Corp',
+          title: 'Frontend Lead',
           recommendation: 'SKIP',
         }),
       );
@@ -97,6 +103,12 @@ describe('EstimatedVacancyService', () => {
       const { items } = await service.list({ company: 'acme' });
       expect(items).toHaveLength(1);
       expect(items[0].company).toBe('Acme');
+    });
+
+    it('filters by title, case-insensitively', async () => {
+      const { items } = await service.list({ title: 'frontend' });
+      expect(items).toHaveLength(1);
+      expect(items[0].title).toBe('Frontend Lead');
     });
 
     it('respects limit/offset', async () => {
