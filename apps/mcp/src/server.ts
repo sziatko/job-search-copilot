@@ -175,13 +175,18 @@ export function createServer(
     {
       title: 'List / search applications',
       description:
-        'List recorded applications with optional filters (status, or a search term ' +
-        'matched against company or role). Each item is flattened: the application ' +
-        'fields plus company / title / applyUrl / matchScore / recommendation / ' +
-        'estimationComment from the linked vacancy.',
+        'List recorded applications with optional filters: `status`; `search`, a single ' +
+        "free-text term matched against the linked vacancy's company OR title; and/or " +
+        '`company` / `title`, matched against the linked vacancy independently — giving ' +
+        'more than one of `search`/`company`/`title` narrows to rows matching all of them ' +
+        '(AND), not any one (OR). Each is ILIKE %term%, case-insensitive. Each result item ' +
+        'is flattened: the application fields plus company / title / applyUrl / ' +
+        'matchScore / recommendation / estimationComment from the linked vacancy.',
       inputSchema: {
         status: ApplicationStatusEnum.optional(),
         search: z.string().optional(),
+        company: z.string().optional(),
+        title: z.string().optional(),
         limit: z.number().int().min(1).max(500).optional(),
         offset: z.number().int().min(0).optional(),
       },
@@ -250,77 +255,6 @@ export function createServer(
         }
         throw err;
       }
-    },
-  );
-
-  server.registerTool(
-    'find_by_company',
-    {
-      title: 'Find records by company (both tables)',
-      description:
-        'Check whether a company already has a record, in one call, across both ' +
-        'tables: analyzed vacancies (EstimatedVacancy, matched on `company`) and ' +
-        "recorded applications (Application, matched on the linked vacancy's " +
-        '`company` OR `title` — the same `search` list_applications uses, so a ' +
-        'title happening to contain the term can also show up there). Both matches ' +
-        'are ILIKE %term%, case-insensitive. Useful before save_estimated_vacancy / ' +
-        'record_application, to check whether this company is already in the system.',
-      inputSchema: {
-        company: z.string().min(1),
-        limit: z.number().int().min(1).max(50).optional(),
-      },
-    },
-    async ({ company, limit }) => {
-      const [vacanciesResult, applicationsResult] = await Promise.all([
-        vacancies.list({ company, limit: limit ?? 10 }),
-        applications.list({ search: company, limit: limit ?? 10 }),
-      ]);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              { vacancies: vacanciesResult, applications: applicationsResult },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
-    },
-  );
-
-  server.registerTool(
-    'find_by_title',
-    {
-      title: 'Find records by vacancy title (both tables)',
-      description:
-        'Same as find_by_company, but matched on the vacancy `title` instead: analyzed ' +
-        'vacancies (EstimatedVacancy.title) and recorded applications (Application, via ' +
-        "the linked vacancy's company OR title — the same `search` list_applications " +
-        'uses). Both ILIKE %term%, case-insensitive.',
-      inputSchema: {
-        title: z.string().min(1),
-        limit: z.number().int().min(1).max(50).optional(),
-      },
-    },
-    async ({ title, limit }) => {
-      const [vacanciesResult, applicationsResult] = await Promise.all([
-        vacancies.list({ title, limit: limit ?? 10 }),
-        applications.list({ search: title, limit: limit ?? 10 }),
-      ]);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              { vacancies: vacanciesResult, applications: applicationsResult },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
     },
   );
 
