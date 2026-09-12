@@ -279,4 +279,63 @@ describe('job-search-copilot MCP server', () => {
     });
     expect(result.isError).toBe(true);
   });
+
+  it('find_by_company finds matches in both tables', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'save_estimated_vacancy',
+      arguments: { ...validArgs, company: 'Eta Co', title: 'Analyzed Only' },
+    });
+    await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Eta Co', title: 'Applied Role' },
+    });
+
+    const result = await client.callTool({
+      name: 'find_by_company',
+      arguments: { company: 'eta' },
+    });
+    const parsed = JSON.parse(textOf(result));
+    expect(parsed.vacancies.total).toBe(2); // the analyzed one + the placeholder from record_application
+    expect(parsed.applications.total).toBe(1);
+    expect(parsed.applications.items[0].title).toBe('Applied Role');
+  });
+
+  it('find_by_company returns empty results for an unknown company', async () => {
+    const client = await connectedClient();
+    const result = await client.callTool({
+      name: 'find_by_company',
+      arguments: { company: 'Nobody Inc' },
+    });
+    const parsed = JSON.parse(textOf(result));
+    expect(parsed.vacancies.total).toBe(0);
+    expect(parsed.applications.total).toBe(0);
+  });
+
+  it('find_by_title finds matches in both tables', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'save_estimated_vacancy',
+      arguments: { ...validArgs, company: 'Theta Co', title: 'Staff Platform Engineer' },
+    });
+    await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Iota Co', title: 'Staff Platform Engineer' },
+    });
+
+    const result = await client.callTool({
+      name: 'find_by_title',
+      arguments: { title: 'staff platform' },
+    });
+    const parsed = JSON.parse(textOf(result));
+    // Both vacancy rows carry that title: the analyzed one, and record_application's
+    // placeholder for the company it couldn't find an existing (company, title) match for.
+    expect(parsed.vacancies.total).toBe(2);
+    expect(parsed.vacancies.items.map((v: { company: string }) => v.company).sort()).toEqual([
+      'Iota Co',
+      'Theta Co',
+    ]);
+    expect(parsed.applications.total).toBe(1);
+    expect(parsed.applications.items[0].company).toBe('Iota Co');
+  });
 });
