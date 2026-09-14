@@ -71,26 +71,33 @@ any future `DomainError` that isn't pre-validated —
 
 ## MCP tools
 
-Seven tools, registered in `createServer()`. All inputs are `zod` schemas; all
-success outputs are `JSON.stringify(result, null, 2)` as a single text block.
+Ten tools, registered in `createServer()`. All inputs are `zod` schemas; all
+success outputs are `JSON.stringify(result, null, 2)` as a single text block. The 4
+write tools return only a minimal confirmation (see Output column) — they never echo
+back the large text the caller just sent (`fullText`, `estimationComment`,
+`userComment`, `statusComment`); read the full record back with `get_estimated_vacancy`
+/ `list_estimated_vacancies` / `list_applications`.
 
 | Tool | Input | Output | Not-found / error |
 | --- | --- | --- | --- |
-| `save_estimated_vacancy` | `company, title, applyUrl` (`.url()`), `fullText`, `matchScore` (int 0–100), `recommendation` (EN + UA), `estimationComment` | `{ created: boolean, vacancy }` | `DomainError` → `{ isError: true, content: [message] }` |
+| `save_estimated_vacancy` | `company, title, applyUrl` (`.url()`), `fullText`, `matchScore` (int 0–100), `recommendation` (EN + UA), `estimationComment` | `{ success: boolean, vacancy: { id, company, title } }` — `success` is `false` when an existing `applyUrl` caused the analysis to be dropped | `DomainError` → `{ isError: true, content: [message] }` |
+| `save_estimated_vacancies_batch` | `{ vacancies: [...] }` — array (1–100) of the same shape as `save_estimated_vacancy`'s input | `[{ success, vacancy: { id, company, title } }, ...]`, one entry per input, same order and same per-item shape as `save_estimated_vacancy` — not transactional, so one item's dedup/skip doesn't affect the others | array size outside 1–100 → schema-validation error; `DomainError` → `{ isError: true, content: [message] }` |
 | `get_estimated_vacancy` | `{ id: int }` | the full `EstimatedVacancy` | unknown id → `{ isError: true, content: ["EstimatedVacancy <id> not found"] }` |
 | `list_estimated_vacancies` | `recommendation?` (EN only), `userAction?`, `company?`, `title?` (both ILIKE `%term%`, case-insensitive), `limit?` (1–100), `offset?` (≥0) | `{ items, total }` — no `fullText` | — |
-| `update_estimated_vacancy_user_action` | `{ id: int, userAction }` | the full `EstimatedVacancy` | unknown id → `isError` result |
-| `record_application` | `company`, `title` (required), `applyUrl?` (`.url()`), `matchScore?` (int 0–100), `estimationComment?`, `salaryInListing?`, `usedTailoredResume?`, `userComment?`, `status?` | `{ application, resolution, vacancyCreated }` — find-or-creates the vacancy, marks it APPLIED | `DomainError` (blank input / ambiguous match / already recorded) → `{ isError: true, content: [message] }` |
+| `update_estimated_vacancy_user_action` | `{ id: int, userAction }` | `{ success: true, vacancy: { id } }` | unknown id → `isError` result |
+| `record_application` | `company`, `title` (required), `applyUrl?` (`.url()`), `matchScore?` (int 0–100), `estimationComment?`, `salaryInListing?`, `usedTailoredResume?`, `userComment?`, `status?` | `{ success: true, application: { id, company, title } }` — find-or-creates the vacancy, marks it APPLIED; use `list_estimated_vacancies`/`list_applications` to see `resolution`-equivalent state | `DomainError` (blank input / ambiguous match / already recorded) → `{ isError: true, content: [message] }` |
+| `record_applications_batch` | `{ applications: [...] }` — array (1–100) of the same shape as `record_application`'s input | `[{ success: true, application: { id, company, title } }, ...]`, one entry per input, same order and same per-item shape as `record_application` — **transactional**: runs in one `$transaction` (`ApplicationService.recordMany`), so one failing item rolls back the whole batch | array size outside 1–100 → schema-validation error; `DomainError` on any item → `{ isError: true, content: [message] }`, nothing persisted |
 | `list_applications` | `status?`, `search?` (linked vacancy's company OR title), `company?`, `title?` (each independent — given with `search` and/or each other, they AND, not OR; all three ILIKE `%term%`, case-insensitive), `limit?` (1–500), `offset?` (≥0) | `{ items: ApplicationListItem[], total }` (flattened join) | — |
-| `update_application_status` | `{ id?: int, company?: string, title?: string, status, statusComment?: string }` — exactly one of `id` or `(company, title)` (case-insensitive match against the linked vacancy); `statusComment` appended to the existing value joined by `" / "`, never overwritten | `ApplicationListItem` | neither/both id-vs-company+title given, unknown id, unmatched `(company, title)`, or a matched vacancy with no recorded application → `isError` "not found"; 2+ vacancies matching `(company, title)` → `isError` listing candidate ids |
+| `update_application_status` | `{ id?: int, company?: string, title?: string, status, statusComment?: string }` — exactly one of `id` or `(company, title)` (case-insensitive match against the linked vacancy); `statusComment` appended to the existing value joined by `" / "`, never overwritten | `{ success: true, application: { id, company, title } }` — use `list_applications` to see the resulting `status`/`statusComment` | neither/both id-vs-company+title given, unknown id, unmatched `(company, title)`, or a matched vacancy with no recorded application → `isError` "not found"; 2+ vacancies matching `(company, title)` → `isError` listing candidate ids |
 
 `stdout` is reserved for the MCP protocol — all logging goes to `stderr`
 (`console.error` in `apps/mcp/src/index.ts`).
 
 > **What this constrains — breaks if you change it**
-> - Changing `save_estimated_vacancy`'s output shape → the analyzer prompt that
->   reads `created`, and `apps/mcp/src/server.spec.ts` (which destructures
->   `{ created, vacancy }`).
+> - Changing `save_estimated_vacancy`'s output shape → the external
+>   vacancy-match-analyzer prompt (not in this repo) reads `success` (renamed from
+>   `created`) — update it there if you change this again — and
+>   `apps/mcp/src/server.spec.ts` (which destructures `{ success, vacancy }`).
 > - Adding a tool / changing an input schema → `apps/mcp/src/server.spec.ts`
 >   (the in-memory `Client` calls each tool by name).
 > - Writing anything to `stdout` from the MCP process → corrupts the protocol

@@ -37,6 +37,16 @@ export function createServer(
 ): McpServer {
   const server = new McpServer({ name: 'job-search-copilot', version: '0.1.0' });
 
+  const SaveVacancyItemSchema = z.object({
+    company: z.string(),
+    title: z.string(),
+    applyUrl: z.url(),
+    fullText: z.string(),
+    matchScore: z.number().int().min(0).max(100),
+    recommendation: RecommendationInputEnum,
+    estimationComment: z.string(),
+  });
+
   server.registerTool(
     'save_estimated_vacancy',
     {
@@ -44,25 +54,57 @@ export function createServer(
       description:
         'Save a vacancy analyzed by vacancy-match-analyzer, keyed by applyUrl. ' +
         'A vacancy is analyzed once: if one with this applyUrl already exists the ' +
-        'incoming analysis is discarded. Returns { created, vacancy } — check ' +
-        '`created` to know whether this analysis was stored (true) or dropped (false).',
-      inputSchema: {
-        company: z.string(),
-        title: z.string(),
-        applyUrl: z.url(),
-        fullText: z.string(),
-        matchScore: z.number().int().min(0).max(100),
-        recommendation: RecommendationInputEnum,
-        estimationComment: z.string(),
-      },
+        'incoming analysis is discarded. Returns { success, vacancy: { id, company, ' +
+        'title } } — `success` is false when the analysis was dropped as a duplicate. ' +
+        'Use get_estimated_vacancy(id) to read back the full stored record. Saving ' +
+        'several vacancies from one analysis run? Use save_estimated_vacancies_batch instead.',
+      inputSchema: SaveVacancyItemSchema.shape,
     },
     async (input) => {
       try {
         const result = await vacancies.save(input);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        const body = {
+          success: result.created,
+          vacancy: {
+            id: result.vacancy.id,
+            company: result.vacancy.company,
+            title: result.vacancy.title,
+          },
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
       } catch (err) {
         // A caller mistake (e.g. an unrecognized recommendation) — report it as a
         // tool error like the not-found cases below, not a thrown protocol error.
+        if (err instanceof DomainError) {
+          return { isError: true, content: [{ type: 'text', text: err.message }] };
+        }
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
+    'save_estimated_vacancies_batch',
+    {
+      title: 'Save multiple analyzed vacancies in one call',
+      description:
+        'Batch form of save_estimated_vacancy — same applyUrl-dedup rule per item ' +
+        '(analyze-once: an existing applyUrl is skipped, not overwritten). Returns one ' +
+        'entry per input, same order and same shape as save_estimated_vacancy: ' +
+        '{ success, vacancy: { id, company, title } }. Use this instead of N separate ' +
+        'save_estimated_vacancy calls when saving a batch from one analysis run. Max ' +
+        '100 per call.',
+      inputSchema: { vacancies: z.array(SaveVacancyItemSchema).min(1).max(100) },
+    },
+    async ({ vacancies: items }) => {
+      try {
+        const { results } = await vacancies.saveMany(items);
+        const compact = results.map((r) => ({
+          success: r.created,
+          vacancy: { id: r.vacancy.id, company: r.vacancy.company, title: r.vacancy.title },
+        }));
+        return { content: [{ type: 'text', text: JSON.stringify(compact, null, 2) }] };
+      } catch (err) {
         if (err instanceof DomainError) {
           return { isError: true, content: [{ type: 'text', text: err.message }] };
         }
@@ -119,7 +161,8 @@ export function createServer(
     {
       title: 'Update my action on an estimated vacancy',
       description:
-        "Set what the user actually decided to do about a vacancy — separate from the analyzer's recommendation.",
+        'Set what the user actually decided to do about a vacancy — separate from the ' +
+        "analyzer's recommendation. Returns { success: true, vacancy: { id } }.",
       inputSchema: { id: z.number().int(), userAction: UserActionEnum },
     },
     async ({ id, userAction }) => {
@@ -130,9 +173,22 @@ export function createServer(
           content: [{ type: 'text', text: `EstimatedVacancy ${id} not found` }],
         };
       }
-      return { content: [{ type: 'text', text: JSON.stringify(vacancy, null, 2) }] };
+      const body = { success: true, vacancy: { id: vacancy.id } };
+      return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
     },
   );
+
+  const RecordApplicationItemSchema = z.object({
+    company: z.string().min(1),
+    title: z.string().min(1),
+    applyUrl: z.url().optional(),
+    matchScore: z.number().int().min(0).max(100).optional(),
+    estimationComment: z.string().optional(),
+    salaryInListing: z.string().optional(),
+    usedTailoredResume: z.boolean().optional(),
+    userComment: z.string().optional(),
+    status: ApplicationStatusEnum.optional(),
+  });
 
   server.registerTool(
     'record_application',
@@ -144,23 +200,57 @@ export function createServer(
         'links the application to it and marks that vacancy APPLIED; no match creates a ' +
         'minimal vacancy row (fullText "N/A", score/verdict from what you pass or a ' +
         'placeholder) also marked APPLIED; more than one match is an error listing the ' +
-        "candidate ids. The result's `resolution` says which happened.",
-      inputSchema: {
-        company: z.string().min(1),
-        title: z.string().min(1),
-        applyUrl: z.url().optional(),
-        matchScore: z.number().int().min(0).max(100).optional(),
-        estimationComment: z.string().optional(),
-        salaryInListing: z.string().optional(),
-        usedTailoredResume: z.boolean().optional(),
-        userComment: z.string().optional(),
-        status: ApplicationStatusEnum.optional(),
-      },
+        'candidate ids. Returns { success: true, application: { id, company, title } } — ' +
+        'use list_estimated_vacancies / list_applications to see full state. Recording ' +
+        'several applications at once? Use record_applications_batch instead.',
+      inputSchema: RecordApplicationItemSchema.shape,
     },
     async (input) => {
       try {
         const result = await applications.record(input);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        const body = {
+          success: true,
+          application: {
+            id: result.application.id,
+            company: result.application.company,
+            title: result.application.title,
+          },
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
+      } catch (err) {
+        if (err instanceof DomainError) {
+          return { isError: true, content: [{ type: 'text', text: err.message }] };
+        }
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
+    'record_applications_batch',
+    {
+      title: 'Record multiple job applications in one call',
+      description:
+        'Batch form of record_application — same company/title lookup-or-create rule ' +
+        'per item. All-or-nothing: run in one transaction, so a failing item (unknown ' +
+        'match, ambiguous match, an application that already exists) rolls back the ' +
+        'whole batch — safe to retry. Returns one entry per input, same order and same ' +
+        'shape as record_application: { success: true, application: { id, company, ' +
+        'title } }. Max 100 per call.',
+      inputSchema: { applications: z.array(RecordApplicationItemSchema).min(1).max(100) },
+    },
+    async ({ applications: items }) => {
+      try {
+        const { results } = await applications.recordMany(items);
+        const compact = results.map((r) => ({
+          success: true,
+          application: {
+            id: r.application.id,
+            company: r.application.company,
+            title: r.application.title,
+          },
+        }));
+        return { content: [{ type: 'text', text: JSON.stringify(compact, null, 2) }] };
       } catch (err) {
         if (err instanceof DomainError) {
           return { isError: true, content: [{ type: 'text', text: err.message }] };
@@ -213,7 +303,8 @@ export function createServer(
         'never creates anything) all report "not found". `statusComment` is optional and ' +
         "APPENDED to whatever is already stored there (joined with ' / '), not overwritten " +
         '— e.g. "Recruiter called." then later "Interview on 20.09." become "Recruiter ' +
-        'called. / Interview on 20.09."',
+        'called. / Interview on 20.09." Returns { success: true, application: { id, ' +
+        'company, title } } — use list_applications to see the resulting status/statusComment.',
       inputSchema: {
         id: z.number().int().optional(),
         company: z.string().min(1).optional(),
@@ -248,7 +339,15 @@ export function createServer(
             content: [{ type: 'text', text: `${target} not found` }],
           };
         }
-        return { content: [{ type: 'text', text: JSON.stringify(application, null, 2) }] };
+        const body = {
+          success: true,
+          application: {
+            id: application.id,
+            company: application.company,
+            title: application.title,
+          },
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
       } catch (err) {
         if (err instanceof DomainError) {
           return { isError: true, content: [{ type: 'text', text: err.message }] };

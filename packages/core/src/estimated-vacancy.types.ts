@@ -6,6 +6,10 @@ export interface SaveEstimatedVacancyResult {
   vacancy: EstimatedVacancy;
 }
 
+export interface SaveManyEstimatedVacanciesResult {
+  results: SaveEstimatedVacancyResult[];
+}
+
 export interface SaveEstimatedVacancyInput {
   company: string;
   title: string;

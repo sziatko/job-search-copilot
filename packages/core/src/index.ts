@@ -26,6 +26,7 @@ export type {
   ListEstimatedVacanciesResult,
   SaveEstimatedVacancyInput,
   SaveEstimatedVacancyResult,
+  SaveManyEstimatedVacanciesResult,
 } from './estimated-vacancy.types';
 export { createPrismaClient, getPrisma } from './prisma-client';
 export {

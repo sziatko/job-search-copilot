@@ -47,19 +47,22 @@ describe('job-search-copilot MCP server', () => {
       name: 'save_estimated_vacancy',
       arguments: validArgs,
     });
-    const { created, vacancy } = JSON.parse(textOf(saveResult));
-    expect(created).toBe(true);
-    expect(vacancy.recommendation).toBe('APPLY');
-    expect(vacancy.userAction).toBe('NOT_REVIEWED');
+    const { success, vacancy } = JSON.parse(textOf(saveResult));
+    expect(success).toBe(true);
+    expect(vacancy.company).toBe('Acme');
+    expect(vacancy.title).toBe('Backend Engineer');
 
     const getResult = await client.callTool({
       name: 'get_estimated_vacancy',
       arguments: { id: vacancy.id },
     });
-    expect(JSON.parse(textOf(getResult)).applyUrl).toBe(validArgs.applyUrl);
+    const full = JSON.parse(textOf(getResult));
+    expect(full.applyUrl).toBe(validArgs.applyUrl);
+    expect(full.recommendation).toBe('APPLY');
+    expect(full.userAction).toBe('NOT_REVIEWED');
   });
 
-  it('save_estimated_vacancy reports created:false and drops the analysis on a re-save', async () => {
+  it('save_estimated_vacancy reports success:false and drops the analysis on a re-save', async () => {
     const client = await connectedClient();
     await client.callTool({ name: 'save_estimated_vacancy', arguments: validArgs });
 
@@ -67,10 +70,129 @@ describe('job-search-copilot MCP server', () => {
       name: 'save_estimated_vacancy',
       arguments: { ...validArgs, matchScore: 5, estimationComment: 'changed' },
     });
-    const { created, vacancy } = JSON.parse(textOf(again));
-    expect(created).toBe(false);
-    expect(vacancy.matchScore).toBe(80);
-    expect(vacancy.estimationComment).toBe('Strong match.');
+    const { success, vacancy } = JSON.parse(textOf(again));
+    expect(success).toBe(false);
+    expect(vacancy.company).toBe('Acme');
+
+    const got = await client.callTool({
+      name: 'get_estimated_vacancy',
+      arguments: { id: vacancy.id },
+    });
+    const full = JSON.parse(textOf(got));
+    expect(full.matchScore).toBe(80);
+    expect(full.estimationComment).toBe('Strong match.');
+  });
+
+  it('save_estimated_vacancies_batch saves a mixed batch and skips a duplicate applyUrl', async () => {
+    const client = await connectedClient();
+    await client.callTool({ name: 'save_estimated_vacancy', arguments: validArgs });
+
+    const batchResult = await client.callTool({
+      name: 'save_estimated_vacancies_batch',
+      arguments: {
+        vacancies: [
+          validArgs, // duplicate applyUrl — should be skipped
+          { ...validArgs, applyUrl: 'https://example.com/jobs/2', title: 'Frontend Engineer' },
+        ],
+      },
+    });
+    const items = JSON.parse(textOf(batchResult));
+    expect(items).toHaveLength(2);
+    expect(items[0].success).toBe(false);
+    expect(items[0].vacancy.company).toBe('Acme');
+    expect(items[0].vacancy.id).toBeTypeOf('number');
+    expect(items[1].success).toBe(true);
+    expect(items[1].vacancy.title).toBe('Frontend Engineer');
+
+    const list = await client.callTool({ name: 'list_estimated_vacancies', arguments: {} });
+    expect(JSON.parse(textOf(list)).total).toBe(2);
+  });
+
+  it('save_estimated_vacancies_batch rejects an empty or oversized array', async () => {
+    const client = await connectedClient();
+    const empty = await client.callTool({
+      name: 'save_estimated_vacancies_batch',
+      arguments: { vacancies: [] },
+    });
+    expect(empty.isError).toBe(true);
+
+    const tooMany = Array.from({ length: 101 }, (_, i) => ({
+      ...validArgs,
+      applyUrl: `https://example.com/jobs/${i}`,
+    }));
+    const oversized = await client.callTool({
+      name: 'save_estimated_vacancies_batch',
+      arguments: { vacancies: tooMany },
+    });
+    expect(oversized.isError).toBe(true);
+  });
+
+  it('record_applications_batch records a mixed batch in one call', async () => {
+    const client = await connectedClient();
+    const batchResult = await client.callTool({
+      name: 'record_applications_batch',
+      arguments: {
+        applications: [
+          { company: 'Batch Co', title: 'Backend Engineer' },
+          { company: 'Batch Co', title: 'Frontend Engineer', matchScore: 65 },
+        ],
+      },
+    });
+    const items = JSON.parse(textOf(batchResult));
+    expect(items).toHaveLength(2);
+    expect(items[0].success).toBe(true);
+    expect(items[0].application.title).toBe('Backend Engineer');
+    expect(items[1].application.title).toBe('Frontend Engineer');
+
+    const list = await client.callTool({
+      name: 'list_applications',
+      arguments: { company: 'Batch Co' },
+    });
+    expect(JSON.parse(textOf(list)).total).toBe(2);
+  });
+
+  it('record_applications_batch rolls back the whole batch if one item fails', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Existing Co', title: 'Dev' },
+    });
+
+    const result = await client.callTool({
+      name: 'record_applications_batch',
+      arguments: {
+        applications: [
+          { company: 'Never Inserted Co', title: 'Dev' },
+          { company: 'Existing Co', title: 'Dev' }, // already has an application — fails
+        ],
+      },
+    });
+    expect(result.isError).toBe(true);
+
+    const list = await client.callTool({
+      name: 'list_applications',
+      arguments: { company: 'Never Inserted Co' },
+    });
+    expect(JSON.parse(textOf(list)).total).toBe(0);
+  });
+
+  it('record_applications_batch rejects an empty or oversized array', async () => {
+    const client = await connectedClient();
+    const empty = await client.callTool({
+      name: 'record_applications_batch',
+      arguments: { applications: [] },
+    });
+    expect(empty.isError).toBe(true);
+
+    const tooMany = Array.from({ length: 101 }, (_, i) => ({
+      company: `Co ${i}`,
+      title: 'Dev',
+    }));
+    const oversized = await client.callTool({
+      name: 'record_applications_batch',
+      arguments: { applications: tooMany },
+    });
+    expect(oversized.isError).toBe(true);
   });
 
   it('get_estimated_vacancy reports isError for an unknown id', async () => {
@@ -104,7 +226,15 @@ describe('job-search-copilot MCP server', () => {
       name: 'update_estimated_vacancy_user_action',
       arguments: { id: vacancy.id, userAction: 'DECLINED' },
     });
-    expect(JSON.parse(textOf(updateResult)).userAction).toBe('DECLINED');
+    const body = JSON.parse(textOf(updateResult));
+    expect(body.success).toBe(true);
+    expect(body.vacancy.id).toBe(vacancy.id);
+
+    const got = await client.callTool({
+      name: 'get_estimated_vacancy',
+      arguments: { id: vacancy.id },
+    });
+    expect(JSON.parse(textOf(got)).userAction).toBe('DECLINED');
   });
 
   it('update_estimated_vacancy_user_action reports isError for an unknown id', async () => {
@@ -123,9 +253,17 @@ describe('job-search-copilot MCP server', () => {
       arguments: { company: 'Never Analyzed Co', title: 'Staff Engineer', matchScore: 72 },
     });
     const parsed = JSON.parse(textOf(result));
-    expect(parsed.resolution).toBe('created-vacancy');
-    expect(parsed.application.matchScore).toBe(72);
-    expect(parsed.application.recommendation).toBe('APPLY');
+    expect(parsed.success).toBe(true);
+    expect(parsed.application.company).toBe('Never Analyzed Co');
+    expect(parsed.application.title).toBe('Staff Engineer');
+
+    const list = await client.callTool({
+      name: 'list_estimated_vacancies',
+      arguments: { company: 'Never Analyzed Co' },
+    });
+    const { items } = JSON.parse(textOf(list));
+    expect(items[0].matchScore).toBe(72);
+    expect(items[0].recommendation).toBe('APPLY');
   });
 
   it('record_application links to an analyzed vacancy and marks it APPLIED', async () => {
@@ -137,13 +275,16 @@ describe('job-search-copilot MCP server', () => {
       name: 'record_application',
       arguments: { company: 'acme', title: 'backend engineer', salaryInListing: '130 PLN/h' },
     });
-    expect(JSON.parse(textOf(recorded)).resolution).toBe('linked-existing');
+    expect(JSON.parse(textOf(recorded)).success).toBe(true);
 
     const got = await client.callTool({
       name: 'get_estimated_vacancy',
       arguments: { id: vacancy.id },
     });
     expect(JSON.parse(textOf(got)).userAction).toBe('APPLIED');
+
+    const list = await client.callTool({ name: 'list_estimated_vacancies', arguments: {} });
+    expect(JSON.parse(textOf(list)).total).toBe(1); // linked, no new vacancy created
   });
 
   it('list_applications filters by status and search', async () => {
@@ -212,7 +353,16 @@ describe('job-search-copilot MCP server', () => {
       name: 'update_application_status',
       arguments: { id: application.id, status: 'INTERVIEW' },
     });
-    expect(JSON.parse(textOf(updated)).status).toBe('INTERVIEW');
+    const body = JSON.parse(textOf(updated));
+    expect(body.success).toBe(true);
+    expect(body.application.id).toBe(application.id);
+    expect(body.application.company).toBe('Gamma Co');
+
+    const list = await client.callTool({
+      name: 'list_applications',
+      arguments: { company: 'Gamma Co' },
+    });
+    expect(JSON.parse(textOf(list)).items[0].status).toBe('INTERVIEW');
 
     const missing = await client.callTool({
       name: 'update_application_status',
@@ -229,7 +379,7 @@ describe('job-search-copilot MCP server', () => {
     });
     const { application } = JSON.parse(textOf(recorded));
 
-    const first = await client.callTool({
+    await client.callTool({
       name: 'update_application_status',
       arguments: {
         id: application.id,
@@ -237,23 +387,32 @@ describe('job-search-copilot MCP server', () => {
         statusComment: 'Recruiter called.',
       },
     });
-    expect(JSON.parse(textOf(first)).statusComment).toBe('Recruiter called.');
+    const afterFirst = await client.callTool({
+      name: 'list_applications',
+      arguments: { company: 'Delta Co' },
+    });
+    expect(JSON.parse(textOf(afterFirst)).items[0].statusComment).toBe('Recruiter called.');
 
-    const second = await client.callTool({
+    await client.callTool({
       name: 'update_application_status',
       arguments: { id: application.id, status: 'INTERVIEW', statusComment: 'Interview on 20.09.' },
     });
-    expect(JSON.parse(textOf(second)).statusComment).toBe(
+    const afterSecond = await client.callTool({
+      name: 'list_applications',
+      arguments: { company: 'Delta Co' },
+    });
+    expect(JSON.parse(textOf(afterSecond)).items[0].statusComment).toBe(
       'Recruiter called. / Interview on 20.09.',
     );
   });
 
   it('update_application_status matches by company + title, e.g. from a rejection email', async () => {
     const client = await connectedClient();
-    await client.callTool({
+    const recorded = await client.callTool({
       name: 'record_application',
       arguments: { company: 'Epsilon Co', title: 'Dev' },
     });
+    const { application } = JSON.parse(textOf(recorded));
 
     const updated = await client.callTool({
       name: 'update_application_status',
@@ -265,8 +424,17 @@ describe('job-search-copilot MCP server', () => {
       },
     });
     const parsed = JSON.parse(textOf(updated));
-    expect(parsed.status).toBe('REJECTED');
-    expect(parsed.statusComment).toBe('Rejection email received.');
+    expect(parsed.success).toBe(true);
+    expect(parsed.application.id).toBe(application.id);
+    expect(parsed.application.company).toBe('Epsilon Co');
+
+    const list = await client.callTool({
+      name: 'list_applications',
+      arguments: { company: 'Epsilon Co' },
+    });
+    const item = JSON.parse(textOf(list)).items[0];
+    expect(item.status).toBe('REJECTED');
+    expect(item.statusComment).toBe('Rejection email received.');
   });
 
   it('update_application_status isError for an unmatched company/title', async () => {

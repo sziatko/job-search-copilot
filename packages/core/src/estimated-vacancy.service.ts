@@ -5,6 +5,7 @@ import type {
   ListEstimatedVacanciesResult,
   SaveEstimatedVacancyInput,
   SaveEstimatedVacancyResult,
+  SaveManyEstimatedVacanciesResult,
 } from './estimated-vacancy.types';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
@@ -73,6 +74,20 @@ export class EstimatedVacancyService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Save a batch, one applyUrl-dedup save() per item. Not wrapped in a transaction,
+   * unlike ApplicationService.recordMany: each save() is already self-contained (its
+   * own P2002 race handling), and partial progress across a batch is what we want —
+   * one bad item shouldn't roll back the good ones.
+   */
+  async saveMany(inputs: SaveEstimatedVacancyInput[]): Promise<SaveManyEstimatedVacanciesResult> {
+    const results: SaveEstimatedVacancyResult[] = [];
+    for (const input of inputs) {
+      results.push(await this.save(input));
+    }
+    return { results };
   }
 
   async getById(id: number): Promise<EstimatedVacancy | null> {

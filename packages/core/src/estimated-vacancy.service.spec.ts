@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { InvalidRecommendationError } from './errors';
 import { EstimatedVacancyService } from './estimated-vacancy.service';
 import type { SaveEstimatedVacancyInput } from './estimated-vacancy.types';
 
@@ -53,6 +54,33 @@ describe('EstimatedVacancyService', () => {
       expect(resaved.created).toBe(false);
       expect(resaved.vacancy.id).toBe(first.vacancy.id);
       expect(resaved.vacancy.userAction).toBe('READY_TO_APPLY');
+    });
+  });
+
+  describe('saveMany', () => {
+    it('saves a mixed batch, keeping input order and per-item created flags', async () => {
+      await service.save(input({ applyUrl: 'https://example.com/jobs/existing' }));
+
+      const { results } = await service.saveMany([
+        input({ applyUrl: 'https://example.com/jobs/existing', matchScore: 1 }), // duplicate
+        input({ applyUrl: 'https://example.com/jobs/new', company: 'Fresh Co' }),
+      ]);
+
+      expect(results.map((r) => r.created)).toEqual([false, true]);
+      expect(results[0].vacancy.matchScore).toBe(80); // untouched by the duplicate's payload
+      expect(results[1].vacancy.company).toBe('Fresh Co');
+      expect((await service.list()).total).toBe(2);
+    });
+
+    it('does not roll back earlier items when a later one fails', async () => {
+      await expect(
+        service.saveMany([
+          input({ applyUrl: 'https://example.com/jobs/good' }),
+          input({ applyUrl: 'https://example.com/jobs/bad', recommendation: 'NOT_A_REAL_VALUE' }),
+        ]),
+      ).rejects.toBeInstanceOf(InvalidRecommendationError);
+
+      expect((await service.list()).total).toBe(1);
     });
   });
 
