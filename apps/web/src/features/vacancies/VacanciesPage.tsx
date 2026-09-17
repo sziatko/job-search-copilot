@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { toast } from 'sonner';
 import { ApplyDialog } from './components/ApplyDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { StatusFilterSelect } from './components/StatusFilterSelect';
@@ -76,7 +77,10 @@ export function VacanciesPage() {
           company={pendingApply.company}
           title={pendingApply.title}
           onCancel={cancelApply}
-          onConfirm={confirmApply}
+          onConfirm={(details) => {
+            confirmApply(details);
+            toast.success('Application submitted!');
+          }}
         />
       )}
     </div>

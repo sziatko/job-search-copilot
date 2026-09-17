@@ -4,6 +4,7 @@ import { useVirtualRows } from '@/components/useVirtualRows';
 import type { ApplicationListItem, ApplicationStatus } from '../types';
 import { ApplicationStatusSelect } from './ApplicationStatusSelect';
 import { MergedComment } from './MergedComment';
+import { CopyApplicationButton } from './CopyApplicationButton';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
@@ -13,7 +14,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const TH =
   'px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500 whitespace-nowrap';
-const COL_COUNT = 7;
+const COL_COUNT = 8;
 
 export function ApplicationsTable({
   items,
@@ -37,24 +38,26 @@ export function ApplicationsTable({
       ref={scrollRef}
       className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm"
     >
-      <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <table className="min-w-[1200px] w-full table-fixed divide-y divide-slate-200">
         <colgroup>
-          <col className="w-24" />
-          <col />
+          <col className="w-28" />
+          <col className="w-[20%]" />
           <col className="w-20" />
-          <col className="w-40" />
+          <col className="w-36" />
           <col className="w-24" />
-          <col />
+          <col className="w-[35%]" />
+          <col className="w-19" />
           <col className="w-40" />
         </colgroup>
         <thead className="sticky top-0 z-10 bg-slate-50">
           <tr>
-            <th className={TH}>Applied</th>
+            <th className={TH}>Date</th>
             <th className={TH}>Role</th>
             <th className={TH}>Score</th>
             <th className={TH}>Salary in listing</th>
             <th className={TH}>Tailored CV</th>
             <th className={TH}>Comment</th>
+            <th className={TH}>Copy</th>
             <th className={TH}>Status</th>
           </tr>
         </thead>
@@ -75,7 +78,22 @@ export function ApplicationsTable({
                 className="hover:bg-slate-50"
               >
                 <td className="whitespace-nowrap px-4 py-3 align-top text-sm text-slate-500">
-                  {dateFormatter.format(new Date(item.appliedAt))}
+                  <div className="flex items-center gap-1">
+                    {(() => {
+                      const daysSinceApplied = Math.floor(
+                        (Date.now() - new Date(item.appliedAt).getTime()) / (1000 * 60 * 60 * 24)
+                      );
+                      return daysSinceApplied > 30 ? (
+                        <span className="text-orange-500" title={`${daysSinceApplied} days old`}>
+                          ⏳
+                        </span>
+                      ) : null;
+                    })()}
+                    <span>{dateFormatter.format(new Date(item.appliedAt))}</span>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    upd: {dateFormatter.format(new Date(item.updatedAt))}
+                  </div>
                 </td>
                 <td className="px-4 py-3 align-top">
                   {isSynthetic ? (
@@ -90,7 +108,10 @@ export function ApplicationsTable({
                       {item.title}
                     </a>
                   )}
-                  <div className="text-sm text-slate-500">{item.company}</div>
+                  <div className="text-sm text-slate-500">
+                    {item.company}
+                    <span className="ml-2 text-xs text-slate-400">#{item.id}</span>
+                  </div>
                 </td>
                 <td className="px-4 py-3 align-top">
                   <MatchScoreBadge score={item.matchScore} />
@@ -106,6 +127,14 @@ export function ApplicationsTable({
                     userComment={item.userComment}
                     statusComment={item.statusComment}
                     estimationComment={item.estimationComment}
+                  />
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <CopyApplicationButton
+                    id={item.id}
+                    company={item.company}
+                    title={item.title}
+                    applyUrl={item.applyUrl}
                   />
                 </td>
                 <td className="px-4 py-3 align-top">

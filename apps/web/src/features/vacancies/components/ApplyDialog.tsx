@@ -28,6 +28,13 @@ export function ApplyDialog({
     onConfirm({ salary, usedTailoredResume, comment });
   }
 
+  function handleTextareaKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onConfirm({ salary, usedTailoredResume, comment });
+    }
+  }
+
   return (
     <Modal onClose={onCancel} labelledBy={titleId} maxWidthClassName="max-w-md">
       <form onSubmit={handleSubmit}>
@@ -71,6 +78,7 @@ export function ApplyDialog({
               id="apply-comment"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
+              onKeyDown={handleTextareaKeyDown}
               rows={3}
               className="mt-1 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
