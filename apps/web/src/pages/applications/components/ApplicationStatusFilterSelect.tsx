@@ -1,15 +1,13 @@
 import { useId } from 'react';
 import { Select, type SelectOption } from '@/components/ui/Select';
-import { APPLICATION_STATUS_LABELS } from '../constants';
-import {
-  type ApplicationStatusFilter,
-  applicationStatusFilterValues,
-  STATUS_FILTER_ALL,
-} from '../types';
+import { APPLICATION_STATUS_LABELS, FILTER_LABELS } from '../constants';
+import { type ApplicationStatusFilter, applicationStatusFilterValues } from '../types';
 
+// Typed as the full filter union, so adding a filter value without a label here is a
+// compile error rather than a blank row in the dropdown.
 const LABELS: Record<ApplicationStatusFilter, string> = {
   ...APPLICATION_STATUS_LABELS,
-  [STATUS_FILTER_ALL]: 'All',
+  ...FILTER_LABELS,
 };
 
 const OPTIONS: SelectOption<ApplicationStatusFilter>[] = applicationStatusFilterValues.map(

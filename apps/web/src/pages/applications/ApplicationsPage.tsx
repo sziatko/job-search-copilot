@@ -34,7 +34,9 @@ export function ApplicationsPage() {
           </p>
         </header>
 
-        {!loading && !loadError && <StatsStrip total={stats.total} byStatus={stats.byStatus} />}
+        {!loading && !loadError && (
+          <StatsStrip stats={stats} filter={statusFilter} onFilterChange={setStatusFilter} />
+        )}
 
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <ApplicationSearchInput value={q} onChange={setSearchText} />

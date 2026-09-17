@@ -87,7 +87,7 @@ export interface ApplicationListItem {
   id: number;
   appliedAt: Date;
   status: ApplicationStatus;
-  statusUpdatedAt: Date | null;
+  statusUpdatedAt: Date;
   /** Accumulated pipeline notes — see ApplicationService.updateStatus. */
   statusComment: string | null;
   salaryInListing: string | null;

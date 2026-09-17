@@ -29,7 +29,7 @@ with an index page, and (last, separately) a one-off import of the user's existi
   applyUrl, matchScore, recommendation, analyzer comment are read through the join.
   Rationale and the rejected alternatives: [ADR-0017](../decisions/0017-application-1to1-delta.md).
 - **`ApplicationStatus`** = `APPLIED, RECRUITER_SCREEN, REPLIED, INTERVIEW, OFFER,
-  REJECTED, NO_RESPONSE` — a separate axis from `UserAction`
+  REJECTED` — a separate axis from `UserAction`
   ([ADR-0018](../decisions/0018-application-status-separate-enum.md)).
 - A never-analysed application still gets a real `EstimatedVacancy` row: placeholder
   analyzer fields (`fullText:'N/A'`, `matchScore` from the tracker text or `0`,

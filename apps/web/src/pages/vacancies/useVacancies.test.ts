@@ -126,7 +126,8 @@ describe('useVacancies', () => {
             id: 1,
             appliedAt: now,
             status: 'APPLIED',
-            statusUpdatedAt: null,
+            // record() stamps this to appliedAt — it is never null.
+            statusUpdatedAt: now,
             salaryInListing: '130 PLN/h',
             usedTailoredResume: true,
             userComment: 'Adapted CV.',

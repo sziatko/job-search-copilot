@@ -14,7 +14,7 @@ values.
 ## Decision
 
 A distinct enum: `ApplicationStatus = APPLIED, RECRUITER_SCREEN, REPLIED,
-INTERVIEW, OFFER, REJECTED, NO_RESPONSE`, living on `Application`.
+INTERVIEW, OFFER, REJECTED`, living on `Application`.
 `UserAction` is unchanged. The only link between the axes is the side-effect in
 `ApplicationService.record` that sets the linked vacancy's `userAction = APPLIED`;
 nothing is derived in either direction.
@@ -22,8 +22,10 @@ nothing is derived in either direction.
 Ukrainian tracker vocabulary maps to it as: Подано→`APPLIED`,
 Питання від рекрутера→`RECRUITER_SCREEN`, Відповів→`REPLIED`,
 Запрошення на співбесіду / Співбесіда→`INTERVIEW`, Оффер→`OFFER`,
-Відмова→`REJECTED`, Без відповіді / (empty)→`NO_RESPONSE`. Freeform values map to
-the nearest, with the raw text preserved in `userComment`.
+Відмова→`REJECTED`, Без відповіді / (empty)→`APPLIED`. Freeform values map to
+the nearest, with the raw text preserved in `userComment`. "No answer" is not a
+stored value — it ages into the derived Timeout view
+([ADR-0022](0022-timeout-derived-until-scheduled.md)).
 
 ## Why this and not the alternatives
 
@@ -38,8 +40,8 @@ the nearest, with the raw text preserved in `userComment`.
 ## Consequences
 
 - Two enums to maintain. Adding an `ApplicationStatus` value touches: the Prisma
-  enum + a migration; `apps/mcp/src/server.ts` (`ApplicationStatusEnum`); the
-  `@IsEnum(ApplicationStatus)` DTOs in `apps/api`;
+  enum + a migration; `apps/mcp/src/applications/applications.schemas.ts`
+  (`ApplicationStatusEnum`); the `@IsEnum(ApplicationStatus)` DTOs in `apps/api`;
   `apps/web/src/pages/applications/types.ts` (`applicationStatusSchema`) and
   `constants.ts` (`APPLICATION_STATUS_LABELS` / `_ORDER` / `_BADGE_STYLES`, each
   `satisfies Record<…>`); `packages/core/src/index.ts` (re-export); the importer's

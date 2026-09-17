@@ -56,8 +56,10 @@ model Application {
   // the tracker import backfills historical values here.
   appliedAt          DateTime          @default(now())
   status             ApplicationStatus @default(APPLIED)
-  // "When I last moved this in the pipeline" — mirrors userActionUpdatedAt's semantics.
-  statusUpdatedAt    DateTime?
+  // "When I last moved this in the pipeline". Set at creation to `appliedAt` — a fresh
+  // application has already moved once, into the pipeline — then stamped by
+  // updateStatus(). Never null; the DB enforces it.
+  statusUpdatedAt    DateTime
   // Accumulated notes about pipeline movement (one per updateStatus() call that
   // passes a comment), appended to the existing value with " / " — not a history
   // table. Simplest thing that works; revisit as a real history if that's ever
@@ -95,5 +97,4 @@ enum ApplicationStatus {
   INTERVIEW
   OFFER
   REJECTED
-  NO_RESPONSE
 }

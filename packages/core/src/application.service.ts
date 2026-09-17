@@ -349,6 +349,7 @@ async function recordWithin(
     data: {
       estimatedVacancyId: vacancyId,
       appliedAt,
+      statusUpdatedAt: appliedAt,
       status: input.status ?? 'APPLIED',
       salaryInListing: input.salaryInListing?.trim() || null,
       usedTailoredResume: input.usedTailoredResume ?? false,

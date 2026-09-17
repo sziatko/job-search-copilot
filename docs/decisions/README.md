@@ -30,6 +30,7 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0019](0019-record-or-create-vacancy.md) | Recording an application find-or-creates the `EstimatedVacancy` | Accepted |
 | [0020](0020-web-router-tanstack.md) | Web router: `@tanstack/react-router`; TanStack Form deferred | Accepted |
 | [0021](0021-tracker-import-script.md) | One-off `tracker.md` importer: dry-run default, typed `--commit` gate | Accepted |
+| [0022](0022-timeout-derived-until-scheduled.md) | Timeout is derived on the client until a scheduled job owns it | Accepted |
 
 ## Template
 

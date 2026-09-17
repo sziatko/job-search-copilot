@@ -12,22 +12,35 @@ export const applicationStatusSchema = z.enum([
   'INTERVIEW',
   'OFFER',
   'REJECTED',
-  'NO_RESPONSE',
 ]);
 export type ApplicationStatus = z.infer<typeof applicationStatusSchema>;
 export const APPLICATION_STATUS = applicationStatusSchema.enum;
 
-/** Extra option in the status dropdown — UI only, never crosses the wire. */
+// Extra dropdown options — UI only, never cross the wire. ACTIVE and TIMEOUT are
+// derived from dates, not stored: see constants.ts for the rule.
 export const STATUS_FILTER_ALL = 'ALL' as const;
-export type ApplicationStatusFilter = ApplicationStatus | typeof STATUS_FILTER_ALL;
-export const applicationStatusFilterValues: readonly ApplicationStatusFilter[] = [
-  ...applicationStatusSchema.options,
+export const STATUS_FILTER_ACTIVE = 'ACTIVE' as const;
+export const STATUS_FILTER_TIMEOUT = 'TIMEOUT' as const;
+export type ApplicationStatusFilter =
+  | ApplicationStatus
+  | typeof STATUS_FILTER_ALL
+  | typeof STATUS_FILTER_ACTIVE
+  | typeof STATUS_FILTER_TIMEOUT;
+
+const extraFilterValues = [
   STATUS_FILTER_ALL,
+  STATUS_FILTER_ACTIVE,
+  STATUS_FILTER_TIMEOUT,
+] as const;
+
+export const applicationStatusFilterValues: readonly ApplicationStatusFilter[] = [
+  ...extraFilterValues,
+  ...applicationStatusSchema.options,
 ];
 /** Same set as a schema, for the router's validateSearch. */
 export const applicationStatusFilterSchema = z.enum([
+  ...extraFilterValues,
   ...applicationStatusSchema.options,
-  STATUS_FILTER_ALL,
 ]);
 
 // The analyzer's verdict — a third hand-written copy of this enum in the web bundle
@@ -38,7 +51,7 @@ export const applicationListItemSchema = z.object({
   id: z.number(),
   appliedAt: z.string(),
   status: applicationStatusSchema,
-  statusUpdatedAt: z.string().nullable(),
+  statusUpdatedAt: z.string(),
   /** Accumulated pipeline notes — see ApplicationService.updateStatus. Written via MCP/API only. */
   statusComment: z.string().nullable(),
   salaryInListing: z.string().nullable(),

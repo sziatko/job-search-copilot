@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { MatchScoreBadge } from '@/components/MatchScoreBadge';
 import { useVirtualRows } from '@/components/useVirtualRows';
+import { daysSinceLastMove, isTimedOut } from '../constants';
 import type { ApplicationListItem, ApplicationStatus } from '../types';
 import { ApplicationStatusSelect } from './ApplicationStatusSelect';
 import { CopyApplicationButton } from './CopyApplicationButton';
@@ -79,21 +80,23 @@ export function ApplicationsTable({
               >
                 <td className="whitespace-nowrap px-4 py-3 align-top text-sm text-slate-500">
                   <div className="flex items-center gap-1">
-                    {(() => {
-                      const daysSinceApplied = Math.floor(
-                        (Date.now() - new Date(item.appliedAt).getTime()) / (1000 * 60 * 60 * 24),
-                      );
-                      return daysSinceApplied > 30 ? (
-                        <span className="text-orange-500" title={`${daysSinceApplied} days old`}>
-                          ⏳
-                        </span>
-                      ) : null;
-                    })()}
+                    {isTimedOut(item) && (
+                      <span
+                        className="text-orange-500"
+                        title={`${daysSinceLastMove(item)} days since last update`}
+                      >
+                        ⏳
+                      </span>
+                    )}
                     <span>{dateFormatter.format(new Date(item.appliedAt))}</span>
                   </div>
-                  <div className="text-xs text-slate-400">
-                    upd: {dateFormatter.format(new Date(item.updatedAt))}
-                  </div>
+                  {/* Same stamp the hourglass reads; hidden until the row has actually
+                      moved, otherwise it would just repeat the applied date above. */}
+                  {item.statusUpdatedAt !== item.appliedAt && (
+                    <div className="text-xs text-slate-400">
+                      upd: {dateFormatter.format(new Date(item.statusUpdatedAt))}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3 align-top">
                   {isSynthetic ? (

@@ -39,7 +39,7 @@ export function buildHandlers(items: EstimatedVacancyListItem[]) {
         id: 1,
         appliedAt: now,
         status: 'APPLIED',
-        statusUpdatedAt: null,
+        statusUpdatedAt: now,
         statusComment: null,
         salaryInListing: body.salaryInListing ?? null,
         usedTailoredResume: body.usedTailoredResume ?? false,

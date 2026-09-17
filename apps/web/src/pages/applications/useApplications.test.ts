@@ -10,18 +10,25 @@ import { buildApplicationHandlers } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import type { ApplicationListItem } from './types';
 
+const DAY = 86_400_000;
+const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
+
 function application(overrides: Partial<ApplicationListItem> = {}): ApplicationListItem {
+  // Dates are relative to now, not fixed: the strip's Active/Timeout tiles are derived
+  // from them, so a literal date would make these tests rot on the calendar.
+  const applied = daysAgo(10);
   return {
     id: 1,
-    appliedAt: '2026-08-01T00:00:00.000Z',
+    appliedAt: applied,
     status: 'APPLIED',
-    statusUpdatedAt: null,
+    // record() stamps this to appliedAt; only updateStatus() moves it on.
+    statusUpdatedAt: applied,
     statusComment: null,
     salaryInListing: null,
     usedTailoredResume: false,
     userComment: null,
-    createdAt: '2026-08-01T00:00:00.000Z',
-    updatedAt: '2026-08-01T00:00:00.000Z',
+    createdAt: applied,
+    updatedAt: applied,
     estimatedVacancyId: 1,
     company: 'Acme',
     title: 'Backend Engineer',
@@ -111,8 +118,61 @@ describe('ApplicationsPage / useApplications', () => {
     const s = within(strip);
     expect(s.getByText('Offer')).toBeInTheDocument(); // non-zero, so shown
     expect(s.queryByText('Interview')).not.toBeInTheDocument(); // zero, not shown
-    // Total + Applied + Rejected (always) + Offer (non-zero) = 4 cells.
-    expect(strip.querySelectorAll('.text-lg')).toHaveLength(4);
+    // Total + Active + Timeout (always) + Applied + Rejected (always) + Offer = 6 cells.
+    expect(strip.querySelectorAll('.text-lg')).toHaveLength(6);
+  });
+
+  it('counts Active and Timeout, and the two close over the whole log', async () => {
+    mswServer.use(
+      ...buildApplicationHandlers([
+        application({ id: 1, status: 'APPLIED' }),
+        application({
+          id: 2,
+          status: 'INTERVIEW',
+          appliedAt: daysAgo(90),
+          statusUpdatedAt: daysAgo(2), // moved recently — old application is not stale
+        }),
+        application({ id: 3, status: 'REPLIED', appliedAt: daysAgo(45), statusUpdatedAt: daysAgo(45) }),
+        application({ id: 4, status: 'REJECTED', appliedAt: daysAgo(90), statusUpdatedAt: daysAgo(90) }),
+        application({ id: 5, status: 'OFFER', appliedAt: daysAgo(90), statusUpdatedAt: daysAgo(90) }),
+      ]),
+    );
+    renderTracker();
+    const totalLabel = await screen.findByText('Total');
+    const strip = totalLabel.parentElement?.parentElement as HTMLElement;
+    const s = within(strip);
+
+    // The button's accessible name is "<value> <label>".
+    expect(s.getByRole('button', { name: '5 Total' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: '2 Active' })).toBeInTheDocument(); // 1 APPLIED + 2 INTERVIEW
+    // Any non-closed status ages out, not just APPLIED.
+    expect(s.getByRole('button', { name: '1 Timeout' })).toBeInTheDocument(); // 3 REPLIED
+    // Closed outcomes are never "stuck" — 4 and 5 are 90 days old and still not counted.
+    expect(s.getByRole('button', { name: '1 Rejected' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: '1 Offer' })).toBeInTheDocument();
+  });
+
+  it('filters from a stats tile and keeps the dropdown in sync', async () => {
+    mswServer.use(
+      ...buildApplicationHandlers([
+        application({ id: 1, company: 'Fresh Co', appliedAt: daysAgo(5), statusUpdatedAt: daysAgo(5) }),
+        application({
+          id: 2,
+          company: 'Stale Co',
+          appliedAt: daysAgo(60),
+          statusUpdatedAt: daysAgo(60),
+        }),
+      ]),
+    );
+    renderTracker();
+    await screen.findByText('Fresh Co');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '1 Timeout' }));
+
+    await waitFor(() => expect(screen.queryByText('Fresh Co')).not.toBeInTheDocument());
+    expect(screen.getByText('Stale Co')).toBeInTheDocument();
+    expect(screen.getByLabelText('Status')).toHaveValue('TIMEOUT');
   });
 
   it('optimistically changes a status and keeps it on success', async () => {

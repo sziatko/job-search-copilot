@@ -62,6 +62,14 @@ describe('ApplicationService', () => {
       expect(reread?.matchScore).toBe(80); // analyzer fields untouched
     });
 
+    it('stamps statusUpdatedAt to appliedAt on creation', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+      // Same instant as appliedAt, not a separate "now" — a fresh application has
+      // already moved once (into the pipeline). Never null; the column is NOT NULL.
+      expect(application.statusUpdatedAt.getTime()).toBe(application.appliedAt.getTime());
+    });
+
     it('throws for an unknown vacancy id', async () => {
       await expect(applications.record({ estimatedVacancyId: 999_999 })).rejects.toBeInstanceOf(
         InvalidApplicationInputError,
@@ -139,6 +147,11 @@ describe('ApplicationService', () => {
       });
       expect(result.application.status).toBe('REJECTED');
       expect(result.application.appliedAt.toISOString().slice(0, 10)).toBe('2026-07-01');
+      // The tracker-import path: a backdated row is stamped with its own submission
+      // date, not with today.
+      expect(result.application.statusUpdatedAt.getTime()).toBe(
+        result.application.appliedAt.getTime(),
+      );
     });
   });
 

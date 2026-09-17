@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { listApplications, updateApplicationStatus } from './api';
+import { isActive, isTimedOut, matchesFilter } from './constants';
 import {
   type ApplicationListItem,
   type ApplicationStatus,
@@ -49,7 +50,7 @@ export function useApplications() {
   const visibleItems = useMemo(() => {
     const needle = q.toLowerCase();
     return items
-      .filter((item) => statusFilter === STATUS_FILTER_ALL || item.status === statusFilter)
+      .filter((item) => matchesFilter(item, statusFilter))
       .filter(
         (item) =>
           needle === '' ||
@@ -62,10 +63,14 @@ export function useApplications() {
   // Counts over the WHOLE log, not the filtered view — the strip is an overview.
   const stats = useMemo(() => {
     const byStatus = {} as Record<ApplicationStatus, number>;
+    let active = 0;
+    let timedOut = 0;
     for (const item of items) {
       byStatus[item.status] = (byStatus[item.status] ?? 0) + 1;
+      if (isTimedOut(item)) timedOut += 1;
+      else if (isActive(item)) active += 1;
     }
-    return { total: items.length, byStatus };
+    return { total: items.length, byStatus, active, timedOut };
   }, [items]);
 
   const statusMutation = useMutation({
@@ -80,7 +85,11 @@ export function useApplications() {
       });
       const previous = queryClient.getQueryData<ApplicationListItem[]>(APPLICATIONS_KEY);
       queryClient.setQueryData<ApplicationListItem[]>(APPLICATIONS_KEY, (old) =>
-        (old ?? []).map((item) => (item.id === id ? { ...item, status } : item)),
+        (old ?? []).map((item) =>
+          // Mirror what updateStatus() does server-side, or the row keeps its old
+          // last-move stamp until the refetch lands.
+          item.id === id ? { ...item, status, statusUpdatedAt: new Date().toISOString() } : item,
+        ),
       );
       return { previous };
     },

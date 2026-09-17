@@ -83,8 +83,8 @@ what the analyzer's row can't. See [ADR-0017](decisions/0017-application-1to1-de
 | `createdAt` / `updatedAt` | `DateTime` | Row bookkeeping. |
 | `estimatedVacancyId` | `Int @unique` | **NOT NULL 1:1 FK** to `EstimatedVacancy` (`onDelete: Cascade`). |
 | `appliedAt` | `DateTime @default(now())` | The real submission date — distinct from `EstimatedVacancy.createdAt` (date analysed). The tracker import backfills historical values here; the REST API has no `appliedAt` field. |
-| `status` | `ApplicationStatus` enum, default `APPLIED` | `APPLIED` \| `RECRUITER_SCREEN` \| `REPLIED` \| `INTERVIEW` \| `OFFER` \| `REJECTED` \| `NO_RESPONSE`. A separate axis from `UserAction` — [ADR-0018](decisions/0018-application-status-separate-enum.md). |
-| `statusUpdatedAt` | `DateTime?` | Set by `updateStatus()` to `new Date()`. "When I last moved this in the pipeline" — mirrors `userActionUpdatedAt`. |
+| `status` | `ApplicationStatus` enum, default `APPLIED` | `APPLIED` \| `RECRUITER_SCREEN` \| `REPLIED` \| `INTERVIEW` \| `OFFER` \| `REJECTED`. A separate axis from `UserAction` — [ADR-0018](decisions/0018-application-status-separate-enum.md). The former `NO_RESPONSE` value was dropped — [ADR-0022](decisions/0022-timeout-derived-until-scheduled.md). |
+| `statusUpdatedAt` | `DateTime` **NOT NULL** | "When I last moved this in the pipeline". `record()` stamps it to `appliedAt` — a fresh application has already moved once, into the pipeline — and `updateStatus()` restamps it to `new Date()`. Never null: the column has no default, so Prisma makes it *required* in `create`, and a new creation path that forgets it fails to compile rather than silently writing null. (Unlike `EstimatedVacancy.userActionUpdatedAt`, which is still nullable.) |
 | `statusComment` | `String? @db.Text` | Accumulated pipeline notes. Each `updateStatus()` call with a comment **appends** it to the existing value joined by `" / "` — not a history table, not an overwrite. Write-only via MCP (`update_application_status`) / API (`PATCH …/status`); the web `/tracker` page renders it merged with `userComment` and `estimationComment` but never writes it. Deliberately the simplest thing that works — revisit as a real history table if per-entry timestamps/authors are ever needed. |
 | `salaryInListing` | `String?` | Free text ("130 PLN/h"). |
 | `usedTailoredResume` | `Boolean @default(false)` | |
@@ -92,6 +92,14 @@ what the analyzer's row can't. See [ADR-0017](decisions/0017-application-1to1-de
 
 Indexes: `@@index([status])`, `@@index([appliedAt])`. Search on `/tracker` hits the
 linked vacancy's `company` / `title` — both have trigram GIN indexes.
+
+**Active / Timeout are derived, not stored.** `/tracker` splits the log on the client
+from `statusUpdatedAt`: `REJECTED` and `OFFER` are *closed*; of the rest, anything not
+moved for more than 30 days is a *timeout*, and the remainder is *active*. So
+`total = active + timeout + rejected + offer`, with no overlap and no remainder. There
+is deliberately no column, no job, and no server-side filter for it — the rule lives in
+one place, `apps/web/src/pages/applications/constants.ts`. Don't go looking for a
+`timeout` field.
 
 **Record-or-link** (`ApplicationService.record`, one transaction): link by
 `estimatedVacancyId` (web), or by a unique case-insensitive `(company, title)`

@@ -158,8 +158,13 @@ describe('Applications (e2e)', () => {
         .patch(`/api/v1/applications/${created.body.application.id}/status`)
         .send({ status: 'INTERVIEW' })
         .expect(200);
+      // record() stamps statusUpdatedAt to appliedAt, so the POST response already
+      // carries it — the PATCH is the first thing that moves it on.
+      expect(created.body.application.statusUpdatedAt).toBe(created.body.application.appliedAt);
       expect(res.body.status).toBe('INTERVIEW');
-      expect(res.body.statusUpdatedAt).not.toBeNull();
+      expect(new Date(res.body.statusUpdatedAt).getTime()).toBeGreaterThanOrEqual(
+        new Date(created.body.application.appliedAt).getTime(),
+      );
       expect(res.body.statusComment).toBeNull();
     });
 
