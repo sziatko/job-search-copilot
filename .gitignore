@@ -146,3 +146,7 @@ vite.config.ts.timestamp-*
 *.config.mjs
 *.config.mjs.map
 *.config.d.mts
+
+# Local Claude Code config — machine-specific and holds an API token, so it never
+# belongs in the repo. Overrides live in the untracked settings.local.json.
+.claude/settings.json
