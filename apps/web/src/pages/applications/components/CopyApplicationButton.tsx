@@ -38,7 +38,12 @@ const CheckIcon = () => (
   </svg>
 );
 
-export function CopyApplicationButton({ id, company, title, applyUrl }: CopyApplicationButtonProps) {
+export function CopyApplicationButton({
+  id,
+  company,
+  title,
+  applyUrl,
+}: CopyApplicationButtonProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -69,10 +74,10 @@ URL: ${applyUrl}`;
   return (
     <button
       type="button"
-      aria-label={copied ? "Copied!" : "Copy application to clipboard"}
+      aria-label={copied ? 'Copied!' : 'Copy application to clipboard'}
       onClick={handleCopy}
       className="inline-flex items-center justify-center rounded-md bg-slate-100 px-2 py-1.5 text-slate-600 hover:bg-slate-200 hover:text-slate-700 transition-colors"
-      title={copied ? "Copied!" : undefined}
+      title={copied ? 'Copied!' : undefined}
     >
       {copied ? <CheckIcon /> : <CopyIcon />}
     </button>

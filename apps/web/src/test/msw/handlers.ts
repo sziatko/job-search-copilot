@@ -1,6 +1,6 @@
 import { HttpResponse, http } from 'msw';
-import type { ApplicationListItem, ApplicationStatus } from '@/features/applications/types';
-import type { EstimatedVacancyListItem, UserAction } from '@/features/vacancies/types';
+import type { ApplicationListItem, ApplicationStatus } from '@/pages/applications/types';
+import type { EstimatedVacancyListItem, UserAction } from '@/pages/vacancies/types';
 
 const API_URL = 'http://localhost:3000/api/v1';
 

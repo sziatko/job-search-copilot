@@ -68,7 +68,7 @@ The web app's default filter is `NOT_REVIEWED`; the list sorts by `recommendatio
 >   `ApplicationStatusEnum` in [`server.ts`](../apps/mcp/src/server.ts), the
 >   `@IsEnum(ApplicationStatus)` DTOs in `apps/api`, `applicationStatusSchema` +
 >   the `APPLICATION_STATUS_LABELS` / `_ORDER` / `_BADGE_STYLES` maps in
->   [`apps/web/src/features/applications`](../apps/web/src/features/applications),
+>   [`apps/web/src/pages/applications`](../apps/web/src/pages/applications),
 >   the `core` re-export, and the importer's `STATUS_ALIASES`. Same "no single
 >   source" trade-off.
 

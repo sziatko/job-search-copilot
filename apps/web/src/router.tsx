@@ -1,10 +1,10 @@
 import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
 import { z } from 'zod';
 import { RootLayout } from './components/RootLayout';
-import { ApplicationsPage } from './features/applications/ApplicationsPage';
-import { applicationStatusFilterSchema } from './features/applications/types';
-import { VacanciesPage } from './features/vacancies/VacanciesPage';
+import { ApplicationsPage } from './pages/applications/ApplicationsPage';
+import { applicationStatusFilterSchema } from './pages/applications/types';
 import { IndexPage } from './pages/IndexPage';
+import { VacanciesPage } from './pages/vacancies/VacanciesPage';
 
 const rootRoute = createRootRoute({ component: RootLayout });
 

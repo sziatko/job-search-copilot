@@ -57,7 +57,7 @@ fields — [ADR-0019](0019-record-or-create-vacancy.md).
   `VACANCY_SELECT` + `flatten()` in
   [`packages/core/src/application.service.ts`](../../packages/core/src/application.service.ts)
   **and** `applicationListItemSchema` in
-  [`apps/web/src/features/applications/types.ts`](../../apps/web/src/features/applications/types.ts)
+  [`apps/web/src/pages/applications/types.ts`](../../apps/web/src/pages/applications/types.ts)
   (parallel maintenance, same rule as [ADR-0012](0012-web-hand-written-contract.md)).
 - Dropping the `@unique` on `estimatedVacancyId` → `record()`'s
   `ApplicationAlreadyExistsError` guard and its spec become dead; the 1:1 flatten

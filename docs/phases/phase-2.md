@@ -87,7 +87,7 @@ resolve to the same vacancy, an `applyUrl` collision). Not in CI, not re-run.
 
 - All steps landed: migration `20260910205538_add_application_model`,
   `ApplicationService` + spec, the api module + e2e, the three MCP tools + spec,
-  the router + index page + `features/applications/` + tests, `ApplyDialog` wired,
+  the router + index page + `pages/applications/` + tests, `ApplyDialog` wired,
   the importer (`src/tracker-import.ts` + `scripts/import-tracker.ts` + 26 unit tests).
 - `npm test` → **120 passed, 11 files**. `npm run lint` / `typecheck` / `build` clean.
 - **Tracker import run (2026-09-11):** 206 rows written in one transaction against

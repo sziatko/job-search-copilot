@@ -9,10 +9,10 @@ already has `EstimatedVacancyListItem` and the enums. The obvious move is to
 import them.
 
 ## Decision
-Don't. `apps/web/src/features/vacancies/types.ts` defines `zod` schemas
+Don't. `apps/web/src/pages/vacancies/types.ts` defines `zod` schemas
 (`recommendationSchema`, `userActionSchema`, `estimatedVacancyListItemSchema`,
 `listResponseSchema`) by hand; the TS types are `z.infer`'d from them.
-`apps/web/src/features/vacancies/api.ts` parses **every** response through them
+`apps/web/src/pages/vacancies/api.ts` parses **every** response through them
 (`parseResponse()` — logs the detail, throws a short message). The file carries a
 comment saying exactly this and why.
 
@@ -48,4 +48,4 @@ comment saying exactly this and why.
 ## Related
 [ADR-0011](0011-web-tanstack-query.md), [`../contracts.md`](../contracts.md)
 ("Web ↔ API contract"), [`../domain-model.md`](../domain-model.md) (enum-change
-checklist), `apps/web/src/features/vacancies/types.ts`.
+checklist), `apps/web/src/pages/vacancies/types.ts`.

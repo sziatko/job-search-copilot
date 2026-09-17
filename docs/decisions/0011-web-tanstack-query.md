@@ -38,7 +38,7 @@ Adopt `@tanstack/react-query`:
 - A failed load now retries once and can be refetched; the list revalidates after
   a mutation.
 - Tests must wrap the hook in a `QueryClientProvider` with `retry: false` (see
-  `apps/web/src/features/vacancies/useVacancies.test.ts`).
+  `apps/web/src/pages/vacancies/useVacancies.test.ts`).
 - The per-row `Set`/`Map` bookkeeping is smaller but still present, now driven by
   mutation callbacks rather than being the core mechanism.
 
@@ -54,4 +54,4 @@ Adopt `@tanstack/react-query`:
 
 ## Related
 [ADR-0012](0012-web-hand-written-contract.md), [ADR-0013](0013-accessible-ui-primitives.md),
-`apps/web/src/features/vacancies/useVacancies.ts`, `apps/web/src/lib/queryClient.ts`.
+`apps/web/src/pages/vacancies/useVacancies.ts`, `apps/web/src/lib/queryClient.ts`.

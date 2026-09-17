@@ -40,7 +40,7 @@ the nearest, with the raw text preserved in `userComment`.
 - Two enums to maintain. Adding an `ApplicationStatus` value touches: the Prisma
   enum + a migration; `apps/mcp/src/server.ts` (`ApplicationStatusEnum`); the
   `@IsEnum(ApplicationStatus)` DTOs in `apps/api`;
-  `apps/web/src/features/applications/types.ts` (`applicationStatusSchema`) and
+  `apps/web/src/pages/applications/types.ts` (`applicationStatusSchema`) and
   `constants.ts` (`APPLICATION_STATUS_LABELS` / `_ORDER` / `_BADGE_STYLES`, each
   `satisfies Record<…>`); `packages/core/src/index.ts` (re-export); the importer's
   `STATUS_ALIASES`. There is no single source — same trade-off as

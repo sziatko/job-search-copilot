@@ -4,8 +4,8 @@ import { RecommendationBadge } from '@/components/RecommendationBadge';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import type { EstimatedVacancyListItem, UserAction } from '../types';
-import { UserActionSelect } from './UserActionSelect';
 import { CopyVacancyButton } from './CopyVacancyButton';
+import { UserActionSelect } from './UserActionSelect';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 

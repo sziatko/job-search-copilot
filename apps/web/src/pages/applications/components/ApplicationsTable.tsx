@@ -3,8 +3,8 @@ import { MatchScoreBadge } from '@/components/MatchScoreBadge';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import type { ApplicationListItem, ApplicationStatus } from '../types';
 import { ApplicationStatusSelect } from './ApplicationStatusSelect';
-import { MergedComment } from './MergedComment';
 import { CopyApplicationButton } from './CopyApplicationButton';
+import { MergedComment } from './MergedComment';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
@@ -81,7 +81,7 @@ export function ApplicationsTable({
                   <div className="flex items-center gap-1">
                     {(() => {
                       const daysSinceApplied = Math.floor(
-                        (Date.now() - new Date(item.appliedAt).getTime()) / (1000 * 60 * 60 * 24)
+                        (Date.now() - new Date(item.appliedAt).getTime()) / (1000 * 60 * 60 * 24),
                       );
                       return daysSinceApplied > 30 ? (
                         <span className="text-orange-500" title={`${daysSinceApplied} days old`}>

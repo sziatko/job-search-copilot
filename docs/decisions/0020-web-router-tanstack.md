@@ -52,7 +52,7 @@ revisit at the first multi-step / dynamic form.
   paths in the router/tracker tests.
 - Changing the `/tracker` search schema → `trackerSearchSchema` in `router.tsx`
   **and** `applicationStatusFilterSchema` in
-  [`apps/web/src/features/applications/types.ts`](../../apps/web/src/features/applications/types.ts).
+  [`apps/web/src/pages/applications/types.ts`](../../apps/web/src/pages/applications/types.ts).
 - Adding a route without adding it to `routeTree` → it 404s and the tests that
   build from `routeTree` won't see it.
 

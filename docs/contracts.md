@@ -8,8 +8,8 @@ Source of truth:
 [`apps/api/src/applications/applications.controller.ts`](../apps/api/src/applications/applications.controller.ts),
 [`apps/api/src/setup-app.ts`](../apps/api/src/setup-app.ts),
 [`apps/mcp/src/server.ts`](../apps/mcp/src/server.ts),
-[`apps/web/src/features/vacancies/types.ts`](../apps/web/src/features/vacancies/types.ts),
-[`apps/web/src/features/applications/types.ts`](../apps/web/src/features/applications/types.ts).
+[`apps/web/src/pages/vacancies/types.ts`](../apps/web/src/pages/vacancies/types.ts),
+[`apps/web/src/pages/applications/types.ts`](../apps/web/src/pages/applications/types.ts).
 
 ## REST API
 
@@ -58,7 +58,7 @@ any future `DomainError` that isn't pre-validated —
 >   `apps/api/test/{estimated-vacancies,applications}.e2e.spec.ts`.
 > - Changing `POST /applications`' envelope (`{ application, resolution, vacancyCreated }`)
 >   → `recordApplicationResponseSchema` in
->   `apps/web/src/features/applications/types.ts`, `useVacancies.ts`'s `applyMutation`,
+>   `apps/web/src/pages/applications/types.ts`, `useVacancies.ts`'s `applyMutation`,
 >   and `applications.e2e.spec.ts`.
 > - Changing a status code (e.g. POST back to always-201) → the e2e assertions and
 >   [ADR-0005](decisions/0005-analyze-once.md).
@@ -105,8 +105,8 @@ back the large text the caller just sent (`fullText`, `estimationComment`,
 
 ## Web ↔ API contract
 
-`apps/web/src/features/vacancies/types.ts` and
-`apps/web/src/features/applications/types.ts` hold `zod` schemas that mirror the API
+`apps/web/src/pages/vacancies/types.ts` and
+`apps/web/src/pages/applications/types.ts` hold `zod` schemas that mirror the API
 JSON. **The types are inferred from the schemas** (`z.infer`), and each feature's
 `api.ts` parses every response through them via `parseResponse()` (shared from
 `apps/web/src/lib/api.ts`) — a shape mismatch throws a short "unexpected format"
@@ -118,7 +118,7 @@ as strings.
 
 These files are deliberately **not** generated from `core` and do **not** import it
 — [ADR-0012](decisions/0012-web-hand-written-contract.md). It is the one place the
-parallel maintenance is accepted. Note `features/applications/types.ts` carries a
+parallel maintenance is accepted. Note `pages/applications/types.ts` carries a
 third hand-written copy of the `recommendation` enum (the analyzer verdict shown in
 the tracker's Score/Comment columns).
 

@@ -11,10 +11,16 @@ subprocess and speaking stdio to it.
 ## Decision
 Split the two concerns:
 
-- `apps/mcp/src/server.ts` — `createServer(vacancies = new EstimatedVacancyService())`
-  builds an `McpServer` with all four tools registered and returns it, *without*
-  connecting a transport. The optional `vacancies` param lets a test inject a
-  service bound to its own client.
+- `apps/mcp/src/server.ts` — `createServer(vacancies = new EstimatedVacancyService(),
+  applications = new ApplicationService())` builds an `McpServer` and returns it,
+  *without* connecting a transport. The optional params let a test inject services
+  bound to their own client. The nine tools themselves are registered by two
+  per-feature functions this file composes — `registerEstimatedVacancyTools(server,
+  vacancies)` in `estimated-vacancies/estimated-vacancies.tools.ts` (5 tools) and
+  `registerApplicationTools(server, applications)` in
+  `applications/applications.tools.ts` (4 tools) — each with a sibling
+  `*.schemas.ts` for its zod input shapes. `server.ts` itself stays composition
+  only; it does not know what a tool looks like.
 - `apps/mcp/src/index.ts` — the entrypoint: `import './env'` first, then
   `createServer()`, then connect a `StdioServerTransport`, then `main().catch`.
 
@@ -39,10 +45,14 @@ recommended way — and call each tool by name, asserting on the real
 ## What this constrains — breaks if you change it
 - Moving tool registration back into `index.ts` → the in-memory-transport tests
   can't reach the handlers.
-- Removing the `vacancies` parameter from `createServer()` → tests can't inject a
-  service; they'd depend on the process-wide lazy client's env being set.
+- Removing the `vacancies` / `applications` parameters from `createServer()` →
+  tests can't inject a service; they'd depend on the process-wide lazy client's
+  env being set.
 - Renaming a tool or changing an input schema → `apps/mcp/src/server.spec.ts`
   (it calls tools by string name with literal argument objects).
+- Adding a third domain should get its own `<feature>/` folder and
+  `register<Feature>Tools(server, service)` function, composed into
+  `createServer()` the same way — not appended into an existing feature's file.
 
 ## Related
 [ADR-0004](0004-one-service-two-transports.md), [ADR-0015](0015-testing-strategy.md),

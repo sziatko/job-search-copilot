@@ -38,7 +38,7 @@ In `apps/api/src/setup-app.ts`:
   ([ADR-0009](0009-domain-errors-and-configure-app.md)).
 
 ## What this constrains — breaks if you change it
-- Changing the prefix or default version → `apps/web/src/features/vacancies/api.ts`
+- Changing the prefix or default version → `apps/web/src/pages/vacancies/api.ts`
   (`API_BASE`), `apps/web/src/test/msw/handlers.ts`, and every URL in
   `apps/api/test/estimated-vacancies.e2e.spec.ts`.
 - Removing `VERSION_NEUTRAL` from `HealthController` (or the `exclude: ['health']`)
