@@ -16,5 +16,13 @@ export function UserActionSelect({
   disabled?: boolean;
   onChange: (value: UserAction) => void;
 }) {
-  return <Select value={value} options={OPTIONS} disabled={disabled} onChange={onChange} />;
+  return (
+    <Select
+      className="status-select"
+      value={value}
+      options={OPTIONS}
+      disabled={disabled}
+      onChange={onChange}
+    />
+  );
 }

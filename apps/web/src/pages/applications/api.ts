@@ -9,13 +9,20 @@ import {
   recordApplicationResponseSchema,
 } from './types';
 
-export async function listApplications(): Promise<ApplicationListItem[]> {
+export interface ApplicationPage {
+  items: ApplicationListItem[];
+  /** Rows in the log, independent of the page size — so the "N of M" footer and
+   * the dashboard tiles stay truthful past the 500-row fetch cap. */
+  total: number;
+}
+
+export async function listApplications(): Promise<ApplicationPage> {
   // The tracker loads the whole log and filters/sorts client-side (Phase 1 pattern).
   const res = await fetch(`${API_BASE}/applications?limit=500`);
   if (!res.ok) {
     throw new Error(`Failed to load applications: HTTP ${res.status}`);
   }
-  return parseResponse(listApplicationsResponseSchema, await res.json(), 'Load applications').items;
+  return parseResponse(listApplicationsResponseSchema, await res.json(), 'Load applications');
 }
 
 export async function recordApplication(

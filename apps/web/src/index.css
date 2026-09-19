@@ -1,1 +1,722 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens. Every color the app uses comes from here — never a raw
+   Tailwind palette name (bg-slate-50, text-gray-900). The theme switch works
+   by redefining these variables, which is why no `dark:` variant appears
+   anywhere: a utility like `bg-surface` resolves through var(--color-surface),
+   so flipping the variable re-themes every consumer at once.
+
+   Ported from docs/design/dashboard-reference_2.html.
+--------------------------------------------------------------------------- */
+@theme {
+  --font-sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-bg: #f5f7fb;
+  --color-surface: #ffffff;
+  --color-surface-alt: #eef2fa;
+  --color-surface-sunken: #e7edf7;
+  --color-border: #dae3f0;
+  --color-border-strong: #becde3;
+  --color-ink: #12151e;
+  --color-ink-soft: #3a4252;
+  --color-ink-muted: #69738a;
+  --color-ink-faint: #99a2b4;
+  --color-accent: #2e5cd6;
+  --color-accent-ink: #1f45b0;
+  --color-accent-soft: #e6edfc;
+  --color-accent-soft-border: #c2d3f5;
+  --color-good: #17a874;
+  --color-good-soft: #e2f6ec;
+  --color-good-soft-border: #bae9d1;
+  --color-warn: #b4780a;
+  --color-warn-soft: #fbf0da;
+  --color-warn-soft-border: #efd79c;
+  --color-bad: #dc3d3d;
+  --color-bad-soft: #fbeaea;
+  --color-bad-soft-border: #f2c3c3;
+
+  /* Named -card/-pop rather than -sm/-md: those two are Tailwind's own theme
+     keys, and declaring them here would silently override shadow-sm/shadow-md. */
+  --shadow-card: 0 1px 2px rgba(18, 21, 30, 0.06);
+  --shadow-pop: 0 8px 22px rgba(18, 21, 30, 0.09);
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-ink antialiased font-sans;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    margin: 0;
+  }
+  a {
+    @apply text-accent;
+  }
+  button {
+    font-family: inherit;
+  }
+}
+
+@layer components {
+  .mono {
+    @apply font-mono tabular-nums;
+  }
+
+  /* ---------- shell ---------- */
+  .app {
+    @apply flex;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    @apply fixed inset-y-0 left-0 z-40 flex w-[244px] flex-none flex-col gap-[18px] overflow-y-auto overflow-x-hidden border-r border-border bg-surface px-[14px] py-[18px];
+    transition:
+      width 0.18s ease,
+      transform 0.22s ease;
+  }
+  .sidebar.collapsed {
+    width: var(--rail-w);
+    @apply px-[10px];
+  }
+  .sidebar.collapsed .brand {
+    @apply justify-center px-0 py-[4px];
+  }
+  .sidebar.collapsed .brand-text,
+  .sidebar.collapsed .nav-label,
+  .sidebar.collapsed .nav-text,
+  .sidebar.collapsed .nav-count,
+  .sidebar.collapsed .soon-pill,
+  .sidebar.collapsed .foot-text,
+  .sidebar.collapsed .rail-toggle .rail-toggle-text {
+    @apply hidden;
+  }
+  .sidebar.collapsed .nav-item {
+    @apply justify-center px-0 py-[10px];
+  }
+  .sidebar.collapsed .nav-item svg {
+    opacity: 1;
+  }
+  .sidebar.collapsed .sidebar-foot {
+    @apply justify-center px-0;
+  }
+  .sidebar.collapsed .rail-toggle {
+    @apply justify-center;
+  }
+  .sidebar.collapsed .rail-toggle svg {
+    transform: rotate(180deg);
+  }
+
+  .brand {
+    @apply flex items-center gap-[10px] px-[8px] py-[4px];
+  }
+  .brand-mark {
+    @apply flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[8px] text-white;
+    background: linear-gradient(155deg, var(--color-accent), var(--color-accent-ink));
+  }
+  .brand-mark svg {
+    @apply h-[17px] w-[17px];
+  }
+  .brand-name {
+    @apply text-[15px] font-extrabold leading-[1.15] tracking-[-0.01em];
+  }
+  .brand-sub {
+    @apply text-[11px] text-ink-muted;
+  }
+
+  .nav {
+    @apply flex flex-col gap-[2px];
+  }
+  .nav-label {
+    @apply px-[10px] pb-[4px] pt-[10px] text-[10.5px] font-bold uppercase tracking-[.07em] text-ink-faint;
+  }
+  .nav-item {
+    @apply flex w-full cursor-pointer items-center gap-[10px] rounded-[9px] border border-transparent bg-transparent px-[10px] py-[9px] text-left text-[13.5px] font-semibold text-ink-soft no-underline;
+  }
+  .nav-item svg {
+    @apply h-[16px] w-[16px] flex-none opacity-80;
+  }
+  .nav-item:hover {
+    @apply bg-surface-alt text-ink;
+  }
+  .nav-item.active {
+    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
+  }
+  .nav-item.active svg {
+    opacity: 1;
+  }
+  .nav-count {
+    @apply ml-auto rounded-[6px] bg-surface-sunken px-[6px] py-[1px] font-mono text-[11px] text-ink-faint;
+  }
+  .nav-item.active .nav-count {
+    @apply text-accent-ink;
+    background: #fff2;
+  }
+  .nav-item.disabled {
+    @apply cursor-default opacity-55;
+  }
+  .nav-item.disabled:hover {
+    @apply bg-transparent text-ink-soft;
+  }
+  .soon-pill {
+    @apply ml-auto rounded-[20px] border border-border bg-surface-sunken px-[6px] py-[1px] text-[9.5px] font-bold tracking-[.04em] text-ink-muted;
+  }
+
+  .sidebar-foot {
+    @apply mt-auto flex items-center gap-[9px] border-t border-border px-[8px] pb-[4px] pt-[10px];
+  }
+  .avatar {
+    @apply flex h-[28px] w-[28px] flex-none items-center justify-center rounded-full border border-border bg-surface-sunken text-[11px] font-bold text-ink-muted;
+  }
+  .foot-name {
+    @apply text-[12.5px] font-bold leading-[1.2];
+  }
+  .foot-role {
+    @apply text-[10.5px] text-ink-muted;
+  }
+
+  /* A <button> rather than the mockup's <div>: it is a dismiss control, and a
+     click-only div fails the a11y lint. Reset so it renders as a bare overlay. */
+  .scrim {
+    @apply hidden border-0 p-0;
+  }
+
+  .main {
+    @apply flex min-w-0 flex-1 flex-col;
+    margin-left: 244px;
+    transition: margin-left 0.18s ease;
+  }
+  .main.rail {
+    margin-left: var(--rail-w);
+  }
+
+  .rail-toggle {
+    @apply my-[2px] flex w-full cursor-pointer items-center gap-[10px] rounded-[9px] border border-border bg-surface-alt px-[10px] py-[8px] text-[12px] font-bold text-ink-muted;
+  }
+  .rail-toggle:hover {
+    @apply border-border-strong text-ink;
+  }
+  .rail-toggle svg {
+    @apply h-[15px] w-[15px] flex-none;
+    transition: transform 0.18s ease;
+  }
+
+  .topbar {
+    @apply sticky top-0 z-20 flex items-end justify-between gap-[16px] border-b border-border px-[28px] py-[16px] backdrop-blur-[8px];
+    background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  }
+  .topbar-title {
+    @apply text-[20px] font-extrabold tracking-[-0.01em];
+  }
+  .topbar-sub {
+    @apply mt-[3px] text-[12.5px] text-ink-muted;
+  }
+  .menu-toggle {
+    @apply hidden h-[34px] w-[34px] flex-none cursor-pointer items-center justify-center rounded-[8px] border border-border bg-surface text-ink-soft;
+  }
+  .topbar-meta {
+    @apply whitespace-nowrap text-right text-[11.5px] text-ink-faint;
+  }
+
+  .view {
+    @apply px-[28px] pb-[56px] pt-[24px];
+  }
+
+  /* ---------- shared bits ---------- */
+  .kpi-row {
+    @apply mb-[20px] grid gap-[12px];
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .kpi-tile {
+    @apply rounded-[12px] border border-border bg-surface px-[16px] py-[14px] text-left shadow-card;
+  }
+  .kpi-tile .kpi-label {
+    @apply text-[11px] font-bold uppercase tracking-[.04em] text-ink-muted;
+  }
+  .kpi-tile .kpi-value {
+    @apply mt-[6px] font-mono text-[25px] font-semibold tracking-[-0.01em];
+  }
+  .kpi-tile .kpi-note {
+    @apply mt-[3px] text-[11.5px] text-ink-faint;
+  }
+  .kpi-tile.accent .kpi-value {
+    @apply text-accent-ink;
+  }
+  .kpi-tile.good .kpi-value {
+    @apply text-good;
+  }
+  .kpi-tile.bad .kpi-value {
+    @apply text-bad;
+  }
+  /* Not in the mockup: the Timeout tile needs a colour between good and bad. */
+  .kpi-tile.warn .kpi-value {
+    @apply text-warn;
+  }
+  /* The mockup draws KPI tiles as inert <div>s. Ours are quick filters, so they
+     need a pressed state that the mockup has no equivalent for. */
+  .kpi-tile.selected {
+    @apply border-accent-soft-border bg-accent-soft;
+  }
+  button.kpi-tile {
+    @apply cursor-pointer transition-colors;
+  }
+  button.kpi-tile:hover {
+    @apply border-border-strong;
+  }
+
+  .card {
+    @apply rounded-[14px] border border-border bg-surface shadow-card;
+  }
+  .card-head {
+    @apply flex flex-wrap items-center justify-between gap-[12px] px-[18px] pb-[12px] pt-[16px];
+  }
+  .card-head h2 {
+    @apply text-[15px] font-extrabold;
+  }
+  .card-head .count {
+    @apply mt-[2px] text-[12px] text-ink-muted;
+  }
+
+  .toolbar {
+    @apply flex flex-wrap items-center gap-[10px] px-[18px] pb-[14px];
+  }
+  .search-input {
+    @apply min-w-[160px] flex-1 basis-[220px] rounded-[9px] border border-border-strong bg-surface-sunken px-[12px] py-[8px] text-[13px] text-ink;
+  }
+  .search-input:focus {
+    @apply bg-surface outline outline-2 outline-accent-soft-border;
+    outline-offset: 0;
+  }
+  .search-input::placeholder {
+    @apply text-ink-faint;
+  }
+  select.filter-select,
+  select.status-select {
+    @apply rounded-[9px] border border-border-strong bg-surface px-[10px] py-[7px] text-[12.5px] font-semibold text-ink;
+  }
+  select.status-select:disabled {
+    @apply cursor-wait opacity-50;
+  }
+  .filter-group {
+    @apply flex items-center gap-[7px] text-[12px] font-semibold text-ink-muted;
+  }
+
+  table {
+    @apply w-full border-collapse;
+    min-width: 760px;
+  }
+  /* inset shadow, not border-bottom: with border-collapse: collapse the border is
+     painted with the table, so a sticky <thead> visibly detaches while scrolling. */
+  thead th {
+    @apply sticky top-0 z-10 bg-surface px-[18px] py-[9px] text-left text-[10.5px] font-bold uppercase tracking-[.05em] text-ink-faint shadow-[inset_0_-1px_0_var(--color-border)];
+  }
+  tbody td {
+    @apply border-b border-border px-[18px] py-[13px] align-top text-[13px];
+  }
+  tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  tbody tr:hover {
+    @apply bg-surface-alt;
+  }
+  .table-body-scroll {
+    @apply overflow-auto;
+    max-height: 560px;
+    /* Reserve the scrollbar's lane whether or not it is showing. Without this,
+       filtering down to fewer rows removes the scrollbar and every column
+       silently gains ~15px — the table appears to jump as the data changes. */
+    scrollbar-gutter: stable;
+  }
+
+  .role-title {
+    @apply text-[13.5px] font-bold text-ink;
+  }
+  .role-link {
+    @apply text-ink no-underline;
+  }
+  .role-link:hover {
+    @apply text-accent-ink underline;
+  }
+  .role-meta {
+    @apply mt-[2px] text-[12px] text-ink-muted;
+  }
+  .role-meta .id {
+    @apply text-ink-faint;
+  }
+  .date-cell {
+    @apply whitespace-nowrap text-[12.5px] text-ink-soft;
+  }
+  .date-upd {
+    @apply mt-[1px] text-[10.5px] text-ink-faint;
+  }
+  .timeout-mark {
+    @apply text-warn;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-[4px] whitespace-nowrap rounded-[20px] border border-transparent px-[9px] py-[2px] font-mono text-[12px] font-semibold;
+  }
+  .pill.score-hi {
+    @apply border-good-soft-border bg-good-soft text-good;
+  }
+  .pill.score-mid {
+    @apply border-warn-soft-border bg-warn-soft text-warn;
+  }
+  .pill.score-lo {
+    @apply border-border bg-surface-sunken text-ink-muted;
+  }
+  .tag {
+    @apply whitespace-nowrap rounded-[20px] border border-transparent px-[9px] py-[3px] font-sans text-[11px] font-bold;
+  }
+  .tag.good {
+    @apply border-good-soft-border bg-good-soft text-good;
+  }
+  .tag.warn {
+    @apply border-warn-soft-border bg-warn-soft text-warn;
+  }
+  .tag.bad {
+    @apply border-bad-soft-border bg-bad-soft text-bad;
+  }
+  .tag.neutral {
+    @apply border-border bg-surface-sunken text-ink-muted;
+  }
+  .tag.accent {
+    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
+  }
+
+  .comment-cell {
+    @apply max-w-[340px] text-[12.5px] leading-[1.5] text-ink-soft;
+  }
+  .comment-cell .clamp {
+    @apply line-clamp-2;
+  }
+  .comment-cell.expanded .clamp {
+    -webkit-line-clamp: unset;
+  }
+  .show-more {
+    @apply cursor-pointer border-none bg-transparent pt-[3px] text-[12px] font-bold text-accent;
+  }
+  .comment-user {
+    @apply text-ink;
+  }
+  .comment-status {
+    @apply text-accent-ink;
+  }
+  .comment-analyzer {
+    @apply text-ink-muted;
+  }
+
+  .icon-btn {
+    @apply relative inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[8px] border border-border-strong bg-surface text-ink-muted;
+  }
+  .icon-btn:hover {
+    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
+  }
+  .icon-btn svg {
+    @apply h-[14px] w-[14px];
+  }
+  .copied-flag {
+    @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-ink px-[7px] py-[3px] text-[10.5px] font-bold text-bg opacity-0;
+    transition: opacity 0.15s ease;
+  }
+  .icon-btn.flash .copied-flag {
+    @apply opacity-100;
+  }
+  /* Inside a scroll box the bubble is clipped at the top edge, which with
+     virtualization is every row you scroll to, not just the first. */
+  .table-body-scroll .copied-flag {
+    @apply bottom-auto top-[calc(100%+6px)];
+  }
+
+  .empty-state {
+    @apply px-[18px] py-[46px] text-center text-[13px] text-ink-muted;
+  }
+  .table-foot {
+    @apply border-t border-border px-[18px] pb-[16px] pt-[12px] text-[11.5px] text-ink-faint;
+  }
+
+  /* ---------- dashboard ---------- */
+  .dash-grid {
+    @apply grid items-start gap-[16px];
+    grid-template-columns: 1.3fr 1fr;
+  }
+  .funnel {
+    @apply flex flex-col gap-[10px] px-[18px] pb-[18px] pt-[6px];
+  }
+  .funnel-row {
+    @apply grid items-center gap-[10px];
+    grid-template-columns: 118px 1fr 64px 70px;
+  }
+  .funnel-name {
+    @apply text-[12.5px] font-bold text-ink-soft;
+  }
+  .funnel-track {
+    @apply h-[20px] overflow-hidden rounded-[7px] bg-surface-sunken;
+  }
+  .funnel-fill {
+    @apply h-full rounded-[7px] bg-accent;
+    min-width: 3%;
+  }
+  .funnel-value {
+    @apply text-right font-mono text-[13px] font-semibold;
+  }
+  .funnel-conv {
+    @apply whitespace-nowrap text-right font-mono text-[11px] text-ink-faint;
+  }
+
+  .attn-list,
+  .activity-list {
+    @apply flex flex-col;
+  }
+  .attn-item,
+  .activity-item {
+    @apply flex items-center gap-[11px] border-b border-border px-[18px] py-[11px];
+  }
+  .attn-item:last-child,
+  .activity-item:last-child {
+    @apply border-b-0;
+  }
+  .attn-score {
+    @apply min-w-[40px] flex-none rounded-[8px] border border-good-soft-border bg-good-soft px-[7px] py-[5px] text-center font-mono text-[12.5px] font-bold text-good;
+  }
+  .attn-body,
+  .activity-body {
+    @apply min-w-0 flex-1;
+  }
+  .attn-title,
+  .activity-title {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold;
+  }
+  .attn-sub,
+  .activity-sub {
+    @apply mt-[1px] text-[11.5px] text-ink-muted;
+  }
+  .attn-go {
+    @apply flex-none cursor-pointer rounded-[7px] border border-accent-soft-border bg-accent-soft px-[9px] py-[5px] text-[11.5px] font-bold text-accent;
+  }
+  .activity-dot {
+    @apply h-[8px] w-[8px] flex-none rounded-full;
+  }
+  .activity-dot.good {
+    @apply bg-good;
+  }
+  .activity-dot.warn {
+    @apply bg-warn;
+  }
+  .activity-dot.accent {
+    @apply bg-accent;
+  }
+  .activity-time {
+    @apply flex-none font-mono text-[11px] text-ink-faint;
+  }
+
+  /* ---------- profile / soon ---------- */
+  .soon-wrap {
+    @apply mx-auto flex max-w-[420px] flex-col items-center gap-[14px] px-[20px] py-[70px] text-center;
+  }
+  .soon-icon {
+    @apply flex h-[52px] w-[52px] items-center justify-center rounded-[14px] border border-accent-soft-border bg-accent-soft text-accent-ink;
+  }
+  .soon-icon svg {
+    @apply h-[24px] w-[24px];
+  }
+  /* Preflight strips heading weight, so the mockup's size-only rule needs it back. */
+  .soon-wrap h2 {
+    @apply text-[17px] font-bold;
+  }
+  .soon-wrap p {
+    @apply text-[13px] leading-[1.55] text-ink-muted;
+  }
+  .soon-list {
+    @apply flex w-full flex-col gap-[5px] rounded-[10px] border border-border bg-surface-alt px-[16px] py-[12px] text-left text-[12.5px] text-ink-soft;
+  }
+
+  /* ---------- dialogs + forms (not in the mockup; themed so they don't stay white) ---------- */
+  .dialog-title {
+    @apply text-[17px] font-extrabold;
+  }
+  .dialog-sub {
+    @apply mt-[4px] text-[13px] text-ink-muted;
+  }
+  .dialog-actions {
+    @apply mt-[24px] flex justify-end gap-[10px];
+  }
+
+  /* `text-bg` on an accent fill, the inversion the mockup's .copied-flag already
+     uses: --color-accent is dark in the light theme and light in the dark one,
+     so a fixed white/black label would fail contrast in one of them. */
+  .btn {
+    @apply cursor-pointer rounded-[9px] border border-border-strong bg-surface px-[14px] py-[8px] text-[13px] font-bold text-ink;
+  }
+  .btn:hover {
+    @apply bg-surface-alt;
+  }
+  .btn-primary {
+    @apply border-transparent bg-accent text-bg;
+  }
+  .btn-primary:hover {
+    @apply bg-accent-ink;
+  }
+  .btn-danger {
+    @apply border-transparent bg-bad text-bg;
+  }
+
+  .field-label {
+    @apply block text-[12.5px] font-bold text-ink-soft;
+  }
+  .field-input {
+    @apply mt-[6px] w-full rounded-[9px] border border-border-strong bg-surface px-[12px] py-[8px] text-[13px] text-ink;
+  }
+  .field-input:focus {
+    @apply bg-surface outline outline-2 outline-accent-soft-border outline-offset-0;
+  }
+  .field-check {
+    @apply flex items-center gap-[8px] text-[13px] text-ink-soft;
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 860px) {
+    .sidebar,
+    .sidebar.collapsed {
+      @apply w-[244px] px-[14px];
+      transform: translateX(-100%);
+      box-shadow: var(--shadow-pop);
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+    .sidebar.collapsed .brand-text,
+    .sidebar.collapsed .nav-label,
+    .sidebar.collapsed .nav-text,
+    .sidebar.collapsed .nav-count,
+    .sidebar.collapsed .soon-pill,
+    .sidebar.collapsed .foot-text,
+    .sidebar.collapsed .rail-toggle-text {
+      display: revert;
+    }
+    .sidebar.collapsed .brand {
+      @apply justify-start;
+    }
+    .sidebar.collapsed .nav-item {
+      @apply justify-start px-[10px] py-[9px];
+    }
+    .sidebar.collapsed .sidebar-foot {
+      @apply justify-start;
+    }
+    .rail-toggle {
+      @apply hidden;
+    }
+    .main,
+    .main.rail {
+      margin-left: 0;
+    }
+    .menu-toggle {
+      @apply inline-flex;
+    }
+    .scrim.show {
+      @apply fixed inset-0 z-30 block;
+      background: rgba(10, 12, 16, 0.4);
+    }
+    .topbar {
+      @apply px-[16px] py-[14px];
+    }
+    .view {
+      @apply px-[14px] pb-[44px] pt-[18px];
+    }
+    .kpi-row {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .funnel-row {
+      grid-template-columns: 84px 1fr 44px;
+    }
+    .funnel-conv {
+      @apply hidden;
+    }
+  }
+  @media (max-width: 980px) {
+    .dash-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Runtime theme tokens. The utilities above resolve through var(), so
+   redefining them here re-themes everything — that is the entire mechanism, and
+   why no `dark:` variant is needed.
+
+   Three states:
+     no data-theme  -> follows the OS (the media query below)
+     data-theme=light -> forced light, the :not() guard blocks the media query
+     data-theme=dark  -> forced dark, overrides everything
+
+   Ported from docs/design/dashboard-reference_2.html.
+--------------------------------------------------------------------------- */
+:root {
+  --rail-w: 72px;
+  color-scheme: light;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: #12151c;
+    --color-surface: #1a1e27;
+    --color-surface-alt: #21262f;
+    --color-surface-sunken: #0f1218;
+    --color-border: #2c3240;
+    --color-border-strong: #3b4252;
+    --color-ink: #eaedf2;
+    --color-ink-soft: #c2c9d6;
+    --color-ink-muted: #8b93a3;
+    --color-ink-faint: #5e6577;
+    --color-accent: #6e9ee8;
+    --color-accent-ink: #9bbef2;
+    --color-accent-soft: #22304a;
+    --color-accent-soft-border: #35456a;
+    --color-good: #4cbb87;
+    --color-good-soft: #17301f;
+    --color-good-soft-border: #275639;
+    --color-warn: #dcab3f;
+    --color-warn-soft: #362a0e;
+    --color-warn-soft-border: #5c481b;
+    --color-bad: #e17575;
+    --color-bad-soft: #3a1d1d;
+    --color-bad-soft-border: #5e2e2e;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #12151c;
+  --color-surface: #1a1e27;
+  --color-surface-alt: #21262f;
+  --color-surface-sunken: #0f1218;
+  --color-border: #2c3240;
+  --color-border-strong: #3b4252;
+  --color-ink: #eaedf2;
+  --color-ink-soft: #c2c9d6;
+  --color-ink-muted: #8b93a3;
+  --color-ink-faint: #5e6577;
+  --color-accent: #6e9ee8;
+  --color-accent-ink: #9bbef2;
+  --color-accent-soft: #22304a;
+  --color-accent-soft-border: #35456a;
+  --color-good: #4cbb87;
+  --color-good-soft: #17301f;
+  --color-good-soft-border: #275639;
+  --color-warn: #dcab3f;
+  --color-warn-soft: #362a0e;
+  --color-warn-soft-border: #5c481b;
+  --color-bad: #e17575;
+  --color-bad-soft: #3a1d1d;
+  --color-bad-soft-border: #5e2e2e;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
+}

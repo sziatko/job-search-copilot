@@ -14,8 +14,8 @@ const DAY = 86_400_000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
 
 function application(overrides: Partial<ApplicationListItem> = {}): ApplicationListItem {
-  // Dates are relative to now, not fixed: the strip's Active/Timeout tiles are derived
-  // from them, so a literal date would make these tests rot on the calendar.
+  // Dates are relative to now, not fixed: the KPI row's Active/Timeout tiles are
+  // derived from them, so a literal date would make these tests rot on the calendar.
   const applied = daysAgo(10);
   return {
     id: 1,
@@ -82,7 +82,14 @@ describe('ApplicationsPage / useApplications', () => {
     );
     renderTracker();
     await screen.findByText('Newest Co');
-    const order = screen.getAllByText(/(Older|Newest|Middle) Co/).map((el) => el.textContent);
+    // Read the company out of each row's meta cell rather than off a text node:
+    // the cell also carries the id, and matching text nodes couples the test to
+    // how JSX happens to lay the whitespace out.
+    const order = screen
+      .getAllByRole('row')
+      .map((row) => row.querySelector('.role-meta')?.textContent)
+      .filter((cell): cell is string => Boolean(cell))
+      .map((cell) => cell.replace(/\s*#\d+$/, ''));
     expect(order).toEqual(['Newest Co', 'Middle Co', 'Older Co']);
   });
 
@@ -103,7 +110,7 @@ describe('ApplicationsPage / useApplications', () => {
     expect(screen.getByText('Beta Corp')).toBeInTheDocument();
   });
 
-  it('shows a stats strip counting the whole (unfiltered) log', async () => {
+  it('shows a KPI row counting the whole (unfiltered) log', async () => {
     mswServer.use(
       ...buildApplicationHandlers([
         application({ id: 1, status: 'APPLIED' }),
@@ -114,12 +121,12 @@ describe('ApplicationsPage / useApplications', () => {
     );
     renderTracker();
     const totalLabel = await screen.findByText('Total');
-    const strip = totalLabel.parentElement?.parentElement as HTMLElement;
-    const s = within(strip);
+    const row = totalLabel.closest('.kpi-row') as HTMLElement;
+    const s = within(row);
     expect(s.getByText('Offer')).toBeInTheDocument(); // non-zero, so shown
     expect(s.queryByText('Interview')).not.toBeInTheDocument(); // zero, not shown
-    // Total + Active + Timeout (always) + Applied + Rejected (always) + Offer = 6 cells.
-    expect(strip.querySelectorAll('.text-lg')).toHaveLength(6);
+    // Total + Active + Timeout (always) + Applied + Rejected (always) + Offer = 6 tiles.
+    expect(row.querySelectorAll('.kpi-value')).toHaveLength(6);
   });
 
   it('counts Active and Timeout, and the two close over the whole log', async () => {
@@ -132,30 +139,50 @@ describe('ApplicationsPage / useApplications', () => {
           appliedAt: daysAgo(90),
           statusUpdatedAt: daysAgo(2), // moved recently — old application is not stale
         }),
-        application({ id: 3, status: 'REPLIED', appliedAt: daysAgo(45), statusUpdatedAt: daysAgo(45) }),
-        application({ id: 4, status: 'REJECTED', appliedAt: daysAgo(90), statusUpdatedAt: daysAgo(90) }),
-        application({ id: 5, status: 'OFFER', appliedAt: daysAgo(90), statusUpdatedAt: daysAgo(90) }),
+        application({
+          id: 3,
+          status: 'REPLIED',
+          appliedAt: daysAgo(45),
+          statusUpdatedAt: daysAgo(45),
+        }),
+        application({
+          id: 4,
+          status: 'REJECTED',
+          appliedAt: daysAgo(90),
+          statusUpdatedAt: daysAgo(90),
+        }),
+        application({
+          id: 5,
+          status: 'OFFER',
+          appliedAt: daysAgo(90),
+          statusUpdatedAt: daysAgo(90),
+        }),
       ]),
     );
     renderTracker();
     const totalLabel = await screen.findByText('Total');
-    const strip = totalLabel.parentElement?.parentElement as HTMLElement;
-    const s = within(strip);
+    const row = totalLabel.closest('.kpi-row') as HTMLElement;
+    const s = within(row);
 
-    // The button's accessible name is "<value> <label>".
-    expect(s.getByRole('button', { name: '5 Total' })).toBeInTheDocument();
-    expect(s.getByRole('button', { name: '2 Active' })).toBeInTheDocument(); // 1 APPLIED + 2 INTERVIEW
+    // Each tile is a button labelled "<label>: <value>".
+    expect(s.getByRole('button', { name: 'Total: 5' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: 'Active: 2' })).toBeInTheDocument(); // 1 APPLIED + 2 INTERVIEW
     // Any non-closed status ages out, not just APPLIED.
-    expect(s.getByRole('button', { name: '1 Timeout' })).toBeInTheDocument(); // 3 REPLIED
+    expect(s.getByRole('button', { name: 'Timeout: 1' })).toBeInTheDocument(); // 3 REPLIED
     // Closed outcomes are never "stuck" — 4 and 5 are 90 days old and still not counted.
-    expect(s.getByRole('button', { name: '1 Rejected' })).toBeInTheDocument();
-    expect(s.getByRole('button', { name: '1 Offer' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: 'Rejected: 1' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: 'Offer: 1' })).toBeInTheDocument();
   });
 
-  it('filters from a stats tile and keeps the dropdown in sync', async () => {
+  it('filters from a KPI tile and keeps the dropdown in sync', async () => {
     mswServer.use(
       ...buildApplicationHandlers([
-        application({ id: 1, company: 'Fresh Co', appliedAt: daysAgo(5), statusUpdatedAt: daysAgo(5) }),
+        application({
+          id: 1,
+          company: 'Fresh Co',
+          appliedAt: daysAgo(5),
+          statusUpdatedAt: daysAgo(5),
+        }),
         application({
           id: 2,
           company: 'Stale Co',
@@ -168,7 +195,7 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Fresh Co');
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: '1 Timeout' }));
+    await user.click(screen.getByRole('button', { name: 'Timeout: 1' }));
 
     await waitFor(() => expect(screen.queryByText('Fresh Co')).not.toBeInTheDocument());
     expect(screen.getByText('Stale Co')).toBeInTheDocument();

@@ -3,7 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>Job Search Copilot</title>
+
+    <!-- Theme, applied before first paint. Must be a CLASSIC script: Vite defers
+         type="module" ones, which is exactly the flash this avoids.
+
+         It only writes an attribute for an explicit choice. With nothing stored
+         it stays out of the way entirely, and the `prefers-color-scheme` block
+         in index.css themes the page natively — no JS in the default path. -->
+    <script>
+      try {
+        const stored = localStorage.getItem('jsc-theme');
+        if (stored === 'light' || stored === 'dark') {
+          document.documentElement.setAttribute('data-theme', stored);
+        }
+      } catch {
+        /* private mode / storage disabled — fall through to the OS theme */
+      }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    />
   </head>
   <body>
     <div id="root"></div>

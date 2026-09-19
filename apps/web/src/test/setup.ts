@@ -24,6 +24,23 @@ if (!('ResizeObserver' in globalThis)) {
   } as unknown as typeof ResizeObserver;
 }
 
+// jsdom has no matchMedia either. The theme module reads it for the OS
+// preference, and RootLayout renders the theme toggle on every page.
+// (`typeof` rather than `'matchMedia' in window`: that narrower collapses
+// `window` to `never`, because lib.dom already declares the property.)
+if (typeof window.matchMedia !== 'function') {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
 // jsdom lays nothing out — every measurement is 0, which makes the row virtualizer
 // render an empty window. Give elements a usable box so tests that render a
 // virtualized table see rows.

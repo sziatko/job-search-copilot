@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { MatchScoreBadge } from '@/components/MatchScoreBadge';
+import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { daysSinceLastMove, isTimedOut } from '../constants';
 import type { ApplicationListItem, ApplicationStatus } from '../types';
@@ -13,20 +13,31 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
   year: '2-digit',
 });
 
-const TH =
-  'px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500 whitespace-nowrap';
 const COL_COUNT = 8;
+
+/**
+ * These px widths are authoritative because the table sets `table-fixed` — in
+ * auto layout they would only be hints the cell content can override, which is
+ * what made the columns resize as the data changed.
+ *
+ * Fixed layout also means content can never widen a column; it wraps instead.
+ * So each fixed width has to fit its own content PLUS the cell's 36px of
+ * horizontal padding. Role and Comment are deliberately left without a width:
+ * the two of them split whatever is left, down the middle.
+ */
 
 export function ApplicationsTable({
   items,
   savingIds,
   rowErrors,
   onStatusChange,
+  emptyMessage,
 }: {
   items: ApplicationListItem[];
   savingIds: Set<number>;
   rowErrors: Map<number, string>;
   onStatusChange: (id: number, status: ApplicationStatus) => void;
+  emptyMessage: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { virtualItems, paddingTop, paddingBottom, measureElement } = useVirtualRows(
@@ -35,104 +46,97 @@ export function ApplicationsTable({
   );
 
   return (
-    <div
-      ref={scrollRef}
-      className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm"
-    >
-      <table className="min-w-[1200px] w-full table-fixed divide-y divide-slate-200">
-        <colgroup>
-          <col className="w-28" />
-          <col className="w-[20%]" />
-          <col className="w-20" />
-          <col className="w-36" />
-          <col className="w-24" />
-          <col className="w-[35%]" />
-          <col className="w-19" />
-          <col className="w-40" />
-        </colgroup>
-        <thead className="sticky top-0 z-10 bg-slate-50">
+    <div ref={scrollRef} className="table-body-scroll">
+      <table className="min-w-[1180px] table-fixed">
+        <thead>
           <tr>
-            <th className={TH}>Date</th>
-            <th className={TH}>Role</th>
-            <th className={TH}>Score</th>
-            <th className={TH}>Salary in listing</th>
-            <th className={TH}>Tailored CV</th>
-            <th className={TH}>Comment</th>
-            <th className={TH}>Copy</th>
-            <th className={TH}>Status</th>
+            <th style={{ width: 110 }}>Date</th>
+            <th>Role</th>
+            <th style={{ width: 90 }}>Score</th>
+            <th style={{ width: 120 }}>Salary</th>
+            <th style={{ width: 80 }}>CV</th>
+            <th>Comment</th>
+            <th style={{ width: 72 }}>Copy</th>
+            <th style={{ width: 190 }}>Status</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody>
+          {items.length === 0 && (
+            <tr>
+              <td colSpan={COL_COUNT}>
+                <div className="empty-state">{emptyMessage}</div>
+              </td>
+            </tr>
+          )}
+          {/* Spacer rows that stand in for the rows the virtualizer isn't
+              rendering. p-0 because `tbody td` would otherwise pad them and the
+              height would no longer match what the virtualizer assumes. */}
           {paddingTop > 0 && (
-            <tr aria-hidden>
-              <td colSpan={COL_COUNT} style={{ height: paddingTop }} />
+            <tr aria-hidden className="hover:bg-transparent">
+              <td colSpan={COL_COUNT} className="border-0 p-0" style={{ height: paddingTop }} />
             </tr>
           )}
           {virtualItems.map((virtualRow) => {
             const item = items[virtualRow.index];
             const isSynthetic = item.applyUrl.startsWith('tracker://');
+            const moved = item.statusUpdatedAt !== item.appliedAt;
             return (
               <tr
                 key={item.id}
                 data-index={virtualRow.index}
                 ref={measureElement}
-                className="hover:bg-slate-50"
+                className="hover:bg-surface-alt"
               >
-                <td className="whitespace-nowrap px-4 py-3 align-top text-sm text-slate-500">
-                  <div className="flex items-center gap-1">
-                    {isTimedOut(item) && (
-                      <span
-                        className="text-orange-500"
-                        title={`${daysSinceLastMove(item)} days since last update`}
-                      >
-                        ⏳
-                      </span>
-                    )}
-                    <span>{dateFormatter.format(new Date(item.appliedAt))}</span>
-                  </div>
-                  {/* Same stamp the hourglass reads; hidden until the row has actually
-                      moved, otherwise it would just repeat the applied date above. */}
-                  {item.statusUpdatedAt !== item.appliedAt && (
-                    <div className="text-xs text-slate-400">
+                <td className="date-cell">
+                  {isTimedOut(item) && (
+                    <span
+                      className="timeout-mark mr-[4px]"
+                      title={`${daysSinceLastMove(item)} days since last update`}
+                    >
+                      ⏳
+                    </span>
+                  )}
+                  {dateFormatter.format(new Date(item.appliedAt))}
+                  {/* Same stamp the hourglass reads; hidden until the row has
+                      actually moved, or it would just repeat the date above. */}
+                  {moved && (
+                    <div className="date-upd">
                       upd: {dateFormatter.format(new Date(item.statusUpdatedAt))}
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 align-top">
+                <td>
                   {isSynthetic ? (
-                    <span className="font-medium text-slate-900">{item.title}</span>
+                    <span className="role-title">{item.title}</span>
                   ) : (
                     <a
                       href={item.applyUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-medium text-slate-900 hover:text-indigo-600 hover:underline"
+                      className="role-title role-link"
                     >
                       {item.title}
                     </a>
                   )}
-                  <div className="text-sm text-slate-500">
-                    {item.company}
-                    <span className="ml-2 text-xs text-slate-400">#{item.id}</span>
+                  <div className="role-meta">
+                    {item.company} <span className="id">#{item.id}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 align-top">
-                  <MatchScoreBadge score={item.matchScore} />
+                <td>
+                  <ScorePill score={item.matchScore} />
                 </td>
-                <td className="px-4 py-3 align-top text-sm text-slate-600">
-                  {item.salaryInListing ?? '—'}
+                <td className="mono text-[12px]">{item.salaryInListing ?? '—'}</td>
+                <td className="text-[12px] text-ink-muted">
+                  {item.usedTailoredResume ? 'Sent' : '—'}
                 </td>
-                <td className="px-4 py-3 align-top text-sm text-slate-600">
-                  {item.usedTailoredResume ? '✓' : '—'}
-                </td>
-                <td className="px-4 py-3 align-top">
+                <td>
                   <MergedComment
                     userComment={item.userComment}
                     statusComment={item.statusComment}
                     estimationComment={item.estimationComment}
                   />
                 </td>
-                <td className="px-4 py-3 align-top">
+                <td>
                   <CopyApplicationButton
                     id={item.id}
                     company={item.company}
@@ -140,22 +144,22 @@ export function ApplicationsTable({
                     applyUrl={item.applyUrl}
                   />
                 </td>
-                <td className="px-4 py-3 align-top">
+                <td>
                   <ApplicationStatusSelect
                     value={item.status}
                     disabled={savingIds.has(item.id)}
                     onChange={(status) => onStatusChange(item.id, status)}
                   />
                   {rowErrors.has(item.id) && (
-                    <p className="mt-1 text-xs text-red-600">{rowErrors.get(item.id)}</p>
+                    <p className="mt-[4px] text-[11.5px] text-bad">{rowErrors.get(item.id)}</p>
                   )}
                 </td>
               </tr>
             );
           })}
           {paddingBottom > 0 && (
-            <tr aria-hidden>
-              <td colSpan={COL_COUNT} style={{ height: paddingBottom }} />
+            <tr aria-hidden className="hover:bg-transparent">
+              <td colSpan={COL_COUNT} className="border-0 p-0" style={{ height: paddingBottom }} />
             </tr>
           )}
         </tbody>

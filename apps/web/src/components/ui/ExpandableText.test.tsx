@@ -56,13 +56,19 @@ describe('ExpandableText', () => {
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('re-clamps on blur', () => {
+  it('collapses on Escape, and not on blur', () => {
     render(<ExpandableText text={LONG} />);
     const button = screen.getByRole('button');
     fireEvent.click(button);
     expect(button).toHaveAttribute('aria-expanded', 'true');
 
+    // The toggle is its own control, so losing focus must not close text the
+    // user deliberately opened. (When the whole block was one button, blur *was*
+    // the close gesture — that is the behaviour this replaced.)
     fireEvent.blur(button);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.keyDown(button, { key: 'Escape' });
     expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 });

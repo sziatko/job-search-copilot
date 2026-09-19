@@ -27,11 +27,7 @@ export type ApplicationStatusFilter =
   | typeof STATUS_FILTER_ACTIVE
   | typeof STATUS_FILTER_TIMEOUT;
 
-const extraFilterValues = [
-  STATUS_FILTER_ALL,
-  STATUS_FILTER_ACTIVE,
-  STATUS_FILTER_TIMEOUT,
-] as const;
+const extraFilterValues = [STATUS_FILTER_ALL, STATUS_FILTER_ACTIVE, STATUS_FILTER_TIMEOUT] as const;
 
 export const applicationStatusFilterValues: readonly ApplicationStatusFilter[] = [
   ...extraFilterValues,

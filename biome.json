@@ -8,7 +8,8 @@
       "!**/node_modules",
       "!**/*.d.ts",
       "!packages/core/prisma/migrations",
-      "!apps/web/dist"
+      "!apps/web/dist",
+      "!docs/design"
     ]
   },
   "formatter": {
@@ -20,6 +21,9 @@
   "linter": {
     "enabled": true,
     "rules": { "preset": "recommended" }
+  },
+  "css": {
+    "parser": { "tailwindDirectives": true }
   },
   "javascript": {
     "parser": { "unsafeParameterDecoratorsEnabled": true },
@@ -40,6 +44,16 @@
         "rules": {
           "style": {
             "useImportType": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/src/index.css"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDescendingSpecificity": "off"
           }
         }
       }

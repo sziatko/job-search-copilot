@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { ApplyDialog } from './components/ApplyDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -10,6 +9,7 @@ export function VacanciesPage() {
   const {
     loading,
     loadError,
+    total,
     visibleItems,
     savingIds,
     rowErrors,
@@ -25,34 +25,25 @@ export function VacanciesPage() {
   } = useVacancies();
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="px-6 py-10">
-        <header className="mb-6 flex items-end justify-between gap-4">
+    <section className="view">
+      <div className="card">
+        <div className="card-head">
           <div>
-            <Link to="/" className="text-xs text-slate-400 hover:text-indigo-600">
-              ← Home
-            </Link>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-900">Analyzed vacancies</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {loading ? 'Loading…' : `${visibleItems.length} vacancies`}
-            </p>
+            <h2>Analyzed vacancies</h2>
+            <div className="count">
+              {loading ? 'Loading…' : `${visibleItems.length} of ${total} vacancies`}
+            </div>
           </div>
           <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
-        </header>
+        </div>
 
-        {loadError && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            Failed to load vacancies: {loadError}
-          </div>
-        )}
-
-        {!loading && !loadError && visibleItems.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center text-slate-500">
-            No vacancies match this filter.
-          </div>
-        )}
-
-        {!loading && visibleItems.length > 0 && (
+        {loadError ? (
+          <div className="empty-state">Failed to load vacancies: {loadError}</div>
+        ) : loading ? (
+          <div className="empty-state">Loading…</div>
+        ) : visibleItems.length === 0 ? (
+          <div className="empty-state">No vacancies match this filter.</div>
+        ) : (
           <VacancyTable
             items={visibleItems}
             savingIds={savingIds}
@@ -60,6 +51,8 @@ export function VacanciesPage() {
             onActionChange={requestActionChange}
           />
         )}
+
+        <div className="table-foot">Scroll for more · scores from the vacancy-evaluator skill</div>
       </div>
 
       {pendingDecline && (
@@ -83,6 +76,6 @@ export function VacanciesPage() {
           }}
         />
       )}
-    </div>
+    </section>
   );
 }

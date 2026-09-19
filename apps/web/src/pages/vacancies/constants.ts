@@ -22,3 +22,13 @@ export const USER_ACTION_LABELS = {
   APPLIED: 'Applied',
   DECLINED: 'Declined',
 } satisfies Record<UserAction, string>;
+
+/** Analyser verdict, as the short tags the table's "Rec." column shows. The
+ * mockup calls APPLY_WITH_CAVEATS "Consider" and SKIP "Pass" — those are the
+ * labels it renders, and the full wording is in RECOMMENDATION_LABELS for
+ * anywhere with room for it. */
+export const RECOMMENDATION_TAGS = {
+  APPLY: { text: 'Apply', variant: 'good' },
+  APPLY_WITH_CAVEATS: { text: 'Consider', variant: 'warn' },
+  SKIP: { text: 'Pass', variant: 'bad' },
+} satisfies Record<Recommendation, { text: string; variant: string }>;

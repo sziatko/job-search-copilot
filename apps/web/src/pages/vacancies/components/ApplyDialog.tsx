@@ -21,6 +21,8 @@ export function ApplyDialog({
   const [salary, setSalary] = useState('');
   const [usedTailoredResume, setUsedTailoredResume] = useState(false);
   const [comment, setComment] = useState('');
+  const salaryId = useId();
+  const commentId = useId();
   const titleId = useId();
 
   function handleSubmit(e: FormEvent) {
@@ -38,65 +40,58 @@ export function ApplyDialog({
   return (
     <Modal onClose={onCancel} labelledBy={titleId} maxWidthClassName="max-w-md">
       <form onSubmit={handleSubmit}>
-        <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+        <h2 id={titleId} className="dialog-title">
           Mark as applied
         </h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="dialog-sub">
           {title} — {company}
         </p>
 
-        <div className="mt-4 space-y-4">
+        <div className="mt-[16px] space-y-[16px]">
           <div>
-            <label htmlFor="apply-salary" className="block text-sm font-medium text-slate-700">
+            <label htmlFor={salaryId} className="field-label">
               Salary / rate in the listing
             </label>
             <input
-              id="apply-salary"
+              id={salaryId}
               type="text"
               value={salary}
               onChange={(e) => setSalary(e.target.value)}
               placeholder="e.g. 130 PLN/hour"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="field-input"
             />
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="field-check">
             <input
               type="checkbox"
               checked={usedTailoredResume}
               onChange={(e) => setUsedTailoredResume(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              className="h-4 w-4 accent-[var(--color-accent)]"
             />
             Used a tailored resume
           </label>
 
           <div>
-            <label htmlFor="apply-comment" className="block text-sm font-medium text-slate-700">
+            <label htmlFor={commentId} className="field-label">
               Comment
             </label>
             <textarea
-              id="apply-comment"
+              id={commentId}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               onKeyDown={handleTextareaKeyDown}
               rows={3}
-              className="mt-1 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="field-input resize-y"
             />
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
+        <div className="dialog-actions">
+          <button type="button" onClick={onCancel} className="btn">
             Cancel
           </button>
-          <button
-            type="submit"
-            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
+          <button type="submit" className="btn btn-primary">
             OK
           </button>
         </div>

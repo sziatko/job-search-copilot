@@ -65,7 +65,7 @@ export function Modal({
         aria-label="Close dialog"
         tabIndex={-1}
         onClick={onClose}
-        className="absolute inset-0 h-full w-full cursor-default bg-slate-900/40 backdrop-blur-sm"
+        className="absolute inset-0 h-full w-full cursor-default bg-[rgba(10,12,16,.4)] backdrop-blur-sm"
       />
       <div
         ref={dialogRef}
@@ -73,7 +73,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={labelledBy}
         tabIndex={-1}
-        className={`relative w-full ${maxWidthClassName} rounded-xl bg-white p-6 shadow-xl focus:outline-none`}
+        className={`relative w-full ${maxWidthClassName} rounded-[14px] border border-border bg-surface p-[20px] shadow-pop focus:outline-none`}
       >
         {children}
       </div>

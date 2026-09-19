@@ -29,14 +29,17 @@ export const APPLICATION_STATUS_ORDER = {
   REJECTED: 5,
 } satisfies Record<ApplicationStatus, number>;
 
-export const APPLICATION_STATUS_BADGE_STYLES = {
-  APPLIED: 'bg-slate-100 text-slate-600 ring-slate-500/20',
-  RECRUITER_SCREEN: 'bg-sky-50 text-sky-700 ring-sky-600/20',
-  REPLIED: 'bg-sky-50 text-sky-700 ring-sky-600/20',
-  INTERVIEW: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
-  OFFER: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  REJECTED: 'bg-red-50 text-red-700 ring-red-600/20',
-} satisfies Record<ApplicationStatus, string>;
+/** Drives the `.tag <variant>` classes in index.css. The variant carries the
+ * signal (progressing / attention / closed) and the label carries the rest —
+ * Offer, Interview and Recruiter screen all read as "good", as in the mockup. */
+export const APPLICATION_STATUS_TAG_VARIANTS = {
+  APPLIED: 'neutral',
+  RECRUITER_SCREEN: 'good',
+  REPLIED: 'accent',
+  INTERVIEW: 'good',
+  OFFER: 'good',
+  REJECTED: 'bad',
+} satisfies Record<ApplicationStatus, 'good' | 'warn' | 'bad' | 'neutral' | 'accent'>;
 
 /** Labels for the derived filter values. The strip's tiles and the dropdown both read
  * these, so a tile can never disagree with the dropdown entry it selects. */

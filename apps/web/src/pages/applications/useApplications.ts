@@ -1,14 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { listApplications, updateApplicationStatus } from './api';
+import { type ApplicationPage, listApplications, updateApplicationStatus } from './api';
 import { isActive, isTimedOut, matchesFilter } from './constants';
-import {
-  type ApplicationListItem,
-  type ApplicationStatus,
-  type ApplicationStatusFilter,
-  STATUS_FILTER_ALL,
-} from './types';
+import { type ApplicationStatus, type ApplicationStatusFilter, STATUS_FILTER_ALL } from './types';
 
 const APPLICATIONS_KEY = ['applications'] as const;
 
@@ -41,7 +36,7 @@ export function useApplications() {
     isPending: loading,
     error,
   } = useQuery({ queryKey: APPLICATIONS_KEY, queryFn: listApplications });
-  const items = useMemo(() => data ?? [], [data]);
+  const items = useMemo(() => data?.items ?? [], [data]);
   const loadError = error ? (error instanceof Error ? error.message : String(error)) : null;
 
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
@@ -83,13 +78,20 @@ export function useApplications() {
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueryData<ApplicationListItem[]>(APPLICATIONS_KEY);
-      queryClient.setQueryData<ApplicationListItem[]>(APPLICATIONS_KEY, (old) =>
-        (old ?? []).map((item) =>
-          // Mirror what updateStatus() does server-side, or the row keeps its old
-          // last-move stamp until the refetch lands.
-          item.id === id ? { ...item, status, statusUpdatedAt: new Date().toISOString() } : item,
-        ),
+      const previous = queryClient.getQueryData<ApplicationPage>(APPLICATIONS_KEY);
+      queryClient.setQueryData<ApplicationPage>(APPLICATIONS_KEY, (old) =>
+        old
+          ? {
+              ...old,
+              items: old.items.map((item) =>
+                // Mirror what updateStatus() does server-side, or the row keeps its
+                // old last-move stamp until the refetch lands.
+                item.id === id
+                  ? { ...item, status, statusUpdatedAt: new Date().toISOString() }
+                  : item,
+              ),
+            }
+          : old,
       );
       return { previous };
     },
@@ -115,6 +117,7 @@ export function useApplications() {
     loading,
     loadError,
     items,
+    total: data?.total ?? items.length,
     visibleItems,
     stats,
     savingIds,

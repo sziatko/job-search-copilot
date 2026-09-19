@@ -23,9 +23,15 @@ export function ApplicationStatusFilterSelect({
 }) {
   const id = useId();
   return (
-    <label htmlFor={id} className="flex items-center gap-2 text-sm text-slate-600">
-      Status
-      <Select id={id} value={value} options={OPTIONS} onChange={onChange} />
-    </label>
+    <div className="filter-group">
+      <label htmlFor={id}>Status</label>
+      <Select
+        id={id}
+        className="filter-select"
+        value={value}
+        options={OPTIONS}
+        onChange={onChange}
+      />
+    </div>
   );
 }

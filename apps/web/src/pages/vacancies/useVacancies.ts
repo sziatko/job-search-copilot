@@ -1,16 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { recordApplication } from '../applications/api';
-import { listEstimatedVacancies, updateUserAction } from './api';
+import { listEstimatedVacanciesPage, updateUserAction, type VacancyPage } from './api';
 import type { ApplyDetails } from './components/ApplyDialog';
 import { RECOMMENDATION_ORDER } from './constants';
-import {
-  type EstimatedVacancyListItem,
-  STATUS_FILTER_ALL,
-  type StatusFilterValue,
-  USER_ACTION,
-  type UserAction,
-} from './types';
+import { STATUS_FILTER_ALL, type StatusFilterValue, USER_ACTION, type UserAction } from './types';
 
 const VACANCIES_KEY = ['vacancies'] as const;
 
@@ -34,9 +28,9 @@ export function useVacancies() {
     error,
   } = useQuery({
     queryKey: VACANCIES_KEY,
-    queryFn: listEstimatedVacancies,
+    queryFn: () => listEstimatedVacanciesPage(),
   });
-  const items = useMemo(() => data ?? [], [data]);
+  const items = useMemo(() => data?.items ?? [], [data]);
   const loadError = error ? (error instanceof Error ? error.message : String(error)) : null;
 
   // Per-row UI bookkeeping. The cache is the source of truth for the data itself;
@@ -58,6 +52,18 @@ export function useVacancies() {
       });
   }, [items, statusFilter]);
 
+  /** Optimistic write into the page-shaped cache, shared by both mutations. */
+  function patchCachedItem(id: number, next: UserAction) {
+    queryClient.setQueryData<VacancyPage>(VACANCIES_KEY, (old) =>
+      old
+        ? {
+            ...old,
+            items: old.items.map((item) => (item.id === id ? { ...item, userAction: next } : item)),
+          }
+        : old,
+    );
+  }
+
   const actionMutation = useMutation({
     mutationFn: ({ id, userAction }: ActionChange) => updateUserAction(id, userAction),
     onMutate: async ({ id, userAction }) => {
@@ -69,10 +75,8 @@ export function useVacancies() {
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueryData<EstimatedVacancyListItem[]>(VACANCIES_KEY);
-      queryClient.setQueryData<EstimatedVacancyListItem[]>(VACANCIES_KEY, (old) =>
-        (old ?? []).map((item) => (item.id === id ? { ...item, userAction } : item)),
-      );
+      const previous = queryClient.getQueryData<VacancyPage>(VACANCIES_KEY);
+      patchCachedItem(id, userAction);
       return { previous };
     },
     onError: (err, { id }, context) => {
@@ -134,12 +138,8 @@ export function useVacancies() {
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueryData<EstimatedVacancyListItem[]>(VACANCIES_KEY);
-      queryClient.setQueryData<EstimatedVacancyListItem[]>(VACANCIES_KEY, (old) =>
-        (old ?? []).map((item) =>
-          item.id === id ? { ...item, userAction: USER_ACTION.APPLIED } : item,
-        ),
-      );
+      const previous = queryClient.getQueryData<VacancyPage>(VACANCIES_KEY);
+      patchCachedItem(id, USER_ACTION.APPLIED);
       return { previous };
     },
     onError: (err, { id }, context) => {
@@ -170,6 +170,7 @@ export function useVacancies() {
   return {
     loading,
     loadError,
+    total: data?.total ?? items.length,
     visibleItems,
     savingIds,
     rowErrors,

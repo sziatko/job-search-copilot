@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 
 /**
- * Text that clamps to 3 lines. When it actually overflows, the whole block becomes
- * one <button> (click anywhere — text or the inline "Show more" label — to toggle)
- * that expands it in place; it re-clamps on blur or Escape. When the text fits,
- * there is no interactive element and no extra tab stop.
+ * Text that clamps to two lines, with a "Show more" toggle that appears only
+ * when the text actually overflows — a comment that already fits would
+ * otherwise get a button that does nothing. Same `.comment-cell` styling as the
+ * tracker's merged comment, over a single source.
  */
 export function ExpandableText({ text }: { text: string }) {
   const [clampable, setClampable] = useState(false);
@@ -14,9 +14,7 @@ export function ExpandableText({ text }: { text: string }) {
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
 
-  // Callback ref: re-runs whenever the measured node mounts / unmounts, which also
-  // covers the <p> ⇄ <button> swap below. Measures overflow only while clamped.
-  const measureRef = useCallback((el: HTMLSpanElement | null) => {
+  const measureRef = useCallback((el: HTMLDivElement | null) => {
     observerRef.current?.disconnect();
     if (!el) return;
     const check = () => {
@@ -27,31 +25,24 @@ export function ExpandableText({ text }: { text: string }) {
     observerRef.current.observe(el);
   }, []);
 
-  const textSpan = (
-    <span ref={measureRef} className={expanded ? 'block' : 'line-clamp-3'}>
-      {text}
-    </span>
-  );
-
-  if (!clampable) {
-    return <p className="text-sm text-slate-600">{textSpan}</p>;
-  }
-
   return (
-    <button
-      type="button"
-      aria-expanded={expanded}
-      onClick={() => setExpanded((v) => !v)}
-      onBlur={() => setExpanded(false)}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') setExpanded(false);
-      }}
-      className="block w-full cursor-pointer text-left text-sm text-slate-600"
-    >
-      {textSpan}
-      <span className="mt-0.5 block text-xs font-medium text-indigo-600">
-        {expanded ? 'Show less' : 'Show more'}
-      </span>
-    </button>
+    <div className={`comment-cell ${expanded ? 'expanded' : ''}`}>
+      <div ref={measureRef} className="clamp">
+        {text}
+      </div>
+      {clampable && (
+        <button
+          type="button"
+          className="show-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setExpanded(false);
+          }}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
   );
 }

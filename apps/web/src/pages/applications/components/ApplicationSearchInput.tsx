@@ -30,7 +30,7 @@ export function ApplicationSearchInput({
       value={text}
       onChange={(e) => setText(e.target.value)}
       placeholder="Search company or role…"
-      className="w-64 rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+      className="search-input"
     />
   );
 }
