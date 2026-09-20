@@ -41,6 +41,13 @@ if (typeof window.matchMedia !== 'function') {
   })) as unknown as typeof window.matchMedia;
 }
 
+// jsdom *does* define window.scrollTo — but its body only reports "Not implemented"
+// to the virtual console. RootLayout resets scroll on every navigation, and every
+// page in this suite renders that shell, so the notice printed dozens of times a run
+// and buried the real output. Replaced outright, hence no `typeof` guard: a guard
+// would see jsdom's function and skip.
+window.scrollTo = (() => {}) as typeof window.scrollTo;
+
 // jsdom lays nothing out — every measurement is 0, which makes the row virtualizer
 // render an empty window. Give elements a usable box so tests that render a
 // virtualized table see rows.

@@ -28,6 +28,17 @@ and *what a change here breaks over there*.
 - A claim that couldn't be verified from the code alone (rationale that lived only
   in a chat transcript) is flagged inline as `> inferred from code — confirm`.
 
+## Secrets
+
+- **Credentials live in untracked files, never in tracked ones.** The apps read config
+  from env vars loaded at boot ([ADR-0007](decisions/0007-env-config-and-loading.md));
+  the values sit in `.env` / `.env.test`, which `.gitignore` covers — only
+  `.env.example` is tracked. Claude Code's own token lives in `.claude/settings.json`,
+  ignored for the same reason.
+- **If a key does reach a commit, rotating it is the fix.** Rewriting history is the
+  cleanup, not the remedy: by the time you notice, the key has been through clones,
+  backups, and whatever the host caches. Do both, and rotate first.
+
 ## Reviewing & extending these docs
 
 **To review** (e.g. from the chat that did the implementation): run

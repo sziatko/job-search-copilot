@@ -1,0 +1,6 @@
+# Line endings are LF everywhere — in the repository and in the working tree, on
+# every platform. Without `eol=lf`, core.autocrlf=true rewrites the working copy
+# to CRLF on each checkout, and Biome's formatter (default `lineEnding: lf`) then
+# flags every file it reads. CI runs on Linux, so LF is already the canonical
+# form; this makes it explicit for Windows checkouts too.
+* text=auto eol=lf
