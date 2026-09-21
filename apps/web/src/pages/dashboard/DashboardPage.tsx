@@ -20,7 +20,9 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-function timeAgo(iso: string): string {
+/** Exported for its boundaries: a future timestamp (server/browser clock skew) has
+ * to clamp to "this minute" rather than render a negative number. */
+export function timeAgo(iso: string): string {
   const elapsed = Date.now() - new Date(iso).getTime();
   if (elapsed < HOUR) return relative.format(-Math.max(Math.round(elapsed / MINUTE), 0), 'minute');
   if (elapsed < DAY) return relative.format(-Math.round(elapsed / HOUR), 'hour');

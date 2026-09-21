@@ -1,7 +1,14 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { mswServer } from './msw/server';
+
+// `findBy*` waits 1000ms by default — a number written for suites that render one
+// component. These tests boot the whole router, and the first query in a file also
+// pays for a cold module graph; under a loaded machine that exceeds a second, and
+// the failure reads as a hang (`Loading…` in the DOM dump, no error from MSW).
+// Raising the ceiling hides nothing: the assertion still has to become true.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom has no ResizeObserver; ExpandableText and @tanstack/react-virtual construct
 // one. Invoke the callback on observe() so the virtualizer measures its scroll

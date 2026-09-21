@@ -1,13 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { HttpResponse, http } from 'msw';
+import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { routeTree } from '@/router';
 import { buildApplicationHandlers } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import type { ApplicationPage } from './api';
 import type { ApplicationListItem } from './types';
 
 const DAY = 86_400_000;
@@ -48,9 +49,14 @@ function renderTracker(path = '/tracker') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
-    createElement(QueryClientProvider, { client }, createElement(RouterProvider, { router })),
-  );
+  // The client comes back too: one test asserts what the optimistic write put in
+  // the cache, which is not observable through the DOM alone.
+  return {
+    client,
+    ...render(
+      createElement(QueryClientProvider, { client }, createElement(RouterProvider, { router })),
+    ),
+  };
 }
 
 describe('ApplicationsPage / useApplications', () => {
@@ -242,5 +248,105 @@ describe('ApplicationsPage / useApplications', () => {
     );
     renderTracker();
     expect(await screen.findByText(/unexpected format/i)).toBeInTheDocument();
+  });
+
+  it('renders an applyUrl that fails the scheme gate as text, not a link', async () => {
+    // `applyUrl` is scraped, so it is untrusted input that reaches an href. The
+    // table used to test only for `tracker://`; it now runs every value through
+    // the scheme gate, and this is what that widening is supposed to mean in the
+    // DOM: a real link stays a link, everything else becomes plain text.
+    mswServer.use(
+      ...buildApplicationHandlers([
+        application({ id: 1, title: 'Ordinary Role', applyUrl: 'https://acme.com/jobs/1' }),
+        application({
+          id: 2,
+          title: 'Synthetic Role',
+          applyUrl: 'tracker://acme/synthetic-role/2026-09-01',
+        }),
+        application({ id: 3, title: 'Hostile Role', applyUrl: 'javascript:alert(1)' }),
+      ]),
+    );
+    renderTracker();
+    await screen.findByText('Ordinary Role');
+
+    expect(screen.getByRole('link', { name: 'Ordinary Role' })).toHaveAttribute(
+      'href',
+      'https://acme.com/jobs/1',
+    );
+    // Not links — but the posting is still named on the row rather than hidden.
+    expect(screen.queryByRole('link', { name: 'Synthetic Role' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Hostile Role' })).toBeNull();
+    expect(screen.getByText('Synthetic Role')).toBeInTheDocument();
+    expect(screen.getByText('Hostile Role')).toBeInTheDocument();
+  });
+
+  it('shows the last-move stamp on a row only once it has actually moved', async () => {
+    mswServer.use(
+      ...buildApplicationHandlers([
+        // Freshly recorded: statusUpdatedAt is stamped to appliedAt, so a second
+        // date line would just repeat the one above it.
+        application({ id: 1, title: 'Untouched Role' }),
+        application({ id: 2, title: 'Moved Role', statusUpdatedAt: daysAgo(2) }),
+      ]),
+    );
+    renderTracker();
+    await screen.findByText('Untouched Role');
+
+    const rowText = (title: string) =>
+      screen.getAllByRole('row').find((r) => r.textContent?.includes(title))?.textContent ?? '';
+    expect(rowText('Untouched Role')).not.toMatch(/upd:/);
+    expect(rowText('Moved Role')).toMatch(/upd:/);
+  });
+
+  it('marks a row that has gone quiet for more than thirty days', async () => {
+    mswServer.use(
+      ...buildApplicationHandlers([
+        application({ id: 1, title: 'Stale Role', statusUpdatedAt: daysAgo(45) }),
+        application({ id: 2, title: 'Live Role', statusUpdatedAt: daysAgo(1) }),
+      ]),
+    );
+    renderTracker();
+    await screen.findByText('Stale Role');
+
+    const rowText = (title: string) =>
+      screen.getAllByRole('row').find((r) => r.textContent?.includes(title))?.textContent ?? '';
+    expect(rowText('Stale Role')).toContain('⏳');
+    expect(rowText('Live Role')).not.toContain('⏳');
+  });
+
+  it('writes the new last-move stamp into the cache optimistically', async () => {
+    // updateStatus() restamps statusUpdatedAt server-side, and the row's ⏳ mark and
+    // the Active/Timeout tiles both read that field. Without the mirror in
+    // useApplications, a changed row would keep its old bucket until the refetch
+    // landed. The PATCH is delayed so the refetch cannot be the one that moved it —
+    // otherwise the assertion would pass with the mirror deleted.
+    mswServer.use(
+      http.get('http://localhost:3000/api/v1/applications', () =>
+        HttpResponse.json({
+          items: [application({ id: 1, status: 'APPLIED', statusUpdatedAt: daysAgo(10) })],
+          total: 1,
+        }),
+      ),
+      http.patch('http://localhost:3000/api/v1/applications/:id/status', async ({ params }) => {
+        await delay(500);
+        return HttpResponse.json(
+          application({ id: Number(params.id), status: 'INTERVIEW', statusUpdatedAt: daysAgo(0) }),
+        );
+      }),
+    );
+    const { client } = renderTracker();
+    await screen.findByText('Acme');
+
+    const user = userEvent.setup();
+    await user.selectOptions(within(screen.getByRole('table')).getByRole('combobox'), 'INTERVIEW');
+    // Let onMutate's `await cancelQueries` settle — and nothing else, since the
+    // response is still half a second away.
+    await act(async () => {});
+
+    const row = client
+      .getQueryData<ApplicationPage>(['applications'])
+      ?.items.find((i) => i.id === 1);
+    expect(row?.status).toBe('INTERVIEW');
+    expect(row?.statusUpdatedAt).not.toBe(row?.appliedAt);
   });
 });

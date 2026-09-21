@@ -214,6 +214,66 @@ describe('job-search-copilot MCP server', () => {
     expect(items[0]).not.toHaveProperty('fullText');
   });
 
+  it('list tools enforce their own paging ceilings and reject what falls outside them', async () => {
+    // `pagination(maxLimit)` is the one abstraction the tool refactor introduced,
+    // and the two list tools differ only in that number. Nothing else exercises
+    // the bounds — every other call goes through at the defaults.
+    const client = await connectedClient();
+
+    const atVacancyCeiling = await client.callTool({
+      name: 'list_estimated_vacancies',
+      arguments: { limit: 100 },
+    });
+    expect(atVacancyCeiling.isError).toBeFalsy();
+
+    for (const limit of [0, -1, 101]) {
+      const result = await client.callTool({
+        name: 'list_estimated_vacancies',
+        arguments: { limit },
+      });
+      expect(result.isError, `limit ${limit} should be rejected`).toBe(true);
+    }
+
+    // 500 is inside one tool's ceiling and outside the other's, which is the
+    // reason the ceiling is a parameter rather than a shared constant.
+    const applicationsAt500 = await client.callTool({
+      name: 'list_applications',
+      arguments: { limit: 500 },
+    });
+    expect(applicationsAt500.isError).toBeFalsy();
+
+    const applicationsAt501 = await client.callTool({
+      name: 'list_applications',
+      arguments: { limit: 501 },
+    });
+    expect(applicationsAt501.isError).toBe(true);
+  });
+
+  it('list_estimated_vacancies pages with limit and offset without shrinking total', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'save_estimated_vacancies_batch',
+      arguments: {
+        vacancies: [1, 2, 3, 4, 5].map((i) => ({
+          ...validArgs,
+          applyUrl: `https://example.com/jobs/${i}`,
+          title: `Role ${i}`,
+        })),
+      },
+    });
+
+    const page = await client.callTool({
+      name: 'list_estimated_vacancies',
+      arguments: { limit: 2, offset: 1 },
+    });
+    const body = JSON.parse(textOf(page));
+
+    // `total` is the match count, not the size of the page — the same contract the
+    // web app leans on to use `limit=1` as a count endpoint.
+    expect(body.items).toHaveLength(2);
+    expect(body.total).toBe(5);
+  });
+
   it('update_estimated_vacancy_user_action updates userAction', async () => {
     const client = await connectedClient();
     const saveResult = await client.callTool({

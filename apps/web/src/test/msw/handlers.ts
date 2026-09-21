@@ -9,8 +9,22 @@ const API_URL = 'http://localhost:3000/api/v1';
  * against — a fake server, not a fake fetch. */
 export function buildHandlers(items: EstimatedVacancyListItem[]) {
   return [
-    http.get(`${API_URL}/estimated-vacancies`, () => {
-      return HttpResponse.json({ items, total: items.length });
+    http.get(`${API_URL}/estimated-vacancies`, ({ request }) => {
+      // Filter server-side, like the real endpoint, and report `total` as the
+      // number of matches rather than the size of the page. That distinction is
+      // the whole reason the dashboard can use `limit=1` as a count endpoint, so
+      // without it the four parallel requests in dashboard/api.ts are
+      // indistinguishable and the counts cannot be tested at all.
+      const query = new URL(request.url).searchParams;
+      const userAction = query.get('userAction');
+      const recommendation = query.get('recommendation');
+      const matching = items.filter(
+        (item) =>
+          (!userAction || item.userAction === userAction) &&
+          (!recommendation || item.recommendation === recommendation),
+      );
+      const limit = Number(query.get('limit') ?? 100);
+      return HttpResponse.json({ items: matching.slice(0, limit), total: matching.length });
     }),
     http.patch(`${API_URL}/estimated-vacancies/:id/user-action`, async ({ params, request }) => {
       const id = Number(params.id);
