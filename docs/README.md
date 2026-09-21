@@ -10,10 +10,11 @@ and *what a change here breaks over there*.
 | --- | --- |
 | [`architecture.md`](architecture.md) | The system map: the four packages, their boundaries, the request lifecycle, the dev stack. Start here. |
 | [`domain-model.md`](domain-model.md) | `EstimatedVacancy`, the two independent axes (analyzer `recommendation` vs the user's `userAction`), the state flow, analyze-once, the DB-level rules. |
-| [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the four MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
+| [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the nine MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
 | [`decisions/`](decisions/) | One Architecture Decision Record (ADR) per load-bearing choice — context, the decision, why not the alternatives, and what it constrains. |
 | [`phases/phase-1.md`](phases/phase-1.md) | What Phase 1 delivered, its status, and everything deliberately deferred. |
-| [`phases/phase-2.md`](phases/phase-2.md) | Application tracking: the `Application` model, the `/tracker` page, the router, and the one-off `tracker.md` import. |
+| [`phases/phase-2.md`](phases/phase-2.md) | Application tracking: the `Application` model, the `/tracker` page, the router, the one-off `tracker.md` import, and the post-phase work that reworked all of it (2026-09-14 → 09-21). |
+| [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions
 
@@ -33,8 +34,15 @@ and *what a change here breaks over there*.
 - **Credentials live in untracked files, never in tracked ones.** The apps read config
   from env vars loaded at boot ([ADR-0007](decisions/0007-env-config-and-loading.md));
   the values sit in `.env` / `.env.test`, which `.gitignore` covers — only
-  `.env.example` is tracked. Claude Code's own token lives in `.claude/settings.json`,
-  ignored for the same reason.
+  `.env.example` is tracked. Claude Code's own credentials sit in
+  `~/.claude/keys/<profile>.key` — outside the repository working tree entirely, not
+  merely gitignored. `.claude/settings.json` carries no credential — only an
+  `apiKeyHelper` that prints the selected one (`~/.claude/get-key.mjs`, profile named in
+  `~/.claude/profiles.json`). Switch providers with
+  `claude-profile <deepseek|glm|claude|omniroute>`, which rewrites `env` and
+  `apiKeyHelper` in the current project's settings; `claude` means no custom endpoint at
+  all. The file stays gitignored because the helper path is machine-specific, not because
+  it holds a secret.
 - **If a key does reach a commit, rotating it is the fix.** Rewriting history is the
   cleanup, not the remedy: by the time you notice, the key has been through clones,
   backups, and whatever the host caches. Do both, and rotate first.

@@ -30,7 +30,7 @@ apps/web (React SPA)        vacancy-match-analyzer
 | [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the `EstimatedVacancy` + `Application` schema + migrations, the `EstimatedVacancyService` and `ApplicationService` (all queries), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
 | `apps/api` | Thin HTTP transport over the core services for the web app. NestJS: DI, DTO validation, versioned routes (`estimated-vacancies`, `applications`), a health check. | `core`, `@nestjs/*`, `class-validator`, `zod` |
 | `apps/mcp` | Thin stdio transport over the *same* services, exposing nine tools (5 for estimated vacancies, 4 for applications — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. | `core`, `@modelcontextprotocol/sdk`, `zod` |
-| `apps/web` | React 19 + Vite + Tailwind dashboard with `@tanstack/react-router` (routes `/`, `/vacancies`, `/tracker`). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
+| `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/tracker`, `/log`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 (monorepo), [ADR-0002](decisions/0002-core-shared-domain-layer.md) (core as the
@@ -43,7 +43,7 @@ transports over one service).
 
 ```
 Claude runs vacancy-match-analyzer
-  → calls MCP tool save_estimated_vacancy (apps/mcp/src/server.ts)
+  → calls MCP tool save_estimated_vacancy (apps/mcp/src/estimated-vacancies/estimated-vacancies.tools.ts)
   → EstimatedVacancyService.save()  (packages/core)
       → findUnique by applyUrl
           → exists?  return { created: false, vacancy }   (analysis discarded)
@@ -78,8 +78,11 @@ Both transports call the same core service methods; there is no business logic i
 [`contracts.md`](contracts.md) for the exact surfaces.
 
 `apps/web` keeps one shared HTTP helper — `src/lib/api.ts` (`API_BASE`,
-`parseResponse`) — and presentational badges in `src/components/`
-(`MatchScoreBadge`, `RecommendationBadge`); both features consume them.
+`parseResponse`) — plus `src/lib/routeMeta.ts` (each route's title / subtitle /
+`rail` metadata, read by `RootLayout`) and the presentational pieces both features
+draw on under `src/components/ui/` (`ScorePill`, `KpiTile`, `Modal`, `Select`,
+`ExpandableText`, `SoonPage`). The shell is `src/components/RootLayout.tsx` +
+`src/components/shell/`.
 
 ## Dev stack (Docker Compose)
 

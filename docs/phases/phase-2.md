@@ -45,10 +45,12 @@ with an index page, and (last, separately) a one-off import of the user's existi
   in [`../contracts.md`](../contracts.md).
 - **MCP** — three tools; `record_application` takes `company` + `title` (required)
   and find-or-creates the vacancy, the other two mirror the list/update pattern.
-- **Router** — `@tanstack/react-router`, code-based, routes `/` (index, two nav
-  cards), `/vacancies` (the Phase 1 page), `/tracker`. `/tracker` search + status
-  filter live in the URL, zod-validated
-  ([ADR-0020](../decisions/0020-web-router-tanstack.md)).
+- **Router** — `@tanstack/react-router`, code-based. As delivered: `/` (index, two
+  nav cards), `/vacancies` (the Phase 1 page), `/tracker`; search + status filter
+  live in the URL, zod-validated
+  ([ADR-0020](../decisions/0020-web-router-tanstack.md)). **`/` is now the dashboard
+  and two placeholder routes exist** — see Post-phase work, and
+  [ADR-0024](../decisions/0024-web-shell-and-theme.md) for the current set.
 
 ## Record-or-link algorithm
 
@@ -81,7 +83,10 @@ resolve to the same vacancy, an `applyUrl` collision). Not in CI, not re-run.
 [0018](../decisions/0018-application-status-separate-enum.md) ·
 [0019](../decisions/0019-record-or-create-vacancy.md) ·
 [0020](../decisions/0020-web-router-tanstack.md) ·
-[0021](../decisions/0021-tracker-import-script.md)
+[0021](../decisions/0021-tracker-import-script.md) ·
+[0022](../decisions/0022-timeout-derived-until-scheduled.md) ·
+[0023](../decisions/0023-canonical-applyurl.md) ·
+[0024](../decisions/0024-web-shell-and-theme.md)
 
 ## Status
 
@@ -89,7 +94,9 @@ resolve to the same vacancy, an `applyUrl` collision). Not in CI, not re-run.
   `ApplicationService` + spec, the api module + e2e, the three MCP tools + spec,
   the router + index page + `pages/applications/` + tests, `ApplyDialog` wired,
   the importer (`src/tracker-import.ts` + `scripts/import-tracker.ts` + 26 unit tests).
-- `npm test` → **120 passed, 11 files**. `npm run lint` / `typecheck` / `build` clean.
+- `npm test` → **120 passed, 11 files**; `npm run lint` / `typecheck` / `build` clean.
+  Both counts are the snapshot from when these steps landed — the suite has grown
+  since (Post-phase work below records the current numbers).
 - **Tracker import run (2026-09-11):** 206 rows written in one transaction against
   the dev DB — 3 linked to already-analysed vacancies (their `userAction` flipped to
   `APPLIED`), 203 created placeholder `EstimatedVacancy` rows (40 with a synthetic
@@ -116,6 +123,46 @@ resolve to the same vacancy, an `applyUrl` collision). Not in CI, not re-run.
   (`getBoundingClientRect`, `client/offset/scrollHeight`, a callback-invoking
   `ResizeObserver`) so a virtualized table renders rows under jsdom.
 
+## Post-phase work (2026-09-14 → 2026-09-21)
+
+The phase closed on 2026-09-11. Everything after that reworked what it delivered —
+no new phase, and every item already has an owner in `decisions/`. Listed here so
+this doc says what became of the surfaces above.
+
+- **09-14 · the MCP write tools stopped talking.** The four write tools no longer
+  echo back the large text the caller just sent, and two batch variants landed
+  (`save_estimated_vacancies_batch`, `record_applications_batch`). Surface detail:
+  [`contracts.md`](../contracts.md). (`bfce6ba`)
+- **09-17 · `statusUpdatedAt` became NOT NULL and `NO_RESPONSE` was dropped** (two
+  migrations: `20260917145357_require_status_updated_at` and
+  `20260917181545_drop_no_response_status`); Active / Timeout moved to a
+  client-derived rule
+  ([ADR-0022](../decisions/0022-timeout-derived-until-scheduled.md), `c0e6141`). The
+  enum list in `## Data model` above was shortened in the same commit.
+- **09-17 · the MCP server was split into modules** — `server.ts` went from 351 lines
+  to composition-only, each domain owning its own `<feature>/*.tools.ts` +
+  `*.schemas.ts` ([ADR-0010](../decisions/0010-mcp-server-factory.md)). The web app's
+  `features/` directory was renamed `pages/`, which rewrote path references
+  throughout these docs. (`adbe954`)
+- **09-19 · the web app was rebuilt against a UI mockup** — app shell, a three-state
+  theme, the dashboard moved to `/`, `/log` and `/profile` added as `SoonPage`
+  placeholders, per-route `routeMeta`, and an nginx SPA fallback. This is the change
+  that made the route list in `## New surfaces` above stale.
+  ([ADR-0024](../decisions/0024-web-shell-and-theme.md), `c38b14e`)
+- **09-21 · `applyUrl` canonicalization** — the natural key is neutralized before it
+  is ever used as one, with per-domain site rules (Indeed keyed by `jk`). The
+  one-off backfill ran and is done: 107 of 360 rows rewritten, 42 synthetic skipped,
+  two collisions resolved by hand; a re-run once the site rules existed was a no-op
+  (0 rewrites, 0 collisions). ([ADR-0023](../decisions/0023-canonical-applyurl.md))
+- **09-21 · a test-coverage pass over all of the above.** New specs for the web
+  scheme gate (`apps/web/src/lib/url.ts`), the theme store, the Active/Timeout rule,
+  the dashboard metrics, `MergedComment`, and the backfill planner — the last of
+  which moved to `packages/core/src/applyurl-backfill.ts` so it could be tested
+  without executing the script. The pass found and pinned three real defects: a
+  corrupt `statusUpdatedAt` failing open as *Active*, a `router.test.tsx` asserting
+  on a page deleted in `c38b14e`, and the untested scheme gate behind every `href`.
+  `npm test` → **270 passed, 18 files**; `npm run lint` / `typecheck` clean.
+
 ## Deferred
 
 | Item | Why |
@@ -124,6 +171,7 @@ resolve to the same vacancy, an `applyUrl` collision). Not in CI, not re-run.
 | **Ambiguous-match resolution UI** | `AmbiguousVacancyMatchError` is currently just reported; a picker can come later. |
 | **`/tracker` server-side pagination / search / stats** | Row virtualization handles the DOM cost; the whole log still loads in one `limit=500` request. Revisit when the dataset is tens of thousands and one response is genuinely heavy. |
 | **`get_application` MCP tool** | Not needed yet — `list_applications` covers the read side. |
+| **`/log` and `/profile` pages** | Both are `SoonPage` placeholders (2026-09-19). `/log` needs an ingestion ledger that does not exist — nothing records that a posting was *seen*, deduped, or rejected before scoring, which is the same future work [ADR-0023](../decisions/0023-canonical-applyurl.md)'s Context names. `/profile` needs a candidate-profile store. |
 
 ## Explicitly decided *against*
 

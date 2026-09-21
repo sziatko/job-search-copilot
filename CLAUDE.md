@@ -10,7 +10,7 @@ client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (Re
 - [`docs/architecture.md`](docs/architecture.md) — the system map. Start here.
 - [`docs/contracts.md`](docs/contracts.md) — surfaces other code depends on.
 - [`docs/domain-model.md`](docs/domain-model.md) — the two independent axes.
-- [`docs/decisions/`](docs/decisions/) — 22 ADRs, one per load-bearing decision.
+- [`docs/decisions/`](docs/decisions/) — 23 ADRs, one per load-bearing decision.
 - [`docs/design/`](docs/design/) — visual references (HTML mockups). Not prose; open
   in a browser rather than reading.
 
@@ -41,3 +41,33 @@ Quote them from there if you change one; keep this list in step.
 
 All four are root-only — no workspace defines them. The full list, including the
 per-app dev servers, is in the root [`README.md` § Scripts](README.md#scripts-repo-root).
+
+## Phase workflow
+
+A conversation's cost grows with its length — every request re-sends the whole
+history. A phase is far too big to carry in one session, so it is planned and
+worked in **steps**.
+
+**When planning a phase** (writing `docs/phases/phase-N.md`, per
+[`docs/README.md`](docs/README.md)):
+
+- Break the phase into steps that are **independently completable** — each can be
+  finished and verified without the next one existing. Two pieces that cannot be
+  separated are one step, not two.
+- Give the doc a `## Status` section listing every step as a checkbox, in order.
+
+**When working a phase:**
+
+- **One step per session.** Read the phase doc for the first unchecked step; do
+  that one only.
+- **Stop at the step boundary.** Tick its checkbox in `## Status` with the date,
+  report what changed, and tell the user to clear the context before the next
+  step. Do not roll into the next step in the same session, even when it looks
+  small — that is exactly the cost this workflow exists to avoid.
+- **Leave the doc true before you stop.** If the step diverged from what the plan
+  describes, edit that part of the plan — the next session reads it as fact, and a
+  stale plan is worse than none. Beside the checkbox, record only what the next
+  step must know and the code cannot show: a deferral, a path left unvalidated, an
+  operational gotcha. Not what was built — that is in the code.
+- Mid-step, `/compact` is the right tool. At a step boundary it is not: the next
+  step needs none of the previous one, and the phase doc already carries it.

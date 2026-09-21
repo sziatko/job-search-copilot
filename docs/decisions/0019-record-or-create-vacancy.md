@@ -62,8 +62,13 @@ A second application for the same vacancy → `ApplicationAlreadyExistsError`.
 - Changing the placeholder values / the score→recommendation thresholds →
   `deriveRecommendationFromScore` in
   [`packages/core/src/recommendation.ts`](../../packages/core/src/recommendation.ts)
-  and its spec; the web `MatchScoreBadge` uses the same 70 / 50 cut-offs — keep
-  them in step.
+  and its spec. The web colours the same score through
+  [`ScorePill.tsx`](../../apps/web/src/components/ui/ScorePill.tsx) — the component
+  that replaced `MatchScoreBadge` in the 2026-09 redesign (ADR-0024).
+  **These two have drifted: core cuts at 70 / 50, the pill at 70 / 55** — the pill's
+  boundaries were taken from the mockup's `scoreClass`, not from here. A vacancy
+  scoring 52 is `APPLY_WITH_CAVEATS` in the database and "lo" on screen. Nothing
+  enforces agreement; decide which is intended before changing either.
 - Removing the `userAction = APPLIED` side-effect → the `/vacancies` page and the
   Phase 1 `save`-then-`record` MCP spec stop seeing applied vacancies as applied.
 - Loosening the (company, title) match to fuzzy → `AmbiguousVacancyMatchError`

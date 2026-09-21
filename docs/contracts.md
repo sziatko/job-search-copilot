@@ -7,7 +7,8 @@ Source of truth:
 [`apps/api/src/estimated-vacancies/estimated-vacancies.controller.ts`](../apps/api/src/estimated-vacancies/estimated-vacancies.controller.ts),
 [`apps/api/src/applications/applications.controller.ts`](../apps/api/src/applications/applications.controller.ts),
 [`apps/api/src/setup-app.ts`](../apps/api/src/setup-app.ts),
-[`apps/mcp/src/server.ts`](../apps/mcp/src/server.ts),
+[`apps/mcp/src/estimated-vacancies/estimated-vacancies.tools.ts`](../apps/mcp/src/estimated-vacancies/estimated-vacancies.tools.ts),
+[`apps/mcp/src/applications/applications.tools.ts`](../apps/mcp/src/applications/applications.tools.ts),
 [`apps/web/src/pages/vacancies/types.ts`](../apps/web/src/pages/vacancies/types.ts),
 [`apps/web/src/pages/applications/types.ts`](../apps/web/src/pages/applications/types.ts).
 
@@ -37,7 +38,9 @@ the web needs it. See [ADR-0017](decisions/0017-application-1to1-delta.md) /
 
 **`SaveEstimatedVacancyDto`** — `company`, `title`, `applyUrl`, `fullText`,
 `estimationComment`: `@IsString @IsNotEmpty` (note: `applyUrl` is *not*
-URL-validated at the API layer, only by the MCP zod schema); `matchScore`:
+URL-validated at the API layer — `@IsString` is the whole check. Validation and
+canonicalization both happen in `core`, so no transport can skip them: the MCP
+zod schema's `z.url()` is a convenience, not the guard); `matchScore`:
 `@IsInt @Min(0) @Max(100)`; `recommendation`: `@IsIn(RECOMMENDATION_INPUT_VALUES)`
 (EN + Ukrainian, normalized in `save()`).
 
@@ -68,10 +71,18 @@ any future `DomainError` that isn't pre-validated —
 >   [ADR-0012](decisions/0012-web-hand-written-contract.md)).
 > - Moving `/health` under the version prefix → the `docker-compose.yml` `api`
 >   healthcheck (`wget http://localhost:3000/health`) and any external probe.
+> - Changing what `total` means in a list response — it is the number of rows
+>   **matching the filter**, not the size of the page returned. The dashboard reads
+>   four counts straight off it by asking for `limit=1`
+>   (`apps/web/src/pages/dashboard/api.ts`), so making it the page size would
+>   misreport every dashboard number silently rather than error
+>   ([ADR-0024](decisions/0024-web-shell-and-theme.md)).
 
 ## MCP tools
 
-Ten tools, registered in `createServer()`. All inputs are `zod` schemas; all
+Nine tools, registered in `createServer()` — each domain owns its own
+`<feature>/*.tools.ts` + `*.schemas.ts`, and `server.ts` stays composition-only
+([ADR-0010](decisions/0010-mcp-server-factory.md)). All inputs are `zod` schemas; all
 success outputs are `JSON.stringify(result, null, 2)` as a single text block. The 4
 write tools return only a minimal confirmation (see Output column) — they never echo
 back the large text the caller just sent (`fullText`, `estimationComment`,

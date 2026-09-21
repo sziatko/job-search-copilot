@@ -14,7 +14,7 @@ One table. One row per vacancy, keyed for the outside world by `applyUrl`.
 | `updatedAt` | `DateTime @default(now()) @updatedAt` | Bumped on any row update. In practice that means a `userAction` change — analysis fields are never updated (analyze-once). |
 | `company` | `String` | |
 | `title` | `String` | |
-| `applyUrl` | `String @unique` | **The natural key.** The `@unique` constraint is what enforces analyze-once at the DB level. |
+| `applyUrl` | `String @unique` | **The natural key.** The `@unique` constraint is what enforces analyze-once at the DB level. Stored **canonicalized** — `normalizeApplyUrl()` drops the query string, the fragment and a trailing slash, so the spellings one posting arrives in share one row. Exception: a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept. → [ADR-0023](decisions/0023-canonical-applyurl.md) |
 | `fullText` | `String @db.Text` | The whole vacancy text. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
 | `matchScore` | `Int` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. |
 | `recommendation` | `Recommendation` enum | **The analyzer's call.** `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`. |
@@ -59,13 +59,16 @@ The web app's default filter is `NOT_REVIEWED`; the list sorts by `recommendatio
 > - Adding a `Recommendation` or `UserAction` enum value → touches: the Prisma
 >   enum (migration), `RECOMMENDATION_INPUT_VALUES` + `RECOMMENDATION_ALIASES` in
 >   [`recommendation.ts`](../packages/core/src/recommendation.ts), the MCP `zod`
->   enums in [`server.ts`](../apps/mcp/src/server.ts), the `apps/api` DTOs
+>   enums in
+   [`estimated-vacancies.schemas.ts`](../apps/mcp/src/estimated-vacancies/estimated-vacancies.schemas.ts),
+   the `apps/api` DTOs
 >   (`@IsIn(RECOMMENDATION_INPUT_VALUES)` on the save DTO, `@IsEnum` on the
 >   list-query DTO), and the web `recommendationSchema` / `userActionSchema` +
 >   `RECOMMENDATION_ORDER` + the status-filter options in `apps/web`. There is no
 >   single source — see [ADR-0012](decisions/0012-web-hand-written-contract.md).
 > - Adding an `ApplicationStatus` value → the Prisma enum (migration),
->   `ApplicationStatusEnum` in [`server.ts`](../apps/mcp/src/server.ts), the
+>   `ApplicationStatusEnum` in
+   [`applications.schemas.ts`](../apps/mcp/src/applications/applications.schemas.ts), the
 >   `@IsEnum(ApplicationStatus)` DTOs in `apps/api`, `applicationStatusSchema` +
 >   the `APPLICATION_STATUS_LABELS` / `_ORDER` / `_BADGE_STYLES` maps in
 >   [`apps/web/src/pages/applications`](../apps/web/src/pages/applications),
@@ -100,6 +103,12 @@ moved for more than 30 days is a *timeout*, and the remainder is *active*. So
 is deliberately no column, no job, and no server-side filter for it — the rule lives in
 one place, `apps/web/src/pages/applications/constants.ts`. Don't go looking for a
 `timeout` field.
+
+`/tracker`'s status filter therefore carries three values that are **not** stored
+statuses — `ALL`, `ACTIVE`, `TIMEOUT` (`STATUS_FILTER_*` in
+`apps/web/src/pages/applications/types.ts`). `matchesFilter` answers all three from
+the rule above, and none of them ever crosses the wire.
+[ADR-0022](decisions/0022-timeout-derived-until-scheduled.md) owns the rule.
 
 **Record-or-link** (`ApplicationService.record`, one transaction): link by
 `estimatedVacancyId` (web), or by a unique case-insensitive `(company, title)`

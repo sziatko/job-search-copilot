@@ -31,6 +31,8 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0020](0020-web-router-tanstack.md) | Web router: `@tanstack/react-router`; TanStack Form deferred | Accepted |
 | [0021](0021-tracker-import-script.md) | One-off `tracker.md` importer: dry-run default, typed `--commit` gate | Accepted |
 | [0022](0022-timeout-derived-until-scheduled.md) | Timeout is derived on the client until a scheduled job owns it | Accepted |
+| [0023](0023-canonical-applyurl.md) | `applyUrl` is stored canonicalized, with the query string dropped except where a site rule defines it | Accepted |
+| [0024](0024-web-shell-and-theme.md) | The web app shell: a three-state theme, a dashboard at `/`, two placeholder routes | Accepted |
 
 ## Template
 
