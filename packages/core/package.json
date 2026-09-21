@@ -11,7 +11,8 @@
     "studio": "dotenv -e ../../.env -- prisma studio",
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch",
-    "import:tracker": "dotenv -e ../../.env -- tsx scripts/import-tracker.ts"
+    "import:tracker": "dotenv -e ../../.env -- tsx scripts/import-tracker.ts",
+    "backfill:applyurl": "dotenv -e ../../.env -- tsx scripts/backfill-applyurl.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

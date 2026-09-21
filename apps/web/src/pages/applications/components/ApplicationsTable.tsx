@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
+import { isSafeExternalUrl } from '@/lib/url';
 import { daysSinceLastMove, isTimedOut } from '../constants';
 import type { ApplicationListItem, ApplicationStatus } from '../types';
 import { ApplicationStatusSelect } from './ApplicationStatusSelect';
@@ -78,7 +79,7 @@ export function ApplicationsTable({
           )}
           {virtualItems.map((virtualRow) => {
             const item = items[virtualRow.index];
-            const isSynthetic = item.applyUrl.startsWith('tracker://');
+            const linkable = isSafeExternalUrl(item.applyUrl);
             const moved = item.statusUpdatedAt !== item.appliedAt;
             return (
               <tr
@@ -106,9 +107,7 @@ export function ApplicationsTable({
                   )}
                 </td>
                 <td>
-                  {isSynthetic ? (
-                    <span className="role-title">{item.title}</span>
-                  ) : (
+                  {linkable ? (
                     <a
                       href={item.applyUrl}
                       target="_blank"
@@ -117,6 +116,8 @@ export function ApplicationsTable({
                     >
                       {item.title}
                     </a>
+                  ) : (
+                    <span className="role-title">{item.title}</span>
                   )}
                   <div className="role-meta">
                     {item.company} <span className="id">#{item.id}</span>

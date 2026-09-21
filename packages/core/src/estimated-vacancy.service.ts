@@ -9,6 +9,7 @@ import type {
 } from './estimated-vacancy.types';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
+import { buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
 
 const LIST_SELECT = {
   id: true,
@@ -41,9 +42,15 @@ export class EstimatedVacancyService {
    * guaranteed-failing insert on the common path.
    */
   async save(input: SaveEstimatedVacancyInput): Promise<SaveEstimatedVacancyResult> {
-    const existing = await this.db.estimatedVacancy.findUnique({
-      where: { applyUrl: input.applyUrl },
-    });
+    // Neutralized *before* the dedup lookup, not at the insert: applyUrl is the key,
+    // so a sanitized insert against an unsanitized lookup would miss its own row and
+    // trip the unique constraint. A bad scheme costs the link, never the analysis —
+    // postings are scraped from the open web and are untrusted input.
+    const applyUrl =
+      normalizeApplyUrl(input.applyUrl) ??
+      buildSyntheticApplyUrl(input.company, input.title, new Date());
+
+    const existing = await this.db.estimatedVacancy.findUnique({ where: { applyUrl } });
     if (existing) {
       return { created: false, vacancy: existing };
     }
@@ -54,7 +61,7 @@ export class EstimatedVacancyService {
         data: {
           company: input.company,
           title: input.title,
-          applyUrl: input.applyUrl,
+          applyUrl,
           fullText: input.fullText,
           matchScore: input.matchScore,
           recommendation,
@@ -66,7 +73,7 @@ export class EstimatedVacancyService {
       // Lost a race with a concurrent save of the same applyUrl — the other write won.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const raced = await this.db.estimatedVacancy.findUnique({
-          where: { applyUrl: input.applyUrl },
+          where: { applyUrl },
         });
         if (raced) {
           return { created: false, vacancy: raced };

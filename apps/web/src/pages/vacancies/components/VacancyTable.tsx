@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
+import { isSafeExternalUrl } from '@/lib/url';
 import type { EstimatedVacancyListItem, UserAction } from '../types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { RecommendationTag } from './RecommendationTag';
@@ -70,14 +71,18 @@ export function VacancyTable({
               >
                 <td className="date-cell">{dateFormatter.format(new Date(item.createdAt))}</td>
                 <td>
-                  <a
-                    href={item.applyUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="role-title role-link"
-                  >
-                    {item.title}
-                  </a>
+                  {isSafeExternalUrl(item.applyUrl) ? (
+                    <a
+                      href={item.applyUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="role-title role-link"
+                    >
+                      {item.title}
+                    </a>
+                  ) : (
+                    <span className="role-title">{item.title}</span>
+                  )}
                   <div className="role-meta">
                     {item.company} <span className="id">#{item.id}</span>
                   </div>

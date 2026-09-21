@@ -17,6 +17,7 @@ import {
 } from './errors';
 import { getPrisma } from './prisma-client';
 import { deriveRecommendationFromScore } from './recommendation';
+import { buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
 
 /** The EstimatedVacancy fields the /tracker page reads through the join. */
 const VACANCY_SELECT = {
@@ -59,23 +60,6 @@ function flatten(row: ApplicationRow): ApplicationListItem {
     recommendation: ev.recommendation,
     estimationComment: ev.estimationComment,
   };
-}
-
-function slug(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, '-')
-      .replace(/^-+|-+$/g, '') || 'x'
-  );
-}
-
-/** Stand-in applyUrl for a vacancy the user applied to but never had a real listing URL for.
- * Not a real URL — the /tracker page renders these as plain text, not a link. Exported so
- * the tracker importer can detect two rows that would resolve to the same synthetic URL. */
-export function buildSyntheticApplyUrl(company: string, title: string, date: Date): string {
-  return `tracker://${slug(company)}/${slug(title)}/${date.toISOString().slice(0, 10)}`;
 }
 
 export class ApplicationService {
@@ -292,12 +276,17 @@ async function resolveVacancyId(
   const recommendation =
     input.recommendation ??
     (input.matchScore != null ? deriveRecommendationFromScore(input.matchScore) : 'APPLY');
+  // Neutralized, not stored raw: a non-http(s) scheme here would be rendered as a
+  // clickable link by the web app. The record is kept either way — losing a whole
+  // application over a bad URL would be worse than an unlinked one.
+  const applyUrl =
+    normalizeApplyUrl(input.applyUrl) ?? buildSyntheticApplyUrl(company, title, appliedAt);
   try {
     const created = await db.estimatedVacancy.create({
       data: {
         company,
         title,
-        applyUrl: input.applyUrl?.trim() || buildSyntheticApplyUrl(company, title, appliedAt),
+        applyUrl,
         fullText: input.fullText ?? 'N/A',
         matchScore,
         recommendation,
@@ -312,7 +301,7 @@ async function resolveVacancyId(
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw new InvalidApplicationInputError(
         `Could not create a vacancy for "${company}" / "${title}": its applyUrl ` +
-          `(${input.applyUrl?.trim() || buildSyntheticApplyUrl(company, title, appliedAt)}) already belongs ` +
+          `(${applyUrl}) already belongs ` +
           `to another vacancy.`,
       );
     }
