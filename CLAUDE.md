@@ -60,6 +60,11 @@ worked in **steps**.
 
 - **One step per session.** Read the phase doc for the first unchecked step; do
   that one only.
+- **A step carries its own tests.** Write them as part of the step — the plan *is*
+  the agreement, so nothing waits for a second review. Do not tick the checkbox
+  until `npm test` has run green in *this* session; an earlier session's green run
+  is not evidence. Report the real output, then wait for an explicit instruction
+  before `git commit`.
 - **Stop at the step boundary.** Tick its checkbox in `## Status` with the date,
   report what changed, and tell the user to clear the context before the next
   step. Do not roll into the next step in the same session, even when it looks
