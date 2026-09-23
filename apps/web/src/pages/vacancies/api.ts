@@ -15,11 +15,21 @@ export interface VacancyPage {
 }
 
 export async function listEstimatedVacanciesPage(
-  params: { limit?: number; userAction?: UserAction; recommendation?: Recommendation } = {},
+  params: {
+    limit?: number;
+    userAction?: UserAction;
+    recommendation?: Recommendation;
+    /** Free text over company OR title, filtered server-side (ADR-0025). */
+    search?: string;
+    /** ILIKE '%company%' — the company-history modal's filter. */
+    company?: string;
+  } = {},
 ): Promise<VacancyPage> {
   const query = new URLSearchParams({ limit: String(params.limit ?? 100) });
   if (params.userAction) query.set('userAction', params.userAction);
   if (params.recommendation) query.set('recommendation', params.recommendation);
+  if (params.search) query.set('search', params.search);
+  if (params.company) query.set('company', params.company);
 
   const res = await fetch(`${API_BASE}/estimated-vacancies?${query}`);
   if (!res.ok) {

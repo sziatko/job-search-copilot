@@ -312,6 +312,10 @@ describe('ApplicationsPage / useApplications', () => {
       screen.getAllByRole('row').find((r) => r.textContent?.includes(title))?.textContent ?? '';
     expect(rowText('Stale Role')).toContain('⏳');
     expect(rowText('Live Role')).not.toContain('⏳');
+
+    // The explanation is a `.tip` bubble like everywhere else, not a native `title`.
+    const staleRow = screen.getAllByRole('row').find((r) => r.textContent?.includes('Stale Role'));
+    expect(staleRow?.querySelector('.tip')).toHaveTextContent('45 days since last update');
   });
 
   it('writes the new last-move stamp into the cache optimistically', async () => {

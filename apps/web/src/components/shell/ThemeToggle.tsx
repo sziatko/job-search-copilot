@@ -29,10 +29,12 @@ export function ThemeToggle() {
       type="button"
       className="icon-btn"
       onClick={cycle}
-      title={NEXT_LABEL[preference]}
       aria-label={`${CURRENT[preference]} — ${NEXT_LABEL[preference]}`}
     >
       <Icon />
+      {/* The bubble says what a click does; the label also says which theme is on,
+          which the icon only shows. */}
+      <span className="tip">{NEXT_LABEL[preference]}</span>
     </button>
   );
 }

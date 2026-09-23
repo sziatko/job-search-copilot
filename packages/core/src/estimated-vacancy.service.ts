@@ -1,6 +1,7 @@
 import type { EstimatedVacancy, PrismaClient, UserAction } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type {
+  EstimatedVacancyListItem,
   ListEstimatedVacanciesFilters,
   ListEstimatedVacanciesResult,
   SaveEstimatedVacancyInput,
@@ -106,6 +107,15 @@ export class EstimatedVacancyService {
     const where: Prisma.EstimatedVacancyWhereInput = {
       ...(filters.recommendation && { recommendation: filters.recommendation }),
       ...(filters.userAction && { userAction: filters.userAction }),
+      // One clause, not two: `search` is the /vacancies free-text box and widens
+      // (company OR title), where company/title each narrow. Being separate `where`
+      // keys they AND together, so passing both still means "must satisfy both".
+      ...(filters.search && {
+        OR: [
+          { company: { contains: filters.search, mode: 'insensitive' } },
+          { title: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      }),
       ...(filters.company && {
         company: { contains: filters.company, mode: 'insensitive' },
       }),
@@ -128,7 +138,47 @@ export class EstimatedVacancyService {
       this.db.estimatedVacancy.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: await this.withCompanyMatchCounts(items), total };
+  }
+
+  /**
+   * Adds the derived `companyMatchCount` to a page of rows: for each row, how many
+   * vacancies in the whole table have a `company` containing that row's company
+   * (case-insensitive substring — the /vacancies duplicates button, ADR-0025).
+   */
+  private async withCompanyMatchCounts(
+    items: Omit<EstimatedVacancyListItem, 'companyMatchCount'>[],
+  ): Promise<EstimatedVacancyListItem[]> {
+    const names = [...new Set(items.map((item) => item.company))];
+    if (names.length === 0) {
+      return [];
+    }
+
+    // Prefilter so the scan below only sees candidates. One OR over the page's
+    // distinct companies is exactly what the `company` trigram index serves. It can
+    // over-select — Prisma's `contains` does not escape LIKE's `%`/`_`, so a company
+    // called `A_B` also reaches `AXB` — but it can never under-select, which is why
+    // the count itself is done in JS.
+    //
+    // ponytail: a second round-trip plus an O(distinct companies x candidates) scan
+    // on every list call. Fine while a page is a hundred rows; if the table grows,
+    // do the counting in SQL (a lateral join over the same index) instead of pulling
+    // candidate company names into the process.
+    const candidates = await this.db.estimatedVacancy.findMany({
+      where: { OR: names.map((name) => ({ company: { contains: name, mode: 'insensitive' } })) },
+      select: { company: true },
+    });
+
+    const counts = new Map<string, number>();
+    for (const name of names) {
+      const needle = name.toLowerCase();
+      counts.set(
+        name,
+        candidates.filter((candidate) => candidate.company.toLowerCase().includes(needle)).length,
+      );
+    }
+
+    return items.map((item) => ({ ...item, companyMatchCount: counts.get(item.company) ?? 0 }));
   }
 
   /**

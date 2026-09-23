@@ -23,7 +23,7 @@ fields are stripped; type coercion is on.
 | --- | --- | --- | --- |
 | `GET /health` | — | `200 { status: 'ok', db: 'up' }` | `503 { status: 'error', db: 'down' }` if `SELECT 1` fails |
 | `POST /api/v1/estimated-vacancies` | `SaveEstimatedVacancyDto` (below) | `201` + `Location: /api/v1/estimated-vacancies/{id}` when created; `200` when `applyUrl` already exists. Body = the full `EstimatedVacancy` (incl. `fullText`) either way. | `400` DTO validation; `422` `DomainError` (see below) |
-| `GET /api/v1/estimated-vacancies` | query: `recommendation?` (enum, EN), `userAction?` (enum), `company?` (string, ILIKE contains), `limit?` (1–100, default 20 in core), `offset?` (≥0) | `200 { items: EstimatedVacancyListItem[], total: number }` — **items omit `fullText`** | `400` bad query (e.g. `limit=200`) |
+| `GET /api/v1/estimated-vacancies` | query: `recommendation?` (enum, EN), `userAction?` (enum), `company?` (string, ILIKE contains), `search?` (string — `company` **OR** `title`, ILIKE), `limit?` (1–100, default 20 in core), `offset?` (≥0) | `200 { items: EstimatedVacancyListItem[], total: number }` — **items omit `fullText`** and carry the derived `companyMatchCount` | `400` bad query (e.g. `limit=200`) |
 | `GET /api/v1/estimated-vacancies/:id` | — | `200` full `EstimatedVacancy` (incl. `fullText`) | `404` unknown id; `400` non-integer id (`ParseIntPipe`) |
 | `PATCH /api/v1/estimated-vacancies/:id/user-action` | `{ userAction: UserAction }` | `200` full `EstimatedVacancy` | `404` unknown id; `400` bad `userAction` |
 | `POST /api/v1/applications` | `RecordApplicationDto`: `estimatedVacancyId` (`@IsInt @Min(1)`, **required**), `salaryInListing?`, `userComment?` (`@IsString`), `usedTailoredResume?` (`@IsBoolean`), `status?` (`@IsEnum(ApplicationStatus)`). No `appliedAt` — server uses `now()`. | **always `201`** + `Location: /api/v1/applications/{id}`. Body = `{ application: ApplicationListItem, resolution: 'linked-by-id' \| 'linked-existing' \| 'created-vacancy', vacancyCreated: boolean }`. | `400` DTO; `422` `InvalidApplicationInputError` (unknown id) / `ApplicationAlreadyExistsError` (that vacancy already has one) |
@@ -35,6 +35,13 @@ The API exposes only `POST`'s by-id path; the by-`(company, title)` find-or-crea
 path is MCP / import only. `resolution` rides in the JSON envelope (not a header) —
 the web needs it. See [ADR-0017](decisions/0017-application-1to1-delta.md) /
 [ADR-0019](decisions/0019-record-or-create-vacancy.md).
+
+The vacancies list's filter vocabulary differs by transport: `core`'s `list()`
+accepts `company` and `title` independently (both ILIKE), MCP exposes both, and
+HTTP exposes `company` plus the broader `search` (`company` OR `title`). A caller
+wanting a title-only filter over HTTP needs a `title?` field on the DTO — and
+`whitelist: true` strips anything the DTO doesn't declare, so adding the param
+without the field is silently a no-op.
 
 **`SaveEstimatedVacancyDto`** — `company`, `title`, `applyUrl`, `fullText`,
 `estimationComment`: `@IsString @IsNotEmpty` (note: `applyUrl` is *not*
@@ -68,7 +75,12 @@ any future `DomainError` that isn't pre-validated —
 > - Adding a field to the list-item shape → `EstimatedVacancyListItem` +
 >   `LIST_SELECT` in `packages/core`, **and** `estimatedVacancyListItemSchema` in
 >   the web contract (they are maintained by hand in parallel —
->   [ADR-0012](decisions/0012-web-hand-written-contract.md)).
+>   [ADR-0012](decisions/0012-web-hand-written-contract.md)). Two traps: the field
+>   reaches **both** transports, because `list()` feeds `apps/api` and `apps/mcp`
+>   alike; and a field that is *derived* rather than a column must be `.optional()`
+>   in the web schema, because that same schema parses the
+>   `PATCH .../user-action` response, which carries no derived fields
+>   ([ADR-0025](decisions/0025-vacancies-list-search-server-side.md)).
 > - Moving `/health` under the version prefix → the `docker-compose.yml` `api`
 >   healthcheck (`wget http://localhost:3000/health`) and any external probe.
 > - Changing what `total` means in a list response — it is the number of rows
@@ -94,7 +106,7 @@ back the large text the caller just sent (`fullText`, `estimationComment`,
 | `save_estimated_vacancy` | `company, title, applyUrl` (`.url()`), `fullText`, `matchScore` (int 0–100), `recommendation` (EN + UA), `estimationComment` | `{ success: boolean, vacancy: { id, company, title } }` — `success` is `false` when an existing `applyUrl` caused the analysis to be dropped | `DomainError` → `{ isError: true, content: [message] }` |
 | `save_estimated_vacancies_batch` | `{ vacancies: [...] }` — array (1–100) of the same shape as `save_estimated_vacancy`'s input | `[{ success, vacancy: { id, company, title } }, ...]`, one entry per input, same order and same per-item shape as `save_estimated_vacancy` — not transactional, so one item's dedup/skip doesn't affect the others | array size outside 1–100 → schema-validation error; `DomainError` → `{ isError: true, content: [message] }` |
 | `get_estimated_vacancy` | `{ id: int }` | the full `EstimatedVacancy` | unknown id → `{ isError: true, content: ["EstimatedVacancy <id> not found"] }` |
-| `list_estimated_vacancies` | `recommendation?` (EN only), `userAction?`, `company?`, `title?` (both ILIKE `%term%`, case-insensitive), `limit?` (1–100), `offset?` (≥0) | `{ items, total }` — no `fullText` | — |
+| `list_estimated_vacancies` | `recommendation?` (EN only), `userAction?`, `company?`, `title?` (both ILIKE `%term%`, case-insensitive), `limit?` (1–100), `offset?` (≥0) | `{ items, total }` — no `fullText`; each item also carries `companyMatchCount` (derived, see the list-item note under the REST table) | — |
 | `update_estimated_vacancy_user_action` | `{ id: int, userAction }` | `{ success: true, vacancy: { id } }` | unknown id → `isError` result |
 | `record_application` | `company`, `title` (required), `applyUrl?` (`.url()`), `matchScore?` (int 0–100), `estimationComment?`, `salaryInListing?`, `usedTailoredResume?`, `userComment?`, `status?` | `{ success: true, application: { id, company, title } }` — find-or-creates the vacancy, marks it APPLIED; use `list_estimated_vacancies`/`list_applications` to see `resolution`-equivalent state | `DomainError` (blank input / ambiguous match / already recorded) → `{ isError: true, content: [message] }` |
 | `record_applications_batch` | `{ applications: [...] }` — array (1–100) of the same shape as `record_application`'s input | `[{ success: true, application: { id, company, title } }, ...]`, one entry per input, same order and same per-item shape as `record_application` — **transactional**: runs in one `$transaction` (`ApplicationService.recordMany`), so one failing item rolls back the whole batch | array size outside 1–100 → schema-validation error; `DomainError` on any item → `{ isError: true, content: [message] }`, nothing persisted |

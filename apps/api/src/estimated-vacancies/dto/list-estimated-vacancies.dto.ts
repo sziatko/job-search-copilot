@@ -13,6 +13,10 @@ export class ListEstimatedVacanciesQueryDto {
 
   @IsOptional()
   @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
   company?: string;
 
   @IsOptional()

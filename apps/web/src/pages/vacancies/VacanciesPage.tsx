@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { toast } from 'sonner';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { ApplyDialog } from './components/ApplyDialog';
+import { CompanyHistoryModal } from './components/CompanyHistoryModal';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { StatusFilterSelect } from './components/StatusFilterSelect';
 import { VacancyTable } from './components/VacancyTable';
@@ -15,6 +18,8 @@ export function VacanciesPage() {
     rowErrors,
     pendingDecline,
     pendingApply,
+    q,
+    setSearchText,
     statusFilter,
     setStatusFilter,
     requestActionChange,
@@ -24,16 +29,23 @@ export function VacanciesPage() {
     cancelApply,
   } = useVacancies();
 
+  // Which company's history is open, if any — and which of its rows was clicked,
+  // which the modal marks. Page state, not row state: a virtualized row unmounts
+  // as soon as it scrolls out of the window.
+  const [companyHistory, setCompanyHistory] = useState<{
+    company: string;
+    vacancyId: number;
+  } | null>(null);
+
   return (
     <section className="view">
       <div className="card">
-        <div className="card-head">
-          <div>
-            <h2>Analyzed vacancies</h2>
-            <div className="count">
-              {loading ? 'Loading…' : `${visibleItems.length} of ${total} vacancies`}
-            </div>
-          </div>
+        {/* Same shape as the tracker's card: the page title is the shell's, so there
+            is no head here and the toolbar carries the top padding. The search goes
+            to the server, so the count in the foot is the server's match count for
+            the term, not a filtered view — `total` and the loaded rows can differ. */}
+        <div className="toolbar pt-[16px]">
+          <SearchInput value={q} onChange={setSearchText} />
           <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         </div>
 
@@ -49,10 +61,18 @@ export function VacanciesPage() {
             savingIds={savingIds}
             rowErrors={rowErrors}
             onActionChange={requestActionChange}
+            onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
           />
         )}
 
-        <div className="table-foot">Scroll for more · scores from the vacancy-evaluator skill</div>
+        {/* Gated like the tracker's: "Showing 0 of 0" during the first load is a
+            claim about the data, and there is no data yet. */}
+        {!loadError && !loading && (
+          <div className="table-foot">
+            Showing {visibleItems.length} of {total} vacancies · scores from the vacancy-evaluator
+            skill
+          </div>
+        )}
       </div>
 
       {pendingDecline && (
@@ -62,6 +82,14 @@ export function VacanciesPage() {
           confirmLabel="Yes, decline"
           onCancel={cancelDecline}
           onConfirm={confirmDecline}
+        />
+      )}
+
+      {companyHistory && (
+        <CompanyHistoryModal
+          company={companyHistory.company}
+          currentId={companyHistory.vacancyId}
+          onClose={() => setCompanyHistory(null)}
         />
       )}
 

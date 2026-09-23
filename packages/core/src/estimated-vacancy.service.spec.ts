@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvalidRecommendationError } from './errors';
 import { EstimatedVacancyService } from './estimated-vacancy.service';
-import type { SaveEstimatedVacancyInput } from './estimated-vacancy.types';
+import type {
+  EstimatedVacancyListItem,
+  SaveEstimatedVacancyInput,
+} from './estimated-vacancy.types';
 
 // Integration tests: hit the real (test) Postgres database instead of mocking
 // Prisma. A mocked Prisma client would just re-assert our own query calls and
@@ -19,6 +22,13 @@ function input(overrides: Partial<SaveEstimatedVacancyInput> = {}): SaveEstimate
     estimationComment: 'Strong match.',
     ...overrides,
   };
+}
+
+/** company → companyMatchCount, so a count can be asserted without depending on
+ * the page's order (row order is createdAt desc, and rows saved in the same
+ * millisecond have no order to depend on). */
+function countsByCompany(items: EstimatedVacancyListItem[]): Record<string, number> {
+  return Object.fromEntries(items.map((item) => [item.company, item.companyMatchCount]));
 }
 
 describe('EstimatedVacancyService', () => {
@@ -263,6 +273,99 @@ describe('EstimatedVacancyService', () => {
       const page = await service.list({ limit: 1, offset: 1 });
       expect(page.items).toHaveLength(1);
       expect(page.total).toBe(2);
+    });
+
+    describe('companyMatchCount', () => {
+      it('counts the row itself, so a company with no siblings reports 1', async () => {
+        const { items } = await service.list();
+        expect(countsByCompany(items)).toEqual({ Acme: 1, 'Beta Corp': 1 });
+      });
+
+      it('counts every row of the same company', async () => {
+        await service.save(
+          input({ applyUrl: 'https://example.com/jobs/c', title: 'Data Engineer' }),
+        );
+
+        const { items } = await service.list();
+
+        expect(countsByCompany(items).Acme).toBe(2);
+      });
+
+      it('is a case-insensitive substring, in one direction only', async () => {
+        // 'Acme' contains itself in 'Acme Recruiting', but not the reverse — the
+        // needle is this row's own company, which is what the button reports.
+        await service.save(
+          input({ applyUrl: 'https://example.com/jobs/d', company: 'Acme Recruiting' }),
+        );
+
+        const { items } = await service.list();
+
+        expect(countsByCompany(items)).toEqual({ Acme: 2, 'Acme Recruiting': 1, 'Beta Corp': 1 });
+      });
+
+      it('matches a differently-cased company name', async () => {
+        await service.save(
+          input({ applyUrl: 'https://example.com/jobs/e', company: 'acme consulting' }),
+        );
+
+        const { items } = await service.list();
+
+        expect(countsByCompany(items).Acme).toBe(2);
+      });
+
+      it('counts rows that are not on the page', async () => {
+        await service.save(
+          input({ applyUrl: 'https://example.com/jobs/f', title: 'Data Engineer' }),
+        );
+
+        // limit=1 -> one Acme row comes back, but both exist.
+        const { items } = await service.list({ company: 'Acme', limit: 1 });
+
+        expect(items).toHaveLength(1);
+        expect(items[0].companyMatchCount).toBe(2);
+      });
+    });
+
+    describe('search', () => {
+      it('matches on the company', async () => {
+        const { items, total } = await service.list({ search: 'acme' });
+        expect(total).toBe(1);
+        expect(items[0].company).toBe('Acme');
+      });
+
+      it('matches on the title', async () => {
+        const { items, total } = await service.list({ search: 'frontend' });
+        expect(total).toBe(1);
+        expect(items[0].title).toBe('Frontend Lead');
+      });
+
+      it('is case-insensitive', async () => {
+        expect((await service.list({ search: 'BACKEND' })).total).toBe(1);
+      });
+
+      it('ANDs with the other filters rather than replacing them', async () => {
+        // `search` widens (company OR title); it must not also *drop* the narrowing
+        // filters — Acme matches, but no Acme row is SKIP.
+        expect((await service.list({ search: 'acme', recommendation: 'SKIP' })).total).toBe(0);
+        expect((await service.list({ search: 'acme', recommendation: 'APPLY' })).total).toBe(1);
+      });
+
+      it('counts every match in total while the page stays limited', async () => {
+        // Same term reaching two rows through different columns — the OR half of the
+        // clause — and `total` staying the match count rather than the page size.
+        await service.save(
+          input({
+            applyUrl: 'https://example.com/jobs/c',
+            company: 'Gamma',
+            title: 'Acme Support Lead',
+          }),
+        );
+
+        const page = await service.list({ search: 'acme', limit: 1 });
+
+        expect(page.items).toHaveLength(1);
+        expect(page.total).toBe(2); // Acme (company) + Acme Support Lead (title)
+      });
     });
   });
 

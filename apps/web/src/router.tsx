@@ -52,11 +52,20 @@ const indexRoute = createRoute({
   staticData: DASHBOARD_META,
 });
 
+// /vacancies' search box. Unlike the tracker's, the term is not used to filter in
+// the browser: it is sent to the API (ADR-0025), so it is the only filter that has
+// to survive in the URL. The status filter stays component state.
+const vacanciesSearchSchema = z.object({
+  q: z.string().optional(),
+});
+
 const vacanciesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/vacancies',
   component: VacanciesPage,
   staticData: VACANCIES_META,
+  validateSearch: (search): z.infer<typeof vacanciesSearchSchema> =>
+    vacanciesSearchSchema.parse(search),
 });
 
 // No backend behind either of these yet — see the pages for what is missing.

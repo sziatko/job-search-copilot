@@ -1,4 +1,4 @@
-import { ApplicationSearchInput } from './components/ApplicationSearchInput';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { ApplicationStatusFilterSelect } from './components/ApplicationStatusFilterSelect';
 import { ApplicationsTable } from './components/ApplicationsTable';
 import { TrackerKpis } from './components/TrackerKpis';
@@ -32,7 +32,7 @@ export function ApplicationsPage() {
 
       <div className="card">
         <div className="toolbar pt-[16px]">
-          <ApplicationSearchInput value={q} onChange={setSearchText} />
+          <SearchInput value={q} onChange={setSearchText} />
           <ApplicationStatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         </div>
 

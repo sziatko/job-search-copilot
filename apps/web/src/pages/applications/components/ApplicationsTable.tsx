@@ -90,11 +90,9 @@ export function ApplicationsTable({
               >
                 <td className="date-cell">
                   {isTimedOut(item) && (
-                    <span
-                      className="timeout-mark mr-[4px]"
-                      title={`${daysSinceLastMove(item)} days since last update`}
-                    >
+                    <span className="timeout-mark mr-[4px]">
                       ⏳
+                      <span className="tip">{daysSinceLastMove(item)} days since last update</span>
                     </span>
                   )}
                   {dateFormatter.format(new Date(item.appliedAt))}

@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 /** Debounced text search over company / role. Local state keeps typing snappy;
- * the debounced call pushes the term into the URL (see useApplications). */
-export function ApplicationSearchInput({
+ * the debounced call pushes the term into the URL (see useApplications and
+ * useVacancies — the tracker filters on it client-side, /vacancies sends it to
+ * the API, ADR-0025). */
+export function SearchInput({
   value,
   onChange,
 }: {

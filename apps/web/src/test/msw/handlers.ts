@@ -2,7 +2,7 @@ import { HttpResponse, http } from 'msw';
 import type { ApplicationListItem, ApplicationStatus } from '@/pages/applications/types';
 import type { EstimatedVacancyListItem, UserAction } from '@/pages/vacancies/types';
 
-const API_URL = 'http://localhost:3000/api/v1';
+export const API_URL = 'http://localhost:3000/api/v1';
 
 /** Builds handlers backed by a mutable in-memory `items` array, mirroring what
  * the real API does closely enough for the dashboard's own logic to be tested
@@ -18,13 +18,30 @@ export function buildHandlers(items: EstimatedVacancyListItem[]) {
       const query = new URL(request.url).searchParams;
       const userAction = query.get('userAction');
       const recommendation = query.get('recommendation');
+      const search = query.get('search');
+      const company = query.get('company');
       const matching = items.filter(
         (item) =>
           (!userAction || item.userAction === userAction) &&
-          (!recommendation || item.recommendation === recommendation),
+          (!recommendation || item.recommendation === recommendation) &&
+          (!company || item.company.toLowerCase().includes(company.toLowerCase())) &&
+          // /vacancies sends its term here rather than filtering client-side, so
+          // without this the page's search tests would pass while doing nothing.
+          (!search ||
+            item.company.toLowerCase().includes(search.toLowerCase()) ||
+            item.title.toLowerCase().includes(search.toLowerCase())),
       );
       const limit = Number(query.get('limit') ?? 100);
-      return HttpResponse.json({ items: matching.slice(0, limit), total: matching.length });
+      // `companyMatchCount` is derived by the real endpoint (ADR-0025), counted
+      // over every vacancy, not just the page — so the fake derives it too, and
+      // the UI's button is exercised against the semantics the API actually has.
+      const page = matching.slice(0, limit).map((item) => ({
+        ...item,
+        companyMatchCount: items.filter((candidate) =>
+          candidate.company.toLowerCase().includes(item.company.toLowerCase()),
+        ).length,
+      }));
+      return HttpResponse.json({ items: page, total: matching.length });
     }),
     http.patch(`${API_URL}/estimated-vacancies/:id/user-action`, async ({ params, request }) => {
       const id = Number(params.id);

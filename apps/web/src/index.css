@@ -34,6 +34,7 @@
   --color-warn-soft: #fbf0da;
   --color-warn-soft-border: #efd79c;
   --color-bad: #dc3d3d;
+  --color-bad-ink: #b32b2b;
   --color-bad-soft: #fbeaea;
   --color-bad-soft-border: #f2c3c3;
 
@@ -322,6 +323,14 @@
   tbody tr:hover {
     @apply bg-surface-alt;
   }
+  /* The history modal's own row — the one the user clicked to open it. Plain
+     `bg-accent-soft` on the <tr> would lose to `tbody tr:hover` above, so the
+     marker would vanish under the very cursor that opened the modal; half-strength
+     keeps the `Current` pill, which wears the full tint, readable on top of it. */
+  .row-current,
+  .row-current:hover {
+    @apply bg-accent-soft/50;
+  }
   .table-body-scroll {
     @apply overflow-auto;
     max-height: 560px;
@@ -353,7 +362,17 @@
     @apply mt-[1px] text-[10.5px] text-ink-faint;
   }
   .timeout-mark {
-    @apply text-warn;
+    /* `relative` is what its `.tip` is positioned against. */
+    @apply relative text-warn;
+  }
+  /* Two places a centred bubble cannot go. The ⏳ leads the first column, where it
+     loses its left half to the scroll box's edge — clipped, not just overhanging.
+     The theme toggle trails the topbar, where the same half goes off the window. */
+  .date-cell .tip {
+    @apply left-0 translate-x-0;
+  }
+  .topbar .tip {
+    @apply left-auto right-0 translate-x-0;
   }
 
   .pill {
@@ -415,20 +434,42 @@
   .icon-btn:hover {
     @apply border-accent-soft-border bg-accent-soft text-accent-ink;
   }
+  /* Decline keeps the red it wore as a text button: hovering to accent would read
+     as "harmless" on the one control in the row that is not. */
+  .icon-btn-danger:hover {
+    @apply border-bad-soft-border bg-bad-soft text-bad-ink;
+  }
   .icon-btn svg {
     @apply h-[14px] w-[14px];
   }
-  .copied-flag {
+  /* The bubble an `.icon-btn` or a `.meta-btn` reveals — the only label the Action
+     column's four icon controls have, the duplicates button's count, and the copy
+     buttons' "Copied" confirmation. One class for all of them: a hover tip and a
+     flash are the same box with the same reveal. */
+  .tip {
     @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-ink px-[7px] py-[3px] text-[10.5px] font-bold text-bg opacity-0;
     transition: opacity 0.15s ease;
   }
-  .icon-btn.flash .copied-flag {
+  /* Whichever element directly contains the bubble reveals it. This used to name
+     `.icon-btn` and `.meta-btn` one by one; a list is what the next tip has to be
+     added to, and the ⏳ marker (a `<span>`, cue-on-hover only) is the third. */
+  :hover > .tip,
+  :focus-visible > .tip,
+  .flash > .tip {
     @apply opacity-100;
   }
-  /* Inside a scroll box the bubble is clipped at the top edge, which with
-     virtualization is every row you scroll to, not just the first. */
-  .table-body-scroll .copied-flag {
-    @apply bottom-auto top-[calc(100%+6px)];
+
+  /* The duplicates button in a row's meta line. Shaped for 12px text rather than
+     `.icon-btn`'s 30px square, which would stretch the row and push the meta line
+     around as it appears. `relative` is what its `.tip` is positioned against. */
+  .meta-btn {
+    @apply relative ml-[6px] inline-flex cursor-pointer items-center gap-[3px] rounded-[6px] border border-border-strong px-[5px] py-[1px] align-middle text-[11px] font-bold text-ink-muted;
+  }
+  .meta-btn:hover {
+    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
+  }
+  .meta-btn svg {
+    @apply h-[11px] w-[11px];
   }
 
   .empty-state {
@@ -563,6 +604,40 @@
   .btn-danger {
     @apply border-transparent bg-bad text-bg;
   }
+  /* Without this, :hover falls through to .btn's grey — a grey flash on a red
+     button. Invisible in a lone dialog; not in a column of them. */
+  .btn-danger:hover {
+    @apply bg-bad-ink;
+  }
+  .btn-sm {
+    @apply px-[9px] py-[4px] text-[12px];
+  }
+
+  /* The closed state of any popover. The UA stylesheet's own
+     `[popover]:not(:popover-open) { display: none }` is a *user-agent* rule and is
+     not `!important` (only `:popover-open::backdrop` is), so author CSS beats it —
+     which `.row-menu`'s `flex` below does, leaving every closed menu on screen.
+     This must sit in this layer, not in `base`: layers are compared before
+     specificity, so a base-layer rule would lose to that same `flex`. */
+  [popover]:not(:popover-open) {
+    display: none;
+  }
+
+  /* The row's ⋯ menu: a native popover, so it lands in the top layer and is not
+     clipped by .table-body-scroll. `inset: auto` is load-bearing — the UA
+     stylesheet sets `inset: 0; margin: auto` on [popover] and Preflight does not
+     neutralise it; the component then sets top/left from getBoundingClientRect(). */
+  .row-menu {
+    @apply m-0 flex flex-col gap-[2px] rounded-[10px] border border-border bg-surface p-[6px] shadow-pop;
+    position: fixed;
+    inset: auto;
+  }
+  .row-menu button {
+    @apply cursor-pointer rounded-[7px] px-[12px] py-[6px] text-left text-[12.5px] font-semibold whitespace-nowrap text-ink;
+  }
+  .row-menu button:hover {
+    @apply bg-surface-alt;
+  }
 
   .field-label {
     @apply block text-[12.5px] font-bold text-ink-soft;
@@ -686,6 +761,7 @@
     --color-warn-soft: #362a0e;
     --color-warn-soft-border: #5c481b;
     --color-bad: #e17575;
+    --color-bad-ink: #eb9a9a;
     --color-bad-soft: #3a1d1d;
     --color-bad-soft-border: #5e2e2e;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);

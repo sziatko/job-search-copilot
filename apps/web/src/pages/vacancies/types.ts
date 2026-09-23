@@ -42,6 +42,11 @@ export const estimatedVacancyListItemSchema = z.object({
   estimationComment: z.string(),
   userAction: userActionSchema,
   userActionUpdatedAt: z.string().nullable(),
+  /** How many vacancies share this row's company. Derived by the list endpoint
+   * (ADR-0025), so it is **optional**: this schema also parses the PATCH
+   * .../user-action response, which returns a plain record with no derived field —
+   * requiring it here would fail every action change with "unexpected format". */
+  companyMatchCount: z.number().optional(),
 });
 export type EstimatedVacancyListItem = z.infer<typeof estimatedVacancyListItemSchema>;
 

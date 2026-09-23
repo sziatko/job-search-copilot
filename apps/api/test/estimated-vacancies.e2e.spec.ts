@@ -103,6 +103,61 @@ describe('EstimatedVacancies (e2e)', () => {
     it('rejects limit above 100 with 400', async () => {
       await request(app.getHttpServer()).get('/api/v1/estimated-vacancies?limit=200').expect(400);
     });
+
+    it('filters by ?search= on either the company or the title', async () => {
+      const server = app.getHttpServer();
+      await request(server).post('/api/v1/estimated-vacancies').send(validPayload).expect(201);
+      await request(server)
+        .post('/api/v1/estimated-vacancies')
+        .send({
+          ...validPayload,
+          company: 'Beta Corp',
+          title: 'Frontend Lead',
+          applyUrl: 'https://example.com/jobs/2',
+          recommendation: 'SKIP',
+        })
+        .expect(201);
+
+      const byCompany = await request(server)
+        .get('/api/v1/estimated-vacancies?search=ACME')
+        .expect(200);
+      expect(byCompany.body.total).toBe(1);
+      expect(byCompany.body.items[0].company).toBe('Acme');
+
+      const byTitle = await request(server)
+        .get('/api/v1/estimated-vacancies?search=frontend')
+        .expect(200);
+      expect(byTitle.body.total).toBe(1);
+      expect(byTitle.body.items[0].title).toBe('Frontend Lead');
+    });
+
+    it('ANDs ?search= with the other query filters', async () => {
+      const server = app.getHttpServer();
+      await request(server).post('/api/v1/estimated-vacancies').send(validPayload).expect(201);
+
+      const res = await request(server)
+        .get('/api/v1/estimated-vacancies?search=acme&recommendation=SKIP')
+        .expect(200);
+      expect(res.body.total).toBe(0);
+    });
+
+    it('carries the derived companyMatchCount, counted across the whole table', async () => {
+      const server = app.getHttpServer();
+      await request(server).post('/api/v1/estimated-vacancies').send(validPayload).expect(201);
+      await request(server)
+        .post('/api/v1/estimated-vacancies')
+        .send({ ...validPayload, title: 'Data Engineer', applyUrl: 'https://example.com/jobs/3' })
+        .expect(201);
+
+      // limit=1: the count still spans both Acme rows, so it is a property of the
+      // row, not of the page it arrived on.
+      const res = await request(server)
+        .get('/api/v1/estimated-vacancies?company=Acme&limit=1')
+        .expect(200);
+
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].companyMatchCount).toBe(2);
+    });
   });
 
   describe('GET /api/v1/estimated-vacancies/:id', () => {

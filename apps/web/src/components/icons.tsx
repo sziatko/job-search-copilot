@@ -129,6 +129,42 @@ export function IconMoon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconMore(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="5" cy="12" r="1.3" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.3" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.3" fill="currentColor" />
+    </Icon>
+  );
+}
+
+export function IconHistory(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.8-6.3L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 8v4.5l3 1.8" />
+    </Icon>
+  );
+}
+
+export function IconCheck(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="m4.5 12.5 5 5 10-11" />
+    </Icon>
+  );
+}
+
+export function IconCross(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Icon>
+  );
+}
+
 export function IconCopy(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

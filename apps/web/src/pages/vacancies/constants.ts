@@ -23,6 +23,16 @@ export const USER_ACTION_LABELS = {
   DECLINED: 'Declined',
 } satisfies Record<UserAction, string>;
 
+/** The Status column's tags. Variants name the `.tag.*` classes in index.css;
+ * `text` reuses the dropdown's labels so a tag can never disagree with the filter
+ * entry that selects the same state. */
+export const USER_ACTION_TAGS = {
+  NOT_REVIEWED: { text: USER_ACTION_LABELS.NOT_REVIEWED, variant: 'neutral' },
+  READY_TO_APPLY: { text: USER_ACTION_LABELS.READY_TO_APPLY, variant: 'accent' },
+  APPLIED: { text: USER_ACTION_LABELS.APPLIED, variant: 'good' },
+  DECLINED: { text: USER_ACTION_LABELS.DECLINED, variant: 'bad' },
+} satisfies Record<UserAction, { text: string; variant: string }>;
+
 /** Analyser verdict, as the short tags the table's "Rec." column shows. The
  * mockup calls APPLY_WITH_CAVEATS "Consider" and SKIP "Pass" — those are the
  * labels it renders, and the full wording is in RECOMMENDATION_LABELS for

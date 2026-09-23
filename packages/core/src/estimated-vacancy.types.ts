@@ -24,6 +24,10 @@ export interface SaveEstimatedVacancyInput {
 export interface ListEstimatedVacanciesFilters {
   recommendation?: Recommendation;
   userAction?: UserAction;
+  /** Matches company OR title, ILIKE '%term%', case-insensitive. For the /vacancies
+   * page's single free-text search box. Independent of `company`/`title` — combined
+   * with them via AND, not OR. */
+  search?: string;
   /** ILIKE '%term%', case-insensitive. */
   company?: string;
   /** ILIKE '%term%', case-insensitive — mirrors `company`; both have a trigram GIN index. */
@@ -50,4 +54,11 @@ export type EstimatedVacancyListItem = {
   estimationComment: string;
   userAction: UserAction;
   userActionUpdatedAt: Date | null;
+  /**
+   * How many vacancies have a `company` containing this row's `company` —
+   * case-insensitive substring, the same semantics as the `company` filter, and
+   * counting this row itself. Derived on every list call, not a column, so it is
+   * absent from the single-record endpoints (`getById`, PATCH) — see ADR-0025.
+   */
+  companyMatchCount: number;
 };

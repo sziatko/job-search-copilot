@@ -51,8 +51,8 @@ URL: ${applyUrl}`;
       className={`icon-btn ${copied ? 'flash' : ''}`}
     >
       <IconCopy />
-      <span className="copied-flag" role="status">
-        Copied
+      <span className="tip" role="status">
+        {copied ? 'Copied' : 'Copy'}
       </span>
     </button>
   );

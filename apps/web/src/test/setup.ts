@@ -55,6 +55,34 @@ if (typeof window.matchMedia !== 'function') {
 // would see jsdom's function and skip.
 window.scrollTo = (() => {}) as typeof window.scrollTo;
 
+// jsdom 30 half-implements the Popover API: `showPopover()` exists and moves the
+// element's internal state, but its CSS engine does not know `:popover-open`, so
+// `[popover]:not(:popover-open){display:none}` matches whether or not the popover
+// is open, keeping the element hidden for good — invisible to every role query.
+// Overriding the two methods (unconditionally: the built-in ones are the trap) to
+// toggle a class, plus the rule below to define what that class means, is the whole
+// stand-in. Setting the inline `display` instead would work for the menu and break
+// the next popover-based component that relies on being hidden while closed.
+if (typeof document !== 'undefined' && !document.getElementById('jsdom-popover-stub')) {
+  const style = document.createElement('style');
+  style.id = 'jsdom-popover-stub';
+  // `!important` on both is a jsdom-local necessity — it has to beat whatever
+  // jsdom's own sheet does here. It is NOT the real browser's rule: the UA rule
+  // hiding a closed popover is not `!important`, which is exactly why author CSS
+  // can defeat it, and why the app carries its own guard (see the `[popover]`
+  // rule in index.css — that one is what the browser actually honours).
+  style.textContent =
+    '[popover]{display:none !important}[popover].popover-open{display:block !important}';
+  document.head.append(style);
+
+  HTMLElement.prototype.showPopover = function (this: HTMLElement) {
+    this.classList.add('popover-open');
+  };
+  HTMLElement.prototype.hidePopover = function (this: HTMLElement) {
+    this.classList.remove('popover-open');
+  };
+}
+
 // jsdom lays nothing out — every measurement is 0, which makes the row virtualizer
 // render an empty window. Give elements a usable box so tests that render a
 // virtualized table see rows.

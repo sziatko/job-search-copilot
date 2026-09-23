@@ -6,9 +6,16 @@ interface CopyVacancyButtonProps {
   company: string;
   title: string;
   applyUrl: string;
+  disabled?: boolean;
 }
 
-export function CopyVacancyButton({ id, company, title, applyUrl }: CopyVacancyButtonProps) {
+export function CopyVacancyButton({
+  id,
+  company,
+  title,
+  applyUrl,
+  disabled,
+}: CopyVacancyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -40,12 +47,13 @@ URL: ${applyUrl}`;
     <button
       type="button"
       aria-label={`Copy ${title} at ${company}`}
+      disabled={disabled}
       onClick={handleCopy}
-      className={`icon-btn ${copied ? 'flash' : ''}`}
+      className={`icon-btn ${copied ? 'flash' : ''} disabled:opacity-50`}
     >
       <IconCopy />
-      <span className="copied-flag" role="status">
-        Copied
+      <span className="tip" role="status">
+        {copied ? 'Copied' : 'Copy'}
       </span>
     </button>
   );

@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { recordApplication } from '../applications/api';
 import { listEstimatedVacanciesPage, updateUserAction, type VacancyPage } from './api';
@@ -21,14 +22,32 @@ interface ActionChange {
 
 export function useVacancies() {
   const queryClient = useQueryClient();
+  const search = useSearch({ from: '/vacancies' });
+  const navigate = useNavigate({ from: '/vacancies' });
+
+  const q = search.q ?? '';
+  const setSearchText = (value: string) => {
+    void navigate({
+      search: (prev) => ({ ...prev, q: value.trim() === '' ? undefined : value }),
+    });
+  };
+
+  // The term is part of the key, not just the request: a different search is a
+  // different page of results, and every exact-key call site below has to agree
+  // on that (getQueryData / setQueryData / cancelQueries do not prefix-match — the
+  // two `invalidateQueries({ queryKey: VACANCIES_KEY })` calls do, deliberately).
+  const queryKey = [...VACANCIES_KEY, q] as const;
 
   const {
     data,
     isPending: loading,
     error,
   } = useQuery({
-    queryKey: VACANCIES_KEY,
-    queryFn: () => listEstimatedVacanciesPage(),
+    queryKey,
+    queryFn: () => listEstimatedVacanciesPage({ search: q }),
+    // A new term is a new key with no cache entry, so without this the table
+    // blanks to "Loading…" on every debounced keystroke.
+    placeholderData: keepPreviousData,
   });
   const items = useMemo(() => data?.items ?? [], [data]);
   const loadError = error ? (error instanceof Error ? error.message : String(error)) : null;
@@ -54,7 +73,7 @@ export function useVacancies() {
 
   /** Optimistic write into the page-shaped cache, shared by both mutations. */
   function patchCachedItem(id: number, next: UserAction) {
-    queryClient.setQueryData<VacancyPage>(VACANCIES_KEY, (old) =>
+    queryClient.setQueryData<VacancyPage>(queryKey, (old) =>
       old
         ? {
             ...old,
@@ -68,20 +87,20 @@ export function useVacancies() {
     mutationFn: ({ id, userAction }: ActionChange) => updateUserAction(id, userAction),
     onMutate: async ({ id, userAction }) => {
       // Don't let an in-flight refetch clobber the optimistic write.
-      await queryClient.cancelQueries({ queryKey: VACANCIES_KEY });
+      await queryClient.cancelQueries({ queryKey });
       setSavingIds((prev) => new Set(prev).add(id));
       setRowErrors((prev) => {
         const next = new Map(prev);
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueryData<VacancyPage>(VACANCIES_KEY);
+      const previous = queryClient.getQueryData<VacancyPage>(queryKey);
       patchCachedItem(id, userAction);
       return { previous };
     },
     onError: (err, { id }, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(VACANCIES_KEY, context.previous);
+        queryClient.setQueryData(queryKey, context.previous);
       }
       setRowErrors((prev) =>
         new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
@@ -131,20 +150,20 @@ export function useVacancies() {
         userComment: details.comment || undefined,
       }),
     onMutate: async ({ id }) => {
-      await queryClient.cancelQueries({ queryKey: VACANCIES_KEY });
+      await queryClient.cancelQueries({ queryKey });
       setSavingIds((prev) => new Set(prev).add(id));
       setRowErrors((prev) => {
         const next = new Map(prev);
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueryData<VacancyPage>(VACANCIES_KEY);
+      const previous = queryClient.getQueryData<VacancyPage>(queryKey);
       patchCachedItem(id, USER_ACTION.APPLIED);
       return { previous };
     },
     onError: (err, { id }, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(VACANCIES_KEY, context.previous);
+        queryClient.setQueryData(queryKey, context.previous);
       }
       setRowErrors((prev) =>
         new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
@@ -176,6 +195,8 @@ export function useVacancies() {
     rowErrors,
     pendingDecline,
     pendingApply,
+    q,
+    setSearchText,
     statusFilter,
     setStatusFilter,
     requestActionChange,
