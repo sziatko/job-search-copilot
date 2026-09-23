@@ -78,7 +78,9 @@ phase is code-complete; steps 5–8 are what the browser pass turned up and step
 were asked for after reading the finished screen, so those six are the steps whose
 evidence is a real viewport rather than jsdom.
 
-Nothing is committed yet: steps 1–10 are all still working-tree changes.
+Landed as one commit, `3e7e86d`, rather than one per step: the tree that passed the
+suite is the tree that was committed, and splitting it after the fact would have
+shipped intermediate states nothing had run.
 
 The **browser pass** ran 2026-09-23 against the dev stack, driving real headless
 Chrome over the DevTools protocol (a throwaway script outside the repo; Node's own
