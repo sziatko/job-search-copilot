@@ -55,14 +55,13 @@ if (typeof window.matchMedia !== 'function') {
 // would see jsdom's function and skip.
 window.scrollTo = (() => {}) as typeof window.scrollTo;
 
-// jsdom 30 half-implements the Popover API: `showPopover()` exists and moves the
-// element's internal state, but its CSS engine does not know `:popover-open`, so
-// `[popover]:not(:popover-open){display:none}` matches whether or not the popover
-// is open, keeping the element hidden for good — invisible to every role query.
-// Overriding the two methods (unconditionally: the built-in ones are the trap) to
-// toggle a class, plus the rule below to define what that class means, is the whole
-// stand-in. Setting the inline `display` instead would work for the menu and break
-// the next popover-based component that relies on being hidden while closed.
+// jsdom 30 has no Popover API at all — `typeof el.showPopover` is `undefined`, and
+// the only trace of it is a UA-stylesheet rule (`[popover]:not(:popover-open)
+// {display:none}`, which its selector engine cannot match either way). So this
+// block *is* the API here: two methods that toggle a class, the rule below that says
+// what the class means, and the declarative invoker the ⋯ menu opens through.
+// Setting the inline `display` instead would work for the menu and break the next
+// popover-based component that relies on being hidden while closed.
 if (typeof document !== 'undefined' && !document.getElementById('jsdom-popover-stub')) {
   const style = document.createElement('style');
   style.id = 'jsdom-popover-stub';
@@ -81,6 +80,31 @@ if (typeof document !== 'undefined' && !document.getElementById('jsdom-popover-s
   HTMLElement.prototype.hidePopover = function (this: HTMLElement) {
     this.classList.remove('popover-open');
   };
+
+  /** The declarative invoker, which is how the ⋯ menu opens: a click on
+   * `[popovertarget]` toggles that element's popover, firing `beforetoggle` first.
+   * The app positions itself in that event, so a stub that skipped straight to
+   * `showPopover` would leave every menu at `top: 0` and prove nothing.
+   *
+   * Light dismiss, `:popover-open` and the top layer stay unmodelled on purpose —
+   * a stub that guessed the spec's ordering would make the tests disagree with the
+   * browser rather than with the app (phase 2.2, step 5: a second click closing the
+   * menu is a real-browser claim, checked by the CDP pass). */
+  document.addEventListener('click', (event) => {
+    const trigger = (event.target as Element | null)?.closest?.('[popovertarget]');
+    const targetId = trigger?.getAttribute('popovertarget');
+    const menu = targetId ? document.getElementById(targetId) : null;
+    if (!menu) return;
+    const opens = !menu.classList.contains('popover-open');
+    const before = new Event('beforetoggle');
+    Object.assign(before, {
+      newState: opens ? 'open' : 'closed',
+      oldState: opens ? 'closed' : 'open',
+    });
+    menu.dispatchEvent(before);
+    if (opens) menu.showPopover();
+    else menu.hidePopover();
+  });
 }
 
 // jsdom lays nothing out — every measurement is 0, which makes the row virtualizer

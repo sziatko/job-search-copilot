@@ -47,6 +47,10 @@ export const estimatedVacancyListItemSchema = z.object({
    * .../user-action response, which returns a plain record with no derived field —
    * requiring it here would fail every action change with "unexpected format". */
   companyMatchCount: z.number().optional(),
+  /** Whether the analyzer ever saw this posting — also derived (same trap, same
+   * reason: phase 2.2, step 7). Read it as "can a score be shown": `false` and
+   * `undefined` both mean no, so consumers must not treat `undefined` as analysed. */
+  hasAnalysis: z.boolean().optional(),
 });
 export type EstimatedVacancyListItem = z.infer<typeof estimatedVacancyListItemSchema>;
 

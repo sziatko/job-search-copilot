@@ -4,10 +4,15 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ApplicationListItem } from '@/pages/applications/types';
 import { routeTree } from '@/router';
-import { buildApplicationHandlers, buildHandlers } from '@/test/msw/handlers';
+import {
+  buildApplicationHandlers,
+  buildHandlers,
+  estimatedVacanciesResolver,
+} from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import type { EstimatedVacancyListItem } from './types';
 
@@ -104,6 +109,10 @@ function menuItem(name: string) {
 
 const SEARCH_BOX = /search company or role/i;
 
+// The toast spies below are file-scoped: a spy that outlives the test it belongs
+// to makes the next one's assertion meaningless.
+afterEach(() => vi.restoreAllMocks());
+
 describe('VacanciesPage / useVacancies', () => {
   it('defaults to the NOT_REVIEWED filter and hides everything else', async () => {
     mswServer.use(
@@ -175,6 +184,28 @@ describe('VacanciesPage / useVacancies', () => {
     expect(screen.queryByText('Backend Engineer')).not.toBeInTheDocument();
   });
 
+  it('sends a padded term to the server trimmed, leaving the box as typed', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
+        vacancy({ id: 2, company: 'Beta Corp', title: 'Frontend Lead' }),
+      ]),
+    );
+    renderVacancies();
+    await screen.findByText('Backend Engineer');
+
+    const box = screen.getByPlaceholderText(SEARCH_BOX);
+    await userEvent.setup().type(box, '  beta  ');
+
+    // The handler matches on the term exactly as it arrives, so an untrimmed
+    // '  beta  ' matches nothing and both rows stay on screen.
+    await waitFor(() => expect(screen.queryByText('Backend Engineer')).not.toBeInTheDocument());
+    await screen.findByText('Frontend Lead');
+    // ...and the box keeps what was typed: trimming before the URL is written
+    // would make a space untypeable mid-word.
+    expect(box).toHaveValue('  beta  ');
+  });
+
   it('shows one title and puts the count in the footer', async () => {
     mswServer.use(
       ...buildHandlers([
@@ -195,6 +226,33 @@ describe('VacanciesPage / useVacancies', () => {
     expect(
       screen.getByText('Showing 2 of 3 vacancies · scores from the vacancy-evaluator skill'),
     ).toBeInTheDocument();
+  });
+
+  it('shows — for a posting the analyzer never saw', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'Acme', matchScore: 80 }),
+        vacancy({
+          id: 2,
+          company: 'Acme',
+          title: 'Imported Role',
+          applyUrl: 'tracker://import/2',
+          matchScore: 0,
+          estimationComment: 'N/A',
+        }),
+      ]),
+    );
+    renderVacancies();
+    await screen.findByText('Backend Engineer');
+
+    // Scoped by title, since both rows share a company and `rowOf` matches any text
+    // in the row. Before this step the placeholder rendered a real-looking `0%`.
+    const imported = rowOf('Imported Role');
+    expect(imported.queryByText('0%')).not.toBeInTheDocument();
+    expect(imported.getByText('—')).toBeInTheDocument();
+    // …and the analysed row keeps its pill: the dash is about the analysis, not
+    // about the row being an import or its link being unusable.
+    expect(rowOf('Backend Engineer').getByText('80%')).toBeInTheDocument();
   });
 
   it('shows the current status as a tag', async () => {
@@ -248,6 +306,69 @@ describe('VacanciesPage / useVacancies', () => {
     await waitFor(() =>
       expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument(),
     );
+  });
+
+  it('closes the ⋯ menu on a second click of its own trigger', async () => {
+    mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
+    renderVacancies();
+    await screen.findByText('Acme');
+
+    const trigger = rowOf('Acme').getByRole('button', { name: 'More statuses' });
+    const user = userEvent.setup();
+    await user.click(trigger);
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+
+    // The trigger is a declarative invoker, so the browser's activation behaviour
+    // owns hide as well as show. A click handler could never do this: the menu is
+    // already closed by the time one runs (light dismiss is on pointerup).
+    await user.click(trigger);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    // …and it still opens on a third click.
+    await user.click(trigger);
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+  });
+
+  it('measures the menu on every open, not once', async () => {
+    mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
+    renderVacancies();
+    await screen.findByText('Acme');
+
+    // The trigger moves between opens — a row above it grows, the list scrolls —
+    // so a position computed once and reused points at nothing. jsdom's rect stub
+    // returns a fixed box (`bottom: 768`, `right: 1024`, window 1024 wide); this one
+    // is moved, which is what makes a cached position visible.
+    const trigger = rowOf('Acme').getByRole('button', { name: 'More statuses' });
+    trigger.getBoundingClientRect = () => ({ bottom: 100, right: 400 }) as DOMRect;
+
+    const user = userEvent.setup();
+    await user.click(trigger);
+    await screen.findByRole('menu');
+    const menu = document.querySelector<HTMLElement>('.row-menu');
+    expect(menu?.style.top).toBe('104px'); // trigger.bottom + 4
+    expect(menu?.style.right).toBe('624px'); // innerWidth 1024 - trigger.right
+  });
+
+  it('opens only the menu of the row that was clicked', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'Acme' }),
+        vacancy({ id: 2, company: 'Beta Corp' }),
+        vacancy({ id: 3, company: 'Gamma' }),
+      ]),
+    );
+    renderVacancies();
+    await screen.findByText('Acme');
+
+    const user = userEvent.setup();
+    await user.click(rowOf('Beta Corp').getByRole('button', { name: 'More statuses' }));
+
+    // The invoker resolves its target by id, and the id is per instance — with one
+    // shared id every row would open the same menu.
+    const open = document.querySelectorAll('.row-menu.popover-open');
+    expect(open).toHaveLength(1);
+    const trigger = rowOf('Beta Corp').getByRole('button', { name: 'More statuses' });
+    expect(open[0].id).toBe(trigger.getAttribute('popovertarget'));
   });
 
   it('disables every control in a row while its save is in flight', async () => {
@@ -314,6 +435,7 @@ describe('VacanciesPage / useVacancies', () => {
   });
 
   it('requires confirmation before persisting APPLIED, then records the application', async () => {
+    const success = vi.spyOn(toast, 'success');
     const items = [vacancy({ id: 1, company: 'Acme' })];
     mswServer.use(...buildHandlers(items));
 
@@ -373,6 +495,169 @@ describe('VacanciesPage / useVacancies', () => {
       }),
     );
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
+    // The other half of finding 1: a successful apply still says so. Against the
+    // spy, because the Toaster lives in main.tsx, outside the route tree.
+    expect(success).toHaveBeenCalledWith('Application submitted!');
+  });
+
+  it('reports a failed apply as a failure, quoting the server', async () => {
+    // The success toast fires from the mutation's `onSuccess`; spying on it is the
+    // assertion that survives the dialog unmounting — the page itself cannot be
+    // asked, and the Toaster is mounted in main.tsx, not in the route tree.
+    const success = vi.spyOn(toast, 'success');
+    try {
+      mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
+      mswServer.use(
+        http.post('http://localhost:3000/api/v1/applications', () =>
+          // The API's own body shape for a refusal (apps/api's DomainExceptionFilter).
+          HttpResponse.json(
+            {
+              statusCode: 422,
+              error: 'ApplicationAlreadyExistsError',
+              message: 'Already recorded.',
+            },
+            { status: 422 },
+          ),
+        ),
+      );
+      renderVacancies();
+      await screen.findByText('Acme');
+
+      const user = userEvent.setup();
+      await user.click(rowOf('Acme').getByRole('button', { name: 'Apply' }));
+      await user.click(screen.getByRole('button', { name: 'OK' }));
+
+      // The row's own line, carrying the server's message rather than `HTTP 422`…
+      await screen.findByText('Already recorded.');
+      // …and the row is back where it was, not optimistically applied.
+      expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+      expect(success).not.toHaveBeenCalled();
+    } finally {
+      success.mockRestore();
+    }
+  });
+
+  /**
+   * Holds the list request for one term open until the test releases it, so a test
+   * can act inside the window finding 3 lives in: `keepPreviousData` is showing the
+   * *older* term's page, and the term being typed has no cache entry yet.
+   *
+   * The handler answers the held request itself rather than delegating — MSW's
+   * `passthrough()` is not "try the next handler", it is "make the **real** request",
+   * which here would hit the dev API on :3000 and fill the test with real vacancies.
+   */
+  /** A promise a test releases by hand — one held request, no timer to race. */
+  function gate() {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return { held, release: () => release() };
+  }
+
+  function holdTermRequest(term: string, items: EstimatedVacancyListItem[]) {
+    const held = gate();
+    const state = { started: 0, release: held.release };
+    // Everything but the held term goes straight to the shared fake. The wrapper
+    // must answer *every* list request, so delegating is what keeps it honest —
+    // and it makes handler order irrelevant.
+    const serve = estimatedVacanciesResolver(items);
+    const handler = http.get('http://localhost:3000/api/v1/estimated-vacancies', async (info) => {
+      if (new URL(info.request.url).searchParams.get('search') !== term) {
+        return serve(info);
+      }
+      state.started += 1;
+      await held.held;
+      return serve(info);
+    });
+    return { handler, state };
+  }
+
+  it('writes an action into the cached page that exists while a term loads', async () => {
+    const items = [vacancy({ id: 1, company: 'Acme' }), vacancy({ id: 2, company: 'Beta Corp' })];
+    const gate = holdTermRequest('beta', items);
+    mswServer.use(gate.handler, ...buildHandlers(items));
+    const { client } = renderVacancies();
+    await screen.findByText('Acme');
+
+    // The status filter is client-side, and this row's status changes below: under
+    // NOT_REVIEWED it would leave the view before anything could be read.
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
+
+    await user.type(screen.getByPlaceholderText(SEARCH_BOX), 'beta');
+    await waitFor(() => expect(gate.state.started).toBe(1));
+    // The window finding 3 lives in: the term being typed has no cache entry, and
+    // the rows on screen are the *older* term's page, held by `keepPreviousData`.
+    expect(client.getQueryData(['vacancies', 'beta'])).toBeUndefined();
+
+    await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
+    await user.click(menuItem('Ready to apply'));
+
+    // The optimistic write lands on the entry that exists — the exact-key write it
+    // replaced hit the absent one and did nothing. Asserted on the cache, not the
+    // screen: the screen cannot show it either way, because `keepPreviousData`
+    // freezes the placeholder to the result it first produced and never re-reads the
+    // entry underneath (see the comment in useVacancies.ts).
+    await waitFor(() =>
+      expect(
+        client.getQueryData<{ items: EstimatedVacancyListItem[] }>(['vacancies', ''])?.items[0]
+          .userAction,
+      ).toBe('READY_TO_APPLY'),
+    );
+    expect(client.getQueryData(['vacancies', 'beta'])).toBeUndefined();
+    // …and the frozen page is still what is on screen, unchanged.
+    expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+
+    gate.state.release();
+  });
+
+  it('restores the cached page it wrote when the save fails mid-search', async () => {
+    const items = [vacancy({ id: 1, company: 'Acme' }), vacancy({ id: 2, company: 'Beta Corp' })];
+    const list = holdTermRequest('beta', items);
+    // The PATCH is held too: the point of this test is the state *between* the
+    // optimistic write and the failure, and without a hold the 500 lands before the
+    // patched value can be read — leaving an assertion that a rollback that never
+    // ran would also satisfy.
+    const patch = gate();
+    const patchState = { started: 0 };
+    mswServer.use(list.handler, ...buildHandlers(items));
+    // A second `use()` call, not another entry in the same one: `use` prepends, so
+    // a later call's handlers take priority — while within one call the first entry
+    // wins. In the same call this override would lose to `buildHandlers`' PATCH.
+    mswServer.use(
+      http.patch('http://localhost:3000/api/v1/estimated-vacancies/:id/user-action', async () => {
+        patchState.started += 1;
+        await patch.held;
+        return HttpResponse.json(null, { status: 500 });
+      }),
+    );
+    const { client } = renderVacancies();
+    await screen.findByText('Acme');
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
+    await user.type(screen.getByPlaceholderText(SEARCH_BOX), 'beta');
+    await waitFor(() => expect(list.state.started).toBe(1));
+
+    await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
+    await user.click(menuItem('Ready to apply'));
+
+    // Mid-flight: the optimistic write is *in* the cached page, which is what makes
+    // the rollback below a real rollback rather than a no-op on an untouched entry.
+    await waitFor(() => expect(patchState.started).toBe(1));
+    const cached = () =>
+      client.getQueryData<{ items: EstimatedVacancyListItem[] }>(['vacancies', ''])?.items[0]
+        .userAction;
+    expect(cached()).toBe('READY_TO_APPLY');
+
+    // Now let it fail: the row says so, and the page it wrote is back to what it held.
+    patch.release();
+    await screen.findByText(/Failed to update vacancy 1/);
+    expect(cached()).toBe('NOT_REVIEWED');
+    expect(client.getQueryData(['vacancies', 'beta'])).toBeUndefined();
+
+    list.state.release();
   });
 
   it('surfaces a row error and rolls the row back when the save fails', async () => {
@@ -464,6 +749,54 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.getByText('Not applied')).toBeInTheDocument();
     });
 
+    it('claims nothing about the log when the applications request fails', async () => {
+      mswServer.use(
+        ...buildHandlers(companyFixtures()),
+        http.get('http://localhost:3000/api/v1/applications', () =>
+          HttpResponse.json(null, { status: 500 }),
+        ),
+      );
+      renderVacancies();
+      await screen.findByText('Backend Engineer');
+
+      const user = userEvent.setup();
+      await user.click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[0]);
+
+      const modal = within(await screen.findByRole('dialog'));
+      // Wait for the failure itself: until then the cells are dashed for being
+      // pending, which is the same paint for the opposite reason.
+      await modal.findByText(/load your applications/i);
+      // Both Acme rows. A failed log is not an empty one, and "Not applied" is the
+      // claim a stopped API used to make for every row here.
+      expect(modal.getAllByText('—')).toHaveLength(2);
+      expect(modal.queryByText('Not applied')).not.toBeInTheDocument();
+      expect(modal.queryByText('Applied')).not.toBeInTheDocument();
+    });
+
+    it('reports the server’s count when the page under it is short', async () => {
+      // `limit=100` against 101 matching rows is the smallest case of what a big
+      // employer's modal gets back: one page, under a count that says otherwise.
+      mswServer.use(
+        ...buildHandlers(
+          Array.from({ length: 101 }, (_, i) =>
+            vacancy({ id: i + 1, company: 'Acme', title: `Role ${i + 1}` }),
+          ),
+        ),
+      );
+      renderVacancies();
+      await screen.findByText('Role 1');
+
+      const user = userEvent.setup();
+      await user.click(screen.getAllByRole('button', { name: /other vacancies at Acme/i })[0]);
+
+      const modal = within(await screen.findByRole('dialog'));
+      // Both numbers, so the count under the button and the rows on screen can no
+      // longer disagree silently ("101 in the log" was the page size, not the log).
+      await modal.findByText('Showing 100 of 101 vacancies, newest first');
+      // 101 fixtures is the honest minimum for a short page (the modal's own
+      // `limit=100`), and jsdom paints all of them in two tables to get there.
+    }, 20_000);
+
     it('marks a stale application with the tracker’s hourglass', async () => {
       mswServer.use(
         ...buildHandlers([
@@ -504,8 +837,18 @@ describe('VacanciesPage / useVacancies', () => {
             company: 'Acme',
             title: 'Imported Role',
             applyUrl: 'tracker://import/2',
+            // The placeholder sentinel `ApplicationService` writes for a row it had
+            // to create. Without it this fixture claimed a real analysis while
+            // carrying a `tracker://` URL — the dash below passed for the wrong
+            // reason (the URL scheme), which is what step 7 separates.
+            estimationComment: 'N/A',
           }),
         ]),
+        // An empty log, served: without a handler here the request is unhandled
+        // (`onUnhandledRequest: 'error'`), the Action cells read `—` for a reason
+        // this test is not about, and the dash count below would be measuring the
+        // failed fetch instead of the importer row's score.
+        ...buildApplicationHandlers([]),
       );
       renderVacancies();
       await screen.findByText('Backend Engineer');
@@ -518,7 +861,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.getByText('Imported Role')).toBeInTheDocument();
       expect(modal.queryByRole('link', { name: 'Imported Role' })).not.toBeInTheDocument();
       // One dash, for the importer row's score — the safe row shows a pill, and
-      // both Action cells say "Not applied" once the log has loaded.
+      // both Action cells say "Not applied" now that the log has loaded.
       await waitFor(() => expect(modal.getAllByText('—')).toHaveLength(1));
       expect(modal.getAllByText('Not applied')).toHaveLength(2);
     });

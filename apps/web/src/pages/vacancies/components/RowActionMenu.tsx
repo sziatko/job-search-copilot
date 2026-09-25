@@ -1,14 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { type ToggleEvent, useEffect, useId, useRef } from 'react';
 import { IconMore } from '@/components/icons';
-import { USER_ACTION_LABELS } from '../constants';
-import { USER_ACTION, type UserAction } from '../types';
-
-/** The statuses that don't earn a button of their own in every row. */
-const MENU_ACTIONS: UserAction[] = [USER_ACTION.NOT_REVIEWED, USER_ACTION.READY_TO_APPLY];
+import { MENU_ACTIONS, USER_ACTION_LABELS } from '../constants';
+import type { UserAction } from '../types';
 
 /**
  * The action cell's ⋯ trigger: a native `popover="auto"`, so it renders in the
  * browser's top layer and is not clipped by `.table-body-scroll`.
+ *
+ * The trigger is a **declarative invoker** (`popovertarget`), not a click handler:
+ * the browser's own activation behaviour owns show *and* hide, so a second click
+ * closes the menu it opened. A handler cannot do that — with `popover="auto"` the
+ * light dismiss runs on pointerup, *before* any click listener, so by the time one
+ * runs the menu is already closed and every check reads "closed, so open it".
  */
 export function RowActionMenu({
   disabled,
@@ -17,6 +20,9 @@ export function RowActionMenu({
   disabled?: boolean;
   onAction: (userAction: UserAction) => void;
 }) {
+  // One id per row: the invoker finds its popover by id, so two rows cannot open
+  // each other's menus.
+  const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -30,17 +36,22 @@ export function RowActionMenu({
     return () => document.removeEventListener('scroll', close, true);
   }, []);
 
-  function open() {
+  /**
+   * Where the menu goes, measured as it opens — `beforetoggle` is the synchronous
+   * hook for that, and it is the only one that works with an invoker: the click has
+   * already happened, and `toggle` fires from a queued task, i.e. after the menu has
+   * painted at its old coordinates.
+   */
+  function position(event: ToggleEvent<HTMLDivElement>) {
     const menu = menuRef.current;
     const trigger = triggerRef.current;
-    if (!menu || !trigger) return;
+    if (event.newState !== 'open' || !menu || !trigger) return;
     const rect = trigger.getBoundingClientRect();
     // Anchored to the trigger's bottom-right: this sits in the last column, so a
     // left-anchored menu would run off the viewport. `right` is measured from the
     // viewport edge, which is also what makes a horizontally scrolled table work.
     menu.style.top = `${rect.bottom + 4}px`;
     menu.style.right = `${window.innerWidth - rect.right}px`;
-    menu.showPopover();
   }
 
   function pick(userAction: UserAction) {
@@ -57,13 +68,21 @@ export function RowActionMenu({
         type="button"
         aria-label="More statuses"
         disabled={disabled}
-        onClick={open}
+        popoverTarget={menuId}
         className="icon-btn disabled:opacity-50"
       >
         <IconMore />
         <span className="tip">More</span>
       </button>
-      <div ref={menuRef} popover="auto" role="menu" aria-label="Set status" className="row-menu">
+      <div
+        id={menuId}
+        ref={menuRef}
+        popover="auto"
+        onBeforeToggle={position}
+        role="menu"
+        aria-label="Set status"
+        className="row-menu"
+      >
         {MENU_ACTIONS.map((userAction) => (
           <button key={userAction} type="button" role="menuitem" onClick={() => pick(userAction)}>
             {USER_ACTION_LABELS[userAction]}

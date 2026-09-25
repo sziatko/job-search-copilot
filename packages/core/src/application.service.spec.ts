@@ -199,6 +199,14 @@ describe('ApplicationService', () => {
       expect(items[0].title).toBe('Frontend Lead');
     });
 
+    it('treats a LIKE metacharacter in the term as literal', async () => {
+      // The join reaches the same two columns as the vacancy service's own search,
+      // so `%` here would widen to the whole log rather than matching nothing.
+      expect((await applications.list({ search: '%' })).total).toBe(0);
+      expect((await applications.list({ search: '_' })).total).toBe(0);
+      expect((await applications.list({ company: '%' })).total).toBe(0);
+    });
+
     it('combines company and title via AND, not OR', async () => {
       // Both fields exist, but only "Acme" / "Backend Engineer" satisfies both at once.
       expect((await applications.list({ company: 'acme', title: 'backend' })).total).toBe(1);
@@ -209,6 +217,30 @@ describe('ApplicationService', () => {
       const page = await applications.list({ limit: 1, offset: 1 });
       expect(page.items).toHaveLength(1);
       expect(page.total).toBe(2);
+    });
+
+    it('orders rows that share one appliedAt, so two pages do not overlap', async () => {
+      // The importer stamps a whole batch with a single timestamp, so a tie is the
+      // normal case, not an exotic one. Read as windows, an unstable order serves
+      // one row twice and skips another; `id desc` is what makes them disjoint.
+      const stamp = new Date('2026-08-20');
+      for (const company of ['Tie One', 'Tie Two', 'Tie Three']) {
+        const vacancy = await seedVacancy({ company, title: 'Same Stamp' });
+        await applications.record({ estimatedVacancyId: vacancy.id, appliedAt: stamp });
+      }
+
+      const first = await applications.list({ limit: 3 });
+      const second = await applications.list({ limit: 3, offset: 3 });
+
+      const tiedIds = first.items.filter((item) => item.appliedAt.getTime() === stamp.getTime());
+      expect(tiedIds).toHaveLength(3);
+      expect(tiedIds.map((item) => item.id)).toEqual(
+        [...tiedIds.map((item) => item.id)].sort((a, b) => b - a),
+      );
+
+      const ids = [...first.items, ...second.items].map((item) => item.id);
+      expect(ids).toHaveLength(5);
+      expect(new Set(ids).size).toBe(5);
     });
   });
 

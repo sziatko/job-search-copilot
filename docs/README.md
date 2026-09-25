@@ -15,6 +15,7 @@ and *what a change here breaks over there*.
 | [`phases/phase-1.md`](phases/phase-1.md) | What Phase 1 delivered, its status, and everything deliberately deferred. |
 | [`phases/phase-2.md`](phases/phase-2.md) | Application tracking: the `Application` model, the `/tracker` page, the router, the one-off `tracker.md` import, and the post-phase work that reworked all of it (2026-09-14 → 09-21). |
 | [`phases/phase-2.1.md`](phases/phase-2.1.md) | Follow-up work on the vacancies table: server-side search, the duplicate-company button and modal, and row actions as buttons. Planned before implementing; its `## Status` is the live checklist. |
+| [`phases/phase-2.2.md`](phases/phase-2.2.md) | The 15 findings of a review over phase 2.1's diff: LIKE wildcards in user input, a list the app truncates and reports wrongly, false claims on failure. Planned before implementing; its `## Status` is the live checklist. |
 | [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions

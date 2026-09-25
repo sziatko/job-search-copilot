@@ -33,6 +33,31 @@ export const USER_ACTION_TAGS = {
   DECLINED: { text: USER_ACTION_LABELS.DECLINED, variant: 'bad' },
 } satisfies Record<UserAction, { text: string; variant: string }>;
 
+/** Where each status is controlled from in a row — the two that confirm first have a
+ * button of their own, the rest live behind ⋯. Total by construction, which is the
+ * point (phase 2.2, finding 14): this split used to be a literal array inside
+ * `RowActionMenu` plus two literal buttons in `VacancyTable`, so a fifth status could
+ * ship with no control anywhere and nothing failed. */
+export const USER_ACTION_CONTROL = {
+  NOT_REVIEWED: 'menu',
+  READY_TO_APPLY: 'menu',
+  APPLIED: 'button',
+  DECLINED: 'button',
+} satisfies Record<UserAction, 'button' | 'menu'>;
+
+/** The statuses the map gives a button to. A status that *becomes* a button cannot
+ * reach a `Record<ButtonStatus, …>` unseen, and one that stops being a button leaves
+ * an excess key behind — the two halves of "a fifth status ships with no control". */
+export type ButtonStatus = {
+  [Status in UserAction]: (typeof USER_ACTION_CONTROL)[Status] extends 'button' ? Status : never;
+}[UserAction];
+
+/** The ⋯ menu's items, derived from the map so the menu can neither offer a status the
+ * map gave a button nor silently drop one it was given. */
+export const MENU_ACTIONS = (Object.keys(USER_ACTION_CONTROL) as UserAction[]).filter(
+  (status) => USER_ACTION_CONTROL[status] === 'menu',
+);
+
 /** Analyser verdict, as the short tags the table's "Rec." column shows. The
  * mockup calls APPLY_WITH_CAVEATS "Consider" and SKIP "Pass" — those are the
  * labels it renders, and the full wording is in RECOMMENDATION_LABELS for

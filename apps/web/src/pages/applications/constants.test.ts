@@ -94,9 +94,11 @@ describe('isTimedOut', () => {
   it('fails open on an unparseable date — the row reads as Active', () => {
     // Named rather than fixed: `NaN > 30` is false, so a corrupt stamp keeps the
     // row in the Active column and the table's hourglass tooltip renders
-    // "NaN days since last update" (ApplicationsTable.tsx:95). `statusUpdatedAt`
-    // is NOT NULL and server-stamped, so nothing produces this today — but the
-    // failure mode is silent, which is what this test exists to record.
+    // "NaN days since last update" (ApplicationsTable.tsx:95). The column is NOT
+    // NULL and server-stamped, so nothing writes this — but the *web contract* does
+    // not rule it out either (`statusUpdatedAt` is a plain `z.string()`, so anything
+    // that serializes a date badly reaches the page), and the failure mode is
+    // silent, which is what this test exists to record.
     const broken = application({ statusUpdatedAt: 'garbage' });
     expect(daysSinceLastMove(broken)).toBeNaN();
     expect(isTimedOut(broken)).toBe(false);

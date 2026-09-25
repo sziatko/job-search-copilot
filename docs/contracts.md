@@ -23,7 +23,7 @@ fields are stripped; type coercion is on.
 | --- | --- | --- | --- |
 | `GET /health` | — | `200 { status: 'ok', db: 'up' }` | `503 { status: 'error', db: 'down' }` if `SELECT 1` fails |
 | `POST /api/v1/estimated-vacancies` | `SaveEstimatedVacancyDto` (below) | `201` + `Location: /api/v1/estimated-vacancies/{id}` when created; `200` when `applyUrl` already exists. Body = the full `EstimatedVacancy` (incl. `fullText`) either way. | `400` DTO validation; `422` `DomainError` (see below) |
-| `GET /api/v1/estimated-vacancies` | query: `recommendation?` (enum, EN), `userAction?` (enum), `company?` (string, ILIKE contains), `search?` (string — `company` **OR** `title`, ILIKE), `limit?` (1–100, default 20 in core), `offset?` (≥0) | `200 { items: EstimatedVacancyListItem[], total: number }` — **items omit `fullText`** and carry the derived `companyMatchCount` | `400` bad query (e.g. `limit=200`) |
+| `GET /api/v1/estimated-vacancies` | query: `recommendation?` (enum, EN), `userAction?` (enum), `company?` (string, ILIKE contains — `%`/`_`/`\` are literal), `search?` (string — `company` **OR** `title`, ILIKE, same escaping), `limit?` (1–100, default 20 in core), `offset?` (≥0) | `200 { items: EstimatedVacancyListItem[], total: number }` — **items omit `fullText`** and carry the derived `companyMatchCount` and `hasAnalysis` | `400` bad query (e.g. `limit=200`) |
 | `GET /api/v1/estimated-vacancies/:id` | — | `200` full `EstimatedVacancy` (incl. `fullText`) | `404` unknown id; `400` non-integer id (`ParseIntPipe`) |
 | `PATCH /api/v1/estimated-vacancies/:id/user-action` | `{ userAction: UserAction }` | `200` full `EstimatedVacancy` | `404` unknown id; `400` bad `userAction` |
 | `POST /api/v1/applications` | `RecordApplicationDto`: `estimatedVacancyId` (`@IsInt @Min(1)`, **required**), `salaryInListing?`, `userComment?` (`@IsString`), `usedTailoredResume?` (`@IsBoolean`), `status?` (`@IsEnum(ApplicationStatus)`). No `appliedAt` — server uses `now()`. | **always `201`** + `Location: /api/v1/applications/{id}`. Body = `{ application: ApplicationListItem, resolution: 'linked-by-id' \| 'linked-existing' \| 'created-vacancy', vacancyCreated: boolean }`. | `400` DTO; `422` `InvalidApplicationInputError` (unknown id) / `ApplicationAlreadyExistsError` (that vacancy already has one) |
@@ -80,7 +80,11 @@ any future `DomainError` that isn't pre-validated —
 >   alike; and a field that is *derived* rather than a column must be `.optional()`
 >   in the web schema, because that same schema parses the
 >   `PATCH .../user-action` response, which carries no derived fields
->   ([ADR-0025](decisions/0025-vacancies-list-search-server-side.md)).
+>   ([ADR-0025](decisions/0025-vacancies-list-search-server-side.md)). Both derived
+>   fields so far — `companyMatchCount`, `hasAnalysis` — go through one private
+>   `withDerivedFields` in `estimated-vacancy.service.ts`; the MSW fake in
+>   `apps/web/src/test/msw/handlers.ts` derives them the same way, so a fixture
+>   cannot hand-set a value the endpoint would not produce.
 > - Moving `/health` under the version prefix → the `docker-compose.yml` `api`
 >   healthcheck (`wget http://localhost:3000/health`) and any external probe.
 > - Changing what `total` means in a list response — it is the number of rows

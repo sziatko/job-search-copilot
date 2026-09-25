@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApplicationService } from './application.service';
 import { InvalidRecommendationError } from './errors';
 import { EstimatedVacancyService } from './estimated-vacancy.service';
 import type {
@@ -326,6 +327,31 @@ describe('EstimatedVacancyService', () => {
       });
     });
 
+    describe('hasAnalysis', () => {
+      it('is true for a row the analyzer saved', async () => {
+        const { items } = await service.list();
+        expect(items.map((item) => item.hasAnalysis)).toEqual([true, true]);
+      });
+
+      it('is false for a placeholder, whatever its other fields say', async () => {
+        // What the importer path creates (ADR-0019) — via the service that writes it,
+        // so the sentinel and the derivation are tested against each other rather
+        // than against a literal this file happens to share.
+        const applications = new ApplicationService();
+        const { application, resolution } = await applications.record({
+          company: 'Placeholder Co',
+          title: 'Imported Role',
+        });
+        expect(resolution).toBe('created-vacancy');
+
+        const { items } = await service.list({ company: 'Placeholder Co' });
+
+        expect(items).toHaveLength(1);
+        expect(items[0].id).toBe(application.estimatedVacancyId);
+        expect(items[0].hasAnalysis).toBe(false);
+      });
+    });
+
     describe('search', () => {
       it('matches on the company', async () => {
         const { items, total } = await service.list({ search: 'acme' });
@@ -365,6 +391,54 @@ describe('EstimatedVacancyService', () => {
 
         expect(page.items).toHaveLength(1);
         expect(page.total).toBe(2); // Acme (company) + Acme Support Lead (title)
+      });
+    });
+
+    // Every term here reaches the pattern Prisma builds from `contains`, where
+    // `%`, `_` and `\` each mean something. A user's typing means none of them.
+    describe('LIKE metacharacters in a term are literal', () => {
+      it('does not treat % as a wildcard', async () => {
+        await service.save(
+          input({ applyUrl: 'https://example.com/jobs/pct', company: '100% Remote' }),
+        );
+
+        // Unescaped, all three of these match every row in the table.
+        expect((await service.list({ search: '%' })).total).toBe(1);
+        expect((await service.list({ company: '%' })).total).toBe(1);
+        expect((await service.list({ search: '100% Rem' })).total).toBe(1);
+      });
+
+      it('does not treat _ as a wildcard', async () => {
+        await service.save(input({ applyUrl: 'https://example.com/jobs/und', company: 'A_B' }));
+        await service.save(input({ applyUrl: 'https://example.com/jobs/und2', company: 'AXB' }));
+
+        const { items, total } = await service.list({ search: 'A_B' });
+
+        expect(total).toBe(1);
+        expect(items[0].company).toBe('A_B');
+      });
+
+      it('does not treat a backslash as an escape', async () => {
+        // `A\B` is also the case where the *unescaped* pattern (`%A\B%`) matches
+        // something else — here `AB` — rather than the row that was typed.
+        await service.save(input({ applyUrl: 'https://example.com/jobs/bs', company: 'A\\B' }));
+        await service.save(input({ applyUrl: 'https://example.com/jobs/bs2', company: 'AB' }));
+
+        const { items, total } = await service.list({ search: 'A\\B' });
+
+        expect(total).toBe(1);
+        expect(items[0].company).toBe('A\\B');
+      });
+
+      it('counts a company whose own name contains a backslash', async () => {
+        // The companyMatchCount prefilter feeds each row's company back through
+        // `contains`; unescaped, that pattern missed the row it came from, so the
+        // duplicates button hid on a company's own page (phase 2.2, finding 12).
+        await service.save(input({ applyUrl: 'https://example.com/jobs/bs', company: 'A\\B' }));
+
+        const { items } = await service.list({ company: 'A\\B' });
+
+        expect(countsByCompany(items)['A\\B']).toBe(1);
       });
     });
   });

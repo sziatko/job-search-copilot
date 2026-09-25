@@ -21,9 +21,14 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 /** Exported for its boundaries: a future timestamp (server/browser clock skew) has
- * to clamp to "this minute" rather than render a negative number. */
+ * to clamp to "this minute" rather than render a negative number, and an
+ * unparseable one has to fail open like `daysSinceLastMove` — `relative.format` on
+ * NaN throws `RangeError`, and there is no error boundary in the router, so one bad
+ * stamp would take the whole dashboard render with it. */
 export function timeAgo(iso: string): string {
   const elapsed = Date.now() - new Date(iso).getTime();
+  // Not `elapsed < HOUR`: NaN fails every comparison below and would reach format().
+  if (!Number.isFinite(elapsed)) return 'unknown';
   if (elapsed < HOUR) return relative.format(-Math.max(Math.round(elapsed / MINUTE), 0), 'minute');
   if (elapsed < DAY) return relative.format(-Math.round(elapsed / HOUR), 'hour');
   return relative.format(-Math.round(elapsed / DAY), 'day');
@@ -140,9 +145,12 @@ export function DashboardPage() {
   }
 
   // "Logged" and "Duplicates caught" in the mockup have no backing table — every
-  // number below is counted from EstimatedVacancy and Application.
+  // number below is counted from EstimatedVacancy and Application. The first step is
+  // "Postings", not "Analyzed": the count includes importer placeholders, which were
+  // never analysed (phase 2.2, finding 11). Narrowing it needs a `hasAnalysis` list
+  // filter, which is deferred — see docs/phases/phase-2.2.md.
   const steps: FunnelStep[] = [
-    { label: 'Analyzed', value: counts?.analyzed ?? 0 },
+    { label: 'Postings', value: counts?.postings ?? 0 },
     { label: 'Recommended', value: counts?.recommended ?? 0 },
     { label: 'Applied', value: metrics.sent },
     { label: 'Got a response', value: metrics.responded },
@@ -153,9 +161,9 @@ export function DashboardPage() {
     <section className="view">
       <div className="kpi-row">
         <KpiTile
-          label="Analyzed"
-          value={counts?.analyzed ?? 0}
-          note="postings scored, deduped by URL"
+          label="Postings"
+          value={counts?.postings ?? 0}
+          note="in the database, deduped by URL"
         />
         <KpiTile
           label="Awaiting triage"
@@ -182,7 +190,7 @@ export function DashboardPage() {
           <div className="card-head">
             <div>
               <h2>Pipeline funnel</h2>
-              <div className="count">From first analysis to interview</div>
+              <div className="count">From posting to interview</div>
             </div>
           </div>
           <Funnel steps={steps} />

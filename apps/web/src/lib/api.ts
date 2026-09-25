@@ -16,3 +16,26 @@ export function parseResponse<T>(schema: z.ZodType<T>, data: unknown, label: str
   }
   return result.data;
 }
+
+/**
+ * The message to show for a failed response: the API's own where it sent one, and
+ * `fallback` otherwise.
+ *
+ * The server says things the status code cannot — "This vacancy already has an
+ * application" against a bare `HTTP 422` (`apps/api`'s DomainExceptionFilter sends
+ * `{ statusCode, error, message }`, and Nest's own errors carry the same key, as a
+ * string or an array for validation failures). Reading it costs one parse of a body
+ * that is already in memory; not reading it turns every refusal into the same
+ * opaque line.
+ */
+export async function errorMessage(res: Response, fallback: string): Promise<Error> {
+  let message: unknown;
+  try {
+    message = ((await res.json()) as { message?: unknown }).message;
+  } catch {
+    return new Error(fallback); // no body, or not JSON
+  }
+  if (typeof message === 'string' && message.trim() !== '') return new Error(message);
+  if (Array.isArray(message) && message.length > 0) return new Error(message.join(', '));
+  return new Error(fallback);
+}

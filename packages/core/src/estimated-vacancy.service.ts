@@ -8,6 +8,8 @@ import type {
   SaveEstimatedVacancyResult,
   SaveManyEstimatedVacanciesResult,
 } from './estimated-vacancy.types';
+import { escapeLikePattern } from './like';
+import { PLACEHOLDER_COMMENT } from './placeholder';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
 import { buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
@@ -104,6 +106,10 @@ export class EstimatedVacancyService {
 
   /** List/search — omits fullText to keep results compact. Use getById for the full record. */
   async list(filters: ListEstimatedVacanciesFilters = {}): Promise<ListEstimatedVacanciesResult> {
+    // Every term below reaches the pattern unescaped by the caller, so it is
+    // escaped here: `%`/`_` are the user's literal characters, not wildcards
+    // (escapeLikePattern). It happens per clause rather than once up front because
+    // each clause escapes a *different* value.
     const where: Prisma.EstimatedVacancyWhereInput = {
       ...(filters.recommendation && { recommendation: filters.recommendation }),
       ...(filters.userAction && { userAction: filters.userAction }),
@@ -112,15 +118,15 @@ export class EstimatedVacancyService {
       // keys they AND together, so passing both still means "must satisfy both".
       ...(filters.search && {
         OR: [
-          { company: { contains: filters.search, mode: 'insensitive' } },
-          { title: { contains: filters.search, mode: 'insensitive' } },
+          { company: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
+          { title: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
         ],
       }),
       ...(filters.company && {
-        company: { contains: filters.company, mode: 'insensitive' },
+        company: { contains: escapeLikePattern(filters.company), mode: 'insensitive' },
       }),
       ...(filters.title && {
-        title: { contains: filters.title, mode: 'insensitive' },
+        title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
       }),
     };
 
@@ -138,34 +144,52 @@ export class EstimatedVacancyService {
       this.db.estimatedVacancy.count({ where }),
     ]);
 
-    return { items: await this.withCompanyMatchCounts(items), total };
+    return { items: await this.withDerivedFields(items), total };
   }
 
   /**
-   * Adds the derived `companyMatchCount` to a page of rows: for each row, how many
-   * vacancies in the whole table have a `company` containing that row's company
-   * (case-insensitive substring — the /vacancies duplicates button, ADR-0025).
+   * Adds the two derived fields a list item carries — neither is a column, and
+   * both are computed on every list call because they are read from the page that
+   * came back rather than from the database:
+   *
+   * - `companyMatchCount`: for each row, how many vacancies have a `company`
+   *   containing that row's company (case-insensitive substring — the /vacancies
+   *   duplicates button, ADR-0025).
+   * - `hasAnalysis`: whether the analyzer ever saw the posting, from the placeholder
+   *   sentinel `estimationComment: 'N/A'` (see the type's own comment for the why and
+   *   the ceiling). One place decides this, which is the point: before it, the modal
+   *   inferred it from the applyUrl's scheme, /vacancies rendered a `0%` for the same
+   *   row, and the dashboard counted it as analysed.
    */
-  private async withCompanyMatchCounts(
-    items: Omit<EstimatedVacancyListItem, 'companyMatchCount'>[],
+  private async withDerivedFields(
+    items: Omit<EstimatedVacancyListItem, 'companyMatchCount' | 'hasAnalysis'>[],
   ): Promise<EstimatedVacancyListItem[]> {
+    // The sentinel is a string constant, not a query, so it can be folded in here
+    // and the early return below still covers both fields.
+    const hasAnalysis = (item: { estimationComment: string }) =>
+      item.estimationComment !== PLACEHOLDER_COMMENT;
+
     const names = [...new Set(items.map((item) => item.company))];
     if (names.length === 0) {
       return [];
     }
 
     // Prefilter so the scan below only sees candidates. One OR over the page's
-    // distinct companies is exactly what the `company` trigram index serves. It can
-    // over-select — Prisma's `contains` does not escape LIKE's `%`/`_`, so a company
-    // called `A_B` also reaches `AXB` — but it can never under-select, which is why
-    // the count itself is done in JS.
+    // distinct companies, each escaped (a company named `A_B` must reach `A_B`, not
+    // `AXB`) — so it selects exactly the superset the JS count then narrows, and the
+    // count itself stays in JS. Under-selecting here is the failure that matters:
+    // it would report 0 matches for a company's own rows and hide the button.
     //
     // ponytail: a second round-trip plus an O(distinct companies x candidates) scan
     // on every list call. Fine while a page is a hundred rows; if the table grows,
     // do the counting in SQL (a lateral join over the same index) instead of pulling
     // candidate company names into the process.
     const candidates = await this.db.estimatedVacancy.findMany({
-      where: { OR: names.map((name) => ({ company: { contains: name, mode: 'insensitive' } })) },
+      where: {
+        OR: names.map((name) => ({
+          company: { contains: escapeLikePattern(name), mode: 'insensitive' },
+        })),
+      },
       select: { company: true },
     });
 
@@ -178,7 +202,11 @@ export class EstimatedVacancyService {
       );
     }
 
-    return items.map((item) => ({ ...item, companyMatchCount: counts.get(item.company) ?? 0 }));
+    return items.map((item) => ({
+      ...item,
+      companyMatchCount: counts.get(item.company) ?? 0,
+      hasAnalysis: hasAnalysis(item),
+    }));
   }
 
   /**

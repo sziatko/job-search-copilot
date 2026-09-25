@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { toast } from 'sonner';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { ApplyDialog } from './components/ApplyDialog';
 import { CompanyHistoryModal } from './components/CompanyHistoryModal';
@@ -98,10 +97,10 @@ export function VacanciesPage() {
           company={pendingApply.company}
           title={pendingApply.title}
           onCancel={cancelApply}
-          onConfirm={(details) => {
-            confirmApply(details);
-            toast.success('Application submitted!');
-          }}
+          // No toast here: the dialog unmounts on confirm, so a success announced
+          // from this line was announced before the server answered (phase 2.2,
+          // finding 1). The mutation's own `onSuccess` is what reports it.
+          onConfirm={confirmApply}
         />
       )}
     </section>

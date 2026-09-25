@@ -1,6 +1,13 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  type QueryKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { recordApplication } from '../applications/api';
 import { listEstimatedVacanciesPage, updateUserAction, type VacancyPage } from './api';
 import type { ApplyDetails } from './components/ApplyDialog';
@@ -25,7 +32,12 @@ export function useVacancies() {
   const search = useSearch({ from: '/vacancies' });
   const navigate = useNavigate({ from: '/vacancies' });
 
+  // `q` is what the box shows — the raw URL value, padding and all, because the
+  // input re-syncs from it and a trimmed value would eat a space as it is typed.
+  // `term` is what the server is asked for and what the cache is keyed on, so
+  // `" dev "` and `"dev"` are one entry and one request.
   const q = search.q ?? '';
+  const term = q.trim();
   const setSearchText = (value: string) => {
     void navigate({
       search: (prev) => ({ ...prev, q: value.trim() === '' ? undefined : value }),
@@ -33,10 +45,25 @@ export function useVacancies() {
   };
 
   // The term is part of the key, not just the request: a different search is a
-  // different page of results, and every exact-key call site below has to agree
-  // on that (getQueryData / setQueryData / cancelQueries do not prefix-match — the
-  // two `invalidateQueries({ queryKey: VACANCIES_KEY })` calls do, deliberately).
-  const queryKey = [...VACANCIES_KEY, q] as const;
+  // different page of results. Every write below therefore goes through the *prefix*
+  // (`{ queryKey: VACANCIES_KEY }`), never one exact key — `findAll` is a partial
+  // match, and only a primitive in a key stops `['vacancies','foo']` from matching
+  // `['vacancies','foobar']` (terms cannot collide here, so the prefix is safe).
+  //
+  // The exact-key write this replaced was a silent no-op in both directions (phase
+  // 2.2, finding 3): while a new term is in flight its entry does not exist yet, so
+  // `setQueryData` returned early and the rollback had no snapshot to restore.
+  //
+  // It is **not** visible, and the prefix write does not make it visible: while the
+  // new query is pending, the rows on screen come from `keepPreviousData`, which
+  // freezes the placeholder to the *result* it first produced
+  // (`queryObserver.js` — `prevResult.isPlaceholderData` ⇒ `placeholderData =
+  // prevResult.data`), so an updated live entry is never re-read. What the prefix
+  // write buys is that the optimistic value lands on the entry that exists and the
+  // rollback has something to put back — measured, not assumed. Doing it "properly"
+  // would mean dropping keepPreviousData, which costs the blank-on-keystroke that
+  // phase 2.1, step 2 added it for.
+  const queryKey = [...VACANCIES_KEY, term] as const;
 
   const {
     data,
@@ -44,7 +71,7 @@ export function useVacancies() {
     error,
   } = useQuery({
     queryKey,
-    queryFn: () => listEstimatedVacanciesPage({ search: q }),
+    queryFn: () => listEstimatedVacanciesPage({ search: term }),
     // A new term is a new key with no cache entry, so without this the table
     // blanks to "Loading…" on every debounced keystroke.
     placeholderData: keepPreviousData,
@@ -71,9 +98,17 @@ export function useVacancies() {
       });
   }, [items, statusFilter]);
 
-  /** Optimistic write into the page-shaped cache, shared by both mutations. */
+  /** Undo a `patchCachedItem` — every key it wrote, back to the snapshot.
+   * `setQueryData` ignores `undefined`, so a page that had no data keeps none. */
+  function restorePages(previous: [QueryKey, VacancyPage | undefined][] | undefined) {
+    for (const [key, data] of previous ?? []) {
+      queryClient.setQueryData(key, data);
+    }
+  }
+
+  /** Optimistic write into **every** cached page, shared by both mutations. */
   function patchCachedItem(id: number, next: UserAction) {
-    queryClient.setQueryData<VacancyPage>(queryKey, (old) =>
+    queryClient.setQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY }, (old) =>
       old
         ? {
             ...old,
@@ -94,14 +129,12 @@ export function useVacancies() {
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueryData<VacancyPage>(queryKey);
+      const previous = queryClient.getQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY });
       patchCachedItem(id, userAction);
       return { previous };
     },
     onError: (err, { id }, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
+      restorePages(context?.previous);
       setRowErrors((prev) =>
         new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
       );
@@ -157,18 +190,20 @@ export function useVacancies() {
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueryData<VacancyPage>(queryKey);
+      const previous = queryClient.getQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY });
       patchCachedItem(id, USER_ACTION.APPLIED);
       return { previous };
     },
     onError: (err, { id }, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
+      restorePages(context?.previous);
       setRowErrors((prev) =>
         new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
       );
     },
+    // Here, not at the call site: the dialog is unmounted the moment it is
+    // confirmed, so a `toast.success` next to `mutate()` announced success before
+    // the server had answered — and kept announcing it when the answer was 422.
+    onSuccess: () => toast.success('Application submitted!'),
     onSettled: (_data, _err, { id }) => {
       setSavingIds((prev) => {
         const next = new Set(prev);

@@ -7,42 +7,55 @@ export const API_URL = 'http://localhost:3000/api/v1';
 /** Builds handlers backed by a mutable in-memory `items` array, mirroring what
  * the real API does closely enough for the dashboard's own logic to be tested
  * against — a fake server, not a fake fetch. */
+/**
+ * The list endpoint's behaviour, as a resolver — exported so a test can *wrap* it
+ * (holding one term's request open, phase 2.2 step 6) instead of re-implementing
+ * the filter, which is how a fake starts disagreeing with the thing it fakes.
+ */
+export function estimatedVacanciesResolver(items: EstimatedVacancyListItem[]) {
+  return ({ request }: { request: Request }) => {
+    // Filter server-side, like the real endpoint, and report `total` as the
+    // number of matches rather than the size of the page. That distinction is
+    // the whole reason the dashboard can use `limit=1` as a count endpoint, so
+    // without it the four parallel requests in dashboard/api.ts are
+    // indistinguishable and the counts cannot be tested at all.
+    const query = new URL(request.url).searchParams;
+    const userAction = query.get('userAction');
+    const recommendation = query.get('recommendation');
+    const search = query.get('search');
+    const company = query.get('company');
+    const matching = items.filter(
+      (item) =>
+        (!userAction || item.userAction === userAction) &&
+        (!recommendation || item.recommendation === recommendation) &&
+        (!company || item.company.toLowerCase().includes(company.toLowerCase())) &&
+        // /vacancies sends its term here rather than filtering client-side, so
+        // without this the page's search tests would pass while doing nothing.
+        (!search ||
+          item.company.toLowerCase().includes(search.toLowerCase()) ||
+          item.title.toLowerCase().includes(search.toLowerCase())),
+    );
+    const limit = Number(query.get('limit') ?? 100);
+    // `companyMatchCount` is derived by the real endpoint (ADR-0025), counted
+    // over every vacancy, not just the page — so the fake derives it too, and
+    // the UI's button is exercised against the semantics the API actually has.
+    const page = matching.slice(0, limit).map((item) => ({
+      ...item,
+      companyMatchCount: items.filter((candidate) =>
+        candidate.company.toLowerCase().includes(item.company.toLowerCase()),
+      ).length,
+      // Derived the same way the endpoint derives it (phase 2.2, step 7) rather than
+      // hand-set per fixture: a fixture is a placeholder by carrying the sentinel
+      // `estimationComment: 'N/A'`, which is what the importer actually writes.
+      hasAnalysis: item.estimationComment !== 'N/A',
+    }));
+    return HttpResponse.json({ items: page, total: matching.length });
+  };
+}
+
 export function buildHandlers(items: EstimatedVacancyListItem[]) {
   return [
-    http.get(`${API_URL}/estimated-vacancies`, ({ request }) => {
-      // Filter server-side, like the real endpoint, and report `total` as the
-      // number of matches rather than the size of the page. That distinction is
-      // the whole reason the dashboard can use `limit=1` as a count endpoint, so
-      // without it the four parallel requests in dashboard/api.ts are
-      // indistinguishable and the counts cannot be tested at all.
-      const query = new URL(request.url).searchParams;
-      const userAction = query.get('userAction');
-      const recommendation = query.get('recommendation');
-      const search = query.get('search');
-      const company = query.get('company');
-      const matching = items.filter(
-        (item) =>
-          (!userAction || item.userAction === userAction) &&
-          (!recommendation || item.recommendation === recommendation) &&
-          (!company || item.company.toLowerCase().includes(company.toLowerCase())) &&
-          // /vacancies sends its term here rather than filtering client-side, so
-          // without this the page's search tests would pass while doing nothing.
-          (!search ||
-            item.company.toLowerCase().includes(search.toLowerCase()) ||
-            item.title.toLowerCase().includes(search.toLowerCase())),
-      );
-      const limit = Number(query.get('limit') ?? 100);
-      // `companyMatchCount` is derived by the real endpoint (ADR-0025), counted
-      // over every vacancy, not just the page — so the fake derives it too, and
-      // the UI's button is exercised against the semantics the API actually has.
-      const page = matching.slice(0, limit).map((item) => ({
-        ...item,
-        companyMatchCount: items.filter((candidate) =>
-          candidate.company.toLowerCase().includes(item.company.toLowerCase()),
-        ).length,
-      }));
-      return HttpResponse.json({ items: page, total: matching.length });
-    }),
+    http.get(`${API_URL}/estimated-vacancies`, estimatedVacanciesResolver(items)),
     http.patch(`${API_URL}/estimated-vacancies/:id/user-action`, async ({ params, request }) => {
       const id = Number(params.id);
       const item = items.find((i) => i.id === id);
@@ -93,8 +106,22 @@ export function buildHandlers(items: EstimatedVacancyListItem[]) {
 /** Fake server for the /tracker page, backed by a mutable in-memory list. */
 export function buildApplicationHandlers(applications: ApplicationListItem[]) {
   return [
-    http.get(`${API_URL}/applications`, () => {
-      return HttpResponse.json({ items: applications, total: applications.length });
+    http.get(`${API_URL}/applications`, ({ request }) => {
+      // Sorted and sliced like the real endpoint — `appliedAt desc` with `id desc`
+      // as the tiebreaker (the core has the same order, for the same reason). The
+      // web's log loader pages this, so a fake that ignored limit/offset would let
+      // a broken loader pass: `onUnhandledRequest: 'error'` would not fire, and the
+      // loop would read the same thousand rows as page one, forever.
+      const query = new URL(request.url).searchParams;
+      const limit = Number(query.get('limit') ?? 50);
+      const offset = Number(query.get('offset') ?? 0);
+      const sorted = [...applications].sort(
+        (a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime() || b.id - a.id,
+      );
+      return HttpResponse.json({
+        items: sorted.slice(offset, offset + limit),
+        total: applications.length,
+      });
     }),
     http.patch(`${API_URL}/applications/:id/status`, async ({ params, request }) => {
       const id = Number(params.id);

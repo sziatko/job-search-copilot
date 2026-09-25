@@ -61,4 +61,18 @@ export type EstimatedVacancyListItem = {
    * absent from the single-record endpoints (`getById`, PATCH) — see ADR-0025.
    */
   companyMatchCount: number;
+  /**
+   * Whether the analyzer ever looked at this posting. Derived the same way, and
+   * absent from the single-record endpoints for the same reason.
+   *
+   * The test is the placeholder sentinel `estimationComment: 'N/A'` that
+   * `ApplicationService.resolveVacancyId` writes for a row the *importer* created
+   * (ADR-0019) — there is no column for this, and inventing one would mean the
+   * analyzer and the importer both had to maintain it. Ceiling, named where it is
+   * derived: an analysis commented exactly `N/A` reads as unanalysed, and a
+   * placeholder carrying real tracker notes reads as analysed. Consumers show a
+   * dash rather than a claim, so the failure is a missing number, never a
+   * fabricated one.
+   */
+  hasAnalysis: boolean;
 };

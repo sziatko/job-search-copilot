@@ -44,6 +44,16 @@ export function CompanyHistoryModal({
     (applications.data?.items ?? []).map((item) => [item.estimatedVacancyId, item]),
   );
   const items = data?.items ?? [];
+  // `total` is the server's count of this company's vacancies, not the size of the
+  // page it sent (the company filter is a substring match, so it can count more
+  // than the table shows). The subtitle said "in the log" off `items.length`, so a
+  // 250-vacancy company read "100 in the log" under a button saying 249.
+  const total = data?.total ?? 0;
+
+  // One gate for both claims this row makes about the log: nothing is known until
+  // the tracker's own query has loaded, and on failure it is not "empty" — it never
+  // arrived. Without `isError`, a stopped API painted every row "Not applied".
+  const logUnknown = applications.isPending || applications.isError;
 
   return (
     <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName="max-w-2xl">
@@ -51,8 +61,18 @@ export function CompanyHistoryModal({
         All vacancies at {company}
       </h2>
       <p className="dialog-sub">
-        {isPending ? 'Loading…' : `${items.length} in the log, newest first`}
+        {isPending
+          ? 'Loading…'
+          : items.length < total
+            ? `Showing ${items.length} of ${total} vacancies, newest first`
+            : `${total} vacancies, newest first`}
       </p>
+
+      {applications.isError && (
+        <p className="mt-[6px] text-[12.5px] text-bad">
+          Couldn’t load your applications, so the Action column is hidden.
+        </p>
+      )}
 
       {error ? (
         <div className="empty-state">
@@ -77,12 +97,16 @@ export function CompanyHistoryModal({
             <tbody>
               {items.map((item) => {
                 const application = applicationsByVacancy.get(item.id);
+                // Two independent questions, and they used to be one variable: can
+                // this be a link (`isSafeExternalUrl`), and can a score be shown
+                // (`hasAnalysis`). A row can be either without the other — which is
+                // why /vacancies and this table drew the same row differently.
                 const linkable = isSafeExternalUrl(item.applyUrl);
                 const isCurrent = item.id === currentId;
                 return (
                   <tr key={item.id} className={isCurrent ? 'row-current' : undefined}>
                     <td className="date-cell">
-                      {application && isTimedOut(application) && (
+                      {!logUnknown && application && isTimedOut(application) && (
                         <span className="timeout-mark mr-[4px]">
                           ⏳
                           <span className="tip">
@@ -115,13 +139,13 @@ export function CompanyHistoryModal({
                         {item.company} <span className="id">#{item.id}</span>
                       </div>
                     </td>
-                    {/* An importer placeholder has no posting behind it, so its
-                        score would be a fabricated 0%. */}
-                    <td>{linkable ? <ScorePill score={item.matchScore} /> : '—'}</td>
-                    {/* Nothing until the log has loaded — "Not applied" is a claim,
-                        and it would be wrong for one round-trip. */}
+                    {/* A placeholder has no analysis behind its score number. */}
+                    <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
+                    {/* Nothing until the log has loaded, and nothing if it never
+                        did — "Not applied" is a claim, wrong for one round-trip and
+                        false for a failed request. */}
                     <td className="text-[12.5px]">
-                      {applications.isPending ? '—' : application ? 'Applied' : 'Not applied'}
+                      {logUnknown ? '—' : application ? 'Applied' : 'Not applied'}
                     </td>
                   </tr>
                 );

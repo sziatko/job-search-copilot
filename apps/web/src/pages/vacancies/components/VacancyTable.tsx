@@ -4,13 +4,23 @@ import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
-import { USER_ACTION_TAGS } from '../constants';
+import { type ButtonStatus, USER_ACTION_TAGS } from '../constants';
 import { type EstimatedVacancyListItem, USER_ACTION, type UserAction } from '../types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { RecommendationTag } from './RecommendationTag';
 import { RowActionMenu } from './RowActionMenu';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
+
+/** The verbs for the two statuses this cell gives a button to. Typed by
+ * `Record<ButtonStatus, string>`, so it is `USER_ACTION_CONTROL` that decides which
+ * buttons exist: moving a status out of the button half leaves an excess key here,
+ * and moving one in leaves this map short of a key. A status's *tag* text ("Applied")
+ * is a state, not an instruction — hence separate words. */
+const BUTTON_VERBS = {
+  APPLIED: 'Apply',
+  DECLINED: 'Decline',
+} satisfies Record<ButtonStatus, string>;
 
 const COL_COUNT = 7;
 
@@ -111,9 +121,11 @@ export function VacancyTable({
                     )}
                   </div>
                 </td>
-                <td>
-                  <ScorePill score={item.matchScore} />
-                </td>
+                {/* A placeholder (imported, never analysed) has no score to show:
+                    its `matchScore` is the tracker's own number, and rendering it as
+                    `0%` would claim an analysis that never happened. Same rule as the
+                    modal's cell — one field decides, so the two cannot disagree. */}
+                <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
                 <td>
                   <RecommendationTag recommendation={item.recommendation} />
                 </td>
@@ -146,7 +158,7 @@ export function VacancyTable({
                       className="icon-btn disabled:opacity-50"
                     >
                       <IconCheck />
-                      <span className="tip">Apply</span>
+                      <span className="tip">{BUTTON_VERBS.APPLIED}</span>
                     </button>
                     <button
                       type="button"
@@ -155,7 +167,7 @@ export function VacancyTable({
                       className="icon-btn icon-btn-danger disabled:opacity-50"
                     >
                       <IconCross />
-                      <span className="tip">Decline</span>
+                      <span className="tip">{BUTTON_VERBS.DECLINED}</span>
                     </button>
                     <RowActionMenu
                       disabled={saving}

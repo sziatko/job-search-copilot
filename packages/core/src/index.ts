@@ -28,6 +28,8 @@ export type {
   SaveEstimatedVacancyResult,
   SaveManyEstimatedVacanciesResult,
 } from './estimated-vacancy.types';
+export { escapeLikePattern } from './like';
+export { PLACEHOLDER_COMMENT } from './placeholder';
 export { createPrismaClient, getPrisma } from './prisma-client';
 export {
   deriveRecommendationFromScore,

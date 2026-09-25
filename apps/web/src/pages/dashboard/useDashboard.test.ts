@@ -186,6 +186,15 @@ describe('timeAgo', () => {
     expect(timeAgo(daysAgo(3))).toBe('3 days ago');
   });
 
+  it('fails open on an unparseable timestamp instead of throwing', () => {
+    // `Intl.RelativeTimeFormat.format(NaN, …)` throws `RangeError`, and NaN passes
+    // every `<` comparison, so without the guard this reaches format() — and with no
+    // `errorComponent` in the router, one bad stamp would take the whole dashboard
+    // render with it. The tracker's `daysSinceLastMove` fails open the same way.
+    expect(timeAgo('garbage')).toBe('unknown');
+    expect(timeAgo('')).toBe('unknown');
+  });
+
   it('clamps a future timestamp to "this minute" rather than a negative number', () => {
     // Server and browser clocks disagree; the row is stamped by the server, so a
     // browser a little behind will see a timestamp in its own future. Without the

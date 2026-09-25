@@ -43,7 +43,9 @@ export function useApplications() {
   const [rowErrors, setRowErrors] = useState<Map<number, string>>(new Map());
 
   const visibleItems = useMemo(() => {
-    const needle = q.toLowerCase();
+    // Trimmed here, not on write: the URL keeps what was typed (so a trailing
+    // space is typeable), the comparison ignores it.
+    const needle = q.trim().toLowerCase();
     return items
       .filter((item) => matchesFilter(item, statusFilter))
       .filter(

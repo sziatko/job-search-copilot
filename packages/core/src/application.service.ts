@@ -15,6 +15,8 @@ import {
   ApplicationAlreadyExistsError,
   InvalidApplicationInputError,
 } from './errors';
+import { escapeLikePattern } from './like';
+import { PLACEHOLDER_COMMENT } from './placeholder';
 import { getPrisma } from './prisma-client';
 import { deriveRecommendationFromScore } from './recommendation';
 import { buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
@@ -105,20 +107,26 @@ export class ApplicationService {
     // AND-ed together so giving more than one narrows (a caller normally gives just
     // one — search is the /tracker free-text box, company/title are the MCP tool —
     // but composing them via AND rather than clobbering keeps it well-defined either way).
+    // Escaped like the vacancy service's: these are the same free-text terms over
+    // the same two columns, reached through the join.
     const vacancyFilters: Prisma.EstimatedVacancyWhereInput[] = [];
     if (filters.search) {
       vacancyFilters.push({
         OR: [
-          { company: { contains: filters.search, mode: 'insensitive' } },
-          { title: { contains: filters.search, mode: 'insensitive' } },
+          { company: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
+          { title: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
         ],
       });
     }
     if (filters.company) {
-      vacancyFilters.push({ company: { contains: filters.company, mode: 'insensitive' } });
+      vacancyFilters.push({
+        company: { contains: escapeLikePattern(filters.company), mode: 'insensitive' },
+      });
     }
     if (filters.title) {
-      vacancyFilters.push({ title: { contains: filters.title, mode: 'insensitive' } });
+      vacancyFilters.push({
+        title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
+      });
     }
 
     const where: Prisma.ApplicationWhereInput = {
@@ -132,7 +140,12 @@ export class ApplicationService {
     const [rows, total] = await Promise.all([
       this.db.application.findMany({
         where,
-        orderBy: { appliedAt: 'desc' },
+        // `appliedAt` alone is not a total order: the importer stamps a whole batch
+        // with one timestamp, so ties are normal. Offset paging over a tie has no
+        // defined window — the same row can be served by two pages and another
+        // skipped — so `id` breaks the tie. The web's log loader reads this list as
+        // consecutive pages (phase 2.2, step 2).
+        orderBy: [{ appliedAt: 'desc' }, { id: 'desc' }],
         take,
         skip,
         include: APPLICATION_INCLUDE,
@@ -287,10 +300,10 @@ async function resolveVacancyId(
         company,
         title,
         applyUrl,
-        fullText: input.fullText ?? 'N/A',
+        fullText: input.fullText ?? PLACEHOLDER_COMMENT,
         matchScore,
         recommendation,
-        estimationComment: input.estimationComment ?? 'N/A',
+        estimationComment: input.estimationComment ?? PLACEHOLDER_COMMENT,
         userAction: 'APPLIED',
         userActionUpdatedAt: new Date(),
       },

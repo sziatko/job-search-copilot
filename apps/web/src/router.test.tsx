@@ -45,6 +45,28 @@ describe('router', () => {
     expect(screen.queryByText(/failed to load/i)).not.toBeInTheDocument();
   });
 
+  it('reads a JSON-parsed number in ?q= as a term, not as an error', async () => {
+    // The router parses query values before zod sees them, so `?q=2024` is the
+    // number 2024. A strict `z.string()` threw out of validateSearch, and with no
+    // `errorComponent` anywhere the whole page became "Something went wrong!" — for
+    // a URL anyone can type.
+    mswServer.use(...buildHandlers([]));
+    renderAt('/vacancies?q=2024');
+
+    expect(await screen.findByPlaceholderText(/search company or role/i)).toHaveValue('2024');
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+  });
+
+  it('ignores a junk ?status= on /tracker instead of dropping the page', async () => {
+    mswServer.use(...buildApplicationHandlers([]));
+    renderAt('/tracker?status=BOGUS');
+
+    // No coercion could make `BOGUS` a status, so it falls back to what an absent
+    // value means: no filter.
+    expect(await screen.findByLabelText('Status')).toHaveValue('ALL');
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+  });
+
   it('navigates from the index to /tracker', async () => {
     mswServer.use(...buildApplicationHandlers([]), ...buildHandlers([]));
     const user = userEvent.setup();

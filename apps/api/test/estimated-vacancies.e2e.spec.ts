@@ -131,6 +131,18 @@ describe('EstimatedVacancies (e2e)', () => {
       expect(byTitle.body.items[0].title).toBe('Frontend Lead');
     });
 
+    it('treats a LIKE metacharacter in ?search= as a literal', async () => {
+      const server = app.getHttpServer();
+      await request(server).post('/api/v1/estimated-vacancies').send(validPayload).expect(201);
+
+      // Unescaped, `%` is a wildcard and this matches every row in the table.
+      const res = await request(server)
+        .get('/api/v1/estimated-vacancies?search=%25') // %25 is a URL-encoded '%'
+        .expect(200);
+
+      expect(res.body.total).toBe(0);
+    });
+
     it('ANDs ?search= with the other query filters', async () => {
       const server = app.getHttpServer();
       await request(server).post('/api/v1/estimated-vacancies').send(validPayload).expect(201);

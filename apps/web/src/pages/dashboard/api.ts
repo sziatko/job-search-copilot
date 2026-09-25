@@ -2,7 +2,10 @@ import { listEstimatedVacanciesPage } from '../vacancies/api';
 import { type EstimatedVacancyListItem, RECOMMENDATION, USER_ACTION } from '../vacancies/types';
 
 export interface DashboardCounts {
-  analyzed: number;
+  /** Every `EstimatedVacancy` row — analysed *and* imported. Named for what it
+   * counts, not for what the old tile called it: an importer placeholder is in
+   * here too (phase 2.2, finding 11). */
+  postings: number;
   awaitingTriage: number;
   recommended: number;
   reviewQueue: EstimatedVacancyListItem[];
@@ -27,7 +30,7 @@ export async function fetchDashboardCounts(): Promise<DashboardCounts> {
   ]);
 
   return {
-    analyzed: all.total,
+    postings: all.total,
     awaitingTriage: triage.total,
     recommended: apply.total + caveats.total,
     reviewQueue: triage.items,

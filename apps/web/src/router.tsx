@@ -52,11 +52,21 @@ const indexRoute = createRoute({
   staticData: DASHBOARD_META,
 });
 
+// Search terms and filters in the URL, so a view is shareable and the back button
+// works. Values arrive **JSON-parsed** by the router — `?q=2024` is the number 2024 —
+// so a strict `z.string()` threw inside `validateSearch`, and with no `errorComponent`
+// anywhere in the tree that replaces the whole page with "Something went wrong!" for a
+// URL a user can trivially type. `q` coerces (the term is a string by the time it is
+// typed into a box anyway); `status` is an enum, where no coercion could be right, so
+// junk falls back to "no filter" — the same state an absent value means.
+const termSchema = z.coerce.string().optional();
+const statusFilterSchema = applicationStatusFilterSchema.optional().catch(undefined);
+
 // /vacancies' search box. Unlike the tracker's, the term is not used to filter in
 // the browser: it is sent to the API (ADR-0025), so it is the only filter that has
 // to survive in the URL. The status filter stays component state.
 const vacanciesSearchSchema = z.object({
-  q: z.string().optional(),
+  q: termSchema,
 });
 
 const vacanciesRoute = createRoute({
@@ -83,11 +93,11 @@ const profileRoute = createRoute({
   staticData: PROFILE_META,
 });
 
-// The /tracker search box + status filter live in the URL so the view is
-// shareable and the back button works. Parsed / validated by zod on every navigation.
+// The /tracker search box + status filter. Parsed / validated by zod on every
+// navigation — see the note above on why both are lenient.
 const trackerSearchSchema = z.object({
-  q: z.string().optional(),
-  status: applicationStatusFilterSchema.optional(),
+  q: termSchema,
+  status: statusFilterSchema,
 });
 
 const trackerRoute = createRoute({
