@@ -63,7 +63,8 @@ export function registerApplicationTools(
         '`company` / `title`, matched against the linked vacancy independently — giving ' +
         'more than one of `search`/`company`/`title` narrows to rows matching all of them ' +
         '(AND), not any one (OR). Each is ILIKE %term%, case-insensitive. Each result item ' +
-        'is flattened: the application fields plus company / title / applyUrl / ' +
+        'is flattened: the application fields (with its `comments` timeline, oldest first) ' +
+        'plus company / title / applyUrl / ' +
         'matchScore / recommendation / estimationComment from the linked vacancy.',
       inputSchema: {
         status: ApplicationStatusEnum.optional(),
@@ -92,11 +93,11 @@ export function registerApplicationTools(
         'more than one candidate is an error listing the ids to disambiguate with `id`; an ' +
         'unknown id, an unmatched (company, title), or a vacancy that was analyzed but ' +
         'never actually recorded as applied (call record_application first — this tool ' +
-        'never creates anything) all report "not found". `statusComment` is optional and ' +
-        "APPENDED to whatever is already stored there (joined with ' / '), not overwritten " +
-        '— e.g. "Recruiter called." then later "Interview on 20.09." become "Recruiter ' +
-        'called. / Interview on 20.09." Returns { success: true, application: { id, ' +
-        'company, title } } — use list_applications to see the resulting status/statusComment.',
+        'never creates anything) all report "not found". `statusComment` is optional: when ' +
+        "given it is added to the application's timeline as a new dated comment — earlier " +
+        'comments are never changed. Returns { success: true, application: { id, company, ' +
+        'title } } — use list_applications to see the resulting status and `comments` ' +
+        '([{ id, createdAt, body }], oldest first).',
       inputSchema: {
         id: z.number().int().optional(),
         company: z.string().min(1).optional(),

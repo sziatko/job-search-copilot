@@ -7,6 +7,7 @@ import type {
   RecordApplicationInput,
   RecordApplicationResult,
   RecordManyApplicationsResult,
+  UpdateApplicationInput,
   VacancyResolution,
 } from './application.types';
 import { isById } from './application.types';
@@ -33,6 +34,11 @@ const VACANCY_SELECT = {
 
 const APPLICATION_INCLUDE = {
   estimatedVacancy: { select: VACANCY_SELECT },
+  // Oldest first; `id` breaks the tie between notes migrated with one shared date.
+  comments: {
+    select: { id: true, createdAt: true, body: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
 } satisfies Prisma.ApplicationInclude;
 
 type ApplicationRow = Prisma.ApplicationGetPayload<{ include: typeof APPLICATION_INCLUDE }>;
@@ -48,7 +54,7 @@ function flatten(row: ApplicationRow): ApplicationListItem {
     appliedAt: row.appliedAt,
     status: row.status,
     statusUpdatedAt: row.statusUpdatedAt,
-    statusComment: row.statusComment,
+    comments: row.comments,
     salaryInListing: row.salaryInListing,
     usedTailoredResume: row.usedTailoredResume,
     userComment: row.userComment,
@@ -158,26 +164,53 @@ export class ApplicationService {
 
   /**
    * Returns null when no application has this id (P2025 — same pattern as
-   * updateUserAction). `statusComment`, when given, is *appended* to whatever is
-   * already stored — joined with " / " — not overwritten; a plain single column
-   * standing in for a history table until one is actually needed.
+   * updateUserAction). `statusComment`, when given, becomes a new `Comment` row in
+   * the same write — the timeline is append-only (ADR-0028).
    */
   async updateStatus(
     id: number,
     status: ApplicationStatus,
     statusComment?: string,
   ): Promise<ApplicationListItem | null> {
+    const note = statusComment?.trim();
+    return this.updateRow(id, {
+      status,
+      statusUpdatedAt: new Date(),
+      ...(note && { comments: { create: { body: note } } }),
+    });
+  }
+
+  /**
+   * Edit what was entered when applying — the apply modal re-opened. A field left
+   * out is untouched; a blank string clears it. Returns null for an unknown id.
+   */
+  update(id: number, input: UpdateApplicationInput): Promise<ApplicationListItem | null> {
+    const text = (value: string | null | undefined) =>
+      value === undefined ? undefined : value?.trim() || null;
+    return this.updateRow(id, {
+      salaryInListing: text(input.salaryInListing),
+      usedTailoredResume: input.usedTailoredResume,
+      userComment: text(input.userComment),
+    });
+  }
+
+  /**
+   * Append a note to the timeline at any time, without a status move (ADR-0028).
+   * Returns null for an unknown id; a blank body is an InvalidApplicationInputError.
+   */
+  async addComment(id: number, body: string): Promise<ApplicationListItem | null> {
+    const note = body.trim();
+    if (!note) throw new InvalidApplicationInputError('comment body is blank');
+    return this.updateRow(id, { comments: { create: { body: note } } });
+  }
+
+  /** One update, returned flattened; null when no application has this id (P2025 —
+   * same pattern as updateUserAction). */
+  private async updateRow(
+    id: number,
+    data: Prisma.ApplicationUpdateInput,
+  ): Promise<ApplicationListItem | null> {
     try {
-      const data: Prisma.ApplicationUpdateInput = { status, statusUpdatedAt: new Date() };
-      const note = statusComment?.trim();
-      if (note) {
-        const current = await this.db.application.findUnique({
-          where: { id },
-          select: { statusComment: true },
-        });
-        if (!current) return null;
-        data.statusComment = current.statusComment ? `${current.statusComment} / ${note}` : note;
-      }
       const row = await this.db.application.update({
         where: { id },
         data,

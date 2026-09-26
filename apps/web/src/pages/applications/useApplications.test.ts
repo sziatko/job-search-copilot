@@ -24,7 +24,7 @@ function application(overrides: Partial<ApplicationListItem> = {}): ApplicationL
     status: 'APPLIED',
     // record() stamps this to appliedAt; only updateStatus() moves it on.
     statusUpdatedAt: applied,
-    statusComment: null,
+    comments: [],
     salaryInListing: null,
     usedTailoredResume: false,
     userComment: null,
@@ -352,5 +352,75 @@ describe('ApplicationsPage / useApplications', () => {
       ?.items.find((i) => i.id === 1);
     expect(row?.status).toBe('INTERVIEW');
     expect(row?.statusUpdatedAt).not.toBe(row?.appliedAt);
+  });
+
+  describe('the Action column', () => {
+    it('re-opens the apply dialog pre-filled, and saves the edit into the row', async () => {
+      mswServer.use(
+        ...buildApplicationHandlers([
+          application({ id: 1, salaryInListing: '100 PLN/h', userComment: 'First note' }),
+        ]),
+      );
+      renderTracker();
+      await screen.findByText('Acme');
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /edit backend engineer at acme/i }));
+      const dialog = screen.getByRole('dialog', { name: /edit application/i });
+      const salary = within(dialog).getByLabelText(/salary/i);
+      expect(salary).toHaveValue('100 PLN/h');
+      expect(within(dialog).getByLabelText(/^comment$/i)).toHaveValue('First note');
+
+      await user.clear(salary);
+      await user.type(salary, '120 PLN/h');
+      await user.click(within(dialog).getByRole('button', { name: 'OK' }));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(await within(screen.getByRole('table')).findByText('120 PLN/h')).toBeInTheDocument();
+      expect(within(screen.getByRole('table')).getByText('First note')).toBeInTheDocument();
+    });
+
+    it('adds a dated comment to the row', async () => {
+      mswServer.use(...buildApplicationHandlers([application({ id: 1 })]));
+      renderTracker();
+      await screen.findByText('Acme');
+
+      const user = userEvent.setup();
+      await user.click(
+        screen.getByRole('button', { name: /comment on backend engineer at acme/i }),
+      );
+      const dialog = screen.getByRole('dialog', { name: /add a comment/i });
+      const add = within(dialog).getByRole('button', { name: 'Add' });
+      expect(add).toBeDisabled();
+
+      await user.type(within(dialog).getByLabelText(/comment/i), 'Went well.');
+      await user.click(add);
+
+      const table = screen.getByRole('table');
+      expect(await within(table).findByText('Went well.', { exact: false })).toBeInTheDocument();
+      expect(table.querySelector('.comment-status time')).not.toBeNull();
+    });
+
+    it('rolls a failed comment back and shows the row error', async () => {
+      mswServer.use(...buildApplicationHandlers([application({ id: 1 })]));
+      // A later use() is prepended, so this refusal shadows the fake's own handler.
+      mswServer.use(
+        http.post('http://localhost:3000/api/v1/applications/:id/comments', () =>
+          HttpResponse.json({ message: 'Application 1 not found' }, { status: 404 }),
+        ),
+      );
+      renderTracker();
+      await screen.findByText('Acme');
+
+      const user = userEvent.setup();
+      await user.click(
+        screen.getByRole('button', { name: /comment on backend engineer at acme/i }),
+      );
+      const dialog = screen.getByRole('dialog', { name: /add a comment/i });
+      await user.type(within(dialog).getByLabelText(/comment/i), 'Lost note{Enter}');
+
+      expect(await screen.findByText('Application 1 not found')).toBeInTheDocument();
+      expect(screen.queryByText('Lost note', { exact: false })).not.toBeInTheDocument();
+    });
   });
 });

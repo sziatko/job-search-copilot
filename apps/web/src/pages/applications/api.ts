@@ -7,6 +7,7 @@ import {
   type RecordApplicationInput,
   type RecordApplicationResponse,
   recordApplicationResponseSchema,
+  type UpdateApplicationInput,
 } from './types';
 
 export interface ApplicationPage {
@@ -112,4 +113,33 @@ export async function updateApplicationStatus(
     throw new Error(`Failed to update application ${id}: HTTP ${res.status}`);
   }
   return parseResponse(applicationListItemSchema, await res.json(), 'Update application');
+}
+
+/** PATCH or POST against one application, parsed back into the row that replaces it. */
+async function sendForRow(
+  path: string,
+  method: 'PATCH' | 'POST',
+  body: unknown,
+  label: string,
+): Promise<ApplicationListItem> {
+  const res = await fetch(`${API_BASE}/applications/${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw await errorMessage(res, `${label} failed: HTTP ${res.status}`);
+  }
+  return parseResponse(applicationListItemSchema, await res.json(), label);
+}
+
+export function updateApplication(
+  id: number,
+  input: UpdateApplicationInput,
+): Promise<ApplicationListItem> {
+  return sendForRow(`${id}`, 'PATCH', input, 'Edit application');
+}
+
+export function addApplicationComment(id: number, body: string): Promise<ApplicationListItem> {
+  return sendForRow(`${id}/comments`, 'POST', { body }, 'Add comment');
 }

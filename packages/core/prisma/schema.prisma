@@ -60,18 +60,45 @@ model Application {
   // application has already moved once, into the pipeline — then stamped by
   // updateStatus(). Never null; the DB enforces it.
   statusUpdatedAt    DateTime
-  // Accumulated notes about pipeline movement (one per updateStatus() call that
-  // passes a comment), appended to the existing value with " / " — not a history
-  // table. Simplest thing that works; revisit as a real history if that's ever
-  // not enough.
-  statusComment      String?           @db.Text
-
   salaryInListing    String?
   usedTailoredResume Boolean           @default(false)
+  // "The note about this application" — one editable field. What happened since is
+  // `comments` (ADR-0028).
   userComment        String?           @db.Text
+
+  comments           Comment[]
 
   @@index([status])
   @@index([appliedAt])
+}
+
+// An append-only timeline note on an application — a status move's note, or one added
+// at any time. No edit, no delete (ADR-0028). Named `Comment`, not
+// `ApplicationComment`, so a nullable vacancy FK can join it later without a rename.
+model Comment {
+  id            Int         @id @default(autoincrement())
+  createdAt     DateTime    @default(now())
+  body          String      @db.Text
+  applicationId Int
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+}
+
+// Every posting seen before analysis — the dedup log (ADR-0026). Written only through
+// VacancyLogService, which normalizes url and derives both keys; a row written any
+// other way never matches. `createdAt` is the date the posting was first seen. The url
+// is required; company/title can be missing and are filled on a later duplicate.
+model VacancyLogEntry {
+  id         Int      @id @default(autoincrement())
+  createdAt  DateTime @default(now())
+  url        String   @unique
+  company    String?
+  title      String?
+  companyKey String?
+  titleKey   String?
+
+  @@index([companyKey, titleKey])
 }
 
 enum Recommendation {

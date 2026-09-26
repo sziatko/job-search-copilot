@@ -11,7 +11,7 @@ function application(id: number, appliedAt: string): ApplicationListItem {
     appliedAt,
     status: 'APPLIED',
     statusUpdatedAt: appliedAt,
-    statusComment: null,
+    comments: [],
     salaryInListing: null,
     usedTailoredResume: false,
     userComment: null,
@@ -139,5 +139,7 @@ describe('listApplications', () => {
 
     await expect(listApplications()).rejects.toThrow(/still paging after 200 pages/);
     expect(offsets).toHaveLength(200);
-  });
+    // 200 pages × 500 rows = 100k rows through the zod schema: the default 5s is too
+    // tight once the whole suite shares the CPU.
+  }, 20_000);
 });

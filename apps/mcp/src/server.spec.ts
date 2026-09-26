@@ -35,6 +35,7 @@ describe('job-search-copilot MCP server', () => {
   afterEach(async () => {
     await prisma.application.deleteMany();
     await prisma.estimatedVacancy.deleteMany();
+    await prisma.vacancyLogEntry.deleteMany();
   });
 
   afterAll(async () => {
@@ -431,7 +432,7 @@ describe('job-search-copilot MCP server', () => {
     expect(missing.isError).toBe(true);
   });
 
-  it('update_application_status appends statusComment across calls', async () => {
+  it('update_application_status adds each statusComment as a comment', async () => {
     const client = await connectedClient();
     const recorded = await client.callTool({
       name: 'record_application',
@@ -451,7 +452,9 @@ describe('job-search-copilot MCP server', () => {
       name: 'list_applications',
       arguments: { company: 'Delta Co' },
     });
-    expect(JSON.parse(textOf(afterFirst)).items[0].statusComment).toBe('Recruiter called.');
+    expect(JSON.parse(textOf(afterFirst)).items[0].comments).toMatchObject([
+      { body: 'Recruiter called.' },
+    ]);
 
     await client.callTool({
       name: 'update_application_status',
@@ -461,9 +464,9 @@ describe('job-search-copilot MCP server', () => {
       name: 'list_applications',
       arguments: { company: 'Delta Co' },
     });
-    expect(JSON.parse(textOf(afterSecond)).items[0].statusComment).toBe(
-      'Recruiter called. / Interview on 20.09.',
-    );
+    expect(
+      JSON.parse(textOf(afterSecond)).items[0].comments.map((c: { body: string }) => c.body),
+    ).toEqual(['Recruiter called.', 'Interview on 20.09.']);
   });
 
   it('update_application_status matches by company + title, e.g. from a rejection email', async () => {
@@ -494,7 +497,7 @@ describe('job-search-copilot MCP server', () => {
     });
     const item = JSON.parse(textOf(list)).items[0];
     expect(item.status).toBe('REJECTED');
-    expect(item.statusComment).toBe('Rejection email received.');
+    expect(item.comments).toMatchObject([{ body: 'Rejection email received.' }]);
   });
 
   it('update_application_status isError for an unmatched company/title', async () => {
@@ -536,5 +539,65 @@ describe('job-search-copilot MCP server', () => {
       arguments: { status: 'REJECTED' },
     });
     expect(result.isError).toBe(true);
+  });
+  it('check_vacancy_log records a new posting, then reports it as a duplicate', async () => {
+    const client = await connectedClient();
+    const url = 'https://pl.linkedin.com/jobs/view/engineer-at-acme-3900000001?trk=x';
+    const first = await client.callTool({ name: 'check_vacancy_log', arguments: { url } });
+    expect(JSON.parse(textOf(first))).toEqual({ new: true });
+
+    const again = await client.callTool({
+      name: 'check_vacancy_log',
+      arguments: { url: 'https://www.linkedin.com/jobs/view/3900000001' },
+    });
+    expect(JSON.parse(textOf(again))).toEqual({ new: false });
+  });
+
+  it('check_vacancy_log isError without a url, or with a non-http one', async () => {
+    const client = await connectedClient();
+    const missing = await client.callTool({
+      name: 'check_vacancy_log',
+      arguments: { company: 'Acme', title: 'Dev' },
+    });
+    expect(missing.isError).toBe(true);
+    const bad = await client.callTool({
+      name: 'check_vacancy_log',
+      arguments: { url: 'javascript:alert(1)' },
+    });
+    expect(bad.isError).toBe(true);
+  });
+
+  it('check_vacancy_log_batch returns the raw urls of the new entries', async () => {
+    const client = await connectedClient();
+    const result = await client.callTool({
+      name: 'check_vacancy_log_batch',
+      arguments: {
+        entries: [
+          { url: 'https://acme.com/jobs/1?utm_source=x' },
+          { url: 'https://acme.com/jobs/1#apply' },
+          { company: 'Acme', title: 'No link' },
+          { url: 'https://acme.com/jobs/2', company: 'Acme', title: 'Dev' },
+        ],
+      },
+    });
+    expect(JSON.parse(textOf(result))).toEqual({
+      new: ['https://acme.com/jobs/1?utm_source=x', 'https://acme.com/jobs/2'],
+    });
+  });
+
+  it('check_vacancy_log_batch rejects an empty or oversized array', async () => {
+    const client = await connectedClient();
+    const empty = await client.callTool({
+      name: 'check_vacancy_log_batch',
+      arguments: { entries: [] },
+    });
+    expect(empty.isError).toBe(true);
+    const oversized = await client.callTool({
+      name: 'check_vacancy_log_batch',
+      arguments: {
+        entries: Array.from({ length: 101 }, (_, i) => ({ url: `https://a.com/${i}` })),
+      },
+    });
+    expect(oversized.isError).toBe(true);
   });
 });

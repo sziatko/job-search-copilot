@@ -35,13 +35,30 @@ export function buildSyntheticApplyUrl(company: string, title: string, date: Dat
  * it was declared for — `acme.com?jk=1` still loses its query. Entries are added
  * one at a time, only for a domain whose URLs somebody has actually looked at.
  *
- * A normalizer owns the query only; the fragment and trailing-slash rules still
- * apply to its output. Adding a site is an entry here plus a function, nothing
- * else.
+ * A normalizer owns the query; the fragment and trailing-slash rules still apply
+ * to its output. LinkedIn's is the one exception that owns the host and path as
+ * well (ADR-0027) — any new rule that does the same must stay idempotent. Adding
+ * a site is an entry here plus a function, nothing else.
  */
 const SITE_RULES: { domain: string; normalize: (url: URL) => void }[] = [
   { domain: 'indeed.com', normalize: normalizeIndeed },
+  { domain: 'linkedin.com', normalize: normalizeLinkedIn },
 ];
+
+/**
+ * LinkedIn serves one job id under a locale host (`pl.`, `nl.`, `www.`), with or
+ * without a title slug, and under `/comm/` from email digests. All of them become
+ * `https://www.linkedin.com/jobs/view/<id>`, no query (ADR-0027). Any other
+ * LinkedIn path only loses its query, as on any host.
+ */
+function normalizeLinkedIn(parsed: URL): void {
+  parsed.search = '';
+  const id = /^\/(?:comm\/)?jobs\/view\/(?:[^/]*-)?(\d+)(?:\/|$)/.exec(parsed.pathname)?.[1];
+  if (!id) return;
+  parsed.protocol = 'https:';
+  parsed.host = 'www.linkedin.com';
+  parsed.pathname = `/jobs/view/${id}`;
+}
 
 /**
  * Indeed carries the vacancy id in `?jk=`, and prefixes the host with the locale

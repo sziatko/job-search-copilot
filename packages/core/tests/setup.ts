@@ -10,6 +10,7 @@ afterEach(async () => {
   // handle it, but being explicit keeps the intent obvious).
   await prisma.application.deleteMany();
   await prisma.estimatedVacancy.deleteMany();
+  await prisma.vacancyLogEntry.deleteMany();
 });
 
 afterAll(async () => {

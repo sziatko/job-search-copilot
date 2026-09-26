@@ -22,3 +22,6 @@ export class AmbiguousVacancyMatchError extends DomainError {}
 
 /** That EstimatedVacancy already has an Application (strict 1:1 — see ADR-0017). */
 export class ApplicationAlreadyExistsError extends DomainError {}
+
+/** A vacancy-log check without an http(s) url — the log's key. */
+export class InvalidVacancyLogEntryError extends DomainError {}

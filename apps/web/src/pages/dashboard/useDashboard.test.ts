@@ -32,7 +32,7 @@ function application(overrides: Partial<ApplicationListItem> = {}): ApplicationL
     appliedAt: NOW.toISOString(),
     status: 'APPLIED',
     statusUpdatedAt: NOW.toISOString(),
-    statusComment: null,
+    comments: [],
     salaryInListing: null,
     usedTailoredResume: false,
     userComment: null,

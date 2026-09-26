@@ -1,5 +1,9 @@
 import { HttpResponse, http } from 'msw';
-import type { ApplicationListItem, ApplicationStatus } from '@/pages/applications/types';
+import type {
+  ApplicationListItem,
+  ApplicationStatus,
+  UpdateApplicationInput,
+} from '@/pages/applications/types';
 import type { EstimatedVacancyListItem, UserAction } from '@/pages/vacancies/types';
 
 export const API_URL = 'http://localhost:3000/api/v1';
@@ -84,7 +88,7 @@ export function buildHandlers(items: EstimatedVacancyListItem[]) {
         appliedAt: now,
         status: 'APPLIED',
         statusUpdatedAt: now,
-        statusComment: null,
+        comments: [],
         salaryInListing: body.salaryInListing ?? null,
         usedTailoredResume: body.usedTailoredResume ?? false,
         userComment: body.userComment ?? null,
@@ -133,6 +137,39 @@ export function buildApplicationHandlers(applications: ApplicationListItem[]) {
       app.status = body.status;
       app.statusUpdatedAt = new Date().toISOString();
       return HttpResponse.json(app);
+    }),
+    // Same rule as ApplicationService.update: absent is untouched, blank clears.
+    http.patch(`${API_URL}/applications/:id`, async ({ params, request }) => {
+      const app = applications.find((a) => a.id === Number(params.id));
+      if (!app) {
+        return new HttpResponse(null, { status: 404 });
+      }
+      const body = (await request.json()) as UpdateApplicationInput;
+      const text = (value: string | null | undefined, current: string | null) =>
+        value === undefined ? current : value?.trim() || null;
+      app.salaryInListing = text(body.salaryInListing, app.salaryInListing);
+      app.userComment = text(body.userComment, app.userComment);
+      app.usedTailoredResume = body.usedTailoredResume ?? app.usedTailoredResume;
+      return HttpResponse.json(app);
+    }),
+    http.post(`${API_URL}/applications/:id/comments`, async ({ params, request }) => {
+      const app = applications.find((a) => a.id === Number(params.id));
+      if (!app) {
+        return new HttpResponse(null, { status: 404 });
+      }
+      const { body } = (await request.json()) as { body: string };
+      if (!body.trim()) {
+        return HttpResponse.json(
+          { statusCode: 400, message: ['body must not be blank'] },
+          { status: 400 },
+        );
+      }
+      const ids = app.comments.map((c) => c.id);
+      app.comments = [
+        ...app.comments,
+        { id: Math.max(0, ...ids) + 1, createdAt: new Date().toISOString(), body: body.trim() },
+      ];
+      return HttpResponse.json(app, { status: 201 });
     }),
   ];
 }

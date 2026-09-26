@@ -1,7 +1,13 @@
-export type { Application, EstimatedVacancy, PrismaClient } from '@prisma/client';
+export type {
+  Application,
+  EstimatedVacancy,
+  PrismaClient,
+  VacancyLogEntry,
+} from '@prisma/client';
 export { ApplicationStatus, Recommendation, UserAction } from '@prisma/client';
 export { ApplicationService } from './application.service';
 export type {
+  ApplicationComment,
   ApplicationListItem,
   ListApplicationsFilters,
   ListApplicationsResult,
@@ -10,6 +16,7 @@ export type {
   RecordApplicationInput,
   RecordApplicationResult,
   RecordManyApplicationsResult,
+  UpdateApplicationInput,
   VacancyResolution,
 } from './application.types';
 export {
@@ -18,6 +25,7 @@ export {
   DomainError,
   InvalidApplicationInputError,
   InvalidRecommendationError,
+  InvalidVacancyLogEntryError,
 } from './errors';
 export { EstimatedVacancyService } from './estimated-vacancy.service';
 export type {
@@ -36,3 +44,6 @@ export {
   normalizeRecommendation,
   RECOMMENDATION_INPUT_VALUES,
 } from './recommendation';
+export type { CheckVacancyLogOptions, VacancyLogInput } from './vacancy-log';
+export { normalizeCompanyKey, normalizeTitleKey } from './vacancy-log';
+export { VacancyLogService } from './vacancy-log.service';

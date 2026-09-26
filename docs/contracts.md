@@ -6,9 +6,11 @@ of these and the "breaks if" note tells you who to update.
 Source of truth:
 [`apps/api/src/estimated-vacancies/estimated-vacancies.controller.ts`](../apps/api/src/estimated-vacancies/estimated-vacancies.controller.ts),
 [`apps/api/src/applications/applications.controller.ts`](../apps/api/src/applications/applications.controller.ts),
+[`apps/api/src/vacancy-log/vacancy-log.controller.ts`](../apps/api/src/vacancy-log/vacancy-log.controller.ts),
 [`apps/api/src/setup-app.ts`](../apps/api/src/setup-app.ts),
 [`apps/mcp/src/estimated-vacancies/estimated-vacancies.tools.ts`](../apps/mcp/src/estimated-vacancies/estimated-vacancies.tools.ts),
 [`apps/mcp/src/applications/applications.tools.ts`](../apps/mcp/src/applications/applications.tools.ts),
+[`apps/mcp/src/vacancy-log/vacancy-log.tools.ts`](../apps/mcp/src/vacancy-log/vacancy-log.tools.ts),
 [`apps/web/src/pages/vacancies/types.ts`](../apps/web/src/pages/vacancies/types.ts),
 [`apps/web/src/pages/applications/types.ts`](../apps/web/src/pages/applications/types.ts).
 
@@ -27,9 +29,12 @@ fields are stripped; type coercion is on.
 | `GET /api/v1/estimated-vacancies/:id` | — | `200` full `EstimatedVacancy` (incl. `fullText`) | `404` unknown id; `400` non-integer id (`ParseIntPipe`) |
 | `PATCH /api/v1/estimated-vacancies/:id/user-action` | `{ userAction: UserAction }` | `200` full `EstimatedVacancy` | `404` unknown id; `400` bad `userAction` |
 | `POST /api/v1/applications` | `RecordApplicationDto`: `estimatedVacancyId` (`@IsInt @Min(1)`, **required**), `salaryInListing?`, `userComment?` (`@IsString`), `usedTailoredResume?` (`@IsBoolean`), `status?` (`@IsEnum(ApplicationStatus)`). No `appliedAt` — server uses `now()`. | **always `201`** + `Location: /api/v1/applications/{id}`. Body = `{ application: ApplicationListItem, resolution: 'linked-by-id' \| 'linked-existing' \| 'created-vacancy', vacancyCreated: boolean }`. | `400` DTO; `422` `InvalidApplicationInputError` (unknown id) / `ApplicationAlreadyExistsError` (that vacancy already has one) |
-| `GET /api/v1/applications` | query: `status?` (enum), `search?` (string — vacancy `company` OR `title`, ILIKE), `limit?` (1–500, default 50 in core), `offset?` (≥0) | `200 { items: ApplicationListItem[], total: number }` — each item is the `Application` fields **flattened with** `company` / `title` / `applyUrl` / `matchScore` / `recommendation` / `estimationComment` from the linked vacancy | `400` bad query (e.g. `limit=1000`) |
+| `GET /api/v1/applications` | query: `status?` (enum), `search?` (string — vacancy `company` OR `title`, ILIKE), `limit?` (1–500, default 50 in core), `offset?` (≥0) | `200 { items: ApplicationListItem[], total: number }` — each item is the `Application` fields (with `comments: { id, createdAt, body }[]`, oldest first) **flattened with** `company` / `title` / `applyUrl` / `matchScore` / `recommendation` / `estimationComment` from the linked vacancy | `400` bad query (e.g. `limit=1000`) |
 | `GET /api/v1/applications/:id` | — | `200` `ApplicationListItem` | `404` unknown id; `400` non-integer id |
-| `PATCH /api/v1/applications/:id/status` | `{ status: ApplicationStatus, statusComment?: string }` — `statusComment` is **appended** to the existing value joined by `" / "`, never overwritten | `200` `ApplicationListItem` | `404` unknown id; `400` bad `status` |
+| `PATCH /api/v1/applications/:id/status` | `{ status: ApplicationStatus, statusComment?: string }` — `statusComment` becomes a new dated row in the application's `comments` (append-only, [ADR-0028](decisions/0028-comment-table.md)) | `200` `ApplicationListItem` | `404` unknown id; `400` bad `status` |
+| `PATCH /api/v1/applications/:id` | `UpdateApplicationDto`: `salaryInListing?`, `userComment?` (`@IsString`, `null` or blank clears), `usedTailoredResume?` (`@IsBoolean`) — a field left out is untouched; anything else (e.g. `status`) is stripped | `200` `ApplicationListItem` | `404` unknown id; `400` DTO |
+| `POST /api/v1/applications/:id/comments` | `AddCommentDto`: `{ body }` (`@IsString`, `@Matches(/\S/)`) — appended to the timeline, status untouched ([ADR-0028](decisions/0028-comment-table.md)) | `201` `ApplicationListItem` (the whole application, new comment last — the web swaps its row for it) | `404` unknown id; `400` blank / missing `body` |
+| `POST /api/v1/vacancy-log/check` | `CheckVacancyLogDto`: `{ entries: VacancyLogEntryDto[] }` (1–100, `@ValidateNested`), each `url?` / `company?` / `title?` (`@IsString`, raw — normalized in core) | **`200`** `{ new: string[] }` — the url of each new entry **exactly as sent**; those are now recorded, every other entry was a duplicate. An entry without an http(s) url is skipped ([ADR-0026](decisions/0026-vacancy-log-table.md)) | `400` DTO (empty / oversized / non-string) |
 
 The API exposes only `POST`'s by-id path; the by-`(company, title)` find-or-create
 path is MCP / import only. `resolution` rides in the JSON envelope (not a header) —
@@ -62,6 +67,9 @@ any future `DomainError` that isn't pre-validated —
 `CORS_ORIGINS` → reflect any origin (dev). Set it before deploying.
 
 > **What this constrains — breaks if you change it**
+> - Changing `POST /vacancy-log/check`'s body or result → any n8n workflow calling
+>   it (not in this repo; this is n8n's only way in while MCP is stdio-only) and
+>   `apps/api/test/vacancy-log.e2e.spec.ts`.
 > - Renaming a path / changing the prefix or version → `apps/web/src/lib/api.ts`
 >   (`API_BASE`), both features' `api.ts`, the MSW handlers in
 >   `apps/web/src/test/msw/handlers.ts`, and the e2e URLs in
@@ -96,11 +104,11 @@ any future `DomainError` that isn't pre-validated —
 
 ## MCP tools
 
-Nine tools, registered in `createServer()` — each domain owns its own
+Eleven tools, registered in `createServer()` — each domain owns its own
 `<feature>/*.tools.ts` + `*.schemas.ts`, and `server.ts` stays composition-only
 ([ADR-0010](decisions/0010-mcp-server-factory.md)). All inputs are `zod` schemas; all
-success outputs are `JSON.stringify(result, null, 2)` as a single text block. The 4
-write tools return only a minimal confirmation (see Output column) — they never echo
+success outputs are `JSON.stringify(result, null, 2)` as a single text block. The
+record/save/update tools return only a minimal confirmation (see Output column) — they never echo
 back the large text the caller just sent (`fullText`, `estimationComment`,
 `userComment`, `statusComment`); read the full record back with `get_estimated_vacancy`
 / `list_estimated_vacancies` / `list_applications`.
@@ -115,7 +123,9 @@ back the large text the caller just sent (`fullText`, `estimationComment`,
 | `record_application` | `company`, `title` (required), `applyUrl?` (`.url()`), `matchScore?` (int 0–100), `estimationComment?`, `salaryInListing?`, `usedTailoredResume?`, `userComment?`, `status?` | `{ success: true, application: { id, company, title } }` — find-or-creates the vacancy, marks it APPLIED; use `list_estimated_vacancies`/`list_applications` to see `resolution`-equivalent state | `DomainError` (blank input / ambiguous match / already recorded) → `{ isError: true, content: [message] }` |
 | `record_applications_batch` | `{ applications: [...] }` — array (1–100) of the same shape as `record_application`'s input | `[{ success: true, application: { id, company, title } }, ...]`, one entry per input, same order and same per-item shape as `record_application` — **transactional**: runs in one `$transaction` (`ApplicationService.recordMany`), so one failing item rolls back the whole batch | array size outside 1–100 → schema-validation error; `DomainError` on any item → `{ isError: true, content: [message] }`, nothing persisted |
 | `list_applications` | `status?`, `search?` (linked vacancy's company OR title), `company?`, `title?` (each independent — given with `search` and/or each other, they AND, not OR; all three ILIKE `%term%`, case-insensitive), `limit?` (1–500), `offset?` (≥0) | `{ items: ApplicationListItem[], total }` (flattened join) | — |
-| `update_application_status` | `{ id?: int, company?: string, title?: string, status, statusComment?: string }` — exactly one of `id` or `(company, title)` (case-insensitive match against the linked vacancy); `statusComment` appended to the existing value joined by `" / "`, never overwritten | `{ success: true, application: { id, company, title } }` — use `list_applications` to see the resulting `status`/`statusComment` | neither/both id-vs-company+title given, unknown id, unmatched `(company, title)`, or a matched vacancy with no recorded application → `isError` "not found"; 2+ vacancies matching `(company, title)` → `isError` listing candidate ids |
+| `update_application_status` | `{ id?: int, company?: string, title?: string, status, statusComment?: string }` — exactly one of `id` or `(company, title)` (case-insensitive match against the linked vacancy); `statusComment` becomes a new dated comment on the application, earlier ones untouched | `{ success: true, application: { id, company, title } }` — use `list_applications` to see the resulting `status` / `comments` | neither/both id-vs-company+title given, unknown id, unmatched `(company, title)`, or a matched vacancy with no recorded application → `isError` "not found"; 2+ vacancies matching `(company, title)` → `isError` listing candidate ids |
+| `check_vacancy_log` | `url` (required, raw string — not `.url()`, core decides what is usable), `company?`, `title?` | `{ new: boolean }` — a new posting is **recorded** by the same call ([ADR-0026](decisions/0026-vacancy-log-table.md)) | missing or non-http(s) url → `InvalidVacancyLogEntryError` → `isError` |
+| `check_vacancy_log_batch` | `{ entries: [...] }` — array (1–100) of `{ url?, company?, title? }` | `{ new: string[] }` — the url of each new entry exactly as sent, recorded by this call; **transactional**, in order, so a posting twice in one call is new only once. Entries without an http(s) url are skipped | array size outside 1–100 → schema-validation error |
 
 `stdout` is reserved for the MCP protocol — all logging goes to `stderr`
 (`console.error` in `apps/mcp/src/index.ts`).

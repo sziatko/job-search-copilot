@@ -165,10 +165,10 @@ describe('Applications (e2e)', () => {
       expect(new Date(res.body.statusUpdatedAt).getTime()).toBeGreaterThanOrEqual(
         new Date(created.body.application.appliedAt).getTime(),
       );
-      expect(res.body.statusComment).toBeNull();
+      expect(res.body.comments).toEqual([]);
     });
 
-    it('appends statusComment across calls, joined with " / "', async () => {
+    it('turns each statusComment into a dated comment, oldest first', async () => {
       const vacancyId = await seedVacancy();
       const created = await request(app.getHttpServer())
         .post('/api/v1/applications')
@@ -179,19 +179,23 @@ describe('Applications (e2e)', () => {
         .patch(`/api/v1/applications/${id}/status`)
         .send({ status: 'RECRUITER_SCREEN', statusComment: 'Recruiter called.' })
         .expect(200);
-      expect(first.body.statusComment).toBe('Recruiter called.');
+      expect(first.body.comments).toMatchObject([{ body: 'Recruiter called.' }]);
+      expect(typeof first.body.comments[0].createdAt).toBe('string');
 
       const second = await request(app.getHttpServer())
         .patch(`/api/v1/applications/${id}/status`)
         .send({ status: 'INTERVIEW', statusComment: 'Interview on 20.09.' })
         .expect(200);
-      expect(second.body.statusComment).toBe('Recruiter called. / Interview on 20.09.');
+      expect(second.body.comments.map((c: { body: string }) => c.body)).toEqual([
+        'Recruiter called.',
+        'Interview on 20.09.',
+      ]);
 
       const noComment = await request(app.getHttpServer())
         .patch(`/api/v1/applications/${id}/status`)
         .send({ status: 'OFFER' })
         .expect(200);
-      expect(noComment.body.statusComment).toBe('Recruiter called. / Interview on 20.09.');
+      expect(noComment.body.comments).toHaveLength(2);
     });
 
     it('404s for an unknown id', async () => {
@@ -210,6 +214,90 @@ describe('Applications (e2e)', () => {
         .patch(`/api/v1/applications/${created.body.application.id}/status`)
         .send({ status: 'MAYBE' })
         .expect(400);
+    });
+  });
+
+  async function recordOne(extra: Record<string, unknown> = {}): Promise<number> {
+    const vacancyId = await seedVacancy();
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/applications')
+      .send({ estimatedVacancyId: vacancyId, ...extra })
+      .expect(201);
+    return res.body.application.id as number;
+  }
+
+  describe('PATCH /api/v1/applications/:id', () => {
+    it('edits the given fields and leaves the rest', async () => {
+      const id = await recordOne({ salaryInListing: '100 PLN/h', userComment: 'Old' });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/applications/${id}`)
+        .send({ usedTailoredResume: true, userComment: 'New', status: 'OFFER' })
+        .expect(200);
+      expect(res.body).toMatchObject({
+        salaryInListing: '100 PLN/h',
+        usedTailoredResume: true,
+        userComment: 'New',
+        // not a field of this DTO — stripped by whitelist, so the status stays
+        status: 'APPLIED',
+      });
+    });
+
+    it('clears a field sent as null', async () => {
+      const id = await recordOne({ salaryInListing: '100 PLN/h' });
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/applications/${id}`)
+        .send({ salaryInListing: null })
+        .expect(200);
+      expect(res.body.salaryInListing).toBeNull();
+    });
+
+    it('404s for an unknown id; 400s on a bad field', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/v1/applications/999999')
+        .send({ userComment: 'x' })
+        .expect(404);
+      const id = await recordOne();
+      await request(app.getHttpServer())
+        .patch(`/api/v1/applications/${id}`)
+        .send({ usedTailoredResume: 'yes' })
+        .expect(400);
+    });
+  });
+
+  describe('POST /api/v1/applications/:id/comments', () => {
+    it('201s with the application, the new comment last', async () => {
+      const id = await recordOne();
+      await request(app.getHttpServer())
+        .patch(`/api/v1/applications/${id}/status`)
+        .send({ status: 'INTERVIEW', statusComment: 'Booked.' })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/applications/${id}/comments`)
+        .send({ body: 'Went well.' })
+        .expect(201);
+      expect(res.body.status).toBe('INTERVIEW');
+      expect(res.body.comments.map((c: { body: string }) => c.body)).toEqual([
+        'Booked.',
+        'Went well.',
+      ]);
+    });
+
+    it('400s on a blank or missing body; 404s for an unknown id', async () => {
+      const id = await recordOne();
+      await request(app.getHttpServer())
+        .post(`/api/v1/applications/${id}/comments`)
+        .send({ body: '   ' })
+        .expect(400);
+      await request(app.getHttpServer())
+        .post(`/api/v1/applications/${id}/comments`)
+        .send({})
+        .expect(400);
+      await request(app.getHttpServer())
+        .post('/api/v1/applications/999999/comments')
+        .send({ body: 'x' })
+        .expect(404);
     });
   });
 });

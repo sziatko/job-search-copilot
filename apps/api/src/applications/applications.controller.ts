@@ -12,8 +12,10 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { AddCommentDto } from './dto/add-comment.dto';
 import { ListApplicationsQueryDto } from './dto/list-applications.dto';
 import { RecordApplicationDto } from './dto/record-application.dto';
+import { UpdateApplicationDto } from './dto/update-application.dto';
 import { UpdateApplicationStatusDto } from './dto/update-application-status.dto';
 
 @Controller('applications')
@@ -54,6 +56,26 @@ export class ApplicationsController {
     @Body() dto: UpdateApplicationStatusDto,
   ) {
     const application = await this.applications.updateStatus(id, dto.status, dto.statusComment);
+    if (!application) {
+      throw new NotFoundException(`Application ${id} not found`);
+    }
+    return application;
+  }
+
+  @Patch(':id')
+  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateApplicationDto) {
+    const application = await this.applications.update(id, dto);
+    if (!application) {
+      throw new NotFoundException(`Application ${id} not found`);
+    }
+    return application;
+  }
+
+  /** 201 with the whole application back (not the comment alone): the web replaces
+   * its row with it. */
+  @Post(':id/comments')
+  async addComment(@Param('id', ParseIntPipe) id: number, @Body() dto: AddCommentDto) {
+    const application = await this.applications.addComment(id, dto.body);
     if (!application) {
       throw new NotFoundException(`Application ${id} not found`);
     }

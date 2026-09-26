@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { IconComment, IconEdit } from '@/components/icons';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
@@ -32,12 +33,16 @@ export function ApplicationsTable({
   savingIds,
   rowErrors,
   onStatusChange,
+  onEdit,
+  onComment,
   emptyMessage,
 }: {
   items: ApplicationListItem[];
   savingIds: Set<number>;
   rowErrors: Map<number, string>;
   onStatusChange: (id: number, status: ApplicationStatus) => void;
+  onEdit: (item: ApplicationListItem) => void;
+  onComment: (item: ApplicationListItem) => void;
   emptyMessage: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -48,7 +53,7 @@ export function ApplicationsTable({
 
   return (
     <div ref={scrollRef} className="table-body-scroll">
-      <table className="min-w-[1180px] table-fixed">
+      <table className="min-w-[1246px] table-fixed">
         <thead>
           <tr>
             <th style={{ width: 110 }}>Date</th>
@@ -57,7 +62,7 @@ export function ApplicationsTable({
             <th style={{ width: 120 }}>Salary</th>
             <th style={{ width: 80 }}>CV</th>
             <th>Comment</th>
-            <th style={{ width: 72 }}>Copy</th>
+            <th style={{ width: 138 }}>Action</th>
             <th style={{ width: 190 }}>Status</th>
           </tr>
         </thead>
@@ -131,17 +136,41 @@ export function ApplicationsTable({
                 <td>
                   <MergedComment
                     userComment={item.userComment}
-                    statusComment={item.statusComment}
                     estimationComment={item.estimationComment}
+                    comments={item.comments}
                   />
                 </td>
                 <td>
-                  <CopyApplicationButton
-                    id={item.id}
-                    company={item.company}
-                    title={item.title}
-                    applyUrl={item.applyUrl}
-                  />
+                  {/* Icons, labelled by their `.tip` bubbles — the /vacancies Action
+                      column's pattern. Edit and Comment wait while the row saves. */}
+                  <div className="flex items-center gap-[6px]">
+                    <CopyApplicationButton
+                      id={item.id}
+                      company={item.company}
+                      title={item.title}
+                      applyUrl={item.applyUrl}
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Edit ${item.title} at ${item.company}`}
+                      disabled={savingIds.has(item.id)}
+                      onClick={() => onEdit(item)}
+                      className="icon-btn disabled:opacity-50"
+                    >
+                      <IconEdit />
+                      <span className="tip">Edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Comment on ${item.title} at ${item.company}`}
+                      disabled={savingIds.has(item.id)}
+                      onClick={() => onComment(item)}
+                      className="icon-btn disabled:opacity-50"
+                    >
+                      <IconComment />
+                      <span className="tip">Comment</span>
+                    </button>
+                  </div>
                 </td>
                 <td>
                   <ApplicationStatusSelect

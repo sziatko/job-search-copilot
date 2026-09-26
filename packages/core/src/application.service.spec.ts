@@ -6,11 +6,14 @@ import {
   InvalidApplicationInputError,
 } from './errors';
 import { EstimatedVacancyService } from './estimated-vacancy.service';
+import { getPrisma } from './prisma-client';
 
 // Integration tests against the real (test) Postgres — same rationale as
 // estimated-vacancy.service.spec.ts.
 const applications = new ApplicationService();
 const vacancies = new EstimatedVacancyService();
+
+const bodies = (item: { comments: { body: string }[] } | null) => item?.comments.map((c) => c.body);
 
 let urlSeq = 0;
 async function seedVacancy(
@@ -255,18 +258,18 @@ describe('ApplicationService', () => {
       const updated = await applications.updateStatus(application.id, 'INTERVIEW');
       expect(updated?.status).toBe('INTERVIEW');
       expect(updated?.statusUpdatedAt).toBeInstanceOf(Date);
-      expect(updated?.statusComment).toBeNull();
+      expect(updated?.comments).toEqual([]);
     });
 
-    it('leaves statusComment untouched when none is given', async () => {
+    it('adds no comment when none is given', async () => {
       const vacancy = await seedVacancy();
       const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
       await applications.updateStatus(application.id, 'INTERVIEW', 'Recruiter called.');
       const updated = await applications.updateStatus(application.id, 'OFFER');
-      expect(updated?.statusComment).toBe('Recruiter called.');
+      expect(bodies(updated)).toEqual(['Recruiter called.']);
     });
 
-    it('appends a new statusComment to the existing one, joined with " / "', async () => {
+    it('turns each status note into its own comment row, oldest first', async () => {
       const vacancy = await seedVacancy();
       const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
 
@@ -275,32 +278,93 @@ describe('ApplicationService', () => {
         'RECRUITER_SCREEN',
         'Recruiter called.',
       );
-      expect(first?.statusComment).toBe('Recruiter called.');
+      expect(bodies(first)).toEqual(['Recruiter called.']);
+      expect(first?.comments[0].createdAt).toBeInstanceOf(Date);
 
       const second = await applications.updateStatus(
         application.id,
         'INTERVIEW',
         'Interview on 20.09.',
       );
-      expect(second?.statusComment).toBe('Recruiter called. / Interview on 20.09.');
+      expect(bodies(second)).toEqual(['Recruiter called.', 'Interview on 20.09.']);
 
       const third = await applications.updateStatus(application.id, 'OFFER', 'Offer received!');
-      expect(third?.statusComment).toBe(
-        'Recruiter called. / Interview on 20.09. / Offer received!',
-      );
+      expect(bodies(third)).toEqual([
+        'Recruiter called.',
+        'Interview on 20.09.',
+        'Offer received!',
+      ]);
+      expect(await getPrisma().comment.count({ where: { applicationId: application.id } })).toBe(3);
     });
 
     it('trims the comment and ignores a blank one', async () => {
       const vacancy = await seedVacancy();
       const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
       const withSpaces = await applications.updateStatus(application.id, 'INTERVIEW', '  padded  ');
-      expect(withSpaces?.statusComment).toBe('padded');
+      expect(bodies(withSpaces)).toEqual(['padded']);
       const unchanged = await applications.updateStatus(application.id, 'OFFER', '   ');
-      expect(unchanged?.statusComment).toBe('padded');
+      expect(bodies(unchanged)).toEqual(['padded']);
     });
 
     it('returns null for an unknown id even when a comment is given', async () => {
       expect(await applications.updateStatus(999_999, 'INTERVIEW', 'note')).toBeNull();
+    });
+  });
+
+  describe('update', () => {
+    it('changes only the fields given, and a blank string clears one', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({
+        estimatedVacancyId: vacancy.id,
+        salaryInListing: '100 PLN/h',
+        userComment: 'First note',
+      });
+
+      const edited = await applications.update(application.id, {
+        usedTailoredResume: true,
+        userComment: '  Rewritten  ',
+      });
+      expect(edited).toMatchObject({
+        salaryInListing: '100 PLN/h',
+        usedTailoredResume: true,
+        userComment: 'Rewritten',
+        status: 'APPLIED',
+      });
+
+      const cleared = await applications.update(application.id, { salaryInListing: '  ' });
+      expect(cleared?.salaryInListing).toBeNull();
+      expect(cleared?.userComment).toBe('Rewritten');
+    });
+
+    it('returns null for an unknown id', async () => {
+      expect(await applications.update(999_999, { userComment: 'x' })).toBeNull();
+    });
+  });
+
+  describe('addComment', () => {
+    it('appends a dated comment without moving the status', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+      await applications.updateStatus(application.id, 'INTERVIEW', 'Booked.');
+
+      const updated = await applications.addComment(application.id, '  Went well.  ');
+      expect(bodies(updated)).toEqual(['Booked.', 'Went well.']);
+      expect(updated?.status).toBe('INTERVIEW');
+      expect(updated?.statusUpdatedAt).toEqual(
+        (await applications.getById(application.id))?.statusUpdatedAt,
+      );
+    });
+
+    it('rejects a blank body', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+      await expect(applications.addComment(application.id, '   ')).rejects.toThrow(
+        InvalidApplicationInputError,
+      );
+    });
+
+    it('returns null for an unknown id', async () => {
+      expect(await applications.addComment(999_999, 'note')).toBeNull();
     });
   });
 
@@ -317,7 +381,7 @@ describe('ApplicationService', () => {
       );
       expect(updated?.id).toBe(application.id);
       expect(updated?.status).toBe('REJECTED');
-      expect(updated?.statusComment).toBe('Rejection email received.');
+      expect(bodies(updated)).toEqual(['Rejection email received.']);
     });
 
     it('appends across calls, same as updateStatus by id', async () => {
@@ -331,7 +395,7 @@ describe('ApplicationService', () => {
         'INTERVIEW',
         'Interview scheduled.',
       );
-      expect(second?.statusComment).toBe('Called. / Interview scheduled.');
+      expect(bodies(second)).toEqual(['Called.', 'Interview scheduled.']);
     });
 
     it('returns null when no vacancy matches', async () => {

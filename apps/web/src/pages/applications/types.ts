@@ -43,13 +43,20 @@ export const applicationStatusFilterSchema = z.enum([
 // (see the enum touch-point list in the Phase 2 plan / docs/domain-model.md).
 const recommendationSchema = z.enum(['APPLY', 'APPLY_WITH_CAVEATS', 'SKIP']);
 
+const applicationCommentSchema = z.object({
+  id: z.number(),
+  createdAt: z.string(),
+  body: z.string(),
+});
+export type ApplicationComment = z.infer<typeof applicationCommentSchema>;
+
 export const applicationListItemSchema = z.object({
   id: z.number(),
   appliedAt: z.string(),
   status: applicationStatusSchema,
   statusUpdatedAt: z.string(),
-  /** Accumulated pipeline notes — see ApplicationService.updateStatus. Written via MCP/API only. */
-  statusComment: z.string().nullable(),
+  /** The append-only timeline, oldest first (ADR-0028). */
+  comments: z.array(applicationCommentSchema),
   salaryInListing: z.string().nullable(),
   usedTailoredResume: z.boolean(),
   userComment: z.string().nullable(),
@@ -76,6 +83,13 @@ export const recordApplicationResponseSchema = z.object({
   vacancyCreated: z.boolean(),
 });
 export type RecordApplicationResponse = z.infer<typeof recordApplicationResponseSchema>;
+
+/** PATCH /applications/:id. Absent = untouched; null or blank clears. */
+export interface UpdateApplicationInput {
+  salaryInListing?: string | null;
+  usedTailoredResume?: boolean;
+  userComment?: string | null;
+}
 
 export interface RecordApplicationInput {
   estimatedVacancyId: number;

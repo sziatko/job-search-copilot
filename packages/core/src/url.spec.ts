@@ -159,6 +159,45 @@ describe('normalizeApplyUrl', () => {
     });
   });
 
+  describe('the LinkedIn rule', () => {
+    const canonical = 'https://www.linkedin.com/jobs/view/3900000001';
+
+    it.each([
+      ['https://www.linkedin.com/jobs/view/3900000001'],
+      [
+        'https://pl.linkedin.com/jobs/view/senior-software-engineer-data-f-m-d-at-globex-3900000001?trk=public_jobs_topcard-title',
+      ],
+      ['https://nl.linkedin.com/jobs/view/engineer-2-at-acme-3900000001'],
+      ['https://www.linkedin.com/jobs/view/3900000001?trk=abc&refId=x'],
+      ['https://www.linkedin.com/comm/jobs/view/3900000001/'],
+      ['https://linkedin.com/jobs/view/3900000001/#apply'],
+      ['http://www.linkedin.com/jobs/view/3900000001'],
+    ])('collapses %j onto the one key', (url) => {
+      // One posting, one key — the locale host, slug and /comm/ were three more
+      // keys per job before. See ADR-0027.
+      expect(normalizeApplyUrl(url)).toBe(canonical);
+    });
+
+    it('is idempotent', () => {
+      expect(normalizeApplyUrl(canonical)).toBe(canonical);
+    });
+
+    it('leaves a non-job LinkedIn path on its host, losing only the query', () => {
+      expect(normalizeApplyUrl('https://pl.linkedin.com/company/acme/?trk=x')).toBe(
+        'https://pl.linkedin.com/company/acme',
+      );
+      expect(normalizeApplyUrl('https://www.linkedin.com/jobs/search?currentJobId=123')).toBe(
+        'https://www.linkedin.com/jobs/search',
+      );
+    });
+
+    it('does not read a trailing digit run off a non-id segment', () => {
+      expect(normalizeApplyUrl('https://www.linkedin.com/jobs/view/123abc')).toBe(
+        'https://www.linkedin.com/jobs/view/123abc',
+      );
+    });
+  });
+
   describe('canonicalization', () => {
     it('leaves an already-canonical URL byte-for-byte alone', () => {
       expect(normalizeApplyUrl('https://example.com/jobs/1')).toBe('https://example.com/jobs/1');

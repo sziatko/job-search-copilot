@@ -173,3 +173,20 @@ export function IconCopy(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+export function IconEdit(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
+      <path d="m13.5 8.5 3 3" />
+    </Icon>
+  );
+}
+
+export function IconComment(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
+    </Icon>
+  );
+}

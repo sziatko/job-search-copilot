@@ -1,16 +1,20 @@
 import { useCallback, useRef, useState } from 'react';
+import type { ApplicationComment } from '../types';
 
 interface Part {
   text: string;
   className: string;
+  /** A timeline comment's date, shown before its text. */
+  date?: string;
 }
+
+const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
 /**
  * Three sources merged into one cell, in this order: the user's own note (they wrote
- * it about this specific application), the accumulated pipeline notes from
- * update_application_status (statusComment — read-only here, written via MCP/API),
- * then the analyzer's reasoning. 'N/A' is the backend's placeholder for a
- * never-analysed vacancy — treat it as empty.
+ * it about this specific application), the analyzer's reasoning, then the timeline
+ * comments, oldest first, each with its date (ADR-0028). 'N/A' is the backend's
+ * placeholder for a never-analysed vacancy — treat it as empty.
  *
  * The mockup's single-string cell clamps to two lines with a "Show more" button.
  * That styling is kept, but the toggle is measured rather than always shown: a
@@ -18,19 +22,25 @@ interface Part {
  */
 export function MergedComment({
   userComment,
-  statusComment,
   estimationComment,
+  comments,
 }: {
   userComment: string | null;
-  statusComment: string | null;
   estimationComment: string;
+  comments: ApplicationComment[];
 }) {
   const analyzer = estimationComment && estimationComment !== 'N/A' ? estimationComment : null;
 
   const parts: Part[] = [];
   if (userComment) parts.push({ text: userComment, className: 'comment-user' });
-  if (statusComment) parts.push({ text: statusComment, className: 'comment-status' });
   if (analyzer) parts.push({ text: analyzer, className: 'comment-analyzer' });
+  for (const comment of comments) {
+    parts.push({
+      text: comment.body,
+      className: 'comment-status',
+      date: dateFormatter.format(new Date(comment.createdAt)),
+    });
+  }
 
   const [clampable, setClampable] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -60,7 +70,10 @@ export function MergedComment({
           // biome-ignore lint/suspicious/noArrayIndexKey: parts is a fixed-order, static-length render per item
           <span key={i}>
             {i > 0 && (expanded ? <hr className="my-[4px] border-t border-border" /> : ' — ')}
-            <span className={part.className}>{part.text}</span>
+            <span className={part.className}>
+              {part.date && <time className="mono text-ink-faint">{part.date}: </time>}
+              {part.text}
+            </span>
           </span>
         ))}
       </div>

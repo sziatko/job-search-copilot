@@ -58,6 +58,14 @@ export interface RecordManyApplicationsResult {
   results: RecordApplicationResult[];
 }
 
+/** ApplicationService.update: the fields the apply modal wrote. Absent = untouched;
+ * null or blank = cleared. */
+export interface UpdateApplicationInput {
+  salaryInListing?: string | null;
+  usedTailoredResume?: boolean;
+  userComment?: string | null;
+}
+
 export interface ListApplicationsFilters {
   status?: ApplicationStatus;
   /** Matches EstimatedVacancy.company OR .title, ILIKE '%term%', case-insensitive. For
@@ -78,6 +86,12 @@ export interface ListApplicationsResult {
   total: number;
 }
 
+export interface ApplicationComment {
+  id: number;
+  createdAt: Date;
+  body: string;
+}
+
 /**
  * A flattened Application ⋈ EstimatedVacancy row: the Application's own delta plus
  * the vacancy fields the /tracker page renders. The vacancy fields are never NULL —
@@ -88,8 +102,8 @@ export interface ApplicationListItem {
   appliedAt: Date;
   status: ApplicationStatus;
   statusUpdatedAt: Date;
-  /** Accumulated pipeline notes — see ApplicationService.updateStatus. */
-  statusComment: string | null;
+  /** The append-only timeline, oldest first (ADR-0028). */
+  comments: ApplicationComment[];
   salaryInListing: string | null;
   usedTailoredResume: boolean;
   userComment: string | null;

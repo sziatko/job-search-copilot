@@ -5,7 +5,7 @@ export class UpdateApplicationStatusDto {
   @IsEnum(ApplicationStatus)
   status!: ApplicationStatus;
 
-  /** Appended to the existing statusComment (joined with " / "), not overwritten. */
+  /** Added to the application's timeline as a new Comment row (ADR-0028). */
   @IsOptional()
   @IsString()
   statusComment?: string;

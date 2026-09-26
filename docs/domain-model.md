@@ -88,10 +88,10 @@ what the analyzer's row can't. See [ADR-0017](decisions/0017-application-1to1-de
 | `appliedAt` | `DateTime @default(now())` | The real submission date — distinct from `EstimatedVacancy.createdAt` (date analysed). The tracker import backfills historical values here; the REST API has no `appliedAt` field. |
 | `status` | `ApplicationStatus` enum, default `APPLIED` | `APPLIED` \| `RECRUITER_SCREEN` \| `REPLIED` \| `INTERVIEW` \| `OFFER` \| `REJECTED`. A separate axis from `UserAction` — [ADR-0018](decisions/0018-application-status-separate-enum.md). The former `NO_RESPONSE` value was dropped — [ADR-0022](decisions/0022-timeout-derived-until-scheduled.md). |
 | `statusUpdatedAt` | `DateTime` **NOT NULL** | "When I last moved this in the pipeline". `record()` stamps it to `appliedAt` — a fresh application has already moved once, into the pipeline — and `updateStatus()` restamps it to `new Date()`. Never null: the column has no default, so Prisma makes it *required* in `create`, and a new creation path that forgets it fails to compile rather than silently writing null. (Unlike `EstimatedVacancy.userActionUpdatedAt`, which is still nullable.) |
-| `statusComment` | `String? @db.Text` | Accumulated pipeline notes. Each `updateStatus()` call with a comment **appends** it to the existing value joined by `" / "` — not a history table, not an overwrite. Write-only via MCP (`update_application_status`) / API (`PATCH …/status`); the web `/tracker` page renders it merged with `userComment` and `estimationComment` but never writes it. Deliberately the simplest thing that works — revisit as a real history table if per-entry timestamps/authors are ever needed. |
+| `comments` | `Comment[]` | The append-only timeline, oldest first — see [`Comment`](#comment) below. Replaced the single `statusComment` text column (notes joined with `" / "`), which the migration split into rows ([ADR-0028](decisions/0028-comment-table.md)). |
 | `salaryInListing` | `String?` | Free text ("130 PLN/h"). |
 | `usedTailoredResume` | `Boolean @default(false)` | |
-| `userComment` | `String? @db.Text` | The user's own note about this application. |
+| `userComment` | `String? @db.Text` | The user's own note about this application — one editable field, written by the apply modal. Not a comment row: it is "the note", comments are "what happened since". |
 
 Indexes: `@@index([status])`, `@@index([appliedAt])`. Search on `/tracker` hits the
 linked vacancy's `company` / `title` — both have trigram GIN indexes.
@@ -135,6 +135,39 @@ match, or a matched vacancy with no recorded application yet, both return `null`
 > - Adding a field the `/tracker` page needs from the vacancy → `VACANCY_SELECT` +
 >   `flatten()` in `application.service.ts` **and** `applicationListItemSchema` in
 >   the web contract (parallel maintenance — [ADR-0012](decisions/0012-web-hand-written-contract.md)).
+
+## `Comment`
+
+One timeline note on an `Application` — [ADR-0028](decisions/0028-comment-table.md).
+**Append-only**: no surface edits or deletes one.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `Int` autoincrement | Primary key; the tie-break for notes that share a `createdAt` (the migrated ones do). |
+| `createdAt` | `DateTime @default(now())` | When the note was written. Migrated notes carry their application's `statusUpdatedAt` — the only date there was. |
+| `body` | `String @db.Text` | Trimmed; a blank note is never stored. |
+| `applicationId` | `Int` | FK to `Application`, `onDelete: Cascade`. `@@index([applicationId, createdAt])`. |
+
+Written by `updateStatus()` when a status move carries a note. Named `Comment`, not
+`ApplicationComment`, so comments on vacancies can join later as a second nullable FK.
+
+## `VacancyLogEntry`
+
+Every posting seen before analysis, the dedup log —
+[ADR-0026](decisions/0026-vacancy-log-table.md). Not a vacancy: most rows were
+screened out on the title and never analysed, and none carries text, score or verdict.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `createdAt` | `DateTime` | When the posting was first seen (the import sets it from the file's Дата). |
+| `url` | `String @unique` | **Required**, `normalizeApplyUrl`'d. An entry without an http(s) link is not checkable. |
+| `company` / `title` | `String?` | Can be missing; a later duplicate that carries them fills them in. |
+| `companyKey` / `titleKey` | `String?` | Match keys: lowercase, punctuation collapsed, company legal suffixes stripped. `@@index([companyKey, titleKey])`. |
+
+Written **only** by `VacancyLogService` (`check` / `checkMany`): match by `url`, else
+by the keys; a miss is recorded and reported as new, a hit is a duplicate — nothing
+else is reported. Every analysed vacancy is expected to be here already: the agent
+checks before it analyses, and the one-off import seeded the rest.
 
 ## Analyze-once
 

@@ -186,5 +186,7 @@ Both write paths already called this function before the dedup lookup
 ## Related
 
 - [ADR-0005](0005-analyze-once.md) — the invariant this key carries.
+- [ADR-0027](0027-linkedin-site-rule.md) — a second site rule, LinkedIn, which *does* merge
+  locale hosts (unlike Indeed above) and owns the path as well as the query.
 - [`docs/domain-model.md`](../domain-model.md) — the `applyUrl` field.
 - [`docs/contracts.md`](../contracts.md) — the value every read surface returns.

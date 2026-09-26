@@ -34,7 +34,9 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0023](0023-canonical-applyurl.md) | `applyUrl` is stored canonicalized, with the query string dropped except where a site rule defines it | Accepted |
 | [0024](0024-web-shell-and-theme.md) | The web app shell: a three-state theme, a dashboard at `/`, two placeholder routes | Accepted |
 | [0025](0025-vacancies-list-search-server-side.md) | The vacancies list: server-side search, a derived company count, and what stays out of the list item | Accepted |
-
+| [0026](0026-vacancy-log-table.md) | The vacancy log is its own table, and answers only "new or duplicate" | Accepted |
+| [0027](0027-linkedin-site-rule.md) | LinkedIn site rule: one key per job id, locale host merged | Accepted |
+| [0028](0028-comment-table.md) | Application comments are rows in a `Comment` table, replacing `statusComment` | Accepted |
 ## Template
 
 ```markdown

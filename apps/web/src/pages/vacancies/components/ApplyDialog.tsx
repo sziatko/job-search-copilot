@@ -7,20 +7,28 @@ export interface ApplyDetails {
   comment: string;
 }
 
+/** Opened from /vacancies to record an application, and from /tracker, pre-filled
+ * with `initial`, to edit one. */
 export function ApplyDialog({
   company,
   title,
+  heading = 'Mark as applied',
+  initial,
   onCancel,
   onConfirm,
 }: {
   company: string;
   title: string;
+  heading?: string;
+  initial?: ApplyDetails;
   onCancel: () => void;
   onConfirm: (details: ApplyDetails) => void;
 }) {
-  const [salary, setSalary] = useState('');
-  const [usedTailoredResume, setUsedTailoredResume] = useState(false);
-  const [comment, setComment] = useState('');
+  const [salary, setSalary] = useState(initial?.salary ?? '');
+  const [usedTailoredResume, setUsedTailoredResume] = useState(
+    initial?.usedTailoredResume ?? false,
+  );
+  const [comment, setComment] = useState(initial?.comment ?? '');
   const salaryId = useId();
   const commentId = useId();
   const titleId = useId();
@@ -41,7 +49,7 @@ export function ApplyDialog({
     <Modal onClose={onCancel} labelledBy={titleId} maxWidthClassName="max-w-md">
       <form onSubmit={handleSubmit}>
         <h2 id={titleId} className="dialog-title">
-          Mark as applied
+          {heading}
         </h2>
         <p className="dialog-sub">
           {title} — {company}
