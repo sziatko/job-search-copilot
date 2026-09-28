@@ -1,10 +1,14 @@
 import { useId } from 'react';
 import { Select, type SelectOption } from '@/components/ui/Select';
-import { USER_ACTION_LABELS } from '../constants';
+import { STATUS_LABELS } from '../constants';
 import { STATUS_FILTER_ALL, type StatusFilterValue, statusFilterValues } from '../types';
 
+// Applied stands for the whole pipeline, as in the filter itself.
 const LABELS: Record<StatusFilterValue, string> = {
-  ...USER_ACTION_LABELS,
+  NOT_REVIEWED: STATUS_LABELS.NOT_REVIEWED,
+  SAVED_FOR_LATER: STATUS_LABELS.SAVED_FOR_LATER,
+  DECLINED: STATUS_LABELS.DECLINED,
+  APPLIED: STATUS_LABELS.APPLIED,
   [STATUS_FILTER_ALL]: 'All',
 };
 

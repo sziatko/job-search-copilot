@@ -4,11 +4,11 @@ The surfaces other code — inside this repo and outside it — depends on. Chan
 of these and the "breaks if" note tells you who to update.
 
 Source of truth:
-[`apps/api/src/estimated-vacancies/estimated-vacancies.controller.ts`](../apps/api/src/estimated-vacancies/estimated-vacancies.controller.ts),
+[`apps/api/src/vacancies/vacancies.controller.ts`](../apps/api/src/vacancies/vacancies.controller.ts),
 [`apps/api/src/applications/applications.controller.ts`](../apps/api/src/applications/applications.controller.ts),
-[`apps/api/src/vacancy-log/vacancy-log.controller.ts`](../apps/api/src/vacancy-log/vacancy-log.controller.ts),
+[`apps/api/src/log/log.controller.ts`](../apps/api/src/log/log.controller.ts),
 [`apps/api/src/setup-app.ts`](../apps/api/src/setup-app.ts),
-[`apps/mcp/src/estimated-vacancies/estimated-vacancies.tools.ts`](../apps/mcp/src/estimated-vacancies/estimated-vacancies.tools.ts),
+[`apps/mcp/src/vacancies/vacancies.tools.ts`](../apps/mcp/src/vacancies/vacancies.tools.ts),
 [`apps/mcp/src/applications/applications.tools.ts`](../apps/mcp/src/applications/applications.tools.ts),
 [`apps/mcp/src/vacancy-log/vacancy-log.tools.ts`](../apps/mcp/src/vacancy-log/vacancy-log.tools.ts),
 [`apps/web/src/pages/vacancies/types.ts`](../apps/web/src/pages/vacancies/types.ts),
@@ -24,21 +24,20 @@ fields are stripped; type coercion is on.
 | Method + path | Body / query | Success | Errors |
 | --- | --- | --- | --- |
 | `GET /health` | — | `200 { status: 'ok', db: 'up' }` | `503 { status: 'error', db: 'down' }` if `SELECT 1` fails |
-| `POST /api/v1/estimated-vacancies` | `SaveEstimatedVacancyDto` (below) | `201` + `Location: /api/v1/estimated-vacancies/{id}` when created; `200` when `applyUrl` already exists. Body = the full `EstimatedVacancy` (incl. `fullText`) either way. | `400` DTO validation; `422` `DomainError` (see below) |
-| `GET /api/v1/estimated-vacancies` | query: `recommendation?` (enum, EN), `userAction?` (enum), `company?` (string, ILIKE contains — `%`/`_`/`\` are literal), `search?` (string — `company` **OR** `title`, ILIKE, same escaping), `limit?` (1–100, default 20 in core), `offset?` (≥0) | `200 { items: EstimatedVacancyListItem[], total: number }` — **items omit `fullText`** and carry the derived `companyMatchCount` and `hasAnalysis` | `400` bad query (e.g. `limit=200`) |
-| `GET /api/v1/estimated-vacancies/:id` | — | `200` full `EstimatedVacancy` (incl. `fullText`) | `404` unknown id; `400` non-integer id (`ParseIntPipe`) |
-| `PATCH /api/v1/estimated-vacancies/:id/user-action` | `{ userAction: UserAction }` | `200` full `EstimatedVacancy` | `404` unknown id; `400` bad `userAction` |
-| `POST /api/v1/applications` | `RecordApplicationDto`: `estimatedVacancyId` (`@IsInt @Min(1)`, **required**), `salaryInListing?`, `userComment?` (`@IsString`), `usedTailoredResume?` (`@IsBoolean`), `status?` (`@IsEnum(ApplicationStatus)`). No `appliedAt` — server uses `now()`. | **always `201`** + `Location: /api/v1/applications/{id}`. Body = `{ application: ApplicationListItem, resolution: 'linked-by-id' \| 'linked-existing' \| 'created-vacancy', vacancyCreated: boolean }`. | `400` DTO; `422` `InvalidApplicationInputError` (unknown id) / `ApplicationAlreadyExistsError` (that vacancy already has one) |
-| `GET /api/v1/applications` | query: `status?` (enum), `search?` (string — vacancy `company` OR `title`, ILIKE), `limit?` (1–500, default 50 in core), `offset?` (≥0) | `200 { items: ApplicationListItem[], total: number }` — each item is the `Application` fields (with `comments: { id, createdAt, body }[]`, oldest first) **flattened with** `company` / `title` / `applyUrl` / `matchScore` / `recommendation` / `estimationComment` from the linked vacancy | `400` bad query (e.g. `limit=1000`) |
-| `GET /api/v1/applications/:id` | — | `200` `ApplicationListItem` | `404` unknown id; `400` non-integer id |
-| `PATCH /api/v1/applications/:id/status` | `{ status: ApplicationStatus, statusComment?: string }` — `statusComment` becomes a new dated row in the application's `comments` (append-only, [ADR-0028](decisions/0028-comment-table.md)) | `200` `ApplicationListItem` | `404` unknown id; `400` bad `status` |
-| `PATCH /api/v1/applications/:id` | `UpdateApplicationDto`: `salaryInListing?`, `userComment?` (`@IsString`, `null` or blank clears), `usedTailoredResume?` (`@IsBoolean`) — a field left out is untouched; anything else (e.g. `status`) is stripped | `200` `ApplicationListItem` | `404` unknown id; `400` DTO |
-| `POST /api/v1/applications/:id/comments` | `AddCommentDto`: `{ body }` (`@IsString`, `@Matches(/\S/)`) — appended to the timeline, status untouched ([ADR-0028](decisions/0028-comment-table.md)) | `201` `ApplicationListItem` (the whole application, new comment last — the web swaps its row for it) | `404` unknown id; `400` blank / missing `body` |
-| `POST /api/v1/vacancy-log/check` | `CheckVacancyLogDto`: `{ entries: VacancyLogEntryDto[] }` (1–100, `@ValidateNested`), each `url?` / `company?` / `title?` (`@IsString`, raw — normalized in core) | **`200`** `{ new: string[] }` — the url of each new entry **exactly as sent**; those are now recorded, every other entry was a duplicate. An entry without an http(s) url is skipped ([ADR-0026](decisions/0026-vacancy-log-table.md)) | `400` DTO (empty / oversized / non-string) |
+| `POST /api/v1/vacancies` | `SaveVacancyDto` (below) | `201` + `Location: /api/v1/vacancies/{id}` when created; `200` when `applyUrl` already exists. Body = the full `Vacancy` row (incl. `fullText`) either way — without `estimationComment`, which is a `Comment` row now; `GET /:id` returns it. | `400` DTO validation; `422` `DomainError` (see below) |
+| `GET /api/v1/vacancies` | query: `recommendation?` (enum, EN), `status?` (`A,B` — any of them, each `@IsEnum(VacancyStatus)`), `company?` (string, ILIKE contains — `%`/`_`/`\` are literal), `search?` (string — `company` **OR** `title`, ILIKE, same escaping), `limit?` (1–100, default 20 in core), `offset?` (≥0) | `200 { items: VacancyListItem[], total: number }` — **items omit `fullText`** and carry the derived `companyMatchCount` and `hasAnalysis` | `400` bad query (e.g. `limit=200`) |
+| `GET /api/v1/vacancies/:id` | — | `200` full `Vacancy` (incl. `fullText`, `status`, `statusChangedAt`, salary / CV) plus `comments` (every one, oldest first) and `estimationComment: string \| null`, the first `ANALYZER` comment | `404` unknown id; `400` non-integer id (`ParseIntPipe`) |
+| `PATCH /api/v1/vacancies/:id/status` | `{ status: VacancyStatus }` — any status; every call is journaled and moves `statusChangedAt`, the same status included | `200` as `GET /:id` — the web parses it with its list-item schema | `404` unknown id; `400` bad `status` |
+| `POST /api/v1/applications` | `RecordApplicationDto`: `vacancyId` (`@IsInt @Min(1)`, **required**), `salaryInListing?`, `comment?` (`@IsString`; added as a `USER` comment), `usedTailoredResume?` (`@IsBoolean`), `status?` (`@IsIn(PIPELINE_STATUSES)` — recorded further along; `APPLIED` is journaled first). No `appliedAt` — server uses `now()`. | **always `201`** + `Location: /api/v1/applications/{id}` — the vacancy's id. Body = `{ application: ApplicationListItem, resolution: 'linked-by-id' \| 'linked-existing' \| 'created-vacancy', vacancyCreated: boolean }`. | `400` DTO; `422` `InvalidApplicationInputError` (unknown id) / `AlreadyAppliedError` (that vacancy is already in the pipeline) |
+| `GET /api/v1/applications` | query: `status?` (one pipeline status, `@IsIn(PIPELINE_STATUSES)`), `search?` (string — `company` OR `title`, ILIKE), `limit?` (1–500, default 50 in core), `offset?` (≥0) | `200 { items: ApplicationListItem[], total: number }` — the vacancies in the pipeline, `statusChangedAt desc, id desc`. Each item: `id` (the vacancy's), `status`, `statusChangedAt`, `appliedAt` (the latest `APPLIED` journal row; `null` if none), `salaryInListing`, `usedTailoredResume`, `company` / `title` / `applyUrl` / `matchScore` / `recommendation`, and `comments: { id, createdAt, body, source }[]`, oldest first, the `ANALYZER` one included | `400` bad query (e.g. `limit=1000`, a triage `status`) |
+| `GET /api/v1/applications/:id` | — | `200` `ApplicationListItem` | `404` unknown id or not in the pipeline; `400` non-integer id |
+| `PATCH /api/v1/applications/:id/status` | `{ status: VacancyStatus, comment?: string }` — any status (the UI offers the pipeline); every call is journaled and moves `statusChangedAt`, the same status included. A non-blank `comment` becomes a new dated `USER` row in `comments` (append-only) | `200` `ApplicationListItem` | `404` unknown id; `400` bad `status` |
+| `PATCH /api/v1/applications/:id` | `UpdateApplicationDto`: `salaryInListing?` (`@IsString`, `null` or blank clears), `usedTailoredResume?` (`@IsBoolean`), `comment?` (`@IsString`; a non-blank one is added as a `USER` comment, it edits none) — a field left out is untouched; anything else (e.g. `status`) is stripped | `200` `ApplicationListItem` | `404` unknown id; `400` DTO |
+| `POST /api/v1/log/check` | `CheckLogDto`: `{ entries: LogEntryDto[] }` (1–100, `@ValidateNested`), each `url?` / `company?` / `title?` (`@IsString`, raw — normalized in core) | **`200`** `{ new: string[] }` — the url of each new entry **exactly as sent**; those are now recorded, every other entry was a duplicate. An entry without an http(s) url is skipped ([ADR-0026](decisions/0026-vacancy-log-table.md)) | `400` DTO (empty / oversized / non-string) |
 
 The API exposes only `POST`'s by-id path; the by-`(company, title)` find-or-create
-path is MCP / import only. `resolution` rides in the JSON envelope (not a header) —
-the web needs it. See [ADR-0017](decisions/0017-application-1to1-delta.md) /
+path is MCP only. `resolution` rides in the JSON envelope (not a header); the web
+parses only `application`. See [ADR-0029](decisions/0029-one-vacancy-table.md) /
 [ADR-0019](decisions/0019-record-or-create-vacancy.md).
 
 The vacancies list's filter vocabulary differs by transport: `core`'s `list()`
@@ -48,8 +47,8 @@ wanting a title-only filter over HTTP needs a `title?` field on the DTO — and
 `whitelist: true` strips anything the DTO doesn't declare, so adding the param
 without the field is silently a no-op.
 
-**`SaveEstimatedVacancyDto`** — `company`, `title`, `applyUrl`, `fullText`,
-`estimationComment`: `@IsString @IsNotEmpty` (note: `applyUrl` is *not*
+**`SaveVacancyDto`** — `company`, `title`, `applyUrl`, `fullText`,
+`estimationComment` (stored as the vacancy's `ANALYZER` comment): `@IsString @IsNotEmpty` (note: `applyUrl` is *not*
 URL-validated at the API layer — `@IsString` is the whole check. Validation and
 canonicalization both happen in `core`, so no transport can skip them: the MCP
 zod schema's `z.url()` is a convenience, not the guard); `matchScore`:
@@ -67,30 +66,30 @@ any future `DomainError` that isn't pre-validated —
 `CORS_ORIGINS` → reflect any origin (dev). Set it before deploying.
 
 > **What this constrains — breaks if you change it**
-> - Changing `POST /vacancy-log/check`'s body or result → any n8n workflow calling
+> - Changing `POST /log/check`'s body or result → any n8n workflow calling
 >   it (not in this repo; this is n8n's only way in while MCP is stdio-only) and
->   `apps/api/test/vacancy-log.e2e.spec.ts`.
+>   `apps/api/test/log.e2e.spec.ts`.
 > - Renaming a path / changing the prefix or version → `apps/web/src/lib/api.ts`
 >   (`API_BASE`), both features' `api.ts`, the MSW handlers in
 >   `apps/web/src/test/msw/handlers.ts`, and the e2e URLs in
->   `apps/api/test/{estimated-vacancies,applications}.e2e.spec.ts`.
+>   `apps/api/test/{vacancies,applications}.e2e.spec.ts`.
 > - Changing `POST /applications`' envelope (`{ application, resolution, vacancyCreated }`)
 >   → `recordApplicationResponseSchema` in
 >   `apps/web/src/pages/applications/types.ts`, `useVacancies.ts`'s `applyMutation`,
 >   and `applications.e2e.spec.ts`.
 > - Changing a status code (e.g. POST back to always-201) → the e2e assertions and
 >   [ADR-0005](decisions/0005-analyze-once.md).
-> - Adding a field to the list-item shape → `EstimatedVacancyListItem` +
->   `LIST_SELECT` in `packages/core`, **and** `estimatedVacancyListItemSchema` in
+> - Adding a field to the list-item shape → `VacancyListItem` +
+>   `LIST_SELECT` in `packages/core`, **and** `vacancyListItemSchema` in
 >   the web contract (they are maintained by hand in parallel —
 >   [ADR-0012](decisions/0012-web-hand-written-contract.md)). Two traps: the field
 >   reaches **both** transports, because `list()` feeds `apps/api` and `apps/mcp`
 >   alike; and a field that is *derived* rather than a column must be `.optional()`
 >   in the web schema, because that same schema parses the
->   `PATCH .../user-action` response, which carries no derived fields
+>   `PATCH .../status` response, which carries no derived fields
 >   ([ADR-0025](decisions/0025-vacancies-list-search-server-side.md)). Both derived
 >   fields so far — `companyMatchCount`, `hasAnalysis` — go through one private
->   `withDerivedFields` in `estimated-vacancy.service.ts`; the MSW fake in
+>   `withDerivedFields` in `vacancy.service.ts`; the MSW fake in
 >   `apps/web/src/test/msw/handlers.ts` derives them the same way, so a fixture
 >   cannot hand-set a value the endpoint would not produce.
 > - Moving `/health` under the version prefix → the `docker-compose.yml` `api`
@@ -104,26 +103,31 @@ any future `DomainError` that isn't pre-validated —
 
 ## MCP tools
 
-Eleven tools, registered in `createServer()` — each domain owns its own
+Ten tools, registered in `createServer()` — each domain owns its own
 `<feature>/*.tools.ts` + `*.schemas.ts`, and `server.ts` stays composition-only
 ([ADR-0010](decisions/0010-mcp-server-factory.md)). All inputs are `zod` schemas; all
-success outputs are `JSON.stringify(result, null, 2)` as a single text block. The
+success outputs are `JSON.stringify(result, null, 2)` as a single text block. The rules
+that span tools (the order of the workflow, the status model, what `id` means) go to the
+client on connect as the server's `instructions` (`SERVER_INSTRUCTIONS` in
+[`server.ts`](../apps/mcp/src/server.ts)); a tool's own rules are in its description and
+field `.describe()`s. Claude Desktop drops `instructions` (the server does send them), so
+each of those rules is also said in a tool description — descriptions are the copy every
+client shows. The
 record/save/update tools return only a minimal confirmation (see Output column) — they never echo
 back the large text the caller just sent (`fullText`, `estimationComment`,
-`userComment`, `statusComment`); read the full record back with `get_estimated_vacancy`
-/ `list_estimated_vacancies` / `list_applications`.
+`comment`); read the full record back with `get_vacancy`
+/ `list_vacancies` / `list_applications`.
 
 | Tool | Input | Output | Not-found / error |
 | --- | --- | --- | --- |
-| `save_estimated_vacancy` | `company, title, applyUrl` (`.url()`), `fullText`, `matchScore` (int 0–100), `recommendation` (EN + UA), `estimationComment` | `{ success: boolean, vacancy: { id, company, title } }` — `success` is `false` when an existing `applyUrl` caused the analysis to be dropped | `DomainError` → `{ isError: true, content: [message] }` |
-| `save_estimated_vacancies_batch` | `{ vacancies: [...] }` — array (1–100) of the same shape as `save_estimated_vacancy`'s input | `[{ success, vacancy: { id, company, title } }, ...]`, one entry per input, same order and same per-item shape as `save_estimated_vacancy` — not transactional, so one item's dedup/skip doesn't affect the others | array size outside 1–100 → schema-validation error; `DomainError` → `{ isError: true, content: [message] }` |
-| `get_estimated_vacancy` | `{ id: int }` | the full `EstimatedVacancy` | unknown id → `{ isError: true, content: ["EstimatedVacancy <id> not found"] }` |
-| `list_estimated_vacancies` | `recommendation?` (EN only), `userAction?`, `company?`, `title?` (both ILIKE `%term%`, case-insensitive), `limit?` (1–100), `offset?` (≥0) | `{ items, total }` — no `fullText`; each item also carries `companyMatchCount` (derived, see the list-item note under the REST table) | — |
-| `update_estimated_vacancy_user_action` | `{ id: int, userAction }` | `{ success: true, vacancy: { id } }` | unknown id → `isError` result |
-| `record_application` | `company`, `title` (required), `applyUrl?` (`.url()`), `matchScore?` (int 0–100), `estimationComment?`, `salaryInListing?`, `usedTailoredResume?`, `userComment?`, `status?` | `{ success: true, application: { id, company, title } }` — find-or-creates the vacancy, marks it APPLIED; use `list_estimated_vacancies`/`list_applications` to see `resolution`-equivalent state | `DomainError` (blank input / ambiguous match / already recorded) → `{ isError: true, content: [message] }` |
+| `save_vacancy` | `company, title, applyUrl` (`.url()`), `fullText`, `matchScore` (int 0–100), `recommendation` (EN + UA), `estimationComment` | `{ success: boolean, vacancy: { id, company, title } }` — `success` is `false` when an existing `applyUrl` caused the analysis to be dropped | `DomainError` → `{ isError: true, content: [message] }` |
+| `save_vacancies_batch` | `{ vacancies: [...] }` — array (1–100) of the same shape as `save_vacancy`'s input | `[{ success, vacancy: { id, company, title } }, ...]`, one entry per input, same order and same per-item shape as `save_vacancy` — not transactional, so one item's dedup/skip doesn't affect the others | array size outside 1–100 → schema-validation error; `DomainError` → `{ isError: true, content: [message] }` |
+| `get_vacancy` | `{ id: int }` | the full `Vacancy`, with `status`, `comments` and `estimationComment` | unknown id → `{ isError: true, content: ["Vacancy <id> not found"] }` |
+| `list_vacancies` | `recommendation?` (EN only), `status?` (an array — any of them), `applyUrl?` (exact after normalization), `company?`, `title?` (both ILIKE `%term%`, case-insensitive), `limit?` (1–100), `offset?` (≥0) | `{ items, total }` — no `fullText`; each item also carries `companyMatchCount` (derived, see the list-item note under the REST table) | — |
+| `record_application` | `vacancyId`, or `company` + `title` — exactly one of the two, `applyUrl?` (`.url()`), `matchScore?` (int 0–100), `estimationComment?` (the `ANALYZER` comment of a vacancy it creates), `salaryInListing?`, `usedTailoredResume?`, `comment?` (a `USER` comment), `status?` | `{ success: true, application: { id, company, title } }` — `id` is the vacancy's; find-or-creates the vacancy and moves it to APPLIED (then `status?`, a pipeline stage); use `list_vacancies`/`list_applications` to see `resolution`-equivalent state | `DomainError` (blank input / ambiguous match / already in the pipeline) → `{ isError: true, content: [message] }` |
 | `record_applications_batch` | `{ applications: [...] }` — array (1–100) of the same shape as `record_application`'s input | `[{ success: true, application: { id, company, title } }, ...]`, one entry per input, same order and same per-item shape as `record_application` — **transactional**: runs in one `$transaction` (`ApplicationService.recordMany`), so one failing item rolls back the whole batch | array size outside 1–100 → schema-validation error; `DomainError` on any item → `{ isError: true, content: [message] }`, nothing persisted |
-| `list_applications` | `status?`, `search?` (linked vacancy's company OR title), `company?`, `title?` (each independent — given with `search` and/or each other, they AND, not OR; all three ILIKE `%term%`, case-insensitive), `limit?` (1–500), `offset?` (≥0) | `{ items: ApplicationListItem[], total }` (flattened join) | — |
-| `update_application_status` | `{ id?: int, company?: string, title?: string, status, statusComment?: string }` — exactly one of `id` or `(company, title)` (case-insensitive match against the linked vacancy); `statusComment` becomes a new dated comment on the application, earlier ones untouched | `{ success: true, application: { id, company, title } }` — use `list_applications` to see the resulting `status` / `comments` | neither/both id-vs-company+title given, unknown id, unmatched `(company, title)`, or a matched vacancy with no recorded application → `isError` "not found"; 2+ vacancies matching `(company, title)` → `isError` listing candidate ids |
+| `list_applications` | `status?` (one pipeline status), `applyUrl?` (exact after normalization — an email's posting link), `search?` (company OR title), `company?`, `title?` (each independent — given with `search` and/or each other, they AND, not OR; all three ILIKE `%term%`, case-insensitive), `limit?` (1–500), `offset?` (≥0) | `{ items: ApplicationListItem[], total }` — the pipeline, last move first; `id` is the vacancy's | — |
+| `update_vacancy_status` | `{ id?: int, company?: string, title?: string, status, comment?: string }` — any `VacancyStatus`; exactly one of `id` or `(company, title)` (case-insensitive match, among the vacancies already in the pipeline only); every call is an event, the same status included — once per real event; `comment` becomes a new dated `AGENT` comment, earlier ones untouched | `{ success: true, vacancy: { id, company, title } }` — use `get_vacancy` / `list_applications` to see the resulting `status` / `comments` | neither id nor company+title given, unknown id, or unmatched `(company, title)` (a vacancy never applied to included) → `isError` "not found"; 2+ applied vacancies matching `(company, title)` → `isError` listing candidate ids |
 | `check_vacancy_log` | `url` (required, raw string — not `.url()`, core decides what is usable), `company?`, `title?` | `{ new: boolean }` — a new posting is **recorded** by the same call ([ADR-0026](decisions/0026-vacancy-log-table.md)) | missing or non-http(s) url → `InvalidVacancyLogEntryError` → `isError` |
 | `check_vacancy_log_batch` | `{ entries: [...] }` — array (1–100) of `{ url?, company?, title? }` | `{ new: string[] }` — the url of each new entry exactly as sent, recorded by this call; **transactional**, in order, so a posting twice in one call is new only once. Entries without an http(s) url are skipped | array size outside 1–100 → schema-validation error |
 
@@ -131,7 +135,7 @@ back the large text the caller just sent (`fullText`, `estimationComment`,
 (`console.error` in `apps/mcp/src/index.ts`).
 
 > **What this constrains — breaks if you change it**
-> - Changing `save_estimated_vacancy`'s output shape → the external
+> - Changing `save_vacancy`'s output shape → the external
 >   vacancy-match-analyzer prompt (not in this repo) reads `success` (renamed from
 >   `created`) — update it there if you change this again — and
 >   `apps/mcp/src/server.spec.ts` (which destructures `{ success, vacancy }`).
@@ -155,9 +159,7 @@ as strings.
 
 These files are deliberately **not** generated from `core` and do **not** import it
 — [ADR-0012](decisions/0012-web-hand-written-contract.md). It is the one place the
-parallel maintenance is accepted. Note `pages/applications/types.ts` carries a
-third hand-written copy of the `recommendation` enum (the analyzer verdict shown in
-the tracker's Score/Comment columns).
+parallel maintenance is accepted.
 
 > **Breaks if you change it:** the API changes shape but this schema doesn't →
 > `parseResponse` throws and the dashboard shows "the server returned data in an

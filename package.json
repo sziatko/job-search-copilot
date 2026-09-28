@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
+    "dotenv-cli": "^11.0.0",
     "vitest": "^5.0.0"
   }
 }

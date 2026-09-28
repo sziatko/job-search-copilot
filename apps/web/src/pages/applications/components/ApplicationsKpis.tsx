@@ -28,7 +28,7 @@ const ALWAYS: ApplicationStatus[] = ['APPLIED', 'REJECTED'];
  * derived pair is what the 30-day timeout rule surfaces, so dropping them would
  * hide the only place a stalled application is visible at a glance.
  */
-export function TrackerKpis({
+export function ApplicationsKpis({
   stats,
   filter,
   onFilterChange,

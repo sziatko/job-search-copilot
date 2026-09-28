@@ -89,7 +89,6 @@
   .sidebar.collapsed .brand-text,
   .sidebar.collapsed .nav-label,
   .sidebar.collapsed .nav-text,
-  .sidebar.collapsed .nav-count,
   .sidebar.collapsed .soon-pill,
   .sidebar.collapsed .foot-text,
   .sidebar.collapsed .rail-toggle .rail-toggle-text {
@@ -124,9 +123,6 @@
   .brand-name {
     @apply text-[15px] font-extrabold leading-[1.15] tracking-[-0.01em];
   }
-  .brand-sub {
-    @apply text-[11px] text-ink-muted;
-  }
 
   .nav {
     @apply flex flex-col gap-[2px];
@@ -148,13 +144,6 @@
   }
   .nav-item.active svg {
     opacity: 1;
-  }
-  .nav-count {
-    @apply ml-auto rounded-[6px] bg-surface-sunken px-[6px] py-[1px] font-mono text-[11px] text-ink-faint;
-  }
-  .nav-item.active .nav-count {
-    @apply text-accent-ink;
-    background: #fff2;
   }
   .nav-item.disabled {
     @apply cursor-default opacity-55;
@@ -217,9 +206,6 @@
   }
   .menu-toggle {
     @apply hidden h-[34px] w-[34px] flex-none cursor-pointer items-center justify-center rounded-[8px] border border-border bg-surface text-ink-soft;
-  }
-  .topbar-meta {
-    @apply whitespace-nowrap text-right text-[11.5px] text-ink-faint;
   }
 
   .view {
@@ -609,9 +595,6 @@
   .btn-danger:hover {
     @apply bg-bad-ink;
   }
-  .btn-sm {
-    @apply px-[9px] py-[4px] text-[12px];
-  }
 
   /* The closed state of any popover. The UA stylesheet's own
      `[popover]:not(:popover-open) { display: none }` is a *user-agent* rule and is
@@ -666,7 +649,6 @@
     .sidebar.collapsed .brand-text,
     .sidebar.collapsed .nav-label,
     .sidebar.collapsed .nav-text,
-    .sidebar.collapsed .nav-count,
     .sidebar.collapsed .soon-pill,
     .sidebar.collapsed .foot-text,
     .sidebar.collapsed .rail-toggle-text {

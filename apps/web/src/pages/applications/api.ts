@@ -33,11 +33,15 @@ const MAX_PAGES = 200;
  * The tracker filters, sorts and counts client-side, so a truncated log is not
  * "less data" — it is wrong answers: the footer's count and the status filter
  * both ignore whatever the cap cut. And what the cap cuts is the *oldest* rows,
- * because the server orders `appliedAt desc` — exactly the history the
+ * because the server orders `statusChangedAt desc` — exactly the history the
  * company-history modal answers for.
  *
+ * ponytail: offset paging over an order that every status write changes — a write
+ * during a multi-page load shifts the windows and can skip a row. One page (≤500
+ * rows) today; deferred in `docs/backlog.md` (infinite loading).
+ *
  * ponytail: N serial round-trips instead of one. The server-side filter/sort/count
- * that would replace this is the deferred item in `docs/phases/phase-2.2.md`; at
+ * that would replace this is the same backlog item; at
  * ~300 rows this is one request.
  */
 export async function listApplications(): Promise<ApplicationPage> {
@@ -115,31 +119,17 @@ export async function updateApplicationStatus(
   return parseResponse(applicationListItemSchema, await res.json(), 'Update application');
 }
 
-/** PATCH or POST against one application, parsed back into the row that replaces it. */
-async function sendForRow(
-  path: string,
-  method: 'PATCH' | 'POST',
-  body: unknown,
-  label: string,
-): Promise<ApplicationListItem> {
-  const res = await fetch(`${API_BASE}/applications/${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw await errorMessage(res, `${label} failed: HTTP ${res.status}`);
-  }
-  return parseResponse(applicationListItemSchema, await res.json(), label);
-}
-
-export function updateApplication(
+export async function updateApplication(
   id: number,
   input: UpdateApplicationInput,
 ): Promise<ApplicationListItem> {
-  return sendForRow(`${id}`, 'PATCH', input, 'Edit application');
-}
-
-export function addApplicationComment(id: number, body: string): Promise<ApplicationListItem> {
-  return sendForRow(`${id}/comments`, 'POST', { body }, 'Add comment');
+  const res = await fetch(`${API_BASE}/applications/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    throw await errorMessage(res, `Edit application failed: HTTP ${res.status}`);
+  }
+  return parseResponse(applicationListItemSchema, await res.json(), 'Edit application');
 }

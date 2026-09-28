@@ -34,7 +34,7 @@ tool, one config:
   is a single dependency and does lint + format + import-sort together.
 - **No override, `useImportType` on everywhere** — **this actively broke the app.**
   Biome's autofix converted `import { ConfigService }` /
-  `import { EstimatedVacancyService }` / the DTO imports to `import type {...}` in
+  `import { VacancyService }` / the DTO imports to `import type {...}` in
   `apps/api`, because within each file they're only referenced in type position.
   But NestJS DI and `class-validator` read those types as **runtime** metadata
   (`design:paramtypes` via `emitDecoratorMetadata`) — a `type`-only import is

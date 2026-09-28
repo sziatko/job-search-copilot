@@ -118,7 +118,7 @@ resolve to the same vacancy, an `applyUrl` collision). Not in CI, not re-run.
   sticky, and only the visible ~window of `<tr>`s is in the DOM (two spacer rows
   size the scrollbar). No backend change — client-side filter/search/sort/stats
   stay. Feels like infinite scroll; good to ~10k rows. Server-side paging stays
-  deferred (below).
+  deferred ([`../backlog.md`](../backlog.md)).
 - Test setup (`apps/web/src/test/setup.ts`) now stubs jsdom layout
   (`getBoundingClientRect`, `client/offset/scrollHeight`, a callback-invoking
   `ResizeObserver`) so a virtualized table renders rows under jsdom.
@@ -165,13 +165,7 @@ this doc says what became of the surfaces above.
 
 ## Deferred
 
-| Item | Why |
-| --- | --- |
-| **TanStack Form** | This phase's forms are trivial (4 fields, one `<select>`). Adopt at the first genuinely complex form. |
-| **Ambiguous-match resolution UI** | `AmbiguousVacancyMatchError` is currently just reported; a picker can come later. |
-| **`/tracker` server-side pagination / search / stats** | Row virtualization handles the DOM cost; the whole log still loads in one `limit=500` request. Revisit when the dataset is tens of thousands and one response is genuinely heavy. |
-| **`get_application` MCP tool** | Not needed yet — `list_applications` covers the read side. |
-| **`/log` and `/profile` pages** | Both are `SoonPage` placeholders (2026-09-19). `/log` needs an ingestion ledger that does not exist — nothing records that a posting was *seen*, deduped, or rejected before scoring, which is the same future work [ADR-0023](../decisions/0023-canonical-applyurl.md)'s Context names. `/profile` needs a candidate-profile store. |
+Moved to [`../backlog.md`](../backlog.md) (rows marked "phase 2").
 
 ## Explicitly decided *against*
 

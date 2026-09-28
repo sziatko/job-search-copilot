@@ -6,7 +6,7 @@
 ## Context
 
 Phase 2 shipped a router whose `/` was an index of two navigation cards
-([ADR-0020](0020-web-router-tanstack.md)) and exactly one real page, `/tracker`.
+([ADR-0020](0020-web-router-tanstack.md)) and exactly one real page, `/applications`.
 The app was then rebuilt against a UI mockup — `c38b14e`, 55 files, +3369/−561,
 with the mockup itself committed at
 [`docs/design/dashboard-reference_2.html`](../design/dashboard-reference_2.html).
@@ -29,7 +29,7 @@ between files that no compiler checks.
      removes the same key;
    - `apps/web/src/index.css` — `:root` is the OS media query, `data-theme="light"`
      blocks it with a `:not()` guard, `data-theme="dark"` overrides everything.
-2. **`/` is the dashboard.** The route set becomes `/`, `/vacancies`, `/tracker`,
+2. **`/` is the dashboard.** The route set becomes `/`, `/vacancies`, `/applications`,
    `/log`, `/profile`. The sidebar carries navigation; the landing page answers
    what the app is opened for.
 3. **`/log` and `/profile` are placeholders** rendering `SoonPage` — no backend
@@ -100,11 +100,11 @@ between files that no compiler checks.
 ## Related
 
 - [ADR-0020](0020-web-router-tanstack.md) — the router this amends. **Its route list
-  (`/`, `/vacancies`, `/tracker`) is now stale**; the decision it records still stands.
+  (`/`, `/vacancies`, `/applications`) is now stale**; the decision it records still stands.
 - [ADR-0011](0011-web-tanstack-query.md) — the data layer the dashboard reuses.
 - [ADR-0012](0012-web-hand-written-contract.md) — why the web declares its own API
   types instead of importing `core`.
-- [ADR-0022](0022-timeout-derived-until-scheduled.md) — owns `statusUpdatedAt`, which
-  the dashboard's activity feed sorts on.
+- [ADR-0022](0022-timeout-derived-until-scheduled.md) — owns `statusChangedAt` (the timeout clock),
+  which the dashboard's activity feed sorts on.
 - [`docs/design/README.md`](../design/README.md) — the mockup and what it does *not*
   decide (it is an artifact, not prose).

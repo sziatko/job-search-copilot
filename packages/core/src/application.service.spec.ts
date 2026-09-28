@@ -1,27 +1,50 @@
+import type { VacancyStatus } from '@prisma/client';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ApplicationService } from './application.service';
 import {
+  AlreadyAppliedError,
   AmbiguousVacancyMatchError,
-  ApplicationAlreadyExistsError,
   InvalidApplicationInputError,
 } from './errors';
-import { EstimatedVacancyService } from './estimated-vacancy.service';
 import { getPrisma } from './prisma-client';
+import { VacancyService } from './vacancy.service';
 
 // Integration tests against the real (test) Postgres — same rationale as
-// estimated-vacancy.service.spec.ts.
+// vacancy.service.spec.ts.
 const applications = new ApplicationService();
-const vacancies = new EstimatedVacancyService();
+const vacancies = new VacancyService();
+const prisma = getPrisma();
 
-const bodies = (item: { comments: { body: string }[] } | null) => item?.comments.map((c) => c.body);
+/** [source, body] per comment, in the order they came back. */
+const notes = (item: { comments: { source: string; body: string }[] } | null) =>
+  item?.comments.map((c) => [c.source, c.body]);
+
+/** The vacancy's status journal, oldest first. */
+async function journal(vacancyId: number) {
+  const rows = await prisma.statusChange.findMany({
+    where: { vacancyId },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  return rows.map((row) => row.status);
+}
+
+/** The cache agrees with the journal: status and date are its latest row's. */
+async function expectCacheInStep(vacancyId: number) {
+  const vacancy = await prisma.vacancy.findUniqueOrThrow({ where: { id: vacancyId } });
+  const latest = await prisma.statusChange.findFirstOrThrow({
+    where: { vacancyId },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  });
+  expect(vacancy.status).toBe(latest.status);
+  expect(vacancy.statusChangedAt).toEqual(latest.createdAt);
+}
+
+/** Every seeded vacancy was saved by the analyzer, so its comments start with this. */
+const ANALYZED = ['ANALYZER', 'Strong match.'];
 
 let urlSeq = 0;
 async function seedVacancy(
-  overrides: {
-    company?: string;
-    title?: string;
-    userAction?: 'NOT_REVIEWED' | 'READY_TO_APPLY' | 'APPLIED' | 'DECLINED';
-  } = {},
+  overrides: { company?: string; title?: string; status?: VacancyStatus } = {},
 ) {
   urlSeq += 1;
   const { vacancy } = await vacancies.save({
@@ -33,62 +56,84 @@ async function seedVacancy(
     recommendation: 'APPLY',
     estimationComment: 'Strong match.',
   });
-  if (overrides.userAction && overrides.userAction !== 'NOT_REVIEWED') {
-    await vacancies.updateUserAction(vacancy.id, overrides.userAction);
+  if (overrides.status) {
+    await vacancies.updateStatus(vacancy.id, overrides.status);
   }
   return vacancy;
 }
 
 describe('ApplicationService', () => {
   describe('record — by id (web path)', () => {
-    it('links to the vacancy and flips its userAction to APPLIED', async () => {
-      const vacancy = await seedVacancy({ userAction: 'READY_TO_APPLY' });
+    it('moves the vacancy to APPLIED and sets salary / CV / comment', async () => {
+      const vacancy = await seedVacancy({ status: 'SAVED_FOR_LATER' });
 
       const result = await applications.record({
-        estimatedVacancyId: vacancy.id,
+        vacancyId: vacancy.id,
         salaryInListing: '130 PLN/h',
         usedTailoredResume: true,
-        userComment: 'Adapted CV.',
+        comment: '  Adapted CV.  ',
       });
 
       expect(result.resolution).toBe('linked-by-id');
       expect(result.vacancyCreated).toBe(false);
-      expect(result.application.company).toBe('Acme');
-      expect(result.application.matchScore).toBe(80);
-      expect(result.application.salaryInListing).toBe('130 PLN/h');
-      expect(result.application.usedTailoredResume).toBe(true);
-      expect(result.application.userComment).toBe('Adapted CV.');
-      expect(result.application.status).toBe('APPLIED');
+      expect(result.application).toMatchObject({
+        id: vacancy.id,
+        company: 'Acme',
+        matchScore: 80,
+        salaryInListing: '130 PLN/h',
+        usedTailoredResume: true,
+        status: 'APPLIED',
+      });
+      expect(notes(result.application)).toEqual([ANALYZED, ['USER', 'Adapted CV.']]);
 
       const reread = await vacancies.getById(vacancy.id);
-      expect(reread?.userAction).toBe('APPLIED');
+      expect(reread?.status).toBe('APPLIED');
       expect(reread?.matchScore).toBe(80); // analyzer fields untouched
     });
 
-    it('stamps statusUpdatedAt to appliedAt on creation', async () => {
+    it('writes exactly one journal row, and appliedAt is its date', async () => {
       const vacancy = await seedVacancy();
-      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
-      // Same instant as appliedAt, not a separate "now" — a fresh application has
-      // already moved once (into the pipeline). Never null; the column is NOT NULL.
-      expect(application.statusUpdatedAt.getTime()).toBe(application.appliedAt.getTime());
+      const { application } = await applications.record({ vacancyId: vacancy.id });
+
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'APPLIED']);
+      await expectCacheInStep(vacancy.id);
+      expect(application.appliedAt).toEqual(application.statusChangedAt);
     });
 
     it('throws for an unknown vacancy id', async () => {
-      await expect(applications.record({ estimatedVacancyId: 999_999 })).rejects.toBeInstanceOf(
+      await expect(applications.record({ vacancyId: 999_999 })).rejects.toBeInstanceOf(
         InvalidApplicationInputError,
       );
     });
 
-    it('throws when the vacancy already has an application', async () => {
+    it('throws AlreadyAppliedError for a vacancy already in the pipeline', async () => {
       const vacancy = await seedVacancy();
-      await applications.record({ estimatedVacancyId: vacancy.id });
-      await expect(applications.record({ estimatedVacancyId: vacancy.id })).rejects.toBeInstanceOf(
-        ApplicationAlreadyExistsError,
+      await applications.record({ vacancyId: vacancy.id });
+      await applications.updateStatus(vacancy.id, 'REJECTED', undefined, 'USER');
+
+      await expect(applications.record({ vacancyId: vacancy.id })).rejects.toBeInstanceOf(
+        AlreadyAppliedError,
       );
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'APPLIED', 'REJECTED']);
+    });
+
+    it('applies again to a vacancy set back to triage', async () => {
+      const vacancy = await seedVacancy();
+      await applications.record({ vacancyId: vacancy.id });
+      await vacancies.updateStatus(vacancy.id, 'NOT_REVIEWED');
+
+      const { application } = await applications.record({ vacancyId: vacancy.id });
+      expect(application.status).toBe('APPLIED');
+      expect(await journal(vacancy.id)).toEqual([
+        'NOT_REVIEWED',
+        'APPLIED',
+        'NOT_REVIEWED',
+        'APPLIED',
+      ]);
     });
   });
 
-  describe('record — by (company, title) (MCP / import path)', () => {
+  describe('record — by (company, title) (MCP path)', () => {
     it('links to a unique case-insensitive match', async () => {
       const vacancy = await seedVacancy({ company: 'Acme', title: 'Backend Engineer' });
 
@@ -96,8 +141,8 @@ describe('ApplicationService', () => {
 
       expect(result.resolution).toBe('linked-existing');
       expect(result.vacancyCreated).toBe(false);
-      expect(result.application.estimatedVacancyId).toBe(vacancy.id);
-      expect((await vacancies.getById(vacancy.id))?.userAction).toBe('APPLIED');
+      expect(result.application.id).toBe(vacancy.id);
+      expect((await vacancies.getById(vacancy.id))?.status).toBe('APPLIED');
     });
 
     it('creates a placeholder vacancy when nothing matches', async () => {
@@ -106,7 +151,6 @@ describe('ApplicationService', () => {
         title: 'Staff Engineer',
         matchScore: 72,
         estimationComment: 'From tracker notes.',
-        appliedAt: new Date('2026-08-15'),
       });
 
       expect(result.resolution).toBe('created-vacancy');
@@ -114,11 +158,22 @@ describe('ApplicationService', () => {
       expect(result.application.matchScore).toBe(72);
       expect(result.application.recommendation).toBe('APPLY'); // derived from 72
       expect(result.application.applyUrl).toMatch(/^tracker:\/\//);
-      expect(result.application.estimationComment).toBe('From tracker notes.');
+      expect(notes(result.application)).toEqual([['ANALYZER', 'From tracker notes.']]);
 
-      const created = await vacancies.getById(result.application.estimatedVacancyId);
+      const created = await vacancies.getById(result.application.id);
       expect(created?.fullText).toBe('N/A');
-      expect(created?.userAction).toBe('APPLIED');
+      expect(created?.status).toBe('APPLIED');
+      expect(await journal(result.application.id)).toEqual(['NOT_REVIEWED', 'APPLIED']);
+      await expectCacheInStep(result.application.id);
+    });
+
+    it('writes no ANALYZER comment for a placeholder given none', async () => {
+      const result = await applications.record({
+        company: 'Silent Co',
+        title: 'Dev',
+        comment: ' ',
+      });
+      expect(result.application.comments).toEqual([]);
     });
 
     it('defaults matchScore to 0 and recommendation to APPLY when neither is given', async () => {
@@ -141,41 +196,60 @@ describe('ApplicationService', () => {
       );
     });
 
-    it('honours status and appliedAt overrides', async () => {
+    it('journals APPLIED before a status given further along, so appliedAt survives', async () => {
       const result = await applications.record({
         company: 'Status Co',
         title: 'Dev',
         status: 'REJECTED',
-        appliedAt: new Date('2026-07-01'),
       });
       expect(result.application.status).toBe('REJECTED');
-      expect(result.application.appliedAt.toISOString().slice(0, 10)).toBe('2026-07-01');
-      // The tracker-import path: a backdated row is stamped with its own submission
-      // date, not with today.
-      expect(result.application.statusUpdatedAt.getTime()).toBe(
-        result.application.appliedAt.getTime(),
-      );
+      expect(result.application.appliedAt).toEqual(result.application.statusChangedAt);
+      expect(await journal(result.application.id)).toEqual(['NOT_REVIEWED', 'APPLIED', 'REJECTED']);
+      await expectCacheInStep(result.application.id);
     });
   });
 
   describe('list', () => {
+    let acmeId: number;
+    let acmeUrl: string;
+
     beforeEach(async () => {
       const a = await seedVacancy({ company: 'Acme', title: 'Backend Engineer' });
       const b = await seedVacancy({ company: 'Beta Corp', title: 'Frontend Lead' });
-      await applications.record({ estimatedVacancyId: a.id, appliedAt: new Date('2026-08-01') });
-      await applications.record({
-        estimatedVacancyId: b.id,
-        status: 'REJECTED',
-        appliedAt: new Date('2026-08-10'),
-      });
+      acmeId = a.id;
+      acmeUrl = a.applyUrl;
+      await applications.record({ vacancyId: a.id });
+      await applications.record({ vacancyId: b.id, status: 'REJECTED' });
+      // Triage rows stay off /applications.
+      await seedVacancy({ company: 'Triage Co', status: 'SAVED_FOR_LATER' });
+      await seedVacancy({ company: 'Declined Co', status: 'DECLINED' });
     });
 
-    it('returns newest-first, flattened with the vacancy fields', async () => {
+    it('returns only pipeline rows, the last move first', async () => {
       const { items, total } = await applications.list();
       expect(total).toBe(2);
-      expect(items[0].company).toBe('Beta Corp');
-      expect(items[0].title).toBe('Frontend Lead');
-      expect(items[0]).not.toHaveProperty('estimatedVacancy');
+      expect(items.map((item) => item.company)).toEqual(['Beta Corp', 'Acme']);
+    });
+
+    it('moves a row to the top on a status write, not on a comment or an edit', async () => {
+      await applications.updateStatus(acmeId, 'INTERVIEW', undefined, 'USER');
+      expect((await applications.list()).items[0].company).toBe('Acme');
+
+      const beta = (await applications.list()).items[1];
+      await applications.update(beta.id, { comment: 'A note.', salaryInListing: '1' });
+      expect((await applications.list()).items[0].company).toBe('Acme');
+
+      // The status it already has is an event too.
+      await applications.updateStatus(beta.id, 'REJECTED', undefined, 'USER');
+      expect((await applications.list()).items[0].company).toBe('Beta Corp');
+    });
+
+    it('finds a row by its applyUrl, normalized as save does', async () => {
+      const { items } = await applications.list({
+        applyUrl: `${acmeUrl}/?utm_source=mail`,
+      });
+      expect(items.map((item) => item.company)).toEqual(['Acme']);
+      expect((await applications.list({ applyUrl: 'https://example.com/nope' })).total).toBe(0);
     });
 
     it('filters by status', async () => {
@@ -203,8 +277,8 @@ describe('ApplicationService', () => {
     });
 
     it('treats a LIKE metacharacter in the term as literal', async () => {
-      // The join reaches the same two columns as the vacancy service's own search,
-      // so `%` here would widen to the whole log rather than matching nothing.
+      // The same two columns as the vacancy service's own search, so `%` here would
+      // widen to every application rather than matching nothing.
       expect((await applications.list({ search: '%' })).total).toBe(0);
       expect((await applications.list({ search: '_' })).total).toBe(0);
       expect((await applications.list({ company: '%' })).total).toBe(0);
@@ -222,24 +296,28 @@ describe('ApplicationService', () => {
       expect(page.total).toBe(2);
     });
 
-    it('orders rows that share one appliedAt, so two pages do not overlap', async () => {
-      // The importer stamps a whole batch with a single timestamp, so a tie is the
-      // normal case, not an exotic one. Read as windows, an unstable order serves
-      // one row twice and skips another; `id desc` is what makes them disjoint.
-      const stamp = new Date('2026-08-20');
+    it('orders rows that share one statusChangedAt, so two pages do not overlap', async () => {
+      // A migrated batch shares one date, so a tie is the normal case, not an exotic
+      // one. Read as windows, an unstable order serves one row twice and skips
+      // another; `id desc` is what makes them disjoint.
+      const stamp = new Date('2099-01-01');
       for (const company of ['Tie One', 'Tie Two', 'Tie Three']) {
         const vacancy = await seedVacancy({ company, title: 'Same Stamp' });
-        await applications.record({ estimatedVacancyId: vacancy.id, appliedAt: stamp });
+        await applications.record({ vacancyId: vacancy.id });
+        await prisma.vacancy.update({
+          where: { id: vacancy.id },
+          data: { statusChangedAt: stamp },
+        });
       }
 
       const first = await applications.list({ limit: 3 });
       const second = await applications.list({ limit: 3, offset: 3 });
 
-      const tiedIds = first.items.filter((item) => item.appliedAt.getTime() === stamp.getTime());
-      expect(tiedIds).toHaveLength(3);
-      expect(tiedIds.map((item) => item.id)).toEqual(
-        [...tiedIds.map((item) => item.id)].sort((a, b) => b - a),
+      const tiedIds = first.items.map((item) => item.id);
+      expect(first.items.every((item) => item.statusChangedAt.getTime() === stamp.getTime())).toBe(
+        true,
       );
+      expect(tiedIds).toEqual([...tiedIds].sort((a, b) => b - a));
 
       const ids = [...first.items, ...second.items].map((item) => item.id);
       expect(ids).toHaveLength(5);
@@ -247,180 +325,228 @@ describe('ApplicationService', () => {
     });
   });
 
+  describe('getById', () => {
+    it('returns a pipeline row, and null for a triage one', async () => {
+      const applied = await seedVacancy();
+      await applications.record({ vacancyId: applied.id });
+      const saved = await seedVacancy({ status: 'SAVED_FOR_LATER' });
+
+      expect((await applications.getById(applied.id))?.status).toBe('APPLIED');
+      expect(await applications.getById(saved.id)).toBeNull();
+    });
+  });
+
   describe('updateStatus', () => {
     it('returns null for an unknown id', async () => {
-      expect(await applications.updateStatus(999_999, 'INTERVIEW')).toBeNull();
+      expect(await applications.updateStatus(999_999, 'INTERVIEW', undefined, 'USER')).toBeNull();
     });
 
-    it('sets status and stamps statusUpdatedAt', async () => {
+    it('writes one journal row and keeps the cache in step', async () => {
       const vacancy = await seedVacancy();
-      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
-      const updated = await applications.updateStatus(application.id, 'INTERVIEW');
+      await applications.record({ vacancyId: vacancy.id });
+      const updated = await applications.updateStatus(vacancy.id, 'INTERVIEW', undefined, 'USER');
+
       expect(updated?.status).toBe('INTERVIEW');
-      expect(updated?.statusUpdatedAt).toBeInstanceOf(Date);
-      expect(updated?.comments).toEqual([]);
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'APPLIED', 'INTERVIEW']);
+      await expectCacheInStep(vacancy.id);
+      expect(notes(updated)).toEqual([ANALYZED]);
     });
 
-    it('adds no comment when none is given', async () => {
+    it('journals the status it already has as a new event — the next interview round', async () => {
       const vacancy = await seedVacancy();
-      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
-      await applications.updateStatus(application.id, 'INTERVIEW', 'Recruiter called.');
-      const updated = await applications.updateStatus(application.id, 'OFFER');
-      expect(bodies(updated)).toEqual(['Recruiter called.']);
+      await applications.record({ vacancyId: vacancy.id });
+      const first = await applications.updateStatus(vacancy.id, 'INTERVIEW', 'Round 1.', 'AGENT');
+
+      const second = await applications.updateStatus(vacancy.id, 'INTERVIEW', 'Round 2.', 'AGENT');
+
+      expect(await journal(vacancy.id)).toEqual([
+        'NOT_REVIEWED',
+        'APPLIED',
+        'INTERVIEW',
+        'INTERVIEW',
+      ]);
+      expect(second?.statusChangedAt.getTime()).toBeGreaterThanOrEqual(
+        first?.statusChangedAt.getTime() ?? 0,
+      );
+      await expectCacheInStep(vacancy.id);
+      expect(notes(second)).toEqual([ANALYZED, ['AGENT', 'Round 1.'], ['AGENT', 'Round 2.']]);
     });
 
-    it('turns each status note into its own comment row, oldest first', async () => {
+    it('record writes one APPLIED row when told status APPLIED', async () => {
       const vacancy = await seedVacancy();
-      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+      await applications.record({ vacancyId: vacancy.id, status: 'APPLIED' });
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'APPLIED']);
+    });
+
+    it('keeps appliedAt when the row moves on', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({ vacancyId: vacancy.id });
+      const moved = await applications.updateStatus(vacancy.id, 'OFFER', undefined, 'USER');
+      expect(moved?.appliedAt).toEqual(application.appliedAt);
+    });
+
+    it('has no appliedAt for a row set straight past APPLIED', async () => {
+      const vacancy = await seedVacancy();
+      const moved = await applications.updateStatus(vacancy.id, 'INTERVIEW', undefined, 'USER');
+      expect(moved?.appliedAt).toBeNull();
+    });
+
+    it("turns each status note into its own comment row, with the caller's source, oldest first", async () => {
+      const vacancy = await seedVacancy();
+      await applications.record({ vacancyId: vacancy.id });
 
       const first = await applications.updateStatus(
-        application.id,
+        vacancy.id,
         'RECRUITER_SCREEN',
         'Recruiter called.',
+        'AGENT',
       );
-      expect(bodies(first)).toEqual(['Recruiter called.']);
-      expect(first?.comments[0].createdAt).toBeInstanceOf(Date);
+      expect(notes(first)).toEqual([ANALYZED, ['AGENT', 'Recruiter called.']]);
+      expect(first?.comments[1].createdAt).toBeInstanceOf(Date);
 
-      const second = await applications.updateStatus(
-        application.id,
-        'INTERVIEW',
-        'Interview on 20.09.',
-      );
-      expect(bodies(second)).toEqual(['Recruiter called.', 'Interview on 20.09.']);
-
-      const third = await applications.updateStatus(application.id, 'OFFER', 'Offer received!');
-      expect(bodies(third)).toEqual([
-        'Recruiter called.',
-        'Interview on 20.09.',
+      await applications.updateStatus(vacancy.id, 'INTERVIEW', 'Interview on 20.09.', 'USER');
+      const third = await applications.updateStatus(
+        vacancy.id,
+        'OFFER',
         'Offer received!',
+        'AGENT',
+      );
+      expect(notes(third)).toEqual([
+        ANALYZED,
+        ['AGENT', 'Recruiter called.'],
+        ['USER', 'Interview on 20.09.'],
+        ['AGENT', 'Offer received!'],
       ]);
-      expect(await getPrisma().comment.count({ where: { applicationId: application.id } })).toBe(3);
+      expect(await prisma.comment.count({ where: { vacancyId: vacancy.id } })).toBe(4);
     });
 
     it('trims the comment and ignores a blank one', async () => {
       const vacancy = await seedVacancy();
-      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
-      const withSpaces = await applications.updateStatus(application.id, 'INTERVIEW', '  padded  ');
-      expect(bodies(withSpaces)).toEqual(['padded']);
-      const unchanged = await applications.updateStatus(application.id, 'OFFER', '   ');
-      expect(bodies(unchanged)).toEqual(['padded']);
+      await applications.record({ vacancyId: vacancy.id });
+      const withSpaces = await applications.updateStatus(
+        vacancy.id,
+        'INTERVIEW',
+        '  padded  ',
+        'USER',
+      );
+      expect(notes(withSpaces)).toEqual([ANALYZED, ['USER', 'padded']]);
+      const unchanged = await applications.updateStatus(vacancy.id, 'OFFER', '   ', 'USER');
+      expect(notes(unchanged)).toEqual([ANALYZED, ['USER', 'padded']]);
     });
 
     it('returns null for an unknown id even when a comment is given', async () => {
-      expect(await applications.updateStatus(999_999, 'INTERVIEW', 'note')).toBeNull();
+      expect(await applications.updateStatus(999_999, 'INTERVIEW', 'note', 'USER')).toBeNull();
     });
   });
 
   describe('update', () => {
     it('changes only the fields given, and a blank string clears one', async () => {
       const vacancy = await seedVacancy();
-      const { application } = await applications.record({
-        estimatedVacancyId: vacancy.id,
-        salaryInListing: '100 PLN/h',
-        userComment: 'First note',
-      });
+      await applications.record({ vacancyId: vacancy.id, salaryInListing: '100 PLN/h' });
 
-      const edited = await applications.update(application.id, {
-        usedTailoredResume: true,
-        userComment: '  Rewritten  ',
-      });
+      const edited = await applications.update(vacancy.id, { usedTailoredResume: true });
       expect(edited).toMatchObject({
         salaryInListing: '100 PLN/h',
         usedTailoredResume: true,
-        userComment: 'Rewritten',
         status: 'APPLIED',
       });
+      expect(notes(edited)).toEqual([ANALYZED]);
 
-      const cleared = await applications.update(application.id, { salaryInListing: '  ' });
+      const cleared = await applications.update(vacancy.id, { salaryInListing: '  ' });
       expect(cleared?.salaryInListing).toBeNull();
-      expect(cleared?.userComment).toBe('Rewritten');
+    });
+
+    it('adds a non-blank comment as a USER row, and moves nothing', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({
+        vacancyId: vacancy.id,
+        comment: 'First note',
+      });
+
+      const edited = await applications.update(vacancy.id, { comment: '  Went well.  ' });
+      expect(notes(edited)).toEqual([ANALYZED, ['USER', 'First note'], ['USER', 'Went well.']]);
+      expect(edited?.statusChangedAt).toEqual(application.statusChangedAt);
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'APPLIED']);
+
+      const blank = await applications.update(vacancy.id, { comment: '   ' });
+      expect(blank?.comments).toHaveLength(3);
     });
 
     it('returns null for an unknown id', async () => {
-      expect(await applications.update(999_999, { userComment: 'x' })).toBeNull();
-    });
-  });
-
-  describe('addComment', () => {
-    it('appends a dated comment without moving the status', async () => {
-      const vacancy = await seedVacancy();
-      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
-      await applications.updateStatus(application.id, 'INTERVIEW', 'Booked.');
-
-      const updated = await applications.addComment(application.id, '  Went well.  ');
-      expect(bodies(updated)).toEqual(['Booked.', 'Went well.']);
-      expect(updated?.status).toBe('INTERVIEW');
-      expect(updated?.statusUpdatedAt).toEqual(
-        (await applications.getById(application.id))?.statusUpdatedAt,
-      );
-    });
-
-    it('rejects a blank body', async () => {
-      const vacancy = await seedVacancy();
-      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
-      await expect(applications.addComment(application.id, '   ')).rejects.toThrow(
-        InvalidApplicationInputError,
-      );
-    });
-
-    it('returns null for an unknown id', async () => {
-      expect(await applications.addComment(999_999, 'note')).toBeNull();
+      expect(await applications.update(999_999, { comment: 'x' })).toBeNull();
     });
   });
 
   describe('updateStatusByVacancy', () => {
     it('resolves a unique (company, title) match and updates it', async () => {
       const vacancy = await seedVacancy({ company: 'Delta Co', title: 'Dev' });
-      const { application } = await applications.record({ estimatedVacancyId: vacancy.id });
+      await applications.record({ vacancyId: vacancy.id });
 
       const updated = await applications.updateStatusByVacancy(
         'delta co',
         'DEV',
         'REJECTED',
         'Rejection email received.',
+        'AGENT',
       );
-      expect(updated?.id).toBe(application.id);
+      expect(updated?.id).toBe(vacancy.id);
       expect(updated?.status).toBe('REJECTED');
-      expect(bodies(updated)).toEqual(['Rejection email received.']);
+      expect(notes(updated)).toEqual([ANALYZED, ['AGENT', 'Rejection email received.']]);
     });
 
-    it('appends across calls, same as updateStatus by id', async () => {
-      const vacancy = await seedVacancy({ company: 'Echo Co', title: 'Dev' });
-      await applications.record({ estimatedVacancyId: vacancy.id });
+    it('returns null for a vacancy never applied to, and writes nothing', async () => {
+      const vacancy = await seedVacancy({ company: 'Foxtrot Co', title: 'Dev' });
+      const updated = await applications.updateStatusByVacancy(
+        'Foxtrot Co',
+        'Dev',
+        'REJECTED',
+        undefined,
+        'AGENT',
+      );
+      expect(updated).toBeNull();
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED']);
+    });
 
-      await applications.updateStatusByVacancy('Echo Co', 'Dev', 'RECRUITER_SCREEN', 'Called.');
-      const second = await applications.updateStatusByVacancy(
-        'Echo Co',
+    it('ignores a triage duplicate of the applied vacancy', async () => {
+      const applied = await seedVacancy({ company: 'Hotel Co', title: 'Dev' });
+      await seedVacancy({ company: 'Hotel Co', title: 'Dev' });
+      await applications.record({ vacancyId: applied.id });
+      const updated = await applications.updateStatusByVacancy(
+        'Hotel Co',
         'Dev',
         'INTERVIEW',
-        'Interview scheduled.',
+        undefined,
+        'AGENT',
       );
-      expect(bodies(second)).toEqual(['Called.', 'Interview scheduled.']);
+      expect(updated?.id).toBe(applied.id);
     });
 
     it('returns null when no vacancy matches', async () => {
       expect(
-        await applications.updateStatusByVacancy('Nobody Inc', 'Ghost Role', 'REJECTED'),
+        await applications.updateStatusByVacancy(
+          'Nobody Inc',
+          'Ghost Role',
+          'REJECTED',
+          undefined,
+          'AGENT',
+        ),
       ).toBeNull();
     });
 
-    it('returns null when the vacancy exists but has no recorded application', async () => {
-      await seedVacancy({ company: 'Foxtrot Co', title: 'Dev' });
-      expect(await applications.updateStatusByVacancy('Foxtrot Co', 'Dev', 'REJECTED')).toBeNull();
-    });
-
-    it('throws AmbiguousVacancyMatchError for two vacancies with the same (company, title)', async () => {
-      await seedVacancy({ company: 'Golf Co', title: 'Dev' });
-      await seedVacancy({ company: 'Golf Co', title: 'Dev' });
+    it('throws AmbiguousVacancyMatchError for two applied vacancies with the same (company, title)', async () => {
+      const first = await seedVacancy({ company: 'Golf Co', title: 'Dev' });
+      const second = await seedVacancy({ company: 'Golf Co', title: 'Dev' });
+      await applications.record({ vacancyId: first.id });
+      await applications.record({ vacancyId: second.id });
       await expect(
-        applications.updateStatusByVacancy('Golf Co', 'Dev', 'REJECTED'),
+        applications.updateStatusByVacancy('Golf Co', 'Dev', 'REJECTED', undefined, 'AGENT'),
       ).rejects.toThrow(AmbiguousVacancyMatchError);
     });
 
     it('throws InvalidApplicationInputError for blank company/title', async () => {
-      await expect(applications.updateStatusByVacancy('  ', 'Dev', 'REJECTED')).rejects.toThrow(
-        InvalidApplicationInputError,
-      );
+      await expect(
+        applications.updateStatusByVacancy('  ', 'Dev', 'REJECTED', undefined, 'AGENT'),
+      ).rejects.toThrow(InvalidApplicationInputError);
     });
   });
 
@@ -428,13 +554,8 @@ describe('ApplicationService', () => {
     it('records a mixed batch in one call', async () => {
       const existing = await seedVacancy({ company: 'Batch Co', title: 'Dev' });
       const { results } = await applications.recordMany([
-        { estimatedVacancyId: existing.id, appliedAt: new Date('2026-08-01') },
-        {
-          company: 'Fresh Co',
-          title: 'Engineer',
-          matchScore: 65,
-          appliedAt: new Date('2026-08-02'),
-        },
+        { vacancyId: existing.id },
+        { company: 'Fresh Co', title: 'Engineer', matchScore: 65 },
       ]);
       expect(results.map((r) => r.resolution)).toEqual(['linked-by-id', 'created-vacancy']);
       expect((await applications.list()).total).toBe(2);
@@ -444,15 +565,17 @@ describe('ApplicationService', () => {
       const vacancy = await seedVacancy();
       await expect(
         applications.recordMany([
-          { company: 'Rollback Co', title: 'Dev', appliedAt: new Date('2026-08-01') },
-          { estimatedVacancyId: 999_999 }, // fails
+          { vacancyId: vacancy.id },
+          { company: 'Rollback Co', title: 'Dev' },
+          { vacancyId: 999_999 }, // fails
           { company: 'Never Inserted', title: 'Dev' },
         ]),
       ).rejects.toBeInstanceOf(InvalidApplicationInputError);
       expect((await applications.list()).total).toBe(0);
       expect((await vacancies.list({ company: 'Rollback Co' })).total).toBe(0);
-      // The pre-existing seed vacancy is still there.
-      expect((await vacancies.getById(vacancy.id))?.id).toBe(vacancy.id);
+      // The pre-existing seed vacancy is untouched, its journal included.
+      expect((await vacancies.getById(vacancy.id))?.status).toBe('NOT_REVIEWED');
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED']);
     });
   });
 });

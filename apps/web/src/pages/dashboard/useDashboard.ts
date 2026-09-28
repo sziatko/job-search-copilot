@@ -58,7 +58,7 @@ export function useDashboard() {
     () =>
       [...apps]
         .sort(
-          (a, b) => new Date(b.statusUpdatedAt).getTime() - new Date(a.statusUpdatedAt).getTime(),
+          (a, b) => new Date(b.statusChangedAt).getTime() - new Date(a.statusChangedAt).getTime(),
         )
         .slice(0, ACTIVITY_SIZE),
     [apps],

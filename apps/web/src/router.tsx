@@ -29,7 +29,7 @@ const VACANCIES_META: RouteMeta = {
   subtitle: "Review the analyzer's shortlist and triage what to apply to",
   rail: true,
 };
-const TRACKER_META: RouteMeta = {
+const APPLICATIONS_META: RouteMeta = {
   title: 'Application tracker',
   subtitle: "Every application you've sent and where it stands",
   rail: true,
@@ -93,26 +93,26 @@ const profileRoute = createRoute({
   staticData: PROFILE_META,
 });
 
-// The /tracker search box + status filter. Parsed / validated by zod on every
+// The /applications search box + status filter. Parsed / validated by zod on every
 // navigation — see the note above on why both are lenient.
-const trackerSearchSchema = z.object({
+const applicationsSearchSchema = z.object({
   q: termSchema,
   status: statusFilterSchema,
 });
 
-const trackerRoute = createRoute({
+const applicationsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/tracker',
+  path: '/applications',
   component: ApplicationsPage,
-  staticData: TRACKER_META,
-  validateSearch: (search): z.infer<typeof trackerSearchSchema> =>
-    trackerSearchSchema.parse(search),
+  staticData: APPLICATIONS_META,
+  validateSearch: (search): z.infer<typeof applicationsSearchSchema> =>
+    applicationsSearchSchema.parse(search),
 });
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   vacanciesRoute,
-  trackerRoute,
+  applicationsRoute,
   logRoute,
   profileRoute,
 ]);

@@ -1,18 +1,55 @@
-import type { EstimatedVacancy, PrismaClient, UserAction } from '@prisma/client';
+import type { PrismaClient, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
-import type {
-  EstimatedVacancyListItem,
-  ListEstimatedVacanciesFilters,
-  ListEstimatedVacanciesResult,
-  SaveEstimatedVacancyInput,
-  SaveEstimatedVacancyResult,
-  SaveManyEstimatedVacanciesResult,
-} from './estimated-vacancy.types';
 import { escapeLikePattern } from './like';
-import { PLACEHOLDER_COMMENT } from './placeholder';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
-import { buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
+import { firstStatus, writeStatus } from './status';
+import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
+import type {
+  ListVacanciesFilters,
+  ListVacanciesResult,
+  SaveManyVacanciesResult,
+  SaveVacancyInput,
+  SaveVacancyResult,
+  VacancyDetail,
+  VacancyListItem,
+} from './vacancy.types';
+
+/** The analyzer's comment: the first `ANALYZER` row. A relation read, so every
+ * reader selects it through here and flattens it with `withEstimation`. */
+const ANALYZER_COMMENT = {
+  where: { source: 'ANALYZER' },
+  orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  take: 1,
+  select: { body: true },
+} satisfies Prisma.Vacancy$commentsArgs;
+
+function withEstimation<T extends { comments: { body: string }[] }>(
+  row: T,
+): Omit<T, 'comments'> & { estimationComment: string | null } {
+  const { comments, ...rest } = row;
+  return { ...rest, estimationComment: comments[0]?.body ?? null };
+}
+
+/** Every comment, every source, oldest first; `id` breaks the tie between notes migrated
+ * with one shared date. */
+export const ALL_COMMENTS = {
+  select: { id: true, createdAt: true, body: true, source: true },
+  orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+} satisfies Prisma.Vacancy$commentsArgs;
+
+const DETAIL_INCLUDE = { comments: ALL_COMMENTS } satisfies Prisma.VacancyInclude;
+
+/** The row with all its comments, plus the analyzer's (the first `ANALYZER` one)
+ * flattened out as `estimationComment`. */
+function toDetail(
+  row: Prisma.VacancyGetPayload<{ include: typeof DETAIL_INCLUDE }>,
+): VacancyDetail {
+  return {
+    ...row,
+    estimationComment: row.comments.find((c) => c.source === 'ANALYZER')?.body ?? null,
+  };
+}
 
 const LIST_SELECT = {
   id: true,
@@ -23,12 +60,12 @@ const LIST_SELECT = {
   applyUrl: true,
   matchScore: true,
   recommendation: true,
-  estimationComment: true,
-  userAction: true,
-  userActionUpdatedAt: true,
-} satisfies Prisma.EstimatedVacancySelect;
+  comments: ANALYZER_COMMENT,
+  status: true,
+  statusChangedAt: true,
+} satisfies Prisma.VacancySelect;
 
-export class EstimatedVacancyService {
+export class VacancyService {
   /**
    * @param db PrismaClient to run against. Defaults (evaluated on construction, not
    *   import) to the lazy process-wide client so DI-less entrypoints (the MCP server)
@@ -44,7 +81,7 @@ export class EstimatedVacancyService {
    * constraint on applyUrl is the real guard; the pre-check just avoids a
    * guaranteed-failing insert on the common path.
    */
-  async save(input: SaveEstimatedVacancyInput): Promise<SaveEstimatedVacancyResult> {
+  async save(input: SaveVacancyInput): Promise<SaveVacancyResult> {
     // Neutralized *before* the dedup lookup, not at the insert: applyUrl is the key,
     // so a sanitized insert against an unsanitized lookup would miss its own row and
     // trip the unique constraint. A bad scheme costs the link, never the analysis —
@@ -53,14 +90,15 @@ export class EstimatedVacancyService {
       normalizeApplyUrl(input.applyUrl) ??
       buildSyntheticApplyUrl(input.company, input.title, new Date());
 
-    const existing = await this.db.estimatedVacancy.findUnique({ where: { applyUrl } });
+    const existing = await this.db.vacancy.findUnique({ where: { applyUrl } });
     if (existing) {
       return { created: false, vacancy: existing };
     }
 
     const recommendation = normalizeRecommendation(input.recommendation);
+    const estimationComment = input.estimationComment.trim();
     try {
-      const vacancy = await this.db.estimatedVacancy.create({
+      const vacancy = await this.db.vacancy.create({
         data: {
           company: input.company,
           title: input.title,
@@ -68,14 +106,17 @@ export class EstimatedVacancyService {
           fullText: input.fullText,
           matchScore: input.matchScore,
           recommendation,
-          estimationComment: input.estimationComment,
+          ...(estimationComment && {
+            comments: { create: { body: estimationComment, source: 'ANALYZER' } },
+          }),
+          ...firstStatus(new Date()),
         },
       });
       return { created: true, vacancy };
     } catch (err) {
       // Lost a race with a concurrent save of the same applyUrl — the other write won.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        const raced = await this.db.estimatedVacancy.findUnique({
+        const raced = await this.db.vacancy.findUnique({
           where: { applyUrl },
         });
         if (raced) {
@@ -92,27 +133,29 @@ export class EstimatedVacancyService {
    * own P2002 race handling), and partial progress across a batch is what we want —
    * one bad item shouldn't roll back the good ones.
    */
-  async saveMany(inputs: SaveEstimatedVacancyInput[]): Promise<SaveManyEstimatedVacanciesResult> {
-    const results: SaveEstimatedVacancyResult[] = [];
+  async saveMany(inputs: SaveVacancyInput[]): Promise<SaveManyVacanciesResult> {
+    const results: SaveVacancyResult[] = [];
     for (const input of inputs) {
       results.push(await this.save(input));
     }
     return { results };
   }
 
-  async getById(id: number): Promise<EstimatedVacancy | null> {
-    return this.db.estimatedVacancy.findUnique({ where: { id } });
+  async getById(id: number): Promise<VacancyDetail | null> {
+    const row = await this.db.vacancy.findUnique({ where: { id }, include: DETAIL_INCLUDE });
+    return row ? toDetail(row) : null;
   }
 
   /** List/search — omits fullText to keep results compact. Use getById for the full record. */
-  async list(filters: ListEstimatedVacanciesFilters = {}): Promise<ListEstimatedVacanciesResult> {
+  async list(filters: ListVacanciesFilters = {}): Promise<ListVacanciesResult> {
     // Every term below reaches the pattern unescaped by the caller, so it is
     // escaped here: `%`/`_` are the user's literal characters, not wildcards
     // (escapeLikePattern). It happens per clause rather than once up front because
     // each clause escapes a *different* value.
-    const where: Prisma.EstimatedVacancyWhereInput = {
+    const where: Prisma.VacancyWhereInput = {
       ...(filters.recommendation && { recommendation: filters.recommendation }),
-      ...(filters.userAction && { userAction: filters.userAction }),
+      ...(filters.status?.length && { status: { in: filters.status } }),
+      ...(filters.applyUrl !== undefined && { applyUrl: applyUrlKey(filters.applyUrl) }),
       // One clause, not two: `search` is the /vacancies free-text box and widens
       // (company OR title), where company/title each narrow. Being separate `where`
       // keys they AND together, so passing both still means "must satisfy both".
@@ -134,17 +177,17 @@ export class EstimatedVacancyService {
     const skip = filters.offset ?? 0;
 
     const [items, total] = await Promise.all([
-      this.db.estimatedVacancy.findMany({
+      this.db.vacancy.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         take,
         skip,
         select: LIST_SELECT,
       }),
-      this.db.estimatedVacancy.count({ where }),
+      this.db.vacancy.count({ where }),
     ]);
 
-    return { items: await this.withDerivedFields(items), total };
+    return { items: await this.withDerivedFields(items.map(withEstimation)), total };
   }
 
   /**
@@ -155,20 +198,15 @@ export class EstimatedVacancyService {
    * - `companyMatchCount`: for each row, how many vacancies have a `company`
    *   containing that row's company (case-insensitive substring — the /vacancies
    *   duplicates button, ADR-0025).
-   * - `hasAnalysis`: whether the analyzer ever saw the posting, from the placeholder
-   *   sentinel `estimationComment: 'N/A'` (see the type's own comment for the why and
-   *   the ceiling). One place decides this, which is the point: before it, the modal
-   *   inferred it from the applyUrl's scheme, /vacancies rendered a `0%` for the same
-   *   row, and the dashboard counted it as analysed.
+   * - `hasAnalysis`: whether the analyzer ever saw the posting — whether it has an
+   *   `ANALYZER` comment (see the type's own comment for the ceiling). One place
+   *   decides this, which is the point: before it, the modal inferred it from the
+   *   applyUrl's scheme, /vacancies rendered a `0%` for the same row, and the
+   *   dashboard counted it as analysed.
    */
   private async withDerivedFields(
-    items: Omit<EstimatedVacancyListItem, 'companyMatchCount' | 'hasAnalysis'>[],
-  ): Promise<EstimatedVacancyListItem[]> {
-    // The sentinel is a string constant, not a query, so it can be folded in here
-    // and the early return below still covers both fields.
-    const hasAnalysis = (item: { estimationComment: string }) =>
-      item.estimationComment !== PLACEHOLDER_COMMENT;
-
+    items: Omit<VacancyListItem, 'companyMatchCount' | 'hasAnalysis'>[],
+  ): Promise<VacancyListItem[]> {
     const names = [...new Set(items.map((item) => item.company))];
     if (names.length === 0) {
       return [];
@@ -184,7 +222,7 @@ export class EstimatedVacancyService {
     // on every list call. Fine while a page is a hundred rows; if the table grows,
     // do the counting in SQL (a lateral join over the same index) instead of pulling
     // candidate company names into the process.
-    const candidates = await this.db.estimatedVacancy.findMany({
+    const candidates = await this.db.vacancy.findMany({
       where: {
         OR: names.map((name) => ({
           company: { contains: escapeLikePattern(name), mode: 'insensitive' },
@@ -205,26 +243,17 @@ export class EstimatedVacancyService {
     return items.map((item) => ({
       ...item,
       companyMatchCount: counts.get(item.company) ?? 0,
-      hasAnalysis: hasAnalysis(item),
+      hasAnalysis: item.estimationComment !== null,
     }));
   }
 
-  /**
-   * Returns null when no vacancy has this id. One round-trip: let the UPDATE fail
-   * with Prisma's "record not found" (P2025) rather than a separate existence check
-   * that also leaves a TOCTOU gap.
-   */
-  async updateUserAction(id: number, userAction: UserAction): Promise<EstimatedVacancy | null> {
-    try {
-      return await this.db.estimatedVacancy.update({
-        where: { id },
-        data: { userAction, userActionUpdatedAt: new Date() },
-      });
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
-        return null;
-      }
-      throw err;
-    }
+  /** Moves the vacancy to `status` through writeStatus — the same status is an event
+   * too. Returns null when no vacancy has this id. */
+  updateStatus(id: number, status: VacancyStatus): Promise<VacancyDetail | null> {
+    return this.db.$transaction(async (tx) => {
+      await writeStatus(tx, id, status);
+      const row = await tx.vacancy.findUnique({ where: { id }, include: DETAIL_INCLUDE });
+      return row ? toDetail(row) : null;
+    });
   }
 }

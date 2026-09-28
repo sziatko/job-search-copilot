@@ -503,14 +503,7 @@ from the mount.
 
 ## Deferred
 
-| Item | Why |
-| --- | --- |
-| **Arrow keys and the `role="menu"` contract** (finding 7) | The click-to-close fix is what breaks the UI today; a roving-tabindex menu is a keyboard-navigation design of its own, and the roles already announce a contract nothing depends on yet. |
-| **A real "availability" column** (finding 11's tail) | `hasAnalysis` is a projection over a sentinel; an explicit column would be honest but needs the analyzer and the importer to write it, which is Phase 4 work. |
-| **A `hasAnalysis` list filter** | The dashboard's relabel needs it to make the tile truthful instead of merely unclaimed. Server-side filter + DTO + web UI — a surface, not a correction. |
-| **Flipping the tip bubble below the control for the top-most visible row** | Measured in phase 2.1, step 9: a bubble on the first visible row of a scrolled list is clipped by the scroll box. The fix needs `useVirtualRows` to expose the row's offset; it is a visual nicety, not a false claim. |
-| **`scrollIntoView` for the marked row in the history modal** | Phase 2.1, step 8. The cap can hide the row the modal was opened from. |
-| **The Comment column prints the sentinel text for placeholders** | Found in step 7 and left alone: `/vacancies` renders `ExpandableText text={item.estimationComment}`, so the 203 imported rows show a literal "N/A" in that column. Truthful, unpolished — and hiding it is one `hasAnalysis ? … : '—'` once someone decides what a placeholder's comment column should say. |
+Moved to [`../backlog.md`](../backlog.md) (rows marked "phase 2.2").
 
 ## Landmines
 

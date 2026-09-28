@@ -8,7 +8,7 @@ export const matchScore = z.number().int().min(0).max(100);
 
 /**
  * Offset/limit paging shared by the two list tools. They differ only in their
- * ceiling (list_estimated_vacancies: 100, list_applications: 500) — pass that in.
+ * ceiling (list_vacancies: 100, list_applications: 500) — pass that in.
  */
 export function pagination(maxLimit: number) {
   return {

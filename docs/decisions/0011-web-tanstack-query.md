@@ -15,8 +15,8 @@ Adopt `@tanstack/react-query`:
 - `QueryClientProvider` in `main.tsx` with one `queryClient`
   (`apps/web/src/lib/queryClient.ts`, `staleTime: 30s`, `retry: 1`).
 - `useVacancies` uses `useQuery({ queryKey: ['vacancies'], queryFn:
-  listEstimatedVacancies })` for the list, and `useMutation` for
-  `updateUserAction` with the canonical optimistic pattern: `onMutate` cancels
+  listVacancies })` for the list, and `useMutation` for
+  `updateVacancyStatus` with the canonical optimistic pattern: `onMutate` cancels
   in-flight queries, snapshots, and writes the optimistic cache update; `onError`
   rolls back from the snapshot and records a per-row error; `onSettled` clears the
   row's saving flag and invalidates the list.

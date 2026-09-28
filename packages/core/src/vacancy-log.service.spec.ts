@@ -5,7 +5,7 @@ import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-log';
 import { VacancyLogService } from './vacancy-log.service';
 
 // Integration tests against the real (test) Postgres — same rationale as
-// estimated-vacancy.service.spec.ts.
+// vacancy.service.spec.ts.
 const log = new VacancyLogService();
 const prisma = getPrisma();
 

@@ -1,13 +1,14 @@
 # 0022 — Timeout is derived on the client until a scheduled job owns it
 
 - Status: Accepted
-- Phase: 2   ·   Date: 2026-09
+- Phase: 2   ·   Date: 2026-09 (updated in phase 3.1: the clock is `statusChangedAt` —
+  [ADR-0029](0029-one-vacancy-table.md))
 
 ## Context
 
-`/tracker` needs to surface applications that have gone quiet. Two facts forced a
-choice: `statusUpdatedAt` is now an always-populated, NOT NULL timestamp, and the
-stack has no scheduler — nothing runs on a clock in `apps/api` or `packages/core`.
+`/applications` needs to surface applications that have gone quiet. Two facts forced a
+choice: `Vacancy.statusChangedAt` — the date of the last status move, the latest
+`StatusChange` row — is always populated, and the stack has no scheduler — nothing runs on a clock in `apps/api` or `packages/core`.
 
 The old `NO_RESPONSE` enum value was meant for this and was never used: 0 rows out
 of 219. It required remembering to set it by hand, which is the kind of step that
@@ -18,8 +19,9 @@ does not survive contact with a real backlog.
 **Timeout is a derived, client-side view for now.**
 
 - `REJECTED` and `OFFER` are *closed* — they are outcomes, not stalls.
-- Of the rest, one whose `statusUpdatedAt` is older than `TIMEOUT_DAYS` (30) is a
-  *timeout*; the remainder is *active*.
+- Of the rest, one whose `statusChangedAt` is older than `TIMEOUT_DAYS` (30) is a
+  *timeout*; the remainder is *active*. The window floats: it counts from applying
+  while `APPLIED`, and from the interview after `INTERVIEW`.
 - Because the two categories partition every non-closed application,
   `total = active + timeout + rejected + offer` — the strip's numbers add up, so a
   broken rule is visible at a glance.
@@ -42,7 +44,7 @@ the same change* — never both at once.
 - **Add a `TIMEOUT` enum value now, before anything writes it.** A stored status with
   no writer competes with the derived rule for the same fact: one row could be
   `status = TIMEOUT` while also "moved two days ago". That is two sources of truth
-  for one fact — precisely the defect just fixed for `statusUpdatedAt`. And the cost
+  for one fact. And the cost
   is asymmetric: *adding* an enum value is a one-line `ALTER TYPE … ADD VALUE`;
   *removing* one took a full type rebuild. Pay the cheap one later.
 - **A server-side filter or endpoint now.** The client already loads the whole log
@@ -65,19 +67,18 @@ the same change* — never both at once.
 - **Writing `status = TIMEOUT` while the client rule still exists** → the tile counts
   the row twice, or the two disagree about it. Add the value back and remove the rule
   together.
-- **A scheduled sweep calling `ApplicationService.updateStatus()`** → that method
-  *always* stamps `statusUpdatedAt = new Date()`. The sweep would reset the very clock
-  it reads, so every row would leave the timeout category the instant it entered it.
-  The job needs its own write that touches only `status`.
+- **A scheduled sweep writing `TIMEOUT` through `writeStatus`** → that is a real move:
+  it stamps `statusChangedAt` and journals the row. That is right for a stored
+  `TIMEOUT` (it is the date the row timed out), but the client rule must be gone by
+  then, or it reads the fresh stamp as "moved today".
 - **Changing `TIMEOUT_DAYS` without it being the single source** → the strip's tile
   and the table's ⏳ share it on purpose; they must never diverge.
-- **Making timeout depend on `updatedAt` instead of `statusUpdatedAt`** → `updatedAt`
-  is Prisma's `@updatedAt` and moves on a comment-only edit, so a note would silently
-  un-stale a row.
+- **Making timeout depend on `updatedAt` instead of `statusChangedAt`** → `updatedAt`
+  is Prisma's `@updatedAt` and moves on a salary / CV edit, so an edit would silently
+  un-stale a row. A comment or an edit never moves `statusChangedAt`.
 
 ## Related
 
 [ADR-0012](0012-web-hand-written-contract.md),
-[ADR-0017](0017-application-1to1-delta.md),
-[ADR-0018](0018-application-status-separate-enum.md),
+[ADR-0029](0029-one-vacancy-table.md),
 [`../domain-model.md`](../domain-model.md) (Active/Timeout section).

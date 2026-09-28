@@ -11,12 +11,12 @@ subprocess and speaking stdio to it.
 ## Decision
 Split the two concerns:
 
-- `apps/mcp/src/server.ts` — `createServer(vacancies = new EstimatedVacancyService(),
+- `apps/mcp/src/server.ts` — `createServer(vacancies = new VacancyService(),
   applications = new ApplicationService())` builds an `McpServer` and returns it,
   *without* connecting a transport. The optional params let a test inject services
   bound to their own client. The nine tools themselves are registered by two
-  per-feature functions this file composes — `registerEstimatedVacancyTools(server,
-  vacancies)` in `estimated-vacancies/estimated-vacancies.tools.ts` (5 tools) and
+  per-feature functions this file composes — `registerVacancyTools(server,
+  vacancies)` in `vacancies/vacancies.tools.ts` (5 tools) and
   `registerApplicationTools(server, applications)` in
   `applications/applications.tools.ts` (4 tools) — each with a sibling
   `*.schemas.ts` for its zod input shapes. `server.ts` itself stays composition

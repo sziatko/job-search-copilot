@@ -5,7 +5,7 @@
 
 ## Context
 
-`applyUrl` is the natural key of `EstimatedVacancy` (`String @unique`) and the
+`applyUrl` is the natural key of `Vacancy` (`String @unique`) and the
 whole mechanism behind analyze-once (ADR-0005): `save()` looks the row up by it,
 and the unique constraint is the real guard against a lost race.
 
@@ -48,7 +48,7 @@ canonical form before it is ever used as a key. It does six things:
    keyed by `jk`.
 
 Both write paths already called this function before the dedup lookup
-(`estimated-vacancy.service.ts` `save()`, `application.service.ts`
+(`vacancy.service.ts` `save()`, `application.service.ts`
 `resolveVacancyId`), so the change lands on every path that writes an `applyUrl`
 — REST, MCP, and the tracker import — without touching a call site.
 
@@ -120,19 +120,18 @@ Both write paths already called this function before the dedup lookup
   and the only one to revisit if an analysis ever vanishes unexplained.
 - **A synthetic key carries the day it was created**, so a vacancy with no usable
   URL saved again on a later day lands on a second key and becomes a second row.
-  `save()` passes `new Date()` (`estimated-vacancy.service.ts`), which is why: two
+  `save()` passes `new Date()` (`vacancy.service.ts`), which is why: two
   saves on the same day dedup, two saves a day apart do not. The tracker path
   passes a caller-supplied `appliedAt` and does not drift, so the two are not
   consistent with each other. Pinned as it stands by a test in
-  `estimated-vacancy.service.spec.ts` rather than changed — the key's shape moves
-  42 stored rows, and `backfill-applyurl.ts` refuses to merge, so changing it is a
-  migration, not an edit.
+  `vacancy.service.spec.ts` rather than changed — the key's shape moves
+  42 stored rows, and a backfill may not merge, so changing it is a migration, not
+  an edit.
 - **Rows written before 2026-09-21 kept their old, unstripped form** and did not
   match a canonicalized lookup. Not a regression (they did not match before
-  either — that was the bug), but the unique constraint was weaker for them. The
-  backfill that fixed it is `packages/core/scripts/backfill-applyurl.ts`
-  (`npm run backfill:applyurl -w @job-search-copilot/core`): dry run by default,
-  one transaction on `--commit`, and it refuses to touch a collision — two rows
+  either — that was the bug), but the unique constraint was weaker for them. A
+  one-off backfill fixed them (removed in phase 3.1; git keeps it): dry run by
+  default, one transaction on `--commit`, and it refused to touch a collision — two rows
   landing on one key — because the unique index makes the merge impossible anyway
   and picking a survivor is a judgement about which analysis and which
   application history to keep.
@@ -163,7 +162,7 @@ Both write paths already called this function before the dedup lookup
   vacancy and creates the duplicate this ADR exists to prevent.
 - Any backfill rewriting pre-existing rows has to handle collisions: two old rows
   can canonicalize onto the same URL and violate the unique index. It must fail
-  loudly and stop. `backfill-applyurl.ts` never deletes and never merges — the
+  loudly and stop. A backfill never deletes and never merges — the
   human resolution *may* delete, as it did for the two pairs above, but that is a
   decision taken with both rows in view, not something a script gets to pick.
 - `buildSyntheticApplyUrl` output (`tracker://…`) deliberately fails the scheme
@@ -172,9 +171,9 @@ Both write paths already called this function before the dedup lookup
   round-trip through it.
 - A site rule (rule 6) owns the query. **Nothing may post-process it** — applying
   rule 2 to its output would delete the `?jk=…` that *is* the identity and
-  re-create the bug the rule fixes. It must stay idempotent: `backfill-applyurl.ts`
-  and every lookup compare `normalizeApplyUrl(x)` against stored values, so a rule
-  that mangles its own output turns each re-run into a rewrite. The fragment and
+  re-create the bug the rule fixes. It must stay idempotent: every lookup compares
+  `normalizeApplyUrl(x)` against stored values, so a rule that mangles its own
+  output stops matching the rows it wrote. The fragment and
   trailing-slash rules still apply to its output, and that is deliberate — the
   rule owns the query *only*, so those stay in one place.
 - Adding an entry to `SITE_RULES` needs a real example whose URL shape somebody

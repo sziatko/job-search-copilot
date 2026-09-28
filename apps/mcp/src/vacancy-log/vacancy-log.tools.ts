@@ -22,8 +22,9 @@ export function registerVacancyLogTools(server: McpServer, log: VacancyLogServic
         'params and LinkedIn host/slug variants are normalized); pass `company` and ' +
         '`title` when known — the same role under a new link is caught by them. ' +
         'Returns { new: true } for a posting never seen before (this call records it), ' +
-        '{ new: false } for a duplicate. Only new postings go on to analysis. Several ' +
-        'postings? Use check_vacancy_log_batch.',
+        '{ new: false } for a duplicate. Only new postings go on to analysis. Check a ' +
+        'posting once: a second call finds the first one and reports a duplicate. ' +
+        'Several postings? Use check_vacancy_log_batch.',
       inputSchema: { url: z.string(), ...entryFields },
     },
     withDomainErrors(async (entry) => json(await log.check(entry))),

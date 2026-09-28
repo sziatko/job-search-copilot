@@ -1,14 +1,14 @@
-import { listEstimatedVacanciesPage } from '../vacancies/api';
-import { type EstimatedVacancyListItem, RECOMMENDATION, USER_ACTION } from '../vacancies/types';
+import { listVacanciesPage } from '../vacancies/api';
+import { RECOMMENDATION, VACANCY_ACTION, type VacancyListItem } from '../vacancies/types';
 
-export interface DashboardCounts {
-  /** Every `EstimatedVacancy` row — analysed *and* imported. Named for what it
+interface DashboardCounts {
+  /** Every `Vacancy` row — analysed *and* imported. Named for what it
    * counts, not for what the old tile called it: an importer placeholder is in
    * here too (phase 2.2, finding 11). */
   postings: number;
   awaitingTriage: number;
   recommended: number;
-  reviewQueue: EstimatedVacancyListItem[];
+  reviewQueue: VacancyListItem[];
 }
 
 /**
@@ -23,10 +23,10 @@ export interface DashboardCounts {
  */
 export async function fetchDashboardCounts(): Promise<DashboardCounts> {
   const [all, triage, apply, caveats] = await Promise.all([
-    listEstimatedVacanciesPage({ limit: 1 }),
-    listEstimatedVacanciesPage({ userAction: USER_ACTION.NOT_REVIEWED, limit: 100 }),
-    listEstimatedVacanciesPage({ recommendation: RECOMMENDATION.APPLY, limit: 1 }),
-    listEstimatedVacanciesPage({ recommendation: RECOMMENDATION.APPLY_WITH_CAVEATS, limit: 1 }),
+    listVacanciesPage({ limit: 1 }),
+    listVacanciesPage({ status: [VACANCY_ACTION.NOT_REVIEWED], limit: 100 }),
+    listVacanciesPage({ recommendation: RECOMMENDATION.APPLY, limit: 1 }),
+    listVacanciesPage({ recommendation: RECOMMENDATION.APPLY_WITH_CAVEATS, limit: 1 }),
   ]);
 
   return {

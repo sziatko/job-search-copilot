@@ -4,7 +4,7 @@
 - Phase: 1 · Date: 2026-09
 
 ## Context
-The initial API mounted routes at the root (`/estimated-vacancies`). Before any
+The initial API mounted routes at the root (`/vacancies`). Before any
 deployment it needs a namespace (so it can share a host with other things) and a
 versioning story (so a breaking change doesn't break the web app mid-deploy).
 
@@ -40,7 +40,7 @@ In `apps/api/src/setup-app.ts`:
 ## What this constrains — breaks if you change it
 - Changing the prefix or default version → `apps/web/src/pages/vacancies/api.ts`
   (`API_BASE`), `apps/web/src/test/msw/handlers.ts`, and every URL in
-  `apps/api/test/estimated-vacancies.e2e.spec.ts`.
+  `apps/api/test/vacancies.e2e.spec.ts`.
 - Removing `VERSION_NEUTRAL` from `HealthController` (or the `exclude: ['health']`)
   → `/health` moves to `/api/v1/health`; the `docker-compose.yml` `api`
   healthcheck (`wget .../health`) fails and the container reports unhealthy.

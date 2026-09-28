@@ -11,7 +11,7 @@ Two very different clients need the same four operations:
   talks MCP over stdio and wants the operations as *tools*.
 
 ## Decision
-Two thin transport apps over the single `EstimatedVacancyService`
+Two thin transport apps over the single `VacancyService`
 ([ADR-0002](0002-core-shared-domain-layer.md)):
 
 - `apps/api` — NestJS REST. DTO validation (`class-validator`), versioned routes,
@@ -35,7 +35,7 @@ their own ADRs.
   [ADR-0002](0002-core-shared-domain-layer.md) exists to prevent.
 
 ## Consequences
-- Adding an operation = one `EstimatedVacancyService` method + one controller
+- Adding an operation = one `VacancyService` method + one controller
   route + one MCP tool + tests for each. Predictable.
 - The two transports can disagree on surface details (MCP `save` returns
   `{ created, vacancy }` as text; REST returns the vacancy with a 201/200 status)
@@ -46,7 +46,7 @@ their own ADRs.
   only → the other transport diverges. Analyze-once lives in `save()`
   ([ADR-0005](0005-analyze-once.md)); both transports inherit it.
 - Adding a third transport → it must also be a thin adapter over
-  `EstimatedVacancyService`; if it needs new behaviour, that behaviour goes in
+  `VacancyService`; if it needs new behaviour, that behaviour goes in
   `core`, not the transport.
 
 ## Related

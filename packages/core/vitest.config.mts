@@ -13,5 +13,6 @@ export default defineConfig({
     env: loadEnv('test', rootDir, ''),
     include: ['src/**/*.spec.ts'],
     setupFiles: ['./tests/setup.ts'],
+    isolate: false, // see the root vitest.config.mts
   },
 });

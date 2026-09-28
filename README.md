@@ -14,7 +14,7 @@ npm-workspaces monorepo:
 
 | Package | What it is |
 | --- | --- |
-| [`packages/core`](packages/core/README.md) | Domain layer — Prisma schema/client, `EstimatedVacancyService`, recommendation normalization, domain errors. Framework-agnostic; shared by `api` and `mcp`. |
+| [`packages/core`](packages/core/README.md) | Domain layer — Prisma schema/client, `VacancyService`, recommendation normalization, domain errors. Framework-agnostic; shared by `api` and `mcp`. |
 | `apps/api` | NestJS REST API (`/api/v1`), the backend for the web app. |
 | `apps/mcp` | MCP server exposing the same operations as tools, so Claude can save/query analyzed vacancies directly. |
 | `apps/web` | React 19 + Vite + Tailwind dashboard. |

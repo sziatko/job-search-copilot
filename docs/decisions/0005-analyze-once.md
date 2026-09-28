@@ -20,15 +20,15 @@ it's already analysed, skip it. `updatedAt` reacts to `userAction` changes."*
 3. If the `create` loses a race (unique-constraint `P2002`), re-`findUnique` and
    return the winner.
 
-Return type is `{ created: boolean; vacancy: EstimatedVacancy }`
-(`SaveEstimatedVacancyResult`) so callers can tell which path ran.
+Return type is `{ created: boolean; vacancy: Vacancy }`
+(`SaveVacancyResult`) so callers can tell which path ran.
 
 Transport consequences:
-- **REST** — `POST /api/v1/estimated-vacancies` → `201 Created` +
-  `Location: /api/v1/estimated-vacancies/{id}` when a row is created; `200 OK`
+- **REST** — `POST /api/v1/vacancies` → `201 Created` +
+  `Location: /api/v1/vacancies/{id}` when a row is created; `200 OK`
   (same body) when the `applyUrl` already existed. Stays a `POST` (the id is
   server-assigned, so there's no client-known URI to `PUT` to).
-- **MCP** — `save_estimated_vacancy` returns `{ created, vacancy }` as JSON text;
+- **MCP** — `save_vacancy` returns `{ created, vacancy }` as JSON text;
   the analyzer reads `created` to know whether its analysis was stored or dropped.
 
 ## Why this and not the alternatives
@@ -38,7 +38,7 @@ Transport consequences:
   actually needs. Considered and set aside.
 - **Inline `previousAnalysis Json?` snapshot** — cheaper middle ground, but "one
   step of history" isn't a requirement anyone stated.
-- **On the HTTP verb:** `PUT /estimated-vacancies/by-url/{encoded}` is the
+- **On the HTTP verb:** `PUT /vacancies/by-url/{encoded}` is the
   RESTfully-purest match for idempotent-by-natural-key, but the encoded-URL-in-path
   ergonomics aren't worth it. `@HttpCode(200)` always was the lighter option, but
   it drops the create/skip signal the MCP caller needs — so the `{ created }`
@@ -47,24 +47,24 @@ Transport consequences:
 ## Consequences
 - Re-submitting a vacancy is a cheap no-op; the analyzer can be careless about
   re-runs.
-- `updatedAt` only ever moves on a `userAction` change, which makes it a useful
-  "last touched by me" timestamp.
+- `updatedAt` only ever moves on the user's changes (status, salary, CV) — the
+  analysis is never rewritten. The semantic date of a move is `statusChangedAt`.
 - The `{ created, vacancy }` shape ripples: `packages/core` (`save` +
-  `SaveEstimatedVacancyResult` export), `apps/api` controller (`@Res` +
+  `SaveVacancyResult` export), `apps/api` controller (`@Res` +
   status/`Location`), `apps/mcp` `server.ts`, and the service / mcp / e2e specs.
 
 ## What this constrains — breaks if you change it
 - Reverting `save()` to an upsert → stored analyses get clobbered; the API's
   `200`-on-existing branch and the MCP `created` flag lose meaning; the
   "second save leaves it untouched" tests in
-  `packages/core/src/estimated-vacancy.service.spec.ts` and
+  `packages/core/src/vacancy.service.spec.ts` and
   `apps/mcp/src/server.spec.ts` fail.
 - Changing `save()`'s return to a bare vacancy again → the API controller can't
   choose 201 vs 200; the MCP analyzer can't detect a dropped analysis.
-- Dropping the `Location` header on create → `apps/api/test/estimated-vacancies.e2e.spec.ts`
+- Dropping the `Location` header on create → `apps/api/test/vacancies.e2e.spec.ts`
   (`expect(res.headers.location)`).
 
 ## Related
 [`../domain-model.md`](../domain-model.md) ("Analyze-once"),
 [`../contracts.md`](../contracts.md), [ADR-0004](0004-one-service-two-transports.md),
-`packages/core/src/estimated-vacancy.service.ts`.
+`packages/core/src/vacancy.service.ts`.

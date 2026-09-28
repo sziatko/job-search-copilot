@@ -31,23 +31,6 @@ if (!('ResizeObserver' in globalThis)) {
   } as unknown as typeof ResizeObserver;
 }
 
-// jsdom has no matchMedia either. The theme module reads it for the OS
-// preference, and RootLayout renders the theme toggle on every page.
-// (`typeof` rather than `'matchMedia' in window`: that narrower collapses
-// `window` to `never`, because lib.dom already declares the property.)
-if (typeof window.matchMedia !== 'function') {
-  window.matchMedia = ((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia;
-}
-
 // jsdom *does* define window.scrollTo — but its body only reports "Not implemented"
 // to the virtual console. RootLayout resets scroll on every navigation, and every
 // page in this suite renders that shell, so the notice printed dozens of times a run

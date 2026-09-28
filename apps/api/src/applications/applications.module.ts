@@ -7,7 +7,7 @@ import { ApplicationsController } from './applications.controller';
   controllers: [ApplicationsController],
   providers: [
     {
-      // Same pattern as EstimatedVacanciesModule — the framework-agnostic core
+      // Same pattern as VacanciesModule — the framework-agnostic core
       // service, constructed here with the DI-managed Prisma client.
       provide: ApplicationService,
       useFactory: (prisma: PrismaService) => new ApplicationService(prisma.client),

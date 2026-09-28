@@ -33,8 +33,7 @@ describe('job-search-copilot MCP server', () => {
   const prisma = getPrisma();
 
   afterEach(async () => {
-    await prisma.application.deleteMany();
-    await prisma.estimatedVacancy.deleteMany();
+    await prisma.vacancy.deleteMany();
     await prisma.vacancyLogEntry.deleteMany();
   });
 
@@ -42,10 +41,10 @@ describe('job-search-copilot MCP server', () => {
     await prisma.$disconnect();
   });
 
-  it('save_estimated_vacancy normalizes the Ukrainian recommendation and persists it', async () => {
+  it('save_vacancy normalizes the Ukrainian recommendation and persists it', async () => {
     const client = await connectedClient();
     const saveResult = await client.callTool({
-      name: 'save_estimated_vacancy',
+      name: 'save_vacancy',
       arguments: validArgs,
     });
     const { success, vacancy } = JSON.parse(textOf(saveResult));
@@ -54,21 +53,46 @@ describe('job-search-copilot MCP server', () => {
     expect(vacancy.title).toBe('Backend Engineer');
 
     const getResult = await client.callTool({
-      name: 'get_estimated_vacancy',
+      name: 'get_vacancy',
       arguments: { id: vacancy.id },
     });
     const full = JSON.parse(textOf(getResult));
     expect(full.applyUrl).toBe(validArgs.applyUrl);
     expect(full.recommendation).toBe('APPLY');
-    expect(full.userAction).toBe('NOT_REVIEWED');
+    expect(full.status).toBe('NOT_REVIEWED');
+    expect(full.comments).toMatchObject([{ source: 'ANALYZER', body: 'Strong match.' }]);
   });
 
-  it('save_estimated_vacancy reports success:false and drops the analysis on a re-save', async () => {
+  it('sends the cross-tool rules as its instructions', async () => {
     const client = await connectedClient();
-    await client.callTool({ name: 'save_estimated_vacancy', arguments: validArgs });
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions).toContain('check_vacancy_log before analysing');
+    expect(instructions).toContain('update_vacancy_status');
+  });
+
+  it('registers exactly the ten tools', async () => {
+    const client = await connectedClient();
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      'check_vacancy_log',
+      'check_vacancy_log_batch',
+      'get_vacancy',
+      'list_applications',
+      'list_vacancies',
+      'record_application',
+      'record_applications_batch',
+      'save_vacancies_batch',
+      'save_vacancy',
+      'update_vacancy_status',
+    ]);
+  });
+
+  it('save_vacancy reports success:false and drops the analysis on a re-save', async () => {
+    const client = await connectedClient();
+    await client.callTool({ name: 'save_vacancy', arguments: validArgs });
 
     const again = await client.callTool({
-      name: 'save_estimated_vacancy',
+      name: 'save_vacancy',
       arguments: { ...validArgs, matchScore: 5, estimationComment: 'changed' },
     });
     const { success, vacancy } = JSON.parse(textOf(again));
@@ -76,7 +100,7 @@ describe('job-search-copilot MCP server', () => {
     expect(vacancy.company).toBe('Acme');
 
     const got = await client.callTool({
-      name: 'get_estimated_vacancy',
+      name: 'get_vacancy',
       arguments: { id: vacancy.id },
     });
     const full = JSON.parse(textOf(got));
@@ -84,12 +108,12 @@ describe('job-search-copilot MCP server', () => {
     expect(full.estimationComment).toBe('Strong match.');
   });
 
-  it('save_estimated_vacancies_batch saves a mixed batch and skips a duplicate applyUrl', async () => {
+  it('save_vacancies_batch saves a mixed batch and skips a duplicate applyUrl', async () => {
     const client = await connectedClient();
-    await client.callTool({ name: 'save_estimated_vacancy', arguments: validArgs });
+    await client.callTool({ name: 'save_vacancy', arguments: validArgs });
 
     const batchResult = await client.callTool({
-      name: 'save_estimated_vacancies_batch',
+      name: 'save_vacancies_batch',
       arguments: {
         vacancies: [
           validArgs, // duplicate applyUrl — should be skipped
@@ -105,14 +129,14 @@ describe('job-search-copilot MCP server', () => {
     expect(items[1].success).toBe(true);
     expect(items[1].vacancy.title).toBe('Frontend Engineer');
 
-    const list = await client.callTool({ name: 'list_estimated_vacancies', arguments: {} });
+    const list = await client.callTool({ name: 'list_vacancies', arguments: {} });
     expect(JSON.parse(textOf(list)).total).toBe(2);
   });
 
-  it('save_estimated_vacancies_batch rejects an empty or oversized array', async () => {
+  it('save_vacancies_batch rejects an empty or oversized array', async () => {
     const client = await connectedClient();
     const empty = await client.callTool({
-      name: 'save_estimated_vacancies_batch',
+      name: 'save_vacancies_batch',
       arguments: { vacancies: [] },
     });
     expect(empty.isError).toBe(true);
@@ -122,7 +146,7 @@ describe('job-search-copilot MCP server', () => {
       applyUrl: `https://example.com/jobs/${i}`,
     }));
     const oversized = await client.callTool({
-      name: 'save_estimated_vacancies_batch',
+      name: 'save_vacancies_batch',
       arguments: { vacancies: tooMany },
     });
     expect(oversized.isError).toBe(true);
@@ -196,40 +220,39 @@ describe('job-search-copilot MCP server', () => {
     expect(oversized.isError).toBe(true);
   });
 
-  it('get_estimated_vacancy reports isError for an unknown id', async () => {
+  it('get_vacancy reports isError for an unknown id', async () => {
     const client = await connectedClient();
     const result = await client.callTool({
-      name: 'get_estimated_vacancy',
+      name: 'get_vacancy',
       arguments: { id: 999_999 },
     });
     expect(result.isError).toBe(true);
   });
 
-  it('list_estimated_vacancies returns saved vacancies without fullText', async () => {
+  it('list_vacancies returns saved vacancies without fullText', async () => {
     const client = await connectedClient();
-    await client.callTool({ name: 'save_estimated_vacancy', arguments: validArgs });
+    await client.callTool({ name: 'save_vacancy', arguments: validArgs });
 
-    const result = await client.callTool({ name: 'list_estimated_vacancies', arguments: {} });
+    const result = await client.callTool({ name: 'list_vacancies', arguments: {} });
     const { items, total } = JSON.parse(textOf(result));
     expect(total).toBe(1);
     expect(items[0]).not.toHaveProperty('fullText');
   });
 
   it('list tools enforce their own paging ceilings and reject what falls outside them', async () => {
-    // `pagination(maxLimit)` is the one abstraction the tool refactor introduced,
-    // and the two list tools differ only in that number. Nothing else exercises
-    // the bounds — every other call goes through at the defaults.
+    // The two list tools differ only in `pagination(maxLimit)`'s number. Nothing
+    // else exercises the bounds — every other call goes through at the defaults.
     const client = await connectedClient();
 
     const atVacancyCeiling = await client.callTool({
-      name: 'list_estimated_vacancies',
+      name: 'list_vacancies',
       arguments: { limit: 100 },
     });
     expect(atVacancyCeiling.isError).toBeFalsy();
 
     for (const limit of [0, -1, 101]) {
       const result = await client.callTool({
-        name: 'list_estimated_vacancies',
+        name: 'list_vacancies',
         arguments: { limit },
       });
       expect(result.isError, `limit ${limit} should be rejected`).toBe(true);
@@ -250,10 +273,10 @@ describe('job-search-copilot MCP server', () => {
     expect(applicationsAt501.isError).toBe(true);
   });
 
-  it('list_estimated_vacancies pages with limit and offset without shrinking total', async () => {
+  it('list_vacancies pages with limit and offset without shrinking total', async () => {
     const client = await connectedClient();
     await client.callTool({
-      name: 'save_estimated_vacancies_batch',
+      name: 'save_vacancies_batch',
       arguments: {
         vacancies: [1, 2, 3, 4, 5].map((i) => ({
           ...validArgs,
@@ -264,7 +287,7 @@ describe('job-search-copilot MCP server', () => {
     });
 
     const page = await client.callTool({
-      name: 'list_estimated_vacancies',
+      name: 'list_vacancies',
       arguments: { limit: 2, offset: 1 },
     });
     const body = JSON.parse(textOf(page));
@@ -275,36 +298,39 @@ describe('job-search-copilot MCP server', () => {
     expect(body.total).toBe(5);
   });
 
-  it('update_estimated_vacancy_user_action updates userAction', async () => {
+  it('update_vacancy_status triages a vacancy; list_vacancies filters by several statuses', async () => {
     const client = await connectedClient();
     const saveResult = await client.callTool({
-      name: 'save_estimated_vacancy',
+      name: 'save_vacancy',
       arguments: validArgs,
     });
     const { vacancy } = JSON.parse(textOf(saveResult));
+    await client.callTool({
+      name: 'save_vacancy',
+      arguments: { ...validArgs, applyUrl: 'https://example.com/jobs/2' },
+    });
 
     const updateResult = await client.callTool({
-      name: 'update_estimated_vacancy_user_action',
-      arguments: { id: vacancy.id, userAction: 'DECLINED' },
+      name: 'update_vacancy_status',
+      arguments: { id: vacancy.id, status: 'SAVED_FOR_LATER' },
     });
     const body = JSON.parse(textOf(updateResult));
     expect(body.success).toBe(true);
     expect(body.vacancy.id).toBe(vacancy.id);
 
     const got = await client.callTool({
-      name: 'get_estimated_vacancy',
+      name: 'get_vacancy',
       arguments: { id: vacancy.id },
     });
-    expect(JSON.parse(textOf(got)).userAction).toBe('DECLINED');
-  });
+    expect(JSON.parse(textOf(got)).status).toBe('SAVED_FOR_LATER');
 
-  it('update_estimated_vacancy_user_action reports isError for an unknown id', async () => {
-    const client = await connectedClient();
-    const result = await client.callTool({
-      name: 'update_estimated_vacancy_user_action',
-      arguments: { id: 999_999, userAction: 'DECLINED' },
+    const saved = await client.callTool({
+      name: 'list_vacancies',
+      arguments: { status: ['SAVED_FOR_LATER', 'DECLINED'] },
     });
-    expect(result.isError).toBe(true);
+    expect(JSON.parse(textOf(saved)).total).toBe(1);
+    const applications = await client.callTool({ name: 'list_applications', arguments: {} });
+    expect(JSON.parse(textOf(applications)).total).toBe(0);
   });
 
   it('record_application creates a placeholder vacancy when nothing matches', async () => {
@@ -319,7 +345,7 @@ describe('job-search-copilot MCP server', () => {
     expect(parsed.application.title).toBe('Staff Engineer');
 
     const list = await client.callTool({
-      name: 'list_estimated_vacancies',
+      name: 'list_vacancies',
       arguments: { company: 'Never Analyzed Co' },
     });
     const { items } = JSON.parse(textOf(list));
@@ -327,28 +353,84 @@ describe('job-search-copilot MCP server', () => {
     expect(items[0].recommendation).toBe('APPLY');
   });
 
-  it('record_application links to an analyzed vacancy and marks it APPLIED', async () => {
+  it('record_application links to an analyzed vacancy and moves it to APPLIED', async () => {
     const client = await connectedClient();
-    const saved = await client.callTool({ name: 'save_estimated_vacancy', arguments: validArgs });
+    const saved = await client.callTool({ name: 'save_vacancy', arguments: validArgs });
     const { vacancy } = JSON.parse(textOf(saved));
 
     const recorded = await client.callTool({
       name: 'record_application',
       arguments: { company: 'acme', title: 'backend engineer', salaryInListing: '130 PLN/h' },
     });
-    expect(JSON.parse(textOf(recorded)).success).toBe(true);
+    const { success, application } = JSON.parse(textOf(recorded));
+    expect(success).toBe(true);
+    expect(application.id).toBe(vacancy.id);
 
     const got = await client.callTool({
-      name: 'get_estimated_vacancy',
+      name: 'get_vacancy',
       arguments: { id: vacancy.id },
     });
-    expect(JSON.parse(textOf(got)).userAction).toBe('APPLIED');
+    expect(JSON.parse(textOf(got))).toMatchObject({
+      status: 'APPLIED',
+      salaryInListing: '130 PLN/h',
+    });
 
-    const list = await client.callTool({ name: 'list_estimated_vacancies', arguments: {} });
+    const again = await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'acme', title: 'backend engineer' },
+    });
+    expect(again.isError).toBe(true);
+
+    const list = await client.callTool({ name: 'list_vacancies', arguments: {} });
     expect(JSON.parse(textOf(list)).total).toBe(1); // linked, no new vacancy created
   });
 
-  it('list_applications filters by status and search', async () => {
+  it('record_application takes a vacancyId instead of company + title, never both', async () => {
+    const client = await connectedClient();
+    const saved = await client.callTool({ name: 'save_vacancy', arguments: validArgs });
+    const { vacancy } = JSON.parse(textOf(saved));
+
+    const both = await client.callTool({
+      name: 'record_application',
+      arguments: { vacancyId: vacancy.id, company: 'Acme', title: 'Backend Engineer' },
+    });
+    expect(both.isError).toBe(true);
+    const neither = await client.callTool({ name: 'record_application', arguments: {} });
+    expect(neither.isError).toBe(true);
+
+    const recorded = await client.callTool({
+      name: 'record_application',
+      arguments: { vacancyId: vacancy.id, salaryInListing: '130 PLN/h' },
+    });
+    expect(JSON.parse(textOf(recorded)).application.id).toBe(vacancy.id);
+    const got = await client.callTool({ name: 'get_vacancy', arguments: { id: vacancy.id } });
+    expect(JSON.parse(textOf(got))).toMatchObject({
+      status: 'APPLIED',
+      salaryInListing: '130 PLN/h',
+    });
+  });
+
+  it('list_applications finds an application by the posting link from an email', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'save_vacancy',
+      arguments: { ...validArgs, applyUrl: 'https://www.linkedin.com/jobs/view/3900000001/' },
+    });
+    await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Acme', title: 'Backend Engineer' },
+    });
+
+    const found = await client.callTool({
+      name: 'list_applications',
+      arguments: { applyUrl: 'https://www.linkedin.com/comm/jobs/view/3900000001/?trk=eml' },
+    });
+    expect(JSON.parse(textOf(found)).items.map((i: { company: string }) => i.company)).toEqual([
+      'Acme',
+    ]);
+  });
+
+  it('list_applications filters by status and search, and rejects a triage status', async () => {
     const client = await connectedClient();
     await client.callTool({
       name: 'record_application',
@@ -370,6 +452,12 @@ describe('job-search-copilot MCP server', () => {
       arguments: { search: 'beta' },
     });
     expect(JSON.parse(textOf(searched)).total).toBe(1);
+
+    const triage = await client.callTool({
+      name: 'list_applications',
+      arguments: { status: 'DECLINED' },
+    });
+    expect(triage.isError).toBe(true);
   });
 
   it('list_applications filters by company and title independently, AND-ed when both given', async () => {
@@ -402,7 +490,7 @@ describe('job-search-copilot MCP server', () => {
     expect(JSON.parse(textOf(byBoth)).total).toBe(1);
   });
 
-  it('update_application_status moves the pipeline stage; isError for an unknown id', async () => {
+  it('update_vacancy_status moves the pipeline stage; isError for an unknown id', async () => {
     const client = await connectedClient();
     const recorded = await client.callTool({
       name: 'record_application',
@@ -411,13 +499,13 @@ describe('job-search-copilot MCP server', () => {
     const { application } = JSON.parse(textOf(recorded));
 
     const updated = await client.callTool({
-      name: 'update_application_status',
+      name: 'update_vacancy_status',
       arguments: { id: application.id, status: 'INTERVIEW' },
     });
     const body = JSON.parse(textOf(updated));
     expect(body.success).toBe(true);
-    expect(body.application.id).toBe(application.id);
-    expect(body.application.company).toBe('Gamma Co');
+    expect(body.vacancy.id).toBe(application.id);
+    expect(body.vacancy.company).toBe('Gamma Co');
 
     const list = await client.callTool({
       name: 'list_applications',
@@ -426,50 +514,49 @@ describe('job-search-copilot MCP server', () => {
     expect(JSON.parse(textOf(list)).items[0].status).toBe('INTERVIEW');
 
     const missing = await client.callTool({
-      name: 'update_application_status',
+      name: 'update_vacancy_status',
       arguments: { id: 999_999, status: 'INTERVIEW' },
     });
     expect(missing.isError).toBe(true);
   });
 
-  it('update_application_status adds each statusComment as a comment', async () => {
+  it("record_application's comment is USER; update_vacancy_status's are AGENT", async () => {
     const client = await connectedClient();
     const recorded = await client.callTool({
       name: 'record_application',
-      arguments: { company: 'Delta Co', title: 'Dev' },
+      arguments: { company: 'Delta Co', title: 'Dev', comment: 'Applied via referral.' },
     });
     const { application } = JSON.parse(textOf(recorded));
 
     await client.callTool({
-      name: 'update_application_status',
+      name: 'update_vacancy_status',
       arguments: {
         id: application.id,
         status: 'RECRUITER_SCREEN',
-        statusComment: 'Recruiter called.',
+        comment: 'Recruiter called.',
       },
     });
-    const afterFirst = await client.callTool({
-      name: 'list_applications',
-      arguments: { company: 'Delta Co' },
-    });
-    expect(JSON.parse(textOf(afterFirst)).items[0].comments).toMatchObject([
-      { body: 'Recruiter called.' },
-    ]);
-
     await client.callTool({
-      name: 'update_application_status',
-      arguments: { id: application.id, status: 'INTERVIEW', statusComment: 'Interview on 20.09.' },
+      name: 'update_vacancy_status',
+      arguments: { id: application.id, status: 'INTERVIEW', comment: 'Interview on 20.09.' },
     });
-    const afterSecond = await client.callTool({
+    const list = await client.callTool({
       name: 'list_applications',
       arguments: { company: 'Delta Co' },
     });
     expect(
-      JSON.parse(textOf(afterSecond)).items[0].comments.map((c: { body: string }) => c.body),
-    ).toEqual(['Recruiter called.', 'Interview on 20.09.']);
+      JSON.parse(textOf(list)).items[0].comments.map((c: { source: string; body: string }) => [
+        c.source,
+        c.body,
+      ]),
+    ).toEqual([
+      ['USER', 'Applied via referral.'],
+      ['AGENT', 'Recruiter called.'],
+      ['AGENT', 'Interview on 20.09.'],
+    ]);
   });
 
-  it('update_application_status matches by company + title, e.g. from a rejection email', async () => {
+  it('update_vacancy_status matches by company + title, e.g. from a rejection email', async () => {
     const client = await connectedClient();
     const recorded = await client.callTool({
       name: 'record_application',
@@ -478,18 +565,18 @@ describe('job-search-copilot MCP server', () => {
     const { application } = JSON.parse(textOf(recorded));
 
     const updated = await client.callTool({
-      name: 'update_application_status',
+      name: 'update_vacancy_status',
       arguments: {
         company: 'epsilon co',
         title: 'DEV',
         status: 'REJECTED',
-        statusComment: 'Rejection email received.',
+        comment: 'Rejection email received.',
       },
     });
     const parsed = JSON.parse(textOf(updated));
     expect(parsed.success).toBe(true);
-    expect(parsed.application.id).toBe(application.id);
-    expect(parsed.application.company).toBe('Epsilon Co');
+    expect(parsed.vacancy.id).toBe(application.id);
+    expect(parsed.vacancy.company).toBe('Epsilon Co');
 
     const list = await client.callTool({
       name: 'list_applications',
@@ -497,26 +584,40 @@ describe('job-search-copilot MCP server', () => {
     });
     const item = JSON.parse(textOf(list)).items[0];
     expect(item.status).toBe('REJECTED');
-    expect(item.comments).toMatchObject([{ body: 'Rejection email received.' }]);
+    expect(item.comments).toMatchObject([{ source: 'AGENT', body: 'Rejection email received.' }]);
   });
 
-  it('update_application_status isError for an unmatched company/title', async () => {
+  it('update_vacancy_status isError for an unmatched company/title', async () => {
     const client = await connectedClient();
     const result = await client.callTool({
-      name: 'update_application_status',
+      name: 'update_vacancy_status',
       arguments: { company: 'Nobody Inc', title: 'Ghost Role', status: 'REJECTED' },
     });
     expect(result.isError).toBe(true);
   });
 
-  it('update_application_status isError for two vacancies matching the same company/title', async () => {
+  it('update_vacancy_status isError for a vacancy that was never applied to', async () => {
+    const client = await connectedClient();
+    await client.callTool({
+      name: 'save_vacancy',
+      arguments: { ...validArgs, company: 'Eta Co', title: 'Dev' },
+    });
+    const result = await client.callTool({
+      name: 'update_vacancy_status',
+      arguments: { company: 'Eta Co', title: 'Dev', status: 'REJECTED' },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('not found');
+  });
+
+  it('update_vacancy_status isError for two applied vacancies matching the same company/title', async () => {
     const client = await connectedClient();
     await client.callTool({
       name: 'record_application',
       arguments: { company: 'Zeta Co', title: 'Dev' },
     });
-    await client.callTool({
-      name: 'save_estimated_vacancy',
+    const saved = await client.callTool({
+      name: 'save_vacancy',
       arguments: {
         ...validArgs,
         company: 'Zeta Co',
@@ -524,18 +625,22 @@ describe('job-search-copilot MCP server', () => {
         applyUrl: 'https://example.com/z2',
       },
     });
+    await client.callTool({
+      name: 'record_application',
+      arguments: { vacancyId: JSON.parse(textOf(saved)).vacancy.id },
+    });
 
     const result = await client.callTool({
-      name: 'update_application_status',
+      name: 'update_vacancy_status',
       arguments: { company: 'Zeta Co', title: 'Dev', status: 'REJECTED' },
     });
     expect(result.isError).toBe(true);
   });
 
-  it('update_application_status isError when neither id nor company+title is given', async () => {
+  it('update_vacancy_status isError when neither id nor company+title is given', async () => {
     const client = await connectedClient();
     const result = await client.callTool({
-      name: 'update_application_status',
+      name: 'update_vacancy_status',
       arguments: { status: 'REJECTED' },
     });
     expect(result.isError).toBe(true);

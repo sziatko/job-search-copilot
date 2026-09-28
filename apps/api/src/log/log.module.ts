@@ -1,10 +1,10 @@
 import { VacancyLogService } from '@job-search-copilot/core';
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { VacancyLogController } from './vacancy-log.controller';
+import { LogController } from './log.controller';
 
 @Module({
-  controllers: [VacancyLogController],
+  controllers: [LogController],
   providers: [
     {
       // Same pattern as ApplicationsModule.
@@ -14,4 +14,4 @@ import { VacancyLogController } from './vacancy-log.controller';
     },
   ],
 })
-export class VacancyLogModule {}
+export class LogModule {}

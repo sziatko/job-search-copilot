@@ -1,12 +1,13 @@
-import { ApplicationStatus } from '@job-search-copilot/core';
+import { VacancyStatus } from '@job-search-copilot/core';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class UpdateApplicationStatusDto {
-  @IsEnum(ApplicationStatus)
-  status!: ApplicationStatus;
+  /** Any status: the UI limits the moves, the API does not. */
+  @IsEnum(VacancyStatus)
+  status!: VacancyStatus;
 
-  /** Added to the application's timeline as a new Comment row (ADR-0028). */
+  /** Added as a USER comment on the vacancy. */
   @IsOptional()
   @IsString()
-  statusComment?: string;
+  comment?: string;
 }

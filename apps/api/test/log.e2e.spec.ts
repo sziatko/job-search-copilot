@@ -13,7 +13,7 @@ describe('Vacancy log (e2e)', () => {
   const prisma = getPrisma();
 
   const check = (body: unknown) =>
-    request(app.getHttpServer()).post('/api/v1/vacancy-log/check').send(body);
+    request(app.getHttpServer()).post('/api/v1/log/check').send(body);
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

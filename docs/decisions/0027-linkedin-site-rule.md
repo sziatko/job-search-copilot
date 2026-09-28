@@ -28,8 +28,8 @@ A `SITE_RULES` entry for `linkedin.com` (`normalizeLinkedIn` in
 the URL becomes `https://www.linkedin.com/jobs/view/<id>`, with no query. Any other
 LinkedIn path falls through to ADR-0023's usual query strip.
 
-The rule applies to `EstimatedVacancy.applyUrl` as well as the log, and existing rows
-are backfilled with `backfill-applyurl.ts`.
+The rule applies to `Vacancy.applyUrl` as well as the log, and existing rows
+were backfilled once.
 
 ## Why this and not the alternatives
 
@@ -50,9 +50,8 @@ are backfilled with `backfill-applyurl.ts`.
 - A `jobs/search?currentJobId=` link (none in the data today) does not match. Rule 2
   strips it to the search page, and every such link collapses onto one key. Add it to
   this rule when one is actually seen.
-- The backfill may find collision pairs: one posting analysed twice under two
-  spellings. Per ADR-0023 the script refuses these, and the user resolves each one by
-  hand.
+- A backfill may find collision pairs: one posting analysed twice under two
+  spellings. Per ADR-0023 it refuses these, and the user resolves each one by hand.
 
 ## What this constrains — breaks if you change it
 

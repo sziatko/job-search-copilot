@@ -1,13 +1,7 @@
-export type {
-  Application,
-  EstimatedVacancy,
-  PrismaClient,
-  VacancyLogEntry,
-} from '@prisma/client';
-export { ApplicationStatus, Recommendation, UserAction } from '@prisma/client';
+export type { PrismaClient, Vacancy, VacancyLogEntry } from '@prisma/client';
+export { CommentSource, Recommendation, VacancyStatus } from '@prisma/client';
 export { ApplicationService } from './application.service';
 export type {
-  ApplicationComment,
   ApplicationListItem,
   ListApplicationsFilters,
   ListApplicationsResult,
@@ -20,22 +14,13 @@ export type {
   VacancyResolution,
 } from './application.types';
 export {
+  AlreadyAppliedError,
   AmbiguousVacancyMatchError,
-  ApplicationAlreadyExistsError,
   DomainError,
   InvalidApplicationInputError,
   InvalidRecommendationError,
   InvalidVacancyLogEntryError,
 } from './errors';
-export { EstimatedVacancyService } from './estimated-vacancy.service';
-export type {
-  EstimatedVacancyListItem,
-  ListEstimatedVacanciesFilters,
-  ListEstimatedVacanciesResult,
-  SaveEstimatedVacancyInput,
-  SaveEstimatedVacancyResult,
-  SaveManyEstimatedVacanciesResult,
-} from './estimated-vacancy.types';
 export { escapeLikePattern } from './like';
 export { PLACEHOLDER_COMMENT } from './placeholder';
 export { createPrismaClient, getPrisma } from './prisma-client';
@@ -44,6 +29,19 @@ export {
   normalizeRecommendation,
   RECOMMENDATION_INPUT_VALUES,
 } from './recommendation';
+export type { PipelineStatus } from './status';
+export { PIPELINE_STATUSES } from './status';
+export { VacancyService } from './vacancy.service';
+export type {
+  ListVacanciesFilters,
+  ListVacanciesResult,
+  SaveManyVacanciesResult,
+  SaveVacancyInput,
+  SaveVacancyResult,
+  VacancyComment,
+  VacancyDetail,
+  VacancyListItem,
+} from './vacancy.types';
 export type { CheckVacancyLogOptions, VacancyLogInput } from './vacancy-log';
 export { normalizeCompanyKey, normalizeTitleKey } from './vacancy-log';
 export { VacancyLogService } from './vacancy-log.service';

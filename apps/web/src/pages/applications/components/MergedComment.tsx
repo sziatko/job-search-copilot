@@ -1,47 +1,24 @@
 import { useCallback, useRef, useState } from 'react';
-import type { ApplicationComment } from '../types';
-
-interface Part {
-  text: string;
-  className: string;
-  /** A timeline comment's date, shown before its text. */
-  date?: string;
-}
+import type { ApplicationComment, CommentSource } from '../types';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
+/** Who wrote it decides how it reads. */
+const SOURCE_CLASS: Record<CommentSource, string> = {
+  USER: 'comment-user',
+  ANALYZER: 'comment-analyzer',
+  AGENT: 'comment-status',
+};
+
 /**
- * Three sources merged into one cell, in this order: the user's own note (they wrote
- * it about this specific application), the analyzer's reasoning, then the timeline
- * comments, oldest first, each with its date (ADR-0028). 'N/A' is the backend's
- * placeholder for a never-analysed vacancy — treat it as empty.
+ * Every comment on the vacancy in one cell, in the order the API sends them (oldest
+ * first), each with its date and styled by its source.
  *
  * The mockup's single-string cell clamps to two lines with a "Show more" button.
  * That styling is kept, but the toggle is measured rather than always shown: a
  * comment that already fits would otherwise display a button that does nothing.
  */
-export function MergedComment({
-  userComment,
-  estimationComment,
-  comments,
-}: {
-  userComment: string | null;
-  estimationComment: string;
-  comments: ApplicationComment[];
-}) {
-  const analyzer = estimationComment && estimationComment !== 'N/A' ? estimationComment : null;
-
-  const parts: Part[] = [];
-  if (userComment) parts.push({ text: userComment, className: 'comment-user' });
-  if (analyzer) parts.push({ text: analyzer, className: 'comment-analyzer' });
-  for (const comment of comments) {
-    parts.push({
-      text: comment.body,
-      className: 'comment-status',
-      date: dateFormatter.format(new Date(comment.createdAt)),
-    });
-  }
-
+export function MergedComment({ comments }: { comments: ApplicationComment[] }) {
   const [clampable, setClampable] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -59,20 +36,21 @@ export function MergedComment({
     observerRef.current.observe(el);
   }, []);
 
-  if (parts.length === 0) {
+  if (comments.length === 0) {
     return <span className="text-ink-faint">—</span>;
   }
 
   return (
     <div className={`comment-cell ${expanded ? 'expanded' : ''}`}>
       <div ref={measureRef} className="clamp">
-        {parts.map((part, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: parts is a fixed-order, static-length render per item
-          <span key={i}>
+        {comments.map((comment, i) => (
+          <span key={comment.id}>
             {i > 0 && (expanded ? <hr className="my-[4px] border-t border-border" /> : ' — ')}
-            <span className={part.className}>
-              {part.date && <time className="mono text-ink-faint">{part.date}: </time>}
-              {part.text}
+            <span className={SOURCE_CLASS[comment.source]}>
+              <time className="mono text-ink-faint">
+                {dateFormatter.format(new Date(comment.createdAt))}:{' '}
+              </time>
+              {comment.body}
             </span>
           </span>
         ))}

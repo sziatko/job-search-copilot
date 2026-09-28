@@ -1,4 +1,4 @@
-import type { ApplicationStatus, PrismaClient } from '@prisma/client';
+import type { CommentSource, PrismaClient, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type {
   ApplicationListItem,
@@ -12,75 +12,94 @@ import type {
 } from './application.types';
 import { isById } from './application.types';
 import {
+  AlreadyAppliedError,
   AmbiguousVacancyMatchError,
-  ApplicationAlreadyExistsError,
   InvalidApplicationInputError,
 } from './errors';
 import { escapeLikePattern } from './like';
 import { PLACEHOLDER_COMMENT } from './placeholder';
 import { getPrisma } from './prisma-client';
 import { deriveRecommendationFromScore } from './recommendation';
-import { buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
+import { firstStatus, PIPELINE_STATUSES, writeStatus } from './status';
+import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
+import { ALL_COMMENTS } from './vacancy.service';
 
-/** The EstimatedVacancy fields the /tracker page reads through the join. */
-const VACANCY_SELECT = {
+/** The Vacancy fields the /applications page reads. */
+const APPLICATION_SELECT = {
+  id: true,
+  status: true,
+  statusChangedAt: true,
+  salaryInListing: true,
+  usedTailoredResume: true,
   company: true,
   title: true,
   applyUrl: true,
   matchScore: true,
   recommendation: true,
-  estimationComment: true,
-} satisfies Prisma.EstimatedVacancySelect;
-
-const APPLICATION_INCLUDE = {
-  estimatedVacancy: { select: VACANCY_SELECT },
-  // Oldest first; `id` breaks the tie between notes migrated with one shared date.
-  comments: {
-    select: { id: true, createdAt: true, body: true },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  comments: ALL_COMMENTS,
+  // appliedAt: the latest APPLIED row — a vacancy can be applied to, set back, and
+  // applied to again.
+  statusChanges: {
+    where: { status: 'APPLIED' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 1,
+    select: { createdAt: true },
   },
-} satisfies Prisma.ApplicationInclude;
+} satisfies Prisma.VacancySelect;
 
-type ApplicationRow = Prisma.ApplicationGetPayload<{ include: typeof APPLICATION_INCLUDE }>;
+type ApplicationRow = Prisma.VacancyGetPayload<{ select: typeof APPLICATION_SELECT }>;
 
-/** Any Prisma client or interactive-transaction client — the record path runs the
- * same way whether it's a single call or one row of an import batch. */
+/** Any Prisma client or interactive-transaction client. */
 type Db = PrismaClient | Prisma.TransactionClient;
 
-function flatten(row: ApplicationRow): ApplicationListItem {
-  const ev = row.estimatedVacancy;
-  return {
-    id: row.id,
-    appliedAt: row.appliedAt,
-    status: row.status,
-    statusUpdatedAt: row.statusUpdatedAt,
-    comments: row.comments,
-    salaryInListing: row.salaryInListing,
-    usedTailoredResume: row.usedTailoredResume,
-    userComment: row.userComment,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    estimatedVacancyId: row.estimatedVacancyId,
-    company: ev.company,
-    title: ev.title,
-    applyUrl: ev.applyUrl,
-    matchScore: ev.matchScore,
-    recommendation: ev.recommendation,
-    estimationComment: ev.estimationComment,
-  };
+const PIPELINE: VacancyStatus[] = [...PIPELINE_STATUSES];
+
+function flatten({ statusChanges, ...row }: ApplicationRow): ApplicationListItem {
+  return { ...row, appliedAt: statusChanges[0]?.createdAt ?? null };
 }
 
+/** A nested write that adds `body` to the vacancy as a `source` comment; nothing when
+ * it is blank. */
+function commentOn(
+  body: string | null | undefined,
+  source: CommentSource,
+): Prisma.VacancyUpdateInput {
+  const note = body?.trim();
+  return note ? { comments: { create: { body: note, source } } } : {};
+}
+
+/** One update, returned flattened; null when no vacancy has this id (P2025 — let the
+ * UPDATE fail rather than check first). */
+async function updateRow(
+  db: Db,
+  id: number,
+  data: Prisma.VacancyUpdateInput,
+): Promise<ApplicationListItem | null> {
+  try {
+    return flatten(await db.vacancy.update({ where: { id }, data, select: APPLICATION_SELECT }));
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      return null;
+    }
+    throw err;
+  }
+}
+
+/**
+ * /applications' view of the vacancies: those with a pipeline status. Not a second
+ * status zone — applying moves the vacancy's own `status`, and `id` is the vacancy's.
+ */
 export class ApplicationService {
   /** @param db defaults (on construction, not import) to the lazy process-wide client —
-   *   same rationale as EstimatedVacancyService. Nest passes its managed client. */
+   *   same rationale as VacancyService. Nest passes its managed client. */
   constructor(private readonly db: PrismaClient = getPrisma()) {}
 
   /**
    * Record that the user applied to a role. In one transaction: resolve the vacancy
    * (link by id, link to a unique (company,title) match, or create a minimal
-   * placeholder-filled row), flip that vacancy's userAction to APPLIED, and create
-   * the Application. Throws a DomainError on blank input, an unknown id, an ambiguous
-   * (company,title) match, or a vacancy that already has an application.
+   * placeholder-filled row), move it to APPLIED (then to `status`, if given), and set
+   * salary / CV / comment. Throws a DomainError on blank input, an unknown id, an
+   * ambiguous (company,title) match, or a vacancy already in the pipeline.
    */
   record(input: RecordApplicationInput): Promise<RecordApplicationResult> {
     return this.db.$transaction((tx) => recordWithin(tx, input));
@@ -88,7 +107,7 @@ export class ApplicationService {
 
   /**
    * Record a whole batch atomically — one transaction, all rows or none. A thrown
-   * row rolls everything back, so a failed import leaves nothing and is safe to retry.
+   * row rolls everything back, so a failed batch leaves nothing and is safe to retry.
    */
   recordMany(inputs: RecordApplicationInput[]): Promise<RecordManyApplicationsResult> {
     return this.db.$transaction(async (tx) => {
@@ -100,22 +119,22 @@ export class ApplicationService {
     });
   }
 
+  /** Null when no vacancy has this id, or it is not in the pipeline. */
   async getById(id: number): Promise<ApplicationListItem | null> {
-    const row = await this.db.application.findUnique({
-      where: { id },
-      include: APPLICATION_INCLUDE,
+    const row = await this.db.vacancy.findFirst({
+      where: { id, status: { in: PIPELINE } },
+      select: APPLICATION_SELECT,
     });
     return row ? flatten(row) : null;
   }
 
   async list(filters: ListApplicationsFilters = {}): Promise<ListApplicationsResult> {
-    // search/company/title each contribute one clause against the linked vacancy;
-    // AND-ed together so giving more than one narrows (a caller normally gives just
-    // one — search is the /tracker free-text box, company/title are the MCP tool —
-    // but composing them via AND rather than clobbering keeps it well-defined either way).
-    // Escaped like the vacancy service's: these are the same free-text terms over
-    // the same two columns, reached through the join.
-    const vacancyFilters: Prisma.EstimatedVacancyWhereInput[] = [];
+    // search/company/title each contribute one clause; AND-ed together so giving more
+    // than one narrows (a caller normally gives just one — search is the /applications
+    // free-text box, company/title are the MCP tool — but composing them via AND
+    // rather than clobbering keeps it well-defined either way). Escaped like the
+    // vacancy service's: these are the same free-text terms over the same two columns.
+    const vacancyFilters: Prisma.VacancyWhereInput[] = [];
     if (filters.search) {
       vacancyFilters.push({
         OR: [
@@ -135,111 +154,81 @@ export class ApplicationService {
       });
     }
 
-    const where: Prisma.ApplicationWhereInput = {
-      ...(filters.status && { status: filters.status }),
-      ...(vacancyFilters.length > 0 && { estimatedVacancy: { AND: vacancyFilters } }),
+    const where: Prisma.VacancyWhereInput = {
+      status: { in: filters.status ? [filters.status] : PIPELINE },
+      ...(filters.applyUrl !== undefined && { applyUrl: applyUrlKey(filters.applyUrl) }),
+      ...(vacancyFilters.length > 0 && { AND: vacancyFilters }),
     };
 
     const take = filters.limit ?? 50;
     const skip = filters.offset ?? 0;
 
     const [rows, total] = await Promise.all([
-      this.db.application.findMany({
+      this.db.vacancy.findMany({
         where,
-        // `appliedAt` alone is not a total order: the importer stamps a whole batch
-        // with one timestamp, so ties are normal. Offset paging over a tie has no
-        // defined window — the same row can be served by two pages and another
-        // skipped — so `id` breaks the tie. The web's log loader reads this list as
-        // consecutive pages (phase 2.2, step 2).
-        orderBy: [{ appliedAt: 'desc' }, { id: 'desc' }],
+        // The last move first — a fresh application tops the list; a comment or an
+        // edit does not reorder. `statusChangedAt` alone is not a total order (a
+        // migrated batch shares one date), and offset paging over a tie has no defined
+        // window, so `id` breaks it. The web reads this list as consecutive pages.
+        orderBy: [{ statusChangedAt: 'desc' }, { id: 'desc' }],
         take,
         skip,
-        include: APPLICATION_INCLUDE,
+        select: APPLICATION_SELECT,
       }),
-      this.db.application.count({ where }),
+      this.db.vacancy.count({ where }),
     ]);
 
     return { items: rows.map(flatten), total };
   }
 
   /**
-   * Returns null when no application has this id (P2025 — same pattern as
-   * updateUserAction). `statusComment`, when given, becomes a new `Comment` row in
-   * the same write — the timeline is append-only (ADR-0028).
+   * Moves the vacancy to `status` through writeStatus — any status, triage included,
+   * and the same one is an event too. `note`, when not blank, becomes a new `source`
+   * comment in the same transaction. `source` is the
+   * caller's: AGENT over MCP, USER over REST. Returns null when no vacancy has this id.
    */
-  async updateStatus(
+  updateStatus(
     id: number,
-    status: ApplicationStatus,
-    statusComment?: string,
+    status: VacancyStatus,
+    note: string | undefined,
+    source: CommentSource,
   ): Promise<ApplicationListItem | null> {
-    const note = statusComment?.trim();
-    return this.updateRow(id, {
-      status,
-      statusUpdatedAt: new Date(),
-      ...(note && { comments: { create: { body: note } } }),
+    return this.db.$transaction(async (tx) => {
+      await writeStatus(tx, id, status);
+      return updateRow(tx, id, commentOn(note, source));
     });
   }
 
   /**
    * Edit what was entered when applying — the apply modal re-opened. A field left
-   * out is untouched; a blank string clears it. Returns null for an unknown id.
+   * out is untouched; a blank string clears it. A non-blank `comment` adds a USER
+   * comment — it edits none. Returns null for an unknown id.
    */
   update(id: number, input: UpdateApplicationInput): Promise<ApplicationListItem | null> {
     const text = (value: string | null | undefined) =>
       value === undefined ? undefined : value?.trim() || null;
-    return this.updateRow(id, {
+    return updateRow(this.db, id, {
       salaryInListing: text(input.salaryInListing),
       usedTailoredResume: input.usedTailoredResume,
-      userComment: text(input.userComment),
+      ...commentOn(input.comment, 'USER'),
     });
-  }
-
-  /**
-   * Append a note to the timeline at any time, without a status move (ADR-0028).
-   * Returns null for an unknown id; a blank body is an InvalidApplicationInputError.
-   */
-  async addComment(id: number, body: string): Promise<ApplicationListItem | null> {
-    const note = body.trim();
-    if (!note) throw new InvalidApplicationInputError('comment body is blank');
-    return this.updateRow(id, { comments: { create: { body: note } } });
-  }
-
-  /** One update, returned flattened; null when no application has this id (P2025 —
-   * same pattern as updateUserAction). */
-  private async updateRow(
-    id: number,
-    data: Prisma.ApplicationUpdateInput,
-  ): Promise<ApplicationListItem | null> {
-    try {
-      const row = await this.db.application.update({
-        where: { id },
-        data,
-        include: APPLICATION_INCLUDE,
-      });
-      return flatten(row);
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
-        return null;
-      }
-      throw err;
-    }
   }
 
   /**
    * Same as updateStatus, but for a caller that only knows (company, title) — the
    * natural shape for an agent reading e.g. a rejection/offer email, which has no
-   * internal Application id. Resolves the same way record()'s by-vacancy path does:
-   * a unique case-insensitive (company, title) match against EstimatedVacancy, then
-   * follows the 1:1 back-relation to its Application. Returns null when nothing
-   * matches, or when a matching vacancy exists but was never actually recorded as
-   * applied (call record_application first — this method never creates anything).
-   * Throws AmbiguousVacancyMatchError for 2+ matches, same as record().
+   * id. A unique case-insensitive (company, title) match among the vacancies already
+   * applied to (PIPELINE_STATUSES) — an email about a vacancy never applied to is not
+   * a status move, so it returns null and the agent routes the email to need-attention.
+   * Returns null when nothing matches — it never creates anything. Throws
+   * AmbiguousVacancyMatchError for 2+ matches.
    */
   async updateStatusByVacancy(
     company: string,
     title: string,
-    status: ApplicationStatus,
-    statusComment?: string,
+    status: VacancyStatus,
+    note: string | undefined,
+    source: CommentSource,
   ): Promise<ApplicationListItem | null> {
     const trimmedCompany = company.trim();
     const trimmedTitle = title.trim();
@@ -247,10 +236,12 @@ export class ApplicationService {
       throw new InvalidApplicationInputError('company and title are required');
     }
 
-    const matches = await findVacancyMatches(this.db, trimmedCompany, trimmedTitle);
+    const matches = (await findVacancyMatches(this.db, trimmedCompany, trimmedTitle)).filter((m) =>
+      PIPELINE.includes(m.status),
+    );
     if (matches.length > 1) {
       throw new AmbiguousVacancyMatchError(
-        `"${trimmedCompany}" / "${trimmedTitle}" matches ${matches.length} analyzed vacancies ` +
+        `"${trimmedCompany}" / "${trimmedTitle}" matches ${matches.length} applied vacancies ` +
           `(ids: ${matches.map((m) => m.id).join(', ')}). Pass id to disambiguate.`,
       );
     }
@@ -258,46 +249,46 @@ export class ApplicationService {
       return null;
     }
 
-    const application = await this.db.application.findUnique({
-      where: { estimatedVacancyId: matches[0].id },
-      select: { id: true },
-    });
-    if (!application) {
-      return null;
-    }
-
-    return this.updateStatus(application.id, status, statusComment);
+    return this.updateStatus(matches[0].id, status, note, source);
   }
 }
 
-/** Case-insensitive (company, title) match against EstimatedVacancy — shared by the
+/** Case-insensitive (company, title) match against Vacancy — shared by the
  * record-or-create path and updateStatusByVacancy. */
-function findVacancyMatches(db: Db, company: string, title: string): Promise<{ id: number }[]> {
-  return db.estimatedVacancy.findMany({
+function findVacancyMatches(
+  db: Db,
+  company: string,
+  title: string,
+): Promise<{ id: number; status: VacancyStatus }[]> {
+  return db.vacancy.findMany({
     where: {
       company: { equals: company, mode: 'insensitive' },
       title: { equals: title, mode: 'insensitive' },
     },
-    select: { id: true },
+    select: { id: true, status: true },
   });
 }
 
-async function resolveVacancyId(
+interface ResolvedVacancy {
+  vacancy: { id: number; status: VacancyStatus };
+  resolution: VacancyResolution;
+  vacancyCreated: boolean;
+}
+
+async function resolveVacancy(
   db: Db,
   input: RecordApplicationInput,
-  appliedAt: Date,
-): Promise<{ vacancyId: number; resolution: VacancyResolution; vacancyCreated: boolean }> {
+  at: Date,
+): Promise<ResolvedVacancy> {
   if (isById(input)) {
-    const vacancy = await db.estimatedVacancy.findUnique({
-      where: { id: input.estimatedVacancyId },
-      select: { id: true },
+    const vacancy = await db.vacancy.findUnique({
+      where: { id: input.vacancyId },
+      select: { id: true, status: true },
     });
     if (!vacancy) {
-      throw new InvalidApplicationInputError(
-        `EstimatedVacancy ${input.estimatedVacancyId} not found`,
-      );
+      throw new InvalidApplicationInputError(`Vacancy ${input.vacancyId} not found`);
     }
-    return { vacancyId: vacancy.id, resolution: 'linked-by-id', vacancyCreated: false };
+    return { vacancy, resolution: 'linked-by-id', vacancyCreated: false };
   }
 
   const company = input.company.trim();
@@ -309,12 +300,12 @@ async function resolveVacancyId(
   const matches = await findVacancyMatches(db, company, title);
 
   if (matches.length === 1) {
-    return { vacancyId: matches[0].id, resolution: 'linked-existing', vacancyCreated: false };
+    return { vacancy: matches[0], resolution: 'linked-existing', vacancyCreated: false };
   }
   if (matches.length > 1) {
     throw new AmbiguousVacancyMatchError(
       `"${company}" / "${title}" matches ${matches.length} analyzed vacancies ` +
-        `(ids: ${matches.map((m) => m.id).join(', ')}). Pass estimatedVacancyId to disambiguate.`,
+        `(ids: ${matches.map((m) => m.id).join(', ')}). Pass vacancyId to disambiguate.`,
     );
   }
 
@@ -325,10 +316,10 @@ async function resolveVacancyId(
   // Neutralized, not stored raw: a non-http(s) scheme here would be rendered as a
   // clickable link by the web app. The record is kept either way — losing a whole
   // application over a bad URL would be worse than an unlinked one.
-  const applyUrl =
-    normalizeApplyUrl(input.applyUrl) ?? buildSyntheticApplyUrl(company, title, appliedAt);
+  const applyUrl = normalizeApplyUrl(input.applyUrl) ?? buildSyntheticApplyUrl(company, title, at);
+  const estimationComment = input.estimationComment?.trim();
   try {
-    const created = await db.estimatedVacancy.create({
+    const created = await db.vacancy.create({
       data: {
         company,
         title,
@@ -336,13 +327,14 @@ async function resolveVacancyId(
         fullText: input.fullText ?? PLACEHOLDER_COMMENT,
         matchScore,
         recommendation,
-        estimationComment: input.estimationComment ?? PLACEHOLDER_COMMENT,
-        userAction: 'APPLIED',
-        userActionUpdatedAt: new Date(),
+        ...(estimationComment && {
+          comments: { create: { body: estimationComment, source: 'ANALYZER' } },
+        }),
+        ...firstStatus(at),
       },
-      select: { id: true },
+      select: { id: true, status: true },
     });
-    return { vacancyId: created.id, resolution: 'created-vacancy', vacancyCreated: true };
+    return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true };
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw new InvalidApplicationInputError(
@@ -356,42 +348,30 @@ async function resolveVacancyId(
 }
 
 async function recordWithin(
-  db: Db,
+  tx: Prisma.TransactionClient,
   input: RecordApplicationInput,
 ): Promise<RecordApplicationResult> {
-  const appliedAt = input.appliedAt ?? new Date();
-  const { vacancyId, resolution, vacancyCreated } = await resolveVacancyId(db, input, appliedAt);
+  const at = new Date();
+  const { vacancy, resolution, vacancyCreated } = await resolveVacancy(tx, input, at);
 
-  const existing = await db.application.findUnique({
-    where: { estimatedVacancyId: vacancyId },
-    select: { id: true },
-  });
-  if (existing) {
-    throw new ApplicationAlreadyExistsError(
-      `EstimatedVacancy ${vacancyId} already has application ${existing.id}`,
-    );
+  if (PIPELINE.includes(vacancy.status)) {
+    throw new AlreadyAppliedError(`Vacancy ${vacancy.id} is already ${vacancy.status}`);
   }
 
-  // A freshly created vacancy is already APPLIED. An existing one we linked to may not be.
-  if (!vacancyCreated) {
-    await db.estimatedVacancy.updateMany({
-      where: { id: vacancyId, userAction: { not: 'APPLIED' } },
-      data: { userAction: 'APPLIED', userActionUpdatedAt: new Date() },
-    });
+  // APPLIED first, so an application recorded further along still has its applied date.
+  await writeStatus(tx, vacancy.id, 'APPLIED', at);
+  if (input.status && input.status !== 'APPLIED') {
+    await writeStatus(tx, vacancy.id, input.status, at);
   }
 
-  const row = await db.application.create({
+  const row = await tx.vacancy.update({
+    where: { id: vacancy.id },
     data: {
-      estimatedVacancyId: vacancyId,
-      appliedAt,
-      statusUpdatedAt: appliedAt,
-      status: input.status ?? 'APPLIED',
       salaryInListing: input.salaryInListing?.trim() || null,
       usedTailoredResume: input.usedTailoredResume ?? false,
-      userComment: input.userComment?.trim() || null,
+      ...commentOn(input.comment, 'USER'),
     },
-    include: APPLICATION_INCLUDE,
+    select: APPLICATION_SELECT,
   });
-
   return { application: flatten(row), resolution, vacancyCreated };
 }

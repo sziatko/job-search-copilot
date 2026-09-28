@@ -41,7 +41,7 @@ service (`job_search_copilot_test`), `DATABASE_URL` in the job env, then
   cold-start latency exceeds the MCP client's connect timeout.
 - **`docker build` in CI** — would catch Dockerfile regressions, but adds
   minutes per run for little payoff at the scaffold stage. **Deferred** (see
-  [phase-1.md](../phases/phase-1.md) "Deferred").
+  [`backlog.md`](../backlog.md)).
 - **Deploy from CI** — nothing is deployed yet; out of scope.
 
 ## Consequences

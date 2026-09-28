@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { KpiTile } from '@/components/ui/KpiTile';
 import { APPLICATION_STATUS_LABELS } from '../applications/constants';
 import type { ApplicationListItem, ApplicationStatus } from '../applications/types';
-import type { EstimatedVacancyListItem } from '../vacancies/types';
+import type { VacancyListItem } from '../vacancies/types';
 import { useDashboard } from './useDashboard';
 
 /** What each status change reads as in the activity feed, and its dot colour. */
@@ -73,7 +73,7 @@ function Funnel({ steps }: { steps: FunnelStep[] }) {
   );
 }
 
-function ReviewQueue({ items }: { items: EstimatedVacancyListItem[] }) {
+function ReviewQueue({ items }: { items: VacancyListItem[] }) {
   if (items.length === 0) {
     return <div className="empty-state">Everything is triaged. Nice.</div>;
   }
@@ -114,7 +114,7 @@ function RecentActivity({ items }: { items: ApplicationListItem[] }) {
               {item.title} · {APPLICATION_STATUS_LABELS[item.status]}
             </div>
           </div>
-          <div className="activity-time">{timeAgo(item.statusUpdatedAt)}</div>
+          <div className="activity-time">{timeAgo(item.statusChangedAt)}</div>
         </div>
       ))}
     </div>
@@ -145,10 +145,10 @@ export function DashboardPage() {
   }
 
   // "Logged" and "Duplicates caught" in the mockup have no backing table — every
-  // number below is counted from EstimatedVacancy and Application. The first step is
+  // number below is counted from Vacancy and Application. The first step is
   // "Postings", not "Analyzed": the count includes importer placeholders, which were
   // never analysed (phase 2.2, finding 11). Narrowing it needs a `hasAnalysis` list
-  // filter, which is deferred — see docs/phases/phase-2.2.md.
+  // filter, which is deferred — see docs/backlog.md.
   const steps: FunnelStep[] = [
     { label: 'Postings', value: counts?.postings ?? 0 },
     { label: 'Recommended', value: counts?.recommended ?? 0 },

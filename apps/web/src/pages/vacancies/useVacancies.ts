@@ -9,14 +9,21 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { recordApplication } from '../applications/api';
-import { listEstimatedVacanciesPage, updateUserAction, type VacancyPage } from './api';
+import { isPipelineStatus } from '../applications/types';
+import { listVacanciesPage, updateVacancyStatus, type VacancyPage } from './api';
 import type { ApplyDetails } from './components/ApplyDialog';
 import { RECOMMENDATION_ORDER } from './constants';
-import { STATUS_FILTER_ALL, type StatusFilterValue, USER_ACTION, type UserAction } from './types';
+import {
+  STATUS_FILTER_ALL,
+  type StatusFilterValue,
+  VACANCY_ACTION,
+  type VacancyAction,
+  type VacancyStatus,
+} from './types';
 
 const VACANCIES_KEY = ['vacancies'] as const;
 
-export interface PendingVacancy {
+interface PendingVacancy {
   id: number;
   company: string;
   title: string;
@@ -24,7 +31,14 @@ export interface PendingVacancy {
 
 interface ActionChange {
   id: number;
-  userAction: UserAction;
+  status: VacancyAction;
+}
+
+/** Applied stands for the whole pipeline: a row stays under it as it moves on. */
+function matchesStatusFilter(status: VacancyStatus, filter: StatusFilterValue): boolean {
+  if (filter === STATUS_FILTER_ALL) return true;
+  if (filter === VACANCY_ACTION.APPLIED) return isPipelineStatus(status);
+  return status === filter;
 }
 
 export function useVacancies() {
@@ -71,7 +85,7 @@ export function useVacancies() {
     error,
   } = useQuery({
     queryKey,
-    queryFn: () => listEstimatedVacanciesPage({ search: term }),
+    queryFn: () => listVacanciesPage({ search: term }),
     // A new term is a new key with no cache entry, so without this the table
     // blanks to "Loading…" on every debounced keystroke.
     placeholderData: keepPreviousData,
@@ -85,11 +99,11 @@ export function useVacancies() {
   const [rowErrors, setRowErrors] = useState<Map<number, string>>(new Map());
   const [pendingDecline, setPendingDecline] = useState<PendingVacancy | null>(null);
   const [pendingApply, setPendingApply] = useState<PendingVacancy | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(USER_ACTION.NOT_REVIEWED);
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(VACANCY_ACTION.NOT_REVIEWED);
 
   const visibleItems = useMemo(() => {
     return items
-      .filter((item) => statusFilter === STATUS_FILTER_ALL || item.userAction === statusFilter)
+      .filter((item) => matchesStatusFilter(item.status, statusFilter))
       .sort((a, b) => {
         const byRecommendation =
           RECOMMENDATION_ORDER[a.recommendation] - RECOMMENDATION_ORDER[b.recommendation];
@@ -107,20 +121,20 @@ export function useVacancies() {
   }
 
   /** Optimistic write into **every** cached page, shared by both mutations. */
-  function patchCachedItem(id: number, next: UserAction) {
+  function patchCachedItem(id: number, next: VacancyStatus) {
     queryClient.setQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY }, (old) =>
       old
         ? {
             ...old,
-            items: old.items.map((item) => (item.id === id ? { ...item, userAction: next } : item)),
+            items: old.items.map((item) => (item.id === id ? { ...item, status: next } : item)),
           }
         : old,
     );
   }
 
   const actionMutation = useMutation({
-    mutationFn: ({ id, userAction }: ActionChange) => updateUserAction(id, userAction),
-    onMutate: async ({ id, userAction }) => {
+    mutationFn: ({ id, status }: ActionChange) => updateVacancyStatus(id, status),
+    onMutate: async ({ id, status }) => {
       // Don't let an in-flight refetch clobber the optimistic write.
       await queryClient.cancelQueries({ queryKey });
       setSavingIds((prev) => new Set(prev).add(id));
@@ -130,7 +144,7 @@ export function useVacancies() {
         return next;
       });
       const previous = queryClient.getQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY });
-      patchCachedItem(id, userAction);
+      patchCachedItem(id, status);
       return { previous };
     },
     onError: (err, { id }, context) => {
@@ -149,38 +163,41 @@ export function useVacancies() {
     },
   });
 
-  function requestActionChange(id: number, userAction: UserAction) {
+  function requestActionChange(id: number, status: VacancyAction) {
+    const item = items.find((i) => i.id === id);
+    // Every status write is an event on the server, so picking the status a row
+    // already has must not send one. An applied row's status moves on /applications
+    // only (the table disables its controls too).
+    if (!item || item.status === status || isPipelineStatus(item.status)) return;
     // Declining/applying are a bit more consequential, so confirm first instead of
     // saving straight away like the other actions.
-    if (userAction === USER_ACTION.DECLINED) {
-      const item = items.find((i) => i.id === id);
-      if (item) setPendingDecline({ id, company: item.company, title: item.title });
+    if (status === VACANCY_ACTION.DECLINED) {
+      setPendingDecline({ id, company: item.company, title: item.title });
       return;
     }
-    if (userAction === USER_ACTION.APPLIED) {
-      const item = items.find((i) => i.id === id);
-      if (item) setPendingApply({ id, company: item.company, title: item.title });
+    if (status === VACANCY_ACTION.APPLIED) {
+      setPendingApply({ id, company: item.company, title: item.title });
       return;
     }
-    actionMutation.mutate({ id, userAction });
+    actionMutation.mutate({ id, status });
   }
 
   function confirmDecline() {
     if (!pendingDecline) return;
-    actionMutation.mutate({ id: pendingDecline.id, userAction: USER_ACTION.DECLINED });
+    actionMutation.mutate({ id: pendingDecline.id, status: VACANCY_ACTION.DECLINED });
     setPendingDecline(null);
   }
 
-  // Marking a vacancy APPLIED creates an Application (persisting the dialog's
-  // salary / tailored-resume / comment) and the server flips userAction to APPLIED
-  // in the same transaction — so this path no longer calls updateUserAction.
+  // Applying records the application (the dialog's salary / tailored-resume /
+  // comment) and moves the vacancy to APPLIED in the same transaction — so this path
+  // does not call updateVacancyStatus.
   const applyMutation = useMutation({
     mutationFn: ({ id, details }: { id: number; details: ApplyDetails }) =>
       recordApplication({
-        estimatedVacancyId: id,
+        vacancyId: id,
         salaryInListing: details.salary || undefined,
         usedTailoredResume: details.usedTailoredResume,
-        userComment: details.comment || undefined,
+        comment: details.comment || undefined,
       }),
     onMutate: async ({ id }) => {
       await queryClient.cancelQueries({ queryKey });
@@ -191,7 +208,7 @@ export function useVacancies() {
         return next;
       });
       const previous = queryClient.getQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY });
-      patchCachedItem(id, USER_ACTION.APPLIED);
+      patchCachedItem(id, VACANCY_ACTION.APPLIED);
       return { previous };
     },
     onError: (err, { id }, context) => {

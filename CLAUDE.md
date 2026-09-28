@@ -10,9 +10,15 @@ client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (Re
 - [`docs/architecture.md`](docs/architecture.md) — the system map. Start here.
 - [`docs/contracts.md`](docs/contracts.md) — surfaces other code depends on.
 - [`docs/domain-model.md`](docs/domain-model.md) — the two independent axes.
-- [`docs/decisions/`](docs/decisions/) — 28 ADRs, one per load-bearing decision.
+- [`docs/decisions/`](docs/decisions/) — 29 ADRs, one per load-bearing decision.
 - [`docs/design/`](docs/design/) — visual references (HTML mockups). Not prose; open
   in a browser rather than reading.
+- [`skills/`](skills/) — the user's Claude skills that drive the MCP server, kept here
+  and uploaded to claude.ai by hand. How the tools behave is told by the server itself
+  (the tool descriptions — the one copy every client shows; `SERVER_INSTRUCTIONS` in
+  `apps/mcp/src/server.ts` only summarises them, Claude Desktop drops it), never by a
+  skill; a skill holds only the user's workflow. A tool rename or a changed field →
+  update the skills that call it in the same step, and tell the user to re-upload them.
 
 ## Invariants
 
@@ -23,14 +29,13 @@ Quote them from there if you change one; keep this list in step.
 
 1. **`packages/core` is the only database client.**
 2. **A vacancy is analysed once.**
-3. **`recommendation` is the analyzer's; `userAction` is the user's.**
+3. **`recommendation` is the analyzer's; `status` is the user's.**
 4. **`recommendation` is stored canonical-English.**
 5. **The web app's API contract is a hand-written zod schema**, not a `core` import.
 6. **`apps/api` disables Biome's `useImportType`.**
 7. **Tests run against a real `job_search_copilot_test` database**, sequentially
    (`fileParallelism: false`), and are integration tests, not Prisma mocks.
 8. **Env is loaded by the app entrypoint, validated at boot.**
-9. **Every `Application` links 1:1 to an `EstimatedVacancy`.**
 
 ## Commands
 
@@ -39,7 +44,12 @@ Quote them from there if you change one; keep this list in step.
     npm run typecheck  # builds core first, then tsc --noEmit on the three apps
     npm run migrate:dev
 
-All four are root-only — no workspace defines them. The full list, including the
+All four are root-only — no workspace defines them. One project only:
+`npm test -- --project web` (or `core`, `api`, `mcp`); web needs no database. Mid-step,
+run just the projects the change touches; the full `npm test` still gates the
+checkbox. A core edit touches api and mcp too — they read core's `dist/`, which the
+Docker `core` watcher rebuilds (without the stack up, `npm run build
+--workspace=@job-search-copilot/core` first). The full list, including the
 per-app dev servers, is in the root [`README.md` § Scripts](README.md#scripts-repo-root).
 
 ## Phase workflow
@@ -72,7 +82,8 @@ worked in **steps**.
 - **Leave the doc true before you stop.** If the step diverged from what the plan
   describes, edit that part of the plan — the next session reads it as fact, and a
   stale plan is worse than none. Beside the checkbox, record only what the next
-  step must know and the code cannot show: a deferral, a path left unvalidated, an
-  operational gotcha. Not what was built — that is in the code.
+  step must know and the code cannot show: a path left unvalidated, an operational
+  gotcha. Not what was built — that is in the code. A deferral or a new idea goes to
+  [`docs/backlog.md`](docs/backlog.md), not into the phase doc.
 - Mid-step, `/compact` is the right tool. At a step boundary it is not: the next
   step needs none of the previous one, and the phase doc already carries it.

@@ -9,7 +9,7 @@ x-repo-volumes: &repo-volumes
 x-database-url: &database-url postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-job_search_copilot}
 
 # Bind-mount file change events don't reliably reach containers on Windows/Docker Desktop,
-# so file watchers (tsc --watch, nest start --watch, tsx watch) are told to poll instead.
+# so file watchers (tsc --watch, nest start --watch) are told to poll instead.
 x-watch-env: &watch-env
   CHOKIDAR_USEPOLLING: 'true'
   CHOKIDAR_INTERVAL: '300'
@@ -99,7 +99,6 @@ services:
       core:
         condition: service_started
     environment:
-      <<: *watch-env
       DATABASE_URL: *database-url
     volumes: *repo-volumes
     command: sleep infinity

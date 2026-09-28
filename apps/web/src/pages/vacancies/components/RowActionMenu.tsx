@@ -1,7 +1,7 @@
 import { type ToggleEvent, useEffect, useId, useRef } from 'react';
 import { IconMore } from '@/components/icons';
-import { MENU_ACTIONS, USER_ACTION_LABELS } from '../constants';
-import type { UserAction } from '../types';
+import { MENU_ACTIONS, STATUS_LABELS } from '../constants';
+import type { VacancyAction } from '../types';
 
 /**
  * The action cell's ⋯ trigger: a native `popover="auto"`, so it renders in the
@@ -18,7 +18,7 @@ export function RowActionMenu({
   onAction,
 }: {
   disabled?: boolean;
-  onAction: (userAction: UserAction) => void;
+  onAction: (status: VacancyAction) => void;
 }) {
   // One id per row: the invoker finds its popover by id, so two rows cannot open
   // each other's menus.
@@ -54,11 +54,11 @@ export function RowActionMenu({
     menu.style.right = `${window.innerWidth - rect.right}px`;
   }
 
-  function pick(userAction: UserAction) {
+  function pick(status: VacancyAction) {
     // Close *before* handing the choice up: an open popover lives in the top
     // layer, above the modal an APPLIED/DECLINED choice opens.
     menuRef.current?.hidePopover();
-    onAction(userAction);
+    onAction(status);
   }
 
   return (
@@ -83,9 +83,9 @@ export function RowActionMenu({
         aria-label="Set status"
         className="row-menu"
       >
-        {MENU_ACTIONS.map((userAction) => (
-          <button key={userAction} type="button" role="menuitem" onClick={() => pick(userAction)}>
-            {USER_ACTION_LABELS[userAction]}
+        {MENU_ACTIONS.map((status) => (
+          <button key={status} type="button" role="menuitem" onClick={() => pick(status)}>
+            {STATUS_LABELS[status]}
           </button>
         ))}
       </div>

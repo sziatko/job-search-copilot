@@ -10,7 +10,7 @@ import type { Response } from 'express';
 
 /**
  * Maps a @job-search-copilot/core DomainError (a caller mistake) to 422 instead of
- * letting it fall through to Nest's default 500. Registered globally in main.ts.
+ * letting it fall through to Nest's default 500. Registered globally in setup-app.ts.
  */
 @Catch(DomainError)
 export class DomainExceptionFilter implements ExceptionFilter {

@@ -4,8 +4,9 @@ import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
-import { type ButtonStatus, USER_ACTION_TAGS } from '../constants';
-import { type EstimatedVacancyListItem, USER_ACTION, type UserAction } from '../types';
+import { isPipelineStatus } from '../../applications/types';
+import { type ButtonStatus, STATUS_TAGS } from '../constants';
+import { VACANCY_ACTION, type VacancyAction, type VacancyListItem } from '../types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { RecommendationTag } from './RecommendationTag';
 import { RowActionMenu } from './RowActionMenu';
@@ -13,7 +14,7 @@ import { RowActionMenu } from './RowActionMenu';
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
 /** The verbs for the two statuses this cell gives a button to. Typed by
- * `Record<ButtonStatus, string>`, so it is `USER_ACTION_CONTROL` that decides which
+ * `Record<ButtonStatus, string>`, so it is `ACTION_CONTROL` that decides which
  * buttons exist: moving a status out of the button half leaves an excess key here,
  * and moving one in leaves this map short of a key. A status's *tag* text ("Applied")
  * is a state, not an instruction — hence separate words. */
@@ -42,10 +43,10 @@ export function VacancyTable({
   onActionChange,
   onShowCompanyHistory,
 }: {
-  items: EstimatedVacancyListItem[];
+  items: VacancyListItem[];
   savingIds: Set<number>;
   rowErrors: Map<number, string>;
-  onActionChange: (id: number, userAction: UserAction) => void;
+  onActionChange: (id: number, status: VacancyAction) => void;
   /** Better than a per-row modal: the rows are virtualized, so anything mounted
    * inside one unmounts as soon as it scrolls out of the window. */
   onShowCompanyHistory: (company: string, vacancyId: number) => void;
@@ -82,6 +83,8 @@ export function VacancyTable({
             const others = (item.companyMatchCount ?? 0) - 1;
             const othersLabel = `${others} other ${others === 1 ? 'vacancy' : 'vacancies'} at ${item.company}`;
             const saving = savingIds.has(item.id);
+            // Once applied, the row's status moves on /applications only.
+            const applied = isPipelineStatus(item.status);
             return (
               <tr
                 key={item.id}
@@ -130,11 +133,11 @@ export function VacancyTable({
                   <RecommendationTag recommendation={item.recommendation} />
                 </td>
                 <td>
-                  <ExpandableText text={item.estimationComment} />
+                  {item.estimationComment ? <ExpandableText text={item.estimationComment} /> : '—'}
                 </td>
                 <td>
-                  <span className={`tag ${USER_ACTION_TAGS[item.userAction].variant}`}>
-                    {USER_ACTION_TAGS[item.userAction].text}
+                  <span className={`tag ${STATUS_TAGS[item.status].variant}`}>
+                    {STATUS_TAGS[item.status].text}
                   </span>
                 </td>
                 <td>
@@ -153,8 +156,8 @@ export function VacancyTable({
                     />
                     <button
                       type="button"
-                      disabled={saving}
-                      onClick={() => onActionChange(item.id, USER_ACTION.APPLIED)}
+                      disabled={saving || applied}
+                      onClick={() => onActionChange(item.id, VACANCY_ACTION.APPLIED)}
                       className="icon-btn disabled:opacity-50"
                     >
                       <IconCheck />
@@ -162,16 +165,16 @@ export function VacancyTable({
                     </button>
                     <button
                       type="button"
-                      disabled={saving}
-                      onClick={() => onActionChange(item.id, USER_ACTION.DECLINED)}
+                      disabled={saving || applied}
+                      onClick={() => onActionChange(item.id, VACANCY_ACTION.DECLINED)}
                       className="icon-btn icon-btn-danger disabled:opacity-50"
                     >
                       <IconCross />
                       <span className="tip">{BUTTON_VERBS.DECLINED}</span>
                     </button>
                     <RowActionMenu
-                      disabled={saving}
-                      onAction={(userAction) => onActionChange(item.id, userAction)}
+                      disabled={saving || applied}
+                      onAction={(status) => onActionChange(item.id, status)}
                     />
                   </div>
                   {rowErrors.has(item.id) && (

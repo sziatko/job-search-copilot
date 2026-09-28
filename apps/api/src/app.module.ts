@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ApplicationsModule } from './applications/applications.module';
 import { validateEnv } from './config/env.validation';
-import { EstimatedVacanciesModule } from './estimated-vacancies/estimated-vacancies.module';
 import { HealthModule } from './health/health.module';
+import { LogModule } from './log/log.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { VacancyLogModule } from './vacancy-log/vacancy-log.module';
+import { VacanciesModule } from './vacancies/vacancies.module';
 
 @Module({
   imports: [
@@ -14,9 +14,9 @@ import { VacancyLogModule } from './vacancy-log/vacancy-log.module';
     ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, validate: validateEnv }),
     PrismaModule,
     HealthModule,
-    EstimatedVacanciesModule,
+    VacanciesModule,
     ApplicationsModule,
-    VacancyLogModule,
+    LogModule,
   ],
 })
 export class AppModule {}

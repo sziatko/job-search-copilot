@@ -6,8 +6,7 @@ import { z } from 'zod';
  * fails startup with a readable message instead of surfacing as a confusing error
  * deep in a request later.
  */
-export const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+const envSchema = z.object({
   DATABASE_URL: z.url(),
   API_PORT: z.coerce.number().int().positive().default(3000),
   /** Comma-separated CORS allowlist. Empty → reflect any origin (dev convenience). */

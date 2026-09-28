@@ -1,11 +1,11 @@
-import { ApplicationStatus } from '@job-search-copilot/core';
+import { PIPELINE_STATUSES, type PipelineStatus } from '@job-search-copilot/core';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class ListApplicationsQueryDto {
   @IsOptional()
-  @IsEnum(ApplicationStatus)
-  status?: ApplicationStatus;
+  @IsIn(PIPELINE_STATUSES)
+  status?: PipelineStatus;
 
   @IsOptional()
   @IsString()

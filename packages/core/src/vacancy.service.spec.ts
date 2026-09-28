@@ -1,18 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApplicationService } from './application.service';
 import { InvalidRecommendationError } from './errors';
-import { EstimatedVacancyService } from './estimated-vacancy.service';
-import type {
-  EstimatedVacancyListItem,
-  SaveEstimatedVacancyInput,
-} from './estimated-vacancy.types';
+import { getPrisma } from './prisma-client';
+import { VacancyService } from './vacancy.service';
+import type { SaveVacancyInput, VacancyListItem } from './vacancy.types';
 
 // Integration tests: hit the real (test) Postgres database instead of mocking
 // Prisma. A mocked Prisma client would just re-assert our own query calls and
 // break on every harmless refactor — the DB round-trip is what actually matters.
-const service = new EstimatedVacancyService();
+const service = new VacancyService();
 
-function input(overrides: Partial<SaveEstimatedVacancyInput> = {}): SaveEstimatedVacancyInput {
+/** The vacancy's status journal, oldest first. */
+async function journal(vacancyId: number) {
+  const rows = await getPrisma().statusChange.findMany({
+    where: { vacancyId },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  return rows.map((row) => row.status);
+}
+
+function input(overrides: Partial<SaveVacancyInput> = {}): SaveVacancyInput {
   return {
     company: 'Acme',
     title: 'Backend Engineer',
@@ -28,17 +35,25 @@ function input(overrides: Partial<SaveEstimatedVacancyInput> = {}): SaveEstimate
 /** company → companyMatchCount, so a count can be asserted without depending on
  * the page's order (row order is createdAt desc, and rows saved in the same
  * millisecond have no order to depend on). */
-function countsByCompany(items: EstimatedVacancyListItem[]): Record<string, number> {
+function countsByCompany(items: VacancyListItem[]): Record<string, number> {
   return Object.fromEntries(items.map((item) => [item.company, item.companyMatchCount]));
 }
 
-describe('EstimatedVacancyService', () => {
+describe('VacancyService', () => {
   describe('save', () => {
     it('creates a new vacancy with the recommendation normalized to English', async () => {
       const { created, vacancy } = await service.save(input({ recommendation: 'ПОДАВАТИСЯ' }));
       expect(created).toBe(true);
       expect(vacancy.recommendation).toBe('APPLY');
-      expect(vacancy.userAction).toBe('NOT_REVIEWED');
+      expect(vacancy.status).toBe('NOT_REVIEWED');
+    });
+
+    it('journals NOT_REVIEWED, dated with the cache', async () => {
+      const { vacancy } = await service.save(input());
+      const rows = await getPrisma().statusChange.findMany({ where: { vacancyId: vacancy.id } });
+      expect(rows.map((r) => [r.status, r.createdAt])).toEqual([
+        ['NOT_REVIEWED', vacancy.statusChangedAt],
+      ]);
     });
 
     it('leaves an already-saved vacancy untouched on a second save (same applyUrl)', async () => {
@@ -53,18 +68,28 @@ describe('EstimatedVacancyService', () => {
       expect(second.created).toBe(false);
       expect(second.vacancy.id).toBe(first.vacancy.id);
       expect(second.vacancy.matchScore).toBe(60);
-      expect(second.vacancy.estimationComment).toBe('First pass.');
+      // Analyze-once covers the comment too: the repeat save wrote no second row.
+      expect((await service.getById(first.vacancy.id))?.estimationComment).toBe('First pass.');
+      expect(all.items[0].estimationComment).toBe('First pass.');
+      expect(await getPrisma().comment.count()).toBe(1);
+      expect(await getPrisma().statusChange.count()).toBe(1);
     });
 
-    it('a second save does not disturb a userAction set in between', async () => {
+    it('writes the estimationComment as one ANALYZER comment', async () => {
+      const { vacancy } = await service.save(input({ estimationComment: '  Strong match.  ' }));
+      const rows = await getPrisma().comment.findMany({ where: { vacancyId: vacancy.id } });
+      expect(rows.map((r) => [r.source, r.body])).toEqual([['ANALYZER', 'Strong match.']]);
+    });
+
+    it('a second save does not disturb a status set in between', async () => {
       const first = await service.save(input());
-      await service.updateUserAction(first.vacancy.id, 'READY_TO_APPLY');
+      await service.updateStatus(first.vacancy.id, 'SAVED_FOR_LATER');
 
       const resaved = await service.save(input({ matchScore: 50 }));
 
       expect(resaved.created).toBe(false);
       expect(resaved.vacancy.id).toBe(first.vacancy.id);
-      expect(resaved.vacancy.userAction).toBe('READY_TO_APPLY');
+      expect(resaved.vacancy.status).toBe('SAVED_FOR_LATER');
     });
 
     it('collapses two tracking variants of one posting into a single row', async () => {
@@ -172,8 +197,8 @@ describe('EstimatedVacancyService', () => {
         // A named cost, pinned rather than fixed (ADR-0023). The same company and
         // title saved again tomorrow lands on a different key and becomes a second
         // row — the duplicate the unique index exists to prevent. Changing the key
-        // shape would move the 42 synthetic rows already stored, and
-        // `backfill-applyurl.ts` refuses to merge, so it is recorded, not changed.
+        // shape would move the 42 synthetic rows already stored, which would need a
+        // collision-aware backfill, so it is recorded, not changed.
         const day1 = await service.save(input({ applyUrl: 'not a url at all' }));
         expect(day1.created).toBe(true);
 
@@ -220,10 +245,24 @@ describe('EstimatedVacancyService', () => {
       expect(await service.getById(999_999)).toBeNull();
     });
 
-    it('returns the full record including fullText', async () => {
+    it('returns the full record including fullText and every comment', async () => {
       const { vacancy } = await service.save(input());
+      await new ApplicationService().record({ vacancyId: vacancy.id, comment: 'Applied.' });
       const found = await service.getById(vacancy.id);
       expect(found?.fullText).toBe(vacancy.fullText);
+      expect(found?.estimationComment).toBe('Strong match.');
+      expect(found?.comments.map((c) => [c.source, c.body])).toEqual([
+        ['ANALYZER', 'Strong match.'],
+        ['USER', 'Applied.'],
+      ]);
+    });
+
+    it('reads a missing analyzer comment as null', async () => {
+      const { application } = await new ApplicationService().record({
+        company: 'Placeholder Co',
+        title: 'Imported Role',
+      });
+      expect((await service.getById(application.id))?.estimationComment).toBeNull();
     });
   });
 
@@ -250,6 +289,32 @@ describe('EstimatedVacancyService', () => {
     it('omits fullText from list results', async () => {
       const { items } = await service.list();
       expect(items[0]).not.toHaveProperty('fullText');
+    });
+
+    it('finds a vacancy by its applyUrl, normalized as save does', async () => {
+      const tracked = 'https://example.com/jobs/a/?utm_source=mail#apply';
+      expect((await service.list({ applyUrl: tracked })).items.map((i) => i.company)).toEqual([
+        'Acme',
+      ]);
+      expect((await service.list({ applyUrl: 'https://example.com/jobs/zzz' })).total).toBe(0);
+
+      // An unusable url is compared raw: a placeholder's synthetic key still matches.
+      const { application } = await new ApplicationService().record({
+        company: 'Placeholder Co',
+        title: 'Imported Role',
+      });
+      const found = await service.list({ applyUrl: application.applyUrl });
+      expect(found.items.map((i) => i.id)).toEqual([application.id]);
+    });
+
+    it('filters by any of several statuses', async () => {
+      const { items } = await service.list({ company: 'Beta Corp' });
+      await service.updateStatus(items[0].id, 'DECLINED');
+
+      expect((await service.list({ status: ['DECLINED'] })).total).toBe(1);
+      expect((await service.list({ status: ['NOT_REVIEWED', 'DECLINED'] })).total).toBe(2);
+      expect((await service.list({ status: ['APPLIED', 'REJECTED'] })).total).toBe(0);
+      expect((await service.list({ status: [] })).total).toBe(2);
     });
 
     it('filters by recommendation', async () => {
@@ -347,8 +412,20 @@ describe('EstimatedVacancyService', () => {
         const { items } = await service.list({ company: 'Placeholder Co' });
 
         expect(items).toHaveLength(1);
-        expect(items[0].id).toBe(application.estimatedVacancyId);
+        expect(items[0].id).toBe(application.id);
         expect(items[0].hasAnalysis).toBe(false);
+        expect(items[0].estimationComment).toBeNull();
+      });
+
+      it('is true for a placeholder given an analyzer comment — the named ceiling', async () => {
+        await new ApplicationService().record({
+          company: 'Noted Co',
+          title: 'Imported Role',
+          estimationComment: 'From tracker notes.',
+        });
+        const { items } = await service.list({ company: 'Noted Co' });
+        expect(items[0].hasAnalysis).toBe(true);
+        expect(items[0].estimationComment).toBe('From tracker notes.');
       });
     });
 
@@ -443,16 +520,51 @@ describe('EstimatedVacancyService', () => {
     });
   });
 
-  describe('updateUserAction', () => {
+  describe('updateStatus', () => {
     it('returns null when the id does not exist', async () => {
-      expect(await service.updateUserAction(999_999, 'DECLINED')).toBeNull();
+      expect(await service.updateStatus(999_999, 'DECLINED')).toBeNull();
     });
 
-    it('sets userAction and stamps userActionUpdatedAt', async () => {
+    it('writes one journal row and keeps the cache in step', async () => {
       const { vacancy } = await service.save(input());
-      const updated = await service.updateUserAction(vacancy.id, 'DECLINED');
-      expect(updated?.userAction).toBe('DECLINED');
-      expect(updated?.userActionUpdatedAt).toBeInstanceOf(Date);
+      const updated = await service.updateStatus(vacancy.id, 'DECLINED');
+      expect(updated?.status).toBe('DECLINED');
+      expect(updated?.statusChangedAt.getTime()).toBeGreaterThanOrEqual(
+        vacancy.statusChangedAt.getTime(),
+      );
+      expect(updated?.estimationComment).toBe('Strong match.');
+
+      const latest = await getPrisma().statusChange.findFirstOrThrow({
+        where: { vacancyId: vacancy.id },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      });
+      expect([latest.status, latest.createdAt]).toEqual(['DECLINED', updated?.statusChangedAt]);
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'DECLINED']);
+    });
+
+    it('journals the status the vacancy already has as a new event', async () => {
+      const { vacancy } = await service.save(input());
+      await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
+      const before = await service.getById(vacancy.id);
+
+      const same = await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
+
+      expect(same?.statusChangedAt.getTime()).toBeGreaterThanOrEqual(
+        before?.statusChangedAt.getTime() ?? 0,
+      );
+      expect(await journal(vacancy.id)).toEqual([
+        'NOT_REVIEWED',
+        'SAVED_FOR_LATER',
+        'SAVED_FOR_LATER',
+      ]);
+    });
+
+    it('can set a vacancy back to NOT_REVIEWED', async () => {
+      const { vacancy } = await service.save(input());
+      await service.updateStatus(vacancy.id, 'DECLINED');
+      const back = await service.updateStatus(vacancy.id, 'NOT_REVIEWED');
+      expect(back?.status).toBe('NOT_REVIEWED');
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'DECLINED', 'NOT_REVIEWED']);
     });
   });
 });

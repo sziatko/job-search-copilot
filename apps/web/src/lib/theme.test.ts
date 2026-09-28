@@ -87,14 +87,11 @@ describe('useTheme', () => {
     localStorage.setItem(STORAGE_KEY, 'dark');
     const { result } = renderHook(() => useTheme());
     expect(result.current.preference).toBe('dark');
-    expect(result.current.isDark).toBe(true);
   });
 
-  it('follows the OS when nothing is stored', () => {
+  it("starts on 'system' when nothing is stored", () => {
     const { result } = renderHook(() => useTheme());
     expect(result.current.preference).toBe('system');
-    // The suite's matchMedia stub reports light, so 'system' resolves to light.
-    expect(result.current.isDark).toBe(false);
   });
 
   it('cycles system → light → dark → system, writing the attribute each step', () => {

@@ -8,6 +8,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/setup-app';
 
+/** [source, body] per comment, in the order the API returned them. */
+const notes = (item: { comments: { source: string; body: string }[] }) =>
+  item.comments.map((c) => [c.source, c.body]);
+
+/** Every seeded vacancy was saved by the analyzer, so its comments start with this. */
+const ANALYZED = ['ANALYZER', 'Strong match.'];
+
 describe('Applications (e2e)', () => {
   let app: INestApplication;
   const prisma = getPrisma();
@@ -24,7 +31,7 @@ describe('Applications (e2e)', () => {
 
   async function seedVacancy(overrides: Record<string, unknown> = {}): Promise<number> {
     const res = await request(app.getHttpServer())
-      .post('/api/v1/estimated-vacancies')
+      .post('/api/v1/vacancies')
       .send({
         ...vacancyPayload,
         applyUrl: `https://example.com/jobs/${Math.random()}`,
@@ -41,8 +48,7 @@ describe('Applications (e2e)', () => {
   });
 
   afterEach(async () => {
-    await prisma.application.deleteMany();
-    await prisma.estimatedVacancy.deleteMany();
+    await prisma.vacancy.deleteMany();
   });
 
   afterAll(async () => {
@@ -51,16 +57,16 @@ describe('Applications (e2e)', () => {
   });
 
   describe('POST /api/v1/applications', () => {
-    it('records an application (201 + Location), links the vacancy and marks it APPLIED', async () => {
+    it('records an application (201 + Location) on the vacancy, and moves it to APPLIED', async () => {
       const vacancyId = await seedVacancy();
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/applications')
         .send({
-          estimatedVacancyId: vacancyId,
+          vacancyId,
           salaryInListing: '130 PLN/h',
           usedTailoredResume: true,
-          userComment: 'Adapted CV.',
+          comment: 'Adapted CV.',
         })
         .expect(201);
 
@@ -69,61 +75,67 @@ describe('Applications (e2e)', () => {
       expect(res.body.application.company).toBe('Acme');
       expect(res.body.application.matchScore).toBe(80);
       expect(res.body.application.salaryInListing).toBe('130 PLN/h');
+      expect(res.body.application.id).toBe(vacancyId);
+      expect(res.body.application.appliedAt).toBe(res.body.application.statusChangedAt);
+      expect(notes(res.body.application)).toEqual([ANALYZED, ['USER', 'Adapted CV.']]);
       expect(res.headers.location).toBe(`/api/v1/applications/${res.body.application.id}`);
 
       const vacancy = await request(app.getHttpServer())
-        .get(`/api/v1/estimated-vacancies/${vacancyId}`)
+        .get(`/api/v1/vacancies/${vacancyId}`)
         .expect(200);
-      expect(vacancy.body.userAction).toBe('APPLIED');
+      expect(vacancy.body.status).toBe('APPLIED');
     });
 
-    it('422s on a second application for the same vacancy', async () => {
+    it('422s for a vacancy already in the pipeline', async () => {
       const vacancyId = await seedVacancy();
       await request(app.getHttpServer())
         .post('/api/v1/applications')
-        .send({ estimatedVacancyId: vacancyId })
+        .send({ vacancyId })
         .expect(201);
       await request(app.getHttpServer())
         .post('/api/v1/applications')
-        .send({ estimatedVacancyId: vacancyId })
+        .send({ vacancyId })
         .expect(422);
     });
 
     it('422s for an unknown vacancy id', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/applications')
-        .send({ estimatedVacancyId: 999_999 })
+        .send({ vacancyId: 999_999 })
         .expect(422);
     });
 
-    it('400s for a missing estimatedVacancyId', async () => {
+    it('400s for a missing vacancyId', async () => {
       await request(app.getHttpServer()).post('/api/v1/applications').send({}).expect(400);
     });
 
-    it('400s for a bad status', async () => {
+    it('400s for a status outside the pipeline', async () => {
       const vacancyId = await seedVacancy();
-      await request(app.getHttpServer())
-        .post('/api/v1/applications')
-        .send({ estimatedVacancyId: vacancyId, status: 'MAYBE' })
-        .expect(400);
+      for (const status of ['MAYBE', 'DECLINED']) {
+        await request(app.getHttpServer())
+          .post('/api/v1/applications')
+          .send({ vacancyId, status })
+          .expect(400);
+      }
     });
   });
 
   describe('GET /api/v1/applications', () => {
-    it('lists flattened rows, filters by status and search', async () => {
+    it('lists pipeline rows, the last move first; filters by status and search', async () => {
       const a = await seedVacancy({ applyUrl: 'https://example.com/a', company: 'Acme' });
       const b = await seedVacancy({ applyUrl: 'https://example.com/b', company: 'Beta Corp' });
+      await seedVacancy({ applyUrl: 'https://example.com/c', company: 'Not Applied' });
+      await request(app.getHttpServer()).post('/api/v1/applications').send({ vacancyId: a });
       await request(app.getHttpServer())
         .post('/api/v1/applications')
-        .send({ estimatedVacancyId: a });
-      await request(app.getHttpServer())
-        .post('/api/v1/applications')
-        .send({ estimatedVacancyId: b, status: 'REJECTED' });
+        .send({ vacancyId: b, status: 'REJECTED' });
 
       const all = await request(app.getHttpServer()).get('/api/v1/applications').expect(200);
       expect(all.body.total).toBe(2);
-      expect(all.body.items[0]).toHaveProperty('company');
-      expect(all.body.items[0]).not.toHaveProperty('estimatedVacancy');
+      expect(all.body.items.map((i: { company: string }) => i.company)).toEqual([
+        'Beta Corp',
+        'Acme',
+      ]);
 
       const rejected = await request(app.getHttpServer())
         .get('/api/v1/applications?status=REJECTED')
@@ -137,14 +149,17 @@ describe('Applications (e2e)', () => {
       expect(searched.body.total).toBe(1);
     });
 
-    it('400s for limit above 500', async () => {
+    it('400s for limit above 500, or a status outside the pipeline', async () => {
       await request(app.getHttpServer()).get('/api/v1/applications?limit=1000').expect(400);
+      await request(app.getHttpServer()).get('/api/v1/applications?status=DECLINED').expect(400);
     });
   });
 
   describe('GET /api/v1/applications/:id', () => {
-    it('404s for an unknown id', async () => {
+    it('404s for an unknown id, and for a vacancy not in the pipeline', async () => {
       await request(app.getHttpServer()).get('/api/v1/applications/999999').expect(404);
+      const vacancyId = await seedVacancy();
+      await request(app.getHttpServer()).get(`/api/v1/applications/${vacancyId}`).expect(404);
     });
   });
 
@@ -153,49 +168,49 @@ describe('Applications (e2e)', () => {
       const vacancyId = await seedVacancy();
       const created = await request(app.getHttpServer())
         .post('/api/v1/applications')
-        .send({ estimatedVacancyId: vacancyId });
+        .send({ vacancyId });
       const res = await request(app.getHttpServer())
         .patch(`/api/v1/applications/${created.body.application.id}/status`)
         .send({ status: 'INTERVIEW' })
         .expect(200);
-      // record() stamps statusUpdatedAt to appliedAt, so the POST response already
-      // carries it — the PATCH is the first thing that moves it on.
-      expect(created.body.application.statusUpdatedAt).toBe(created.body.application.appliedAt);
       expect(res.body.status).toBe('INTERVIEW');
-      expect(new Date(res.body.statusUpdatedAt).getTime()).toBeGreaterThanOrEqual(
-        new Date(created.body.application.appliedAt).getTime(),
+      expect(new Date(res.body.statusChangedAt).getTime()).toBeGreaterThanOrEqual(
+        new Date(created.body.application.statusChangedAt).getTime(),
       );
-      expect(res.body.comments).toEqual([]);
+      // The applied date stays the journal's APPLIED row.
+      expect(res.body.appliedAt).toBe(created.body.application.appliedAt);
+      expect(notes(res.body)).toEqual([ANALYZED]);
     });
 
-    it('turns each statusComment into a dated comment, oldest first', async () => {
+    it('turns each comment into a dated USER comment, oldest first', async () => {
       const vacancyId = await seedVacancy();
       const created = await request(app.getHttpServer())
         .post('/api/v1/applications')
-        .send({ estimatedVacancyId: vacancyId });
+        .send({ vacancyId });
       const id = created.body.application.id;
 
       const first = await request(app.getHttpServer())
         .patch(`/api/v1/applications/${id}/status`)
-        .send({ status: 'RECRUITER_SCREEN', statusComment: 'Recruiter called.' })
+        .send({ status: 'RECRUITER_SCREEN', comment: 'Recruiter called.' })
         .expect(200);
-      expect(first.body.comments).toMatchObject([{ body: 'Recruiter called.' }]);
-      expect(typeof first.body.comments[0].createdAt).toBe('string');
+      expect(notes(first.body)).toEqual([ANALYZED, ['USER', 'Recruiter called.']]);
+      expect(typeof first.body.comments[1].createdAt).toBe('string');
 
       const second = await request(app.getHttpServer())
         .patch(`/api/v1/applications/${id}/status`)
-        .send({ status: 'INTERVIEW', statusComment: 'Interview on 20.09.' })
+        .send({ status: 'INTERVIEW', comment: 'Interview on 20.09.' })
         .expect(200);
-      expect(second.body.comments.map((c: { body: string }) => c.body)).toEqual([
-        'Recruiter called.',
-        'Interview on 20.09.',
+      expect(notes(second.body)).toEqual([
+        ANALYZED,
+        ['USER', 'Recruiter called.'],
+        ['USER', 'Interview on 20.09.'],
       ]);
 
       const noComment = await request(app.getHttpServer())
         .patch(`/api/v1/applications/${id}/status`)
         .send({ status: 'OFFER' })
         .expect(200);
-      expect(noComment.body.comments).toHaveLength(2);
+      expect(noComment.body.comments).toHaveLength(3);
     });
 
     it('404s for an unknown id', async () => {
@@ -209,7 +224,7 @@ describe('Applications (e2e)', () => {
       const vacancyId = await seedVacancy();
       const created = await request(app.getHttpServer())
         .post('/api/v1/applications')
-        .send({ estimatedVacancyId: vacancyId });
+        .send({ vacancyId });
       await request(app.getHttpServer())
         .patch(`/api/v1/applications/${created.body.application.id}/status`)
         .send({ status: 'MAYBE' })
@@ -221,26 +236,26 @@ describe('Applications (e2e)', () => {
     const vacancyId = await seedVacancy();
     const res = await request(app.getHttpServer())
       .post('/api/v1/applications')
-      .send({ estimatedVacancyId: vacancyId, ...extra })
+      .send({ vacancyId, ...extra })
       .expect(201);
     return res.body.application.id as number;
   }
 
   describe('PATCH /api/v1/applications/:id', () => {
-    it('edits the given fields and leaves the rest', async () => {
-      const id = await recordOne({ salaryInListing: '100 PLN/h', userComment: 'Old' });
+    it('edits the given fields, leaves the rest, and adds the comment', async () => {
+      const id = await recordOne({ salaryInListing: '100 PLN/h', comment: 'Old' });
 
       const res = await request(app.getHttpServer())
         .patch(`/api/v1/applications/${id}`)
-        .send({ usedTailoredResume: true, userComment: 'New', status: 'OFFER' })
+        .send({ usedTailoredResume: true, comment: 'New', status: 'OFFER' })
         .expect(200);
       expect(res.body).toMatchObject({
         salaryInListing: '100 PLN/h',
         usedTailoredResume: true,
-        userComment: 'New',
         // not a field of this DTO — stripped by whitelist, so the status stays
         status: 'APPLIED',
       });
+      expect(notes(res.body)).toEqual([ANALYZED, ['USER', 'Old'], ['USER', 'New']]);
     });
 
     it('clears a field sent as null', async () => {
@@ -255,49 +270,13 @@ describe('Applications (e2e)', () => {
     it('404s for an unknown id; 400s on a bad field', async () => {
       await request(app.getHttpServer())
         .patch('/api/v1/applications/999999')
-        .send({ userComment: 'x' })
+        .send({ comment: 'x' })
         .expect(404);
       const id = await recordOne();
       await request(app.getHttpServer())
         .patch(`/api/v1/applications/${id}`)
         .send({ usedTailoredResume: 'yes' })
         .expect(400);
-    });
-  });
-
-  describe('POST /api/v1/applications/:id/comments', () => {
-    it('201s with the application, the new comment last', async () => {
-      const id = await recordOne();
-      await request(app.getHttpServer())
-        .patch(`/api/v1/applications/${id}/status`)
-        .send({ status: 'INTERVIEW', statusComment: 'Booked.' })
-        .expect(200);
-
-      const res = await request(app.getHttpServer())
-        .post(`/api/v1/applications/${id}/comments`)
-        .send({ body: 'Went well.' })
-        .expect(201);
-      expect(res.body.status).toBe('INTERVIEW');
-      expect(res.body.comments.map((c: { body: string }) => c.body)).toEqual([
-        'Booked.',
-        'Went well.',
-      ]);
-    });
-
-    it('400s on a blank or missing body; 404s for an unknown id', async () => {
-      const id = await recordOne();
-      await request(app.getHttpServer())
-        .post(`/api/v1/applications/${id}/comments`)
-        .send({ body: '   ' })
-        .expect(400);
-      await request(app.getHttpServer())
-        .post(`/api/v1/applications/${id}/comments`)
-        .send({})
-        .expect(400);
-      await request(app.getHttpServer())
-        .post('/api/v1/applications/999999/comments')
-        .send({ body: 'x' })
-        .expect(404);
     });
   });
 });

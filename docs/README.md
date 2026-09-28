@@ -9,20 +9,25 @@ and *what a change here breaks over there*.
 | Doc | What's in it |
 | --- | --- |
 | [`architecture.md`](architecture.md) | The system map: the four packages, their boundaries, the request lifecycle, the dev stack. Start here. |
-| [`domain-model.md`](domain-model.md) | `EstimatedVacancy`, the two independent axes (analyzer `recommendation` vs the user's `userAction`), the state flow, analyze-once, the DB-level rules. |
-| [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the eleven MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
+| [`domain-model.md`](domain-model.md) | `Vacancy`, the two independent axes (analyzer `recommendation` vs the user's `status`), the `StatusChange` journal, the status lifecycle, analyze-once, the DB-level rules. |
+| [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the ten MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
 | [`decisions/`](decisions/) | One Architecture Decision Record (ADR) per load-bearing choice — context, the decision, why not the alternatives, and what it constrains. |
-| [`phases/phase-1.md`](phases/phase-1.md) | What Phase 1 delivered, its status, and everything deliberately deferred. |
-| [`phases/phase-2.md`](phases/phase-2.md) | Application tracking: the `Application` model, the `/tracker` page, the router, the one-off `tracker.md` import, and the post-phase work that reworked all of it (2026-09-14 → 09-21). |
+| [`backlog.md`](backlog.md) | What is not yet planned into a phase, in two lists: ideas (new capabilities) and improvements / fixes. Only open and planned rows; done and not-relevant ones move to [`backlog-archive.md`](backlog-archive.md). |
+| [`phases/phase-1.md`](phases/phase-1.md) | What Phase 1 delivered and its status. |
+| [`phases/phase-2.md`](phases/phase-2.md) | Application tracking: the `Application` model, the `/applications` page, the router, the one-off `tracker.md` import, and the post-phase work that reworked all of it (2026-09-14 → 09-21). |
 | [`phases/phase-2.1.md`](phases/phase-2.1.md) | Follow-up work on the vacancies table: server-side search, the duplicate-company button and modal, and row actions as buttons. Planned before implementing; its `## Status` is the live checklist. |
 | [`phases/phase-2.2.md`](phases/phase-2.2.md) | The 15 findings of a review over phase 2.1's diff: LIKE wildcards in user input, a list the app truncates and reports wrongly, false claims on failure. Planned before implementing; its `## Status` is the live checklist. |
-| [`phases/phase-3.md`](phases/phase-3.md) | The vacancy log in the DB (check-and-record over MCP and REST, the one-off import, the LinkedIn URL rule), application comments as a table, and editing an application on `/tracker`. Its `## Status` is the live checklist. || [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
+| [`phases/phase-3.md`](phases/phase-3.md) | The vacancy log in the DB (check-and-record over MCP and REST, the one-off import, the LinkedIn URL rule), application comments as a table, and editing an application on `/applications`. Its `## Status` is the live checklist. |
+| [`phases/phase-3.1.md`](phases/phase-3.1.md) | One `Vacancy` table: `Application` merged in, one status enum with a `StatusChange` journal, every comment in one table with a `source`, one apply/edit modal, the renames, and a dead-code sweep. Its `## Status` is the live checklist. |
+| [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions
 
-- **ADRs are numbered globally** (`0001`, `0002`, …) and never renumbered. Each is
-  tagged with the `Phase:` it was decided in. A superseded ADR keeps its file and
-  its `Status:` line points at the replacement.
+- **ADRs are numbered globally** (`0001`, `0002`, …), never renumbered, and a number is
+  never reused. Each is tagged with the `Phase:` it was decided in.
+- **A replaced ADR is deleted**, so it stops costing context. The new ADR's `Replaces:`
+  line names it, and git keeps it (`git log --all -- 'docs/decisions/NNNN-*'`). The
+  index lists the gap in one line.
 - Every ADR ends with a **"What this constrains — breaks if you change it"**
   block; the overview docs carry the same block on the sections where a boundary
   or contract is actually at stake (not on every section). That block names real
@@ -57,10 +62,14 @@ place, and delete the flag once confirmed. Corrections are edits to the existing
 file — no new doc, no changelog.
 
 **To add the next phase:**
-1. Write `docs/phases/phase-N.md` from the phase plan *before* implementing.
+1. Write `docs/phases/phase-N.md` from the phase plan *before* implementing. Items it
+   takes from [`backlog.md`](backlog.md) are marked `planned (phase N)` there; what the
+   phase defers, or a new idea found on the way, goes into the backlog, not into a
+   "Deferred" section of the phase doc. When the phase finishes an item, its row moves
+   to [`backlog-archive.md`](backlog-archive.md).
 2. Add one ADR per load-bearing decision, continuing the numbering, tagged
    `Phase: N`. Copy the template from [`decisions/README.md`](decisions/README.md).
-3. If a Phase-N decision replaces an earlier one, set the old ADR's `Status:` to
-   `Superseded by NNNN` and link both ways.
+3. If a Phase-N decision replaces an earlier one, add `Replaces: NNNN` to the new ADR,
+   delete the old file in the step that removes its code, and fix the links to it.
 4. Update [`architecture.md`](architecture.md) / [`domain-model.md`](domain-model.md) /
    [`contracts.md`](contracts.md) if the change moves a boundary or a contract.

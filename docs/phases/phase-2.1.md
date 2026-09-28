@@ -334,7 +334,7 @@ it. So the jsdom suite was green throughout, and could never have been otherwise
   modal is longer than the cap can open with the marked row below the fold of the
   scroll box (contoso's own modal needs 634px for 540px of box). Nothing scrolls it
   into view — not asked for, and it would have to not fight the newest-first order.
-  Folding it in is `scrollIntoView` on the marked row, when someone wants it.
+  Folding it in is `scrollIntoView` on the marked row — in [`../backlog.md`](../backlog.md).
 - [x] **9 · a wider modal, bubbles above, and the duplicates button's bubble.**
   2026-09-23, asked for straight after step 8 was reported, so no plan step preceded
   it and the tests came with it.

@@ -26,7 +26,14 @@ should the tests actually exercise, and against what?
   file cleans up with a blanket `deleteMany()` in `afterEach`, so running files in
   parallel would let one file's cleanup wipe rows another is mid-assertion on. The
   config comment notes the alternative (per-test rolled-back transactions) was
-  considered and judged not worth it at this suite size.
+  considered and judged not worth it at this suite size. Letting web (no
+  database) run in parallel was tried 2026-09-27 and was *slower* on the 2-core
+  dev machine — 248s against 217s, with timeouts.
+- **No per-file isolation.** Each project's config sets `isolate: false` (a
+  file-based project doesn't inherit it from the root): one environment and module
+  cache per project instead of a fresh jsdom/import per file. Measured 2026-09-27:
+  web 161s → 98s, core/api/mcp 76s → 46s. The price is that state can leak
+  between files.
 - **Vitest env injection.** Each project's config does
   `env: loadEnv('test', rootDir, '')`, so `.env.test`'s `DATABASE_URL` (the test
   DB) is what the tests see; `process.env` still passes through, which is how CI
@@ -61,6 +68,10 @@ Phase 1 ends at **48 tests / 6 files**, all green.
 ## What this constrains — breaks if you change it
 - Turning on `fileParallelism` (or removing the root config's `false`) → DB-backed
   test files race on cleanup; flaky failures.
+- With `isolate: false`, anything a file leaves behind — a `vi.mock`, a stubbed
+  global, module-level state — is still there for the next file in its project. A
+  test that fails in the full run but passes alone (`npm test -- <file>`) is the
+  symptom; clean the state up in the file that set it.
 - Running `npm test` without the test DB up / migrated → every DB-backed suite
   errors on connect.
 - Adding a migration and not running `npm run test:db:migrate` (locally) — CI runs

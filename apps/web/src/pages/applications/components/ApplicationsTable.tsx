@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { IconComment, IconEdit } from '@/components/icons';
+import { IconEdit } from '@/components/icons';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
@@ -34,7 +34,6 @@ export function ApplicationsTable({
   rowErrors,
   onStatusChange,
   onEdit,
-  onComment,
   emptyMessage,
 }: {
   items: ApplicationListItem[];
@@ -42,7 +41,6 @@ export function ApplicationsTable({
   rowErrors: Map<number, string>;
   onStatusChange: (id: number, status: ApplicationStatus) => void;
   onEdit: (item: ApplicationListItem) => void;
-  onComment: (item: ApplicationListItem) => void;
   emptyMessage: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -53,7 +51,7 @@ export function ApplicationsTable({
 
   return (
     <div ref={scrollRef} className="table-body-scroll">
-      <table className="min-w-[1246px] table-fixed">
+      <table className="min-w-[1210px] table-fixed">
         <thead>
           <tr>
             <th style={{ width: 110 }}>Date</th>
@@ -62,7 +60,7 @@ export function ApplicationsTable({
             <th style={{ width: 120 }}>Salary</th>
             <th style={{ width: 80 }}>CV</th>
             <th>Comment</th>
-            <th style={{ width: 138 }}>Action</th>
+            <th style={{ width: 102 }}>Action</th>
             <th style={{ width: 190 }}>Status</th>
           </tr>
         </thead>
@@ -85,7 +83,7 @@ export function ApplicationsTable({
           {virtualItems.map((virtualRow) => {
             const item = items[virtualRow.index];
             const linkable = isSafeExternalUrl(item.applyUrl);
-            const moved = item.statusUpdatedAt !== item.appliedAt;
+            const moved = item.statusChangedAt !== item.appliedAt;
             return (
               <tr
                 key={item.id}
@@ -100,12 +98,12 @@ export function ApplicationsTable({
                       <span className="tip">{daysSinceLastMove(item)} days since last update</span>
                     </span>
                   )}
-                  {dateFormatter.format(new Date(item.appliedAt))}
+                  {item.appliedAt ? dateFormatter.format(new Date(item.appliedAt)) : '—'}
                   {/* Same stamp the hourglass reads; hidden until the row has
                       actually moved, or it would just repeat the date above. */}
                   {moved && (
                     <div className="date-upd">
-                      upd: {dateFormatter.format(new Date(item.statusUpdatedAt))}
+                      upd: {dateFormatter.format(new Date(item.statusChangedAt))}
                     </div>
                   )}
                 </td>
@@ -134,15 +132,11 @@ export function ApplicationsTable({
                   {item.usedTailoredResume ? 'Sent' : '—'}
                 </td>
                 <td>
-                  <MergedComment
-                    userComment={item.userComment}
-                    estimationComment={item.estimationComment}
-                    comments={item.comments}
-                  />
+                  <MergedComment comments={item.comments} />
                 </td>
                 <td>
                   {/* Icons, labelled by their `.tip` bubbles — the /vacancies Action
-                      column's pattern. Edit and Comment wait while the row saves. */}
+                      column's pattern. Edit waits while the row saves. */}
                   <div className="flex items-center gap-[6px]">
                     <CopyApplicationButton
                       id={item.id}
@@ -159,16 +153,6 @@ export function ApplicationsTable({
                     >
                       <IconEdit />
                       <span className="tip">Edit</span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Comment on ${item.title} at ${item.company}`}
-                      disabled={savingIds.has(item.id)}
-                      onClick={() => onComment(item)}
-                      className="icon-btn disabled:opacity-50"
-                    >
-                      <IconComment />
-                      <span className="tip">Comment</span>
                     </button>
                   </div>
                 </td>

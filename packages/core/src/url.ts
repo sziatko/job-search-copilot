@@ -150,3 +150,12 @@ export function normalizeApplyUrl(url: string | null | undefined): string | null
   }
   return parsed.href;
 }
+
+/**
+ * The key an `applyUrl` filter compares against: the url as `save` would have stored
+ * it. An unusable url (no http(s)) is compared raw, so a synthetic `tracker://` key
+ * still finds its placeholder row.
+ */
+export function applyUrlKey(url: string): string {
+  return normalizeApplyUrl(url) ?? url;
+}

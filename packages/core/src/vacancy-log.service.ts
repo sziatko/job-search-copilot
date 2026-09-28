@@ -34,7 +34,7 @@ function prepare(entry: VacancyLogInput): PreparedEntry | null {
  */
 export class VacancyLogService {
   /** @param db defaults (on construction, not import) to the lazy process-wide client —
-   *   same rationale as EstimatedVacancyService. Nest passes its managed client. */
+   *   same rationale as VacancyService. Nest passes its managed client. */
   constructor(private readonly db: PrismaClient = getPrisma()) {}
 
   /** One posting. An entry without an http(s) url is an error, not a silent skip:

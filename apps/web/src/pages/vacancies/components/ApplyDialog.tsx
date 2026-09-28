@@ -7,8 +7,9 @@ export interface ApplyDetails {
   comment: string;
 }
 
-/** Opened from /vacancies to record an application, and from /tracker, pre-filled
- * with `initial`, to edit one. */
+/** Opened from /vacancies to record an application, and from /applications, pre-filled
+ * with `initial`, to edit one. The comment is never pre-filled: comments are
+ * append-only, so in edit mode it is a new one, added beside the others. */
 export function ApplyDialog({
   company,
   title,
@@ -20,7 +21,7 @@ export function ApplyDialog({
   company: string;
   title: string;
   heading?: string;
-  initial?: ApplyDetails;
+  initial?: Omit<ApplyDetails, 'comment'>;
   onCancel: () => void;
   onConfirm: (details: ApplyDetails) => void;
 }) {
@@ -28,7 +29,7 @@ export function ApplyDialog({
   const [usedTailoredResume, setUsedTailoredResume] = useState(
     initial?.usedTailoredResume ?? false,
   );
-  const [comment, setComment] = useState(initial?.comment ?? '');
+  const [comment, setComment] = useState('');
   const salaryId = useId();
   const commentId = useId();
   const titleId = useId();
@@ -82,7 +83,7 @@ export function ApplyDialog({
 
           <div>
             <label htmlFor={commentId} className="field-label">
-              Comment
+              {initial ? 'Add a comment' : 'Comment'}
             </label>
             <textarea
               id={commentId}

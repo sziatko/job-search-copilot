@@ -5,7 +5,7 @@ import { ScorePill } from '@/components/ui/ScorePill';
 import { isSafeExternalUrl } from '@/lib/url';
 import { listApplications } from '@/pages/applications/api';
 import { daysSinceLastMove, isTimedOut } from '@/pages/applications/constants';
-import { listEstimatedVacanciesPage } from '../api';
+import { listVacanciesPage } from '../api';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
@@ -34,14 +34,14 @@ export function CompanyHistoryModal({
     // Deliberately NOT under ['vacancies']: useVacancies invalidates that prefix
     // after every action change, which would refetch this for nothing.
     queryKey: ['vacancy-company', company],
-    queryFn: () => listEstimatedVacanciesPage({ company, limit: 100 }),
+    queryFn: () => listVacanciesPage({ company, limit: 100 }),
   });
 
   // The tracker's own key, so arriving here from /tracker costs no request.
   const applications = useQuery({ queryKey: ['applications'], queryFn: listApplications });
 
   const applicationsByVacancy = new Map(
-    (applications.data?.items ?? []).map((item) => [item.estimatedVacancyId, item]),
+    (applications.data?.items ?? []).map((item) => [item.id, item]),
   );
   const items = data?.items ?? [];
   // `total` is the server's count of this company's vacancies, not the size of the

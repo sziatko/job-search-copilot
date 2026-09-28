@@ -1,7 +1,7 @@
 # @job-search-copilot/core
 
 Domain layer shared by `apps/api` (NestJS) and `apps/mcp` (MCP server): the Prisma
-schema/client, `EstimatedVacancyService`, recommendation normalization, domain errors.
+schema/client, `VacancyService`, recommendation normalization, domain errors.
 
 - Database & migration docs: [`prisma/README.md`](./prisma/README.md).
 - Framework-agnostic on purpose — no `@nestjs/*`, no MCP SDK here.

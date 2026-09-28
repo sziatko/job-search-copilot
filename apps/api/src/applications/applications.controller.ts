@@ -12,7 +12,6 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { AddCommentDto } from './dto/add-comment.dto';
 import { ListApplicationsQueryDto } from './dto/list-applications.dto';
 import { RecordApplicationDto } from './dto/record-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
@@ -23,8 +22,9 @@ export class ApplicationsController {
   constructor(private readonly applications: ApplicationService) {}
 
   /**
-   * Records an application against an already-known EstimatedVacancy id. Always 201
-   * (no idempotency key — re-applying to the same vacancy is a 422, see the service).
+   * Records an application against an already-known Vacancy id. Always 201
+   * (no idempotency key — applying to a vacancy already in the pipeline is a 422,
+   * see the service). The application's id is the vacancy's.
    * The body is an envelope: { application, resolution, vacancyCreated } — the web
    * needs `resolution` in the JSON, not a header.
    */
@@ -55,7 +55,7 @@ export class ApplicationsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateApplicationStatusDto,
   ) {
-    const application = await this.applications.updateStatus(id, dto.status, dto.statusComment);
+    const application = await this.applications.updateStatus(id, dto.status, dto.comment, 'USER');
     if (!application) {
       throw new NotFoundException(`Application ${id} not found`);
     }
@@ -65,17 +65,6 @@ export class ApplicationsController {
   @Patch(':id')
   async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateApplicationDto) {
     const application = await this.applications.update(id, dto);
-    if (!application) {
-      throw new NotFoundException(`Application ${id} not found`);
-    }
-    return application;
-  }
-
-  /** 201 with the whole application back (not the comment alone): the web replaces
-   * its row with it. */
-  @Post(':id/comments')
-  async addComment(@Param('id', ParseIntPipe) id: number, @Body() dto: AddCommentDto) {
-    const application = await this.applications.addComment(id, dto.body);
     if (!application) {
       throw new NotFoundException(`Application ${id} not found`);
     }

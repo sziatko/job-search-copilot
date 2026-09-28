@@ -6,65 +6,25 @@ import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
 import { toast } from 'sonner';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ApplicationListItem } from '@/pages/applications/types';
 import { routeTree } from '@/router';
 import {
-  buildApplicationHandlers,
   buildHandlers,
-  estimatedVacanciesResolver,
+  type FakeVacancy,
+  fakeVacancy,
+  vacanciesResolver,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
-import type { EstimatedVacancyListItem } from './types';
+import type { VacancyListItem } from './types';
 
-function vacancy(overrides: Partial<EstimatedVacancyListItem> = {}): EstimatedVacancyListItem {
-  return {
-    id: 1,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-    company: 'Acme',
-    title: 'Backend Engineer',
-    applyUrl: 'https://example.com/1',
-    matchScore: 80,
-    recommendation: 'APPLY',
-    estimationComment: 'Strong match.',
-    userAction: 'NOT_REVIEWED',
-    userActionUpdatedAt: null,
-    ...overrides,
-  };
-}
+const vacancy = fakeVacancy;
 
 const DAY = 86_400_000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
 
-/** The modal joins this into the tracker's log by `estimatedVacancyId`. */
-function application(overrides: Partial<ApplicationListItem> = {}): ApplicationListItem {
-  const applied = daysAgo(10);
-  return {
-    id: 1,
-    appliedAt: applied,
-    status: 'APPLIED',
-    statusUpdatedAt: applied,
-    comments: [],
-    salaryInListing: null,
-    usedTailoredResume: false,
-    userComment: null,
-    createdAt: applied,
-    updatedAt: applied,
-    estimatedVacancyId: 1,
-    company: 'Acme',
-    title: 'Backend Engineer',
-    applyUrl: 'https://example.com/1',
-    matchScore: 80,
-    recommendation: 'APPLY',
-    estimationComment: 'Strong match.',
-    ...overrides,
-  };
-}
-
 /**
  * Page-level, not `renderHook`: the search term lives in the route's search
  * params, so `useVacancies` calls `useSearch` and throws without a router above
- * it. Same shape as `renderTracker` in the tracker's test.
+ * it. Same shape as `renderApplications` in the tracker's test.
  */
 function renderVacancies(path = '/vacancies') {
   const router = createRouter({
@@ -118,8 +78,8 @@ describe('VacanciesPage / useVacancies', () => {
     mswServer.use(
       ...buildHandlers([
         vacancy({ id: 1, company: 'Acme' }),
-        vacancy({ id: 2, company: 'Declined Co', userAction: 'DECLINED' }),
-        vacancy({ id: 3, company: 'Applied Co', userAction: 'APPLIED' }),
+        vacancy({ id: 2, company: 'Declined Co', status: 'DECLINED' }),
+        vacancy({ id: 3, company: 'Applied Co', status: 'APPLIED' }),
       ]),
     );
     renderVacancies();
@@ -127,6 +87,49 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Acme');
     expect(screen.queryByText('Declined Co')).not.toBeInTheDocument();
     expect(screen.queryByText('Applied Co')).not.toBeInTheDocument();
+  });
+
+  it('files every pipeline status under Applied, each tagged with its own stage', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'New Co' }),
+        vacancy({ id: 2, company: 'Saved Co', status: 'SAVED_FOR_LATER' }),
+        vacancy({ id: 3, company: 'Declined Co', status: 'DECLINED' }),
+        vacancy({ id: 4, company: 'Applied Co', status: 'APPLIED' }),
+        vacancy({ id: 5, company: 'Interview Co', status: 'INTERVIEW' }),
+        vacancy({ id: 6, company: 'Rejected Co', status: 'REJECTED' }),
+      ]),
+    );
+    renderVacancies();
+    await screen.findByText('New Co');
+
+    const user = userEvent.setup();
+    const filter = screen.getByLabelText('Status');
+    expect([...(filter as HTMLSelectElement).options].map((o) => o.textContent)).toEqual([
+      'Not reviewed',
+      'Saved for later',
+      'Declined',
+      'Applied',
+      'All',
+    ]);
+
+    await user.selectOptions(filter, 'APPLIED');
+    await screen.findByText('Interview Co');
+    const companies = () =>
+      screen
+        .getAllByRole('row')
+        .map((row) => row.querySelector('.role-meta')?.textContent ?? '')
+        .filter(Boolean)
+        .map((cell) => cell.replace(/\s*#\d+$/, ''))
+        .sort();
+    expect(companies()).toEqual(['Applied Co', 'Interview Co', 'Rejected Co']);
+    expect(rowOf('Interview Co').getByText('Interview', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Rejected Co').getByText('Rejected', { selector: '.tag' })).toBeInTheDocument();
+
+    await user.selectOptions(filter, 'SAVED_FOR_LATER');
+    await waitFor(() => expect(companies()).toEqual(['Saved Co']));
+    await user.selectOptions(filter, 'DECLINED');
+    await waitFor(() => expect(companies()).toEqual(['Declined Co']));
   });
 
   it('sorts by recommendation (APPLY first) then by match score descending', async () => {
@@ -211,7 +214,7 @@ describe('VacanciesPage / useVacancies', () => {
       ...buildHandlers([
         vacancy({ id: 1, company: 'Acme' }),
         vacancy({ id: 2, company: 'Acme', title: 'Data Engineer' }),
-        vacancy({ id: 3, company: 'Beta Corp', userAction: 'DECLINED' }),
+        vacancy({ id: 3, company: 'Beta Corp', status: 'DECLINED' }),
       ]),
     );
     renderVacancies();
@@ -238,7 +241,7 @@ describe('VacanciesPage / useVacancies', () => {
           title: 'Imported Role',
           applyUrl: 'tracker://import/2',
           matchScore: 0,
-          estimationComment: 'N/A',
+          estimationComment: null,
         }),
       ]),
     );
@@ -249,7 +252,9 @@ describe('VacanciesPage / useVacancies', () => {
     // in the row. Before this step the placeholder rendered a real-looking `0%`.
     const imported = rowOf('Imported Role');
     expect(imported.queryByText('0%')).not.toBeInTheDocument();
-    expect(imported.getByText('—')).toBeInTheDocument();
+    // Two dashes: the score, and the Comment column, which has no analyzer comment
+    // to show (`estimationComment: null`).
+    expect(imported.getAllByText('—')).toHaveLength(2);
     // …and the analysed row keeps its pill: the dash is about the analysis, not
     // about the row being an import or its link being unusable.
     expect(rowOf('Backend Engineer').getByText('80%')).toBeInTheDocument();
@@ -258,8 +263,8 @@ describe('VacanciesPage / useVacancies', () => {
   it('shows the current status as a tag', async () => {
     mswServer.use(
       ...buildHandlers([
-        vacancy({ id: 1, company: 'Acme', userAction: 'READY_TO_APPLY' }),
-        vacancy({ id: 2, company: 'Beta Corp', userAction: 'DECLINED' }),
+        vacancy({ id: 1, company: 'Acme', status: 'SAVED_FOR_LATER' }),
+        vacancy({ id: 2, company: 'Beta Corp', status: 'DECLINED' }),
       ]),
     );
     renderVacancies();
@@ -271,7 +276,7 @@ describe('VacanciesPage / useVacancies', () => {
 
     // Scoped by `.tag`: the ⋯ menu holds the same wording, and it stays in the DOM
     // (hidden) whether or not it is open.
-    expect(rowOf('Acme').getByText('Ready to apply', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Acme').getByText('Saved for later', { selector: '.tag' })).toBeInTheDocument();
     expect(rowOf('Beta Corp').getByText('Declined', { selector: '.tag' })).toBeInTheDocument();
   });
 
@@ -282,7 +287,7 @@ describe('VacanciesPage / useVacancies', () => {
 
     const user = userEvent.setup();
     await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Ready to apply'));
+    await user.click(menuItem('Saved for later'));
 
     // NOT_REVIEWED filter still active -> nothing to confirm, the row just drops out.
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
@@ -290,15 +295,15 @@ describe('VacanciesPage / useVacancies', () => {
 
   it('sets a reviewed row back to Not reviewed from the ⋯ menu', async () => {
     mswServer.use(
-      ...buildHandlers([vacancy({ id: 1, company: 'Acme', userAction: 'READY_TO_APPLY' })]),
+      ...buildHandlers([vacancy({ id: 1, company: 'Acme', status: 'SAVED_FOR_LATER' })]),
     );
     renderVacancies();
-    // The one row is READY_TO_APPLY, so the default filter starts on the empty state.
+    // The one row is SAVED_FOR_LATER, so the default filter starts on the empty state.
     await screen.findByText(/no vacancies match this filter/i);
 
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-    expect(rowOf('Acme').getByText('Ready to apply', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Acme').getByText('Saved for later', { selector: '.tag' })).toBeInTheDocument();
 
     await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
     await user.click(menuItem('Not reviewed'));
@@ -306,6 +311,31 @@ describe('VacanciesPage / useVacancies', () => {
     await waitFor(() =>
       expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument(),
     );
+  });
+
+  it('sends nothing when the ⋯ menu picks the status the row already has', async () => {
+    const patches: string[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      if (request.method === 'PATCH') patches.push(request.url);
+    };
+    mswServer.events.on('request:start', onRequest);
+    try {
+      mswServer.use(
+        ...buildHandlers([vacancy({ id: 1, company: 'Acme', status: 'SAVED_FOR_LATER' })]),
+      );
+      renderVacancies();
+      await screen.findByText(/no vacancies match this filter/i);
+
+      const user = userEvent.setup();
+      await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
+      await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
+      await user.click(menuItem('Saved for later'));
+
+      expect(rowOf('Acme').getByRole('button', { name: 'Apply' })).toBeEnabled();
+      expect(patches).toEqual([]);
+    } finally {
+      mswServer.events.removeListener('request:start', onRequest);
+    }
   });
 
   it('closes the ⋯ menu on a second click of its own trigger', async () => {
@@ -371,14 +401,38 @@ describe('VacanciesPage / useVacancies', () => {
     expect(open[0].id).toBe(trigger.getAttribute('popovertarget'));
   });
 
+  it('locks the status controls of a row already applied to, and only those', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'Interview Co', status: 'INTERVIEW' }),
+        vacancy({ id: 2, company: 'Saved Co', status: 'SAVED_FOR_LATER' }),
+      ]),
+    );
+    renderVacancies('/vacancies');
+    const user = userEvent.setup();
+    await screen.findByText(/no vacancies match this filter/i);
+    await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
+    await screen.findByText('Interview Co');
+
+    // Its status moves on /applications; copying it is still useful here.
+    expect(rowOf('Interview Co').getByRole('button', { name: 'Apply' })).toBeDisabled();
+    expect(rowOf('Interview Co').getByRole('button', { name: 'Decline' })).toBeDisabled();
+    expect(rowOf('Interview Co').getByRole('button', { name: 'More statuses' })).toBeDisabled();
+    expect(rowOf('Interview Co').getByRole('button', { name: /^Copy / })).toBeEnabled();
+    // A triage row keeps all of them.
+    expect(rowOf('Saved Co').getByRole('button', { name: 'Apply' })).toBeEnabled();
+    expect(rowOf('Saved Co').getByRole('button', { name: 'Decline' })).toBeEnabled();
+    expect(rowOf('Saved Co').getByRole('button', { name: 'More statuses' })).toBeEnabled();
+  });
+
   it('disables every control in a row while its save is in flight', async () => {
     const items = [vacancy({ id: 1, company: 'Acme' })];
     mswServer.use(...buildHandlers(items));
     // A slow PATCH, so the in-flight state is observable rather than a race.
     mswServer.use(
-      http.patch('http://localhost:3000/api/v1/estimated-vacancies/:id/user-action', async () => {
+      http.patch('http://localhost:3000/api/v1/vacancies/:id/status', async () => {
         await delay(300);
-        items[0].userAction = 'READY_TO_APPLY';
+        items[0].status = 'SAVED_FOR_LATER';
         return HttpResponse.json(items[0]);
       }),
     );
@@ -388,7 +442,7 @@ describe('VacanciesPage / useVacancies', () => {
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
     await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Ready to apply'));
+    await user.click(menuItem('Saved for later'));
 
     // All four in one `waitFor`: they come from the same `saving` flag, so they
     // have to agree on a single render — checking them one at a time can catch the
@@ -401,7 +455,7 @@ describe('VacanciesPage / useVacancies', () => {
     });
 
     await waitFor(() =>
-      expect(rowOf('Acme').getByText('Ready to apply', { selector: '.tag' })).toBeInTheDocument(),
+      expect(rowOf('Acme').getByText('Saved for later', { selector: '.tag' })).toBeInTheDocument(),
     );
   });
 
@@ -443,31 +497,13 @@ describe('VacanciesPage / useVacancies', () => {
     mswServer.use(
       http.post('http://localhost:3000/api/v1/applications', async ({ request }) => {
         recorded = await request.json();
-        // The real POST flips the vacancy's userAction in the same transaction
-        // (ADR-0019), so the fake has to as well or the refetch after the mutation
-        // puts the row straight back.
-        items[0].userAction = 'APPLIED';
+        // The real POST moves the vacancy to APPLIED in the same transaction, so the
+        // fake has to as well or the refetch after the mutation puts the row straight
+        // back.
         const now = new Date().toISOString();
+        Object.assign(items[0], { status: 'APPLIED', statusChangedAt: now, appliedAt: now });
         return HttpResponse.json({
-          application: {
-            id: 1,
-            appliedAt: now,
-            status: 'APPLIED',
-            statusUpdatedAt: now,
-            comments: [],
-            salaryInListing: '130 PLN/h',
-            usedTailoredResume: true,
-            userComment: 'Adapted CV.',
-            createdAt: now,
-            updatedAt: now,
-            estimatedVacancyId: 1,
-            company: 'Acme',
-            title: 'Backend Engineer',
-            applyUrl: 'https://example.com/1',
-            matchScore: 80,
-            recommendation: 'APPLY',
-            estimationComment: 'Strong match.',
-          },
+          application: items[0],
           resolution: 'linked-by-id',
           vacancyCreated: false,
         });
@@ -488,10 +524,10 @@ describe('VacanciesPage / useVacancies', () => {
 
     await waitFor(() =>
       expect(recorded).toMatchObject({
-        estimatedVacancyId: 1,
+        vacancyId: 1,
         salaryInListing: '130 PLN/h',
         usedTailoredResume: true,
-        userComment: 'Adapted CV.',
+        comment: 'Adapted CV.',
       }),
     );
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
@@ -513,7 +549,7 @@ describe('VacanciesPage / useVacancies', () => {
           HttpResponse.json(
             {
               statusCode: 422,
-              error: 'ApplicationAlreadyExistsError',
+              error: 'AlreadyAppliedError',
               message: 'Already recorded.',
             },
             { status: 422 },
@@ -555,14 +591,14 @@ describe('VacanciesPage / useVacancies', () => {
     return { held, release: () => release() };
   }
 
-  function holdTermRequest(term: string, items: EstimatedVacancyListItem[]) {
+  function holdTermRequest(term: string, items: FakeVacancy[]) {
     const held = gate();
     const state = { started: 0, release: held.release };
     // Everything but the held term goes straight to the shared fake. The wrapper
     // must answer *every* list request, so delegating is what keeps it honest —
     // and it makes handler order irrelevant.
-    const serve = estimatedVacanciesResolver(items);
-    const handler = http.get('http://localhost:3000/api/v1/estimated-vacancies', async (info) => {
+    const serve = vacanciesResolver(items);
+    const handler = http.get('http://localhost:3000/api/v1/vacancies', async (info) => {
       if (new URL(info.request.url).searchParams.get('search') !== term) {
         return serve(info);
       }
@@ -592,7 +628,7 @@ describe('VacanciesPage / useVacancies', () => {
     expect(client.getQueryData(['vacancies', 'beta'])).toBeUndefined();
 
     await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Ready to apply'));
+    await user.click(menuItem('Saved for later'));
 
     // The optimistic write lands on the entry that exists — the exact-key write it
     // replaced hit the absent one and did nothing. Asserted on the cache, not the
@@ -601,9 +637,8 @@ describe('VacanciesPage / useVacancies', () => {
     // entry underneath (see the comment in useVacancies.ts).
     await waitFor(() =>
       expect(
-        client.getQueryData<{ items: EstimatedVacancyListItem[] }>(['vacancies', ''])?.items[0]
-          .userAction,
-      ).toBe('READY_TO_APPLY'),
+        client.getQueryData<{ items: VacancyListItem[] }>(['vacancies', ''])?.items[0].status,
+      ).toBe('SAVED_FOR_LATER'),
     );
     expect(client.getQueryData(['vacancies', 'beta'])).toBeUndefined();
     // …and the frozen page is still what is on screen, unchanged.
@@ -626,7 +661,7 @@ describe('VacanciesPage / useVacancies', () => {
     // a later call's handlers take priority — while within one call the first entry
     // wins. In the same call this override would lose to `buildHandlers`' PATCH.
     mswServer.use(
-      http.patch('http://localhost:3000/api/v1/estimated-vacancies/:id/user-action', async () => {
+      http.patch('http://localhost:3000/api/v1/vacancies/:id/status', async () => {
         patchState.started += 1;
         await patch.held;
         return HttpResponse.json(null, { status: 500 });
@@ -641,15 +676,14 @@ describe('VacanciesPage / useVacancies', () => {
     await waitFor(() => expect(list.state.started).toBe(1));
 
     await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Ready to apply'));
+    await user.click(menuItem('Saved for later'));
 
     // Mid-flight: the optimistic write is *in* the cached page, which is what makes
     // the rollback below a real rollback rather than a no-op on an untouched entry.
     await waitFor(() => expect(patchState.started).toBe(1));
     const cached = () =>
-      client.getQueryData<{ items: EstimatedVacancyListItem[] }>(['vacancies', ''])?.items[0]
-        .userAction;
-    expect(cached()).toBe('READY_TO_APPLY');
+      client.getQueryData<{ items: VacancyListItem[] }>(['vacancies', ''])?.items[0].status;
+    expect(cached()).toBe('SAVED_FOR_LATER');
 
     // Now let it fail: the row says so, and the page it wrote is back to what it held.
     patch.release();
@@ -663,7 +697,7 @@ describe('VacanciesPage / useVacancies', () => {
   it('surfaces a row error and rolls the row back when the save fails', async () => {
     mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
     mswServer.use(
-      http.patch('http://localhost:3000/api/v1/estimated-vacancies/:id/user-action', () =>
+      http.patch('http://localhost:3000/api/v1/vacancies/:id/status', () =>
         HttpResponse.json(null, { status: 500 }),
       ),
     );
@@ -672,7 +706,7 @@ describe('VacanciesPage / useVacancies', () => {
 
     const user = userEvent.setup();
     await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Ready to apply'));
+    await user.click(menuItem('Saved for later'));
 
     // The optimistic write put the row out of the NOT_REVIEWED view; the rollback
     // has to bring it back, tag and all.
@@ -682,7 +716,7 @@ describe('VacanciesPage / useVacancies', () => {
 
   it('surfaces a friendly loadError when the list response has the wrong shape', async () => {
     mswServer.use(
-      http.get('http://localhost:3000/api/v1/estimated-vacancies', () =>
+      http.get('http://localhost:3000/api/v1/vacancies', () =>
         HttpResponse.json({ items: 'not-an-array' }),
       ),
     );
@@ -725,12 +759,10 @@ describe('VacanciesPage / useVacancies', () => {
     });
 
     it('lists every vacancy of that company, with its applied state', async () => {
-      mswServer.use(
-        ...buildHandlers(companyFixtures()),
-        ...buildApplicationHandlers([
-          application({ id: 7, estimatedVacancyId: 2, company: 'Acme', title: 'Data Engineer' }),
-        ]),
-      );
+      // One table: #2 is applied to, and the log the modal reads is its pipeline.
+      const rows = companyFixtures();
+      rows[1].status = 'INTERVIEW';
+      mswServer.use(...buildHandlers(rows));
       renderVacancies();
       await screen.findByText('Backend Engineer');
 
@@ -750,11 +782,12 @@ describe('VacanciesPage / useVacancies', () => {
     });
 
     it('claims nothing about the log when the applications request fails', async () => {
+      // First in the list, so the refusal shadows the fake's own /applications.
       mswServer.use(
-        ...buildHandlers(companyFixtures()),
         http.get('http://localhost:3000/api/v1/applications', () =>
           HttpResponse.json(null, { status: 500 }),
         ),
+        ...buildHandlers(companyFixtures()),
       );
       renderVacancies();
       await screen.findByText('Backend Engineer');
@@ -801,15 +834,13 @@ describe('VacanciesPage / useVacancies', () => {
       mswServer.use(
         ...buildHandlers([
           vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
-          vacancy({ id: 2, company: 'Acme', title: 'Data Engineer' }),
-        ]),
-        ...buildApplicationHandlers([
-          application({
-            id: 7,
-            estimatedVacancyId: 1,
+          // Off the default filter; the modal lists it all the same.
+          vacancy({
+            id: 2,
+            company: 'Acme',
+            title: 'Data Engineer',
             status: 'REPLIED',
-            appliedAt: daysAgo(45),
-            statusUpdatedAt: daysAgo(45),
+            statusChangedAt: daysAgo(45),
           }),
         ]),
       );
@@ -820,7 +851,7 @@ describe('VacanciesPage / useVacancies', () => {
       await user.click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[0]);
 
       const modal = within(await screen.findByRole('dialog'));
-      const mark = modal.getByText('⏳');
+      const mark = await modal.findByText('⏳');
       // The same `.tip` bubble the action buttons wear, not the native `title` it
       // used to carry.
       expect(mark.querySelector('.tip')).toHaveTextContent('45 days since last update');
@@ -837,18 +868,13 @@ describe('VacanciesPage / useVacancies', () => {
             company: 'Acme',
             title: 'Imported Role',
             applyUrl: 'tracker://import/2',
-            // The placeholder sentinel `ApplicationService` writes for a row it had
-            // to create. Without it this fixture claimed a real analysis while
-            // carrying a `tracker://` URL — the dash below passed for the wrong
-            // reason (the URL scheme), which is what step 7 separates.
-            estimationComment: 'N/A',
+            // A row `ApplicationService` had to create has no analyzer comment.
+            // Without that this fixture claimed a real analysis while carrying a
+            // `tracker://` URL — the dash below passed for the wrong reason (the
+            // URL scheme), which is what step 7 separates.
+            estimationComment: null,
           }),
         ]),
-        // An empty log, served: without a handler here the request is unhandled
-        // (`onUnhandledRequest: 'error'`), the Action cells read `—` for a reason
-        // this test is not about, and the dash count below would be measuring the
-        // failed fetch instead of the importer row's score.
-        ...buildApplicationHandlers([]),
       );
       renderVacancies();
       await screen.findByText('Backend Engineer');
@@ -874,7 +900,7 @@ describe('VacanciesPage / useVacancies', () => {
       };
       mswServer.events.on('request:start', onRequestStart);
       try {
-        mswServer.use(...buildHandlers(companyFixtures()), ...buildApplicationHandlers([]));
+        mswServer.use(...buildHandlers(companyFixtures()));
         renderVacancies();
         await screen.findByText('Backend Engineer');
         expect(companyRequests).toEqual([]);

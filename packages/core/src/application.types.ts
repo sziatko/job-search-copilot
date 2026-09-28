@@ -1,49 +1,50 @@
-import type { ApplicationStatus, Recommendation } from '@prisma/client';
+import type { Recommendation, VacancyStatus } from '@prisma/client';
+import type { PipelineStatus } from './status';
+import type { VacancyComment } from './vacancy.types';
 
 /**
  * WEB path: the analyzed vacancy row already exists and the caller knows its id
- * (the /vacancies page marking a row APPLIED). Link directly, no lookup.
+ * (the /vacancies page applying to a row). Link directly, no lookup.
  */
 export interface RecordApplicationByIdInput {
-  estimatedVacancyId: number;
+  vacancyId: number;
   salaryInListing?: string | null;
   usedTailoredResume?: boolean;
-  userComment?: string | null;
-  /** Defaults to APPLIED. */
-  status?: ApplicationStatus;
-  /** Defaults to now(). The tracker import passes historical dates. */
-  appliedAt?: Date;
+  /** Added as a USER comment; a blank one adds none. */
+  comment?: string | null;
+  /** Where the application already is. APPLIED is journaled first either way. */
+  status?: PipelineStatus;
 }
 
 /**
- * MCP / import path: the vacancy is identified by (company, title). A unique match
- * links to it; no match creates a minimal EstimatedVacancy with placeholder analyzer
- * fields (see ApplicationService.record / ADR-0019); more than one match is an error.
+ * MCP path: the vacancy is identified by (company, title). A unique match links to it;
+ * no match creates a minimal Vacancy with placeholder analyzer fields (see
+ * ApplicationService.record / ADR-0019); more than one match is an error.
  */
 export interface RecordApplicationByVacancyInput {
   company: string;
   title: string;
   /** Synthesized as `tracker://…` when absent. */
   applyUrl?: string | null;
-  /** For a created vacancy: from the tracker text, else 0. */
+  /** For a created vacancy: else 0. */
   matchScore?: number | null;
   /** For a created vacancy: explicit, else derived from matchScore, else 'APPLY'. */
   recommendation?: Recommendation | null;
-  /** For a created vacancy: else 'N/A'. */
+  /** For a created vacancy: else PLACEHOLDER_COMMENT ('N/A'). */
   fullText?: string | null;
-  /** For a created vacancy: from the tracker notes, else 'N/A'. */
+  /** For a created vacancy: its ANALYZER comment, else none. */
   estimationComment?: string | null;
   salaryInListing?: string | null;
   usedTailoredResume?: boolean;
-  userComment?: string | null;
-  status?: ApplicationStatus;
-  appliedAt?: Date;
+  /** Added as a USER comment; a blank one adds none. */
+  comment?: string | null;
+  status?: PipelineStatus;
 }
 
 export type RecordApplicationInput = RecordApplicationByIdInput | RecordApplicationByVacancyInput;
 
 export function isById(input: RecordApplicationInput): input is RecordApplicationByIdInput {
-  return 'estimatedVacancyId' in input && typeof input.estimatedVacancyId === 'number';
+  return 'vacancyId' in input && typeof input.vacancyId === 'number';
 }
 
 export type VacancyResolution = 'linked-by-id' | 'linked-existing' | 'created-vacancy';
@@ -59,23 +60,27 @@ export interface RecordManyApplicationsResult {
 }
 
 /** ApplicationService.update: the fields the apply modal wrote. Absent = untouched;
- * null or blank = cleared. */
+ * null or blank = cleared. `comment` is not a field: a non-blank one adds a USER
+ * comment, a blank one adds nothing. */
 export interface UpdateApplicationInput {
   salaryInListing?: string | null;
   usedTailoredResume?: boolean;
-  userComment?: string | null;
+  comment?: string | null;
 }
 
 export interface ListApplicationsFilters {
-  status?: ApplicationStatus;
-  /** Matches EstimatedVacancy.company OR .title, ILIKE '%term%', case-insensitive. For
-   * the /tracker page's single free-text search box. */
+  /** One pipeline status; absent = all of them. */
+  status?: PipelineStatus;
+  /** Matches Vacancy.company OR .title, ILIKE '%term%', case-insensitive. For
+   * the /applications page's single free-text search box. */
   search?: string;
-  /** Matches EstimatedVacancy.company, ILIKE '%term%', case-insensitive. Independent of
+  /** Matches Vacancy.company, ILIKE '%term%', case-insensitive. Independent of
    * `search` — combined with `title` (and `search`, if also given) via AND, not OR. */
   company?: string;
-  /** Matches EstimatedVacancy.title, ILIKE '%term%', case-insensitive. See `company`. */
+  /** Matches Vacancy.title, ILIKE '%term%', case-insensitive. See `company`. */
   title?: string;
+  /** Exact, after the same normalization `save` applies — see `applyUrlKey`. */
+  applyUrl?: string;
   /** Default 50, max 500. */
   limit?: number;
   offset?: number;
@@ -86,34 +91,27 @@ export interface ListApplicationsResult {
   total: number;
 }
 
-export interface ApplicationComment {
-  id: number;
-  createdAt: Date;
-  body: string;
-}
-
 /**
- * A flattened Application ⋈ EstimatedVacancy row: the Application's own delta plus
- * the vacancy fields the /tracker page renders. The vacancy fields are never NULL —
- * a never-analyzed application still has a real (placeholder-filled) vacancy row.
+ * A vacancy seen from /applications: the fields that page renders. `id` is the
+ * vacancy's. The analyzer fields are never NULL — a never-analyzed application still
+ * has a real (placeholder-filled) vacancy row.
  */
 export interface ApplicationListItem {
   id: number;
-  appliedAt: Date;
-  status: ApplicationStatus;
-  statusUpdatedAt: Date;
-  /** The append-only timeline, oldest first (ADR-0028). */
-  comments: ApplicationComment[];
+  /** A pipeline status on every list / getById row. A status write returns the row
+   * whatever it moved to, triage included. */
+  status: VacancyStatus;
+  statusChangedAt: Date;
+  /** The latest APPLIED journal row's date; null when the vacancy reached the pipeline
+   * without one (a status set straight past APPLIED). */
+  appliedAt: Date | null;
+  /** Every comment on the vacancy, oldest first, the analyzer's included. */
+  comments: VacancyComment[];
   salaryInListing: string | null;
   usedTailoredResume: boolean;
-  userComment: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  estimatedVacancyId: number;
   company: string;
   title: string;
   applyUrl: string;
   matchScore: number;
   recommendation: Recommendation;
-  estimationComment: string;
 }

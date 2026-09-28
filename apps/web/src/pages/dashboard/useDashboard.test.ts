@@ -3,10 +3,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildApplicationHandlers, buildHandlers } from '@/test/msw/handlers';
+import { buildHandlers, type FakeVacancy, fakeVacancy } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
-import type { ApplicationListItem } from '../applications/types';
-import type { EstimatedVacancyListItem } from '../vacancies/types';
 import { timeAgo } from './DashboardPage';
 import { useDashboard } from './useDashboard';
 
@@ -26,53 +24,28 @@ function withQueryClient() {
     createElement(QueryClientProvider, { client }, children);
 }
 
-function application(overrides: Partial<ApplicationListItem> = {}): ApplicationListItem {
-  return {
-    id: 1,
-    appliedAt: NOW.toISOString(),
+/** A vacancy in the pipeline. */
+function application(overrides: Partial<FakeVacancy> = {}): FakeVacancy {
+  return fakeVacancy({
+    createdAt: NOW.toISOString(),
     status: 'APPLIED',
-    statusUpdatedAt: NOW.toISOString(),
-    comments: [],
-    salaryInListing: null,
-    usedTailoredResume: false,
-    userComment: null,
-    createdAt: NOW.toISOString(),
-    updatedAt: NOW.toISOString(),
-    estimatedVacancyId: 1,
-    company: 'Acme',
-    title: 'Backend Engineer',
-    applyUrl: 'https://acme.com/jobs/1',
-    matchScore: 80,
-    recommendation: 'APPLY',
-    estimationComment: 'Strong match.',
+    statusChangedAt: NOW.toISOString(),
+    appliedAt: NOW.toISOString(),
     ...overrides,
-  };
+  });
 }
 
-function vacancy(overrides: Partial<EstimatedVacancyListItem> = {}): EstimatedVacancyListItem {
-  return {
-    id: 1,
+function vacancy(overrides: Partial<FakeVacancy> = {}): FakeVacancy {
+  return fakeVacancy({
     createdAt: NOW.toISOString(),
-    updatedAt: NOW.toISOString(),
-    company: 'Acme',
-    title: 'Backend Engineer',
-    applyUrl: 'https://acme.com/jobs/1',
-    matchScore: 80,
-    recommendation: 'APPLY',
-    estimationComment: 'Strong match.',
-    userAction: 'NOT_REVIEWED',
-    userActionUpdatedAt: null,
+    statusChangedAt: NOW.toISOString(),
     ...overrides,
-  };
+  });
 }
 
-async function setUp(
-  options: { applications?: ApplicationListItem[]; vacancies?: EstimatedVacancyListItem[] } = {},
-) {
-  mswServer.use(
-    ...buildApplicationHandlers(options.applications ?? []),
-    ...buildHandlers(options.vacancies ?? []),
-  );
+/** One table, as on the server: the pipeline rows are vacancies too. */
+async function setUp(options: { applications?: FakeVacancy[]; vacancies?: FakeVacancy[] } = {}) {
+  mswServer.use(...buildHandlers([...(options.applications ?? []), ...(options.vacancies ?? [])]));
   const view = renderHook(() => useDashboard(), { wrapper: withQueryClient() });
   await waitFor(() => expect(view.result.current.loading).toBe(false));
   return view;
@@ -132,7 +105,7 @@ describe('useDashboard', () => {
           vacancy({ id: 4, matchScore: 88 }),
           vacancy({ id: 5, matchScore: 61 }),
           vacancy({ id: 6, matchScore: 99 }),
-          vacancy({ id: 7, matchScore: 100, userAction: 'APPLIED' }), // triaged already
+          vacancy({ id: 7, matchScore: 100, status: 'SAVED_FOR_LATER' }), // triaged already
         ],
       });
 
@@ -146,7 +119,7 @@ describe('useDashboard', () => {
     it('shows the six latest moves, newest first', async () => {
       const view = await setUp({
         applications: Array.from({ length: 8 }, (_, i) =>
-          application({ id: i + 1, statusUpdatedAt: daysAgo(i) }),
+          application({ id: i + 1, statusChangedAt: daysAgo(i) }),
         ),
       });
 

@@ -14,7 +14,7 @@ laptop, Postgres in a container.
 ## The four packages
 
 ```
-packages/core   ── domain layer: Prisma schema/client, EstimatedVacancyService,
+packages/core   ── domain layer: Prisma schema/client, VacancyService,
                    recommendation normalization, DomainError types.
                    Framework-agnostic — no @nestjs/*, no MCP SDK.
       ▲     ▲
@@ -27,10 +27,10 @@ apps/web (React SPA)        vacancy-match-analyzer
 
 | Package | Responsibility | Depends on |
 | --- | --- | --- |
-| [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the `EstimatedVacancy` + `Application` schema + migrations, the `EstimatedVacancyService` and `ApplicationService` (all queries), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
-| `apps/api` | Thin HTTP transport over the core services for the web app. NestJS: DI, DTO validation, versioned routes (`estimated-vacancies`, `applications`), a health check. | `core`, `@nestjs/*`, `class-validator`, `zod` |
-| `apps/mcp` | Thin stdio transport over the *same* services, exposing eleven tools (5 for estimated vacancies, 4 for applications, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. | `core`, `@modelcontextprotocol/sdk`, `zod` |
-| `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/tracker`, `/log`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
+| [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the schema (`Vacancy` with its `StatusChange` journal and `Comment`s, `VacancyLogEntry`) + migrations, the `VacancyService`, `ApplicationService` and `VacancyLogService` (all queries), `writeStatus` (the only writer of status), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
+| `apps/api` | Thin HTTP transport over the core services for the web app. NestJS: DI, DTO validation, versioned routes (`vacancies`, `applications`), a health check. | `core`, `@nestjs/*`, `class-validator`, `zod` |
+| `apps/mcp` | Thin stdio transport over the *same* services, exposing ten tools (4 for vacancies, 4 for applications incl. `update_vacancy_status`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. | `core`, `@modelcontextprotocol/sdk`, `zod` |
+| `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/applications`, `/log`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 (monorepo), [ADR-0002](decisions/0002-core-shared-domain-layer.md) (core as the
@@ -43,8 +43,8 @@ transports over one service).
 
 ```
 Claude runs vacancy-match-analyzer
-  → calls MCP tool save_estimated_vacancy (apps/mcp/src/estimated-vacancies/estimated-vacancies.tools.ts)
-  → EstimatedVacancyService.save()  (packages/core)
+  → calls MCP tool save_vacancy (apps/mcp/src/vacancies/vacancies.tools.ts)
+  → VacancyService.save()  (packages/core)
       → findUnique by applyUrl
           → exists?  return { created: false, vacancy }   (analysis discarded)
           → new?     normalizeRecommendation() → create → { created: true, vacancy }
@@ -55,22 +55,25 @@ Claude runs vacancy-match-analyzer
 
 ```
 apps/web  useVacancies()  (TanStack Query)
-  → GET  /api/v1/estimated-vacancies?limit=100        → EstimatedVacancyService.list()
-  → PATCH /api/v1/estimated-vacancies/:id/user-action → EstimatedVacancyService.updateUserAction()
+  → GET  /api/v1/vacancies?limit=100        → VacancyService.list()
+  → PATCH /api/v1/vacancies/:id/status     → VacancyService.updateStatus() → writeStatus()
         (optimistic cache update in the hook; rollback on error; invalidate on settle)
 ```
 
 **User records an application** (Phase 2):
 
 ```
-apps/web  ApplyDialog "mark as applied"  →  POST /api/v1/applications { estimatedVacancyId, ... }
+apps/web  ApplyDialog "mark as applied"  →  POST /api/v1/applications { vacancyId, ... }
 apps/mcp  record_application { company, title, ... }
   → ApplicationService.record()   (packages/core, one transaction)
       → resolve the vacancy: link by id / link to a unique (company,title) match /
-        create a placeholder EstimatedVacancy (analyzer fields = 'N/A' / 0 / derived)
-      → if linked & not already APPLIED: set that vacancy's userAction = APPLIED
-      → create the Application (status, salary, tailored-CV flag, comment, appliedAt)
-  → returns { application, resolution, vacancyCreated }   (flattened join row)
+        create a placeholder Vacancy (fullText 'N/A', score 0 / derived; an ANALYZER
+        comment only if one was passed)
+      → already in the pipeline? AlreadyAppliedError
+      → writeStatus(APPLIED), then writeStatus(status) if recorded further along
+        (each a StatusChange row + the status / statusChangedAt cache)
+      → set salary / tailored-CV flag; add the comment as a USER Comment
+  → returns { application, resolution, vacancyCreated }   (the vacancy, as /applications reads it)
 ```
 
 Both transports call the same core service methods; there is no business logic in
@@ -90,7 +93,7 @@ draw on under `src/components/ui/` (`ScorePill`, `KpiTile`, `Modal`, `Select`,
 `api`, `mcp`, `web`.
 
 - **File watchers poll.** Bind-mount change events don't reliably reach containers
-  on Windows/Docker Desktop, so `tsc --watch`, `nest start --watch`, `tsx watch`,
+  on Windows/Docker Desktop, so `tsc --watch`, `nest start --watch`
   and Vite are all told to poll (`CHOKIDAR_USEPOLLING`, `server.watch.usePolling`).
   > **Breaks if you change it:** dropping the polling env vars → edits on a Windows
   > host stop triggering rebuilds/HMR in the containers.
@@ -130,21 +133,20 @@ container, not just `core`:
 The load-bearing assumptions. Each links to the section or ADR that owns it.
 
 1. **`packages/core` is the only database client.** `apps/api` and `apps/mcp`
-   reach the DB *only* through `EstimatedVacancyService` / `ApplicationService`. A
+   reach the DB *only* through `VacancyService` / `ApplicationService`. A
    query written in a controller or a tool handler is a bug.
    → [ADR-0002](decisions/0002-core-shared-domain-layer.md)
 2. **A vacancy is analysed once.** `save()` never overwrites an existing row for a
    given `applyUrl`. Anything that expects re-analysis to update stored fields is
    wrong. → [ADR-0005](decisions/0005-analyze-once.md),
    [`domain-model.md`](domain-model.md)
-3. **`recommendation` is the analyzer's; `userAction` is the user's.** They are
-   independent axes and neither is derived from the other. The analyzer's fields
-   and `userAction` have disjoint writers: `save()` and `record()`'s
-   create-vacancy path write analysis fields (never `userAction` beyond setting it
-   to `APPLIED`); `updateUserAction()` and `record()`'s link side-effect write only
-   `userAction` + `userActionUpdatedAt`.
+3. **`recommendation` is the analyzer's; `status` is the user's.** They are
+   independent axes and neither is derived from the other, and they have disjoint
+   writers: `save()` and `record()`'s create-vacancy path write the analysis fields
+   (and a new vacancy's first `NOT_REVIEWED`); `writeStatus()` alone writes `status`
+   + `statusChangedAt` and the `StatusChange` journal, in one transaction.
    → [`domain-model.md`](domain-model.md),
-   [ADR-0019](decisions/0019-record-or-create-vacancy.md)
+   [ADR-0029](decisions/0029-one-vacancy-table.md)
 4. **`recommendation` is stored canonical-English.** Ukrainian input is normalized
    on the way in (`normalizeRecommendation`). Every filter/enum downstream assumes
    English. → [`domain-model.md`](domain-model.md)
@@ -160,10 +162,6 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 8. **Env is loaded by the app entrypoint, validated at boot.** `packages/core`
    does not load `.env`; a missing/invalid var fails startup with a readable
    message. → [ADR-0007](decisions/0007-env-config-and-loading.md)
-9. **Every `Application` links 1:1 to an `EstimatedVacancy`.** The tracker reads
-   company / title / score / recommendation / analyzer comment through that join —
-   they are never copied onto `Application`.
-   → [ADR-0017](decisions/0017-application-1to1-delta.md)
 
 ## Stack
 

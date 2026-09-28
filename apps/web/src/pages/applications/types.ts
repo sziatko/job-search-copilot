@@ -1,11 +1,13 @@
-// Runtime contract for /api/v1/applications. Same rules as features/vacancies/types.ts:
+// Runtime contract for /api/v1/applications. Same rules as pages/vacancies/types.ts:
 // zod is the single source of truth, TS types are inferred, api.ts parses every
 // response through these, and @job-search-copilot/core is NOT imported (Prisma/pg
 // must not enter the browser bundle — ADR-0012). Enum values are never written as
-// bare literals elsewhere — use APPLICATION_STATUS or map over `*.options`.
+// bare literals elsewhere — map over `*.options`.
 import { z } from 'zod';
+import { type VacancyStatus, vacancyStatusSchema } from '../vacancies/types';
 
-export const applicationStatusSchema = z.enum([
+/** The pipeline: the statuses /applications shows. */
+export const applicationStatusSchema = vacancyStatusSchema.extract([
   'APPLIED',
   'RECRUITER_SCREEN',
   'REPLIED',
@@ -14,7 +16,10 @@ export const applicationStatusSchema = z.enum([
   'REJECTED',
 ]);
 export type ApplicationStatus = z.infer<typeof applicationStatusSchema>;
-export const APPLICATION_STATUS = applicationStatusSchema.enum;
+
+export function isPipelineStatus(status: VacancyStatus): status is ApplicationStatus {
+  return applicationStatusSchema.safeParse(status).success;
+}
 
 // Extra dropdown options — UI only, never cross the wire. ACTIVE and TIMEOUT are
 // derived from dates, not stored: see constants.ts for the rule.
@@ -39,36 +44,33 @@ export const applicationStatusFilterSchema = z.enum([
   ...applicationStatusSchema.options,
 ]);
 
-// The analyzer's verdict — a third hand-written copy of this enum in the web bundle
-// (see the enum touch-point list in the Phase 2 plan / docs/domain-model.md).
-const recommendationSchema = z.enum(['APPLY', 'APPLY_WITH_CAVEATS', 'SKIP']);
+const commentSourceSchema = z.enum(['ANALYZER', 'USER', 'AGENT']);
+export type CommentSource = z.infer<typeof commentSourceSchema>;
 
 const applicationCommentSchema = z.object({
   id: z.number(),
   createdAt: z.string(),
   body: z.string(),
+  source: commentSourceSchema,
 });
 export type ApplicationComment = z.infer<typeof applicationCommentSchema>;
 
+/** A vacancy in the pipeline; `id` is the vacancy's. */
 export const applicationListItemSchema = z.object({
   id: z.number(),
-  appliedAt: z.string(),
   status: applicationStatusSchema,
-  statusUpdatedAt: z.string(),
-  /** The append-only timeline, oldest first (ADR-0028). */
+  /** The last status move — the list's order and the timeout clock. */
+  statusChangedAt: z.string(),
+  /** The latest APPLIED move; null for a row set straight past it. */
+  appliedAt: z.string().nullable(),
+  /** Every comment on the vacancy, oldest first, the analyzer's included. */
   comments: z.array(applicationCommentSchema),
   salaryInListing: z.string().nullable(),
   usedTailoredResume: z.boolean(),
-  userComment: z.string().nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  estimatedVacancyId: z.number(),
   company: z.string(),
   title: z.string(),
   applyUrl: z.string(),
   matchScore: z.number(),
-  recommendation: recommendationSchema,
-  estimationComment: z.string(),
 });
 export type ApplicationListItem = z.infer<typeof applicationListItemSchema>;
 
@@ -79,22 +81,20 @@ export const listApplicationsResponseSchema = z.object({
 
 export const recordApplicationResponseSchema = z.object({
   application: applicationListItemSchema,
-  resolution: z.enum(['linked-by-id', 'linked-existing', 'created-vacancy']),
-  vacancyCreated: z.boolean(),
 });
 export type RecordApplicationResponse = z.infer<typeof recordApplicationResponseSchema>;
 
-/** PATCH /applications/:id. Absent = untouched; null or blank clears. */
+/** PATCH /applications/:id. Absent = untouched; null or blank clears. A non-blank
+ * `comment` is added as a new USER comment. */
 export interface UpdateApplicationInput {
   salaryInListing?: string | null;
   usedTailoredResume?: boolean;
-  userComment?: string | null;
+  comment?: string;
 }
 
 export interface RecordApplicationInput {
-  estimatedVacancyId: number;
+  vacancyId: number;
   salaryInListing?: string;
   usedTailoredResume?: boolean;
-  userComment?: string;
-  status?: ApplicationStatus;
+  comment?: string;
 }

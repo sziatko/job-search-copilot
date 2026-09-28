@@ -5,12 +5,12 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
-  // company is only ever queried as ILIKE '%term%' (see EstimatedVacancyService.list),
+  // company is only ever queried as ILIKE '%term%' (see VacancyService.list),
   // which a plain b-tree index can't serve — pg_trgm + a GIN index below can.
   extensions = [pg_trgm]
 }
 
-model EstimatedVacancy {
+model Vacancy {
   id                  Int             @id @default(autoincrement())
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @default(now()) @updatedAt
@@ -23,66 +23,51 @@ model EstimatedVacancy {
   fullText            String          @db.Text
   matchScore          Int
   recommendation      Recommendation
-  estimationComment   String          @db.Text
-  userAction          UserAction      @default(NOT_REVIEWED)
-  userActionUpdatedAt DateTime?
+  // The user's side: a cache of the latest StatusChange and its date. Written only
+  // through writeStatus (status.ts), which keeps the two in step.
+  status              VacancyStatus   @default(NOT_REVIEWED)
+  statusChangedAt     DateTime        @default(now())
+  // What was entered when applying (the apply modal).
+  salaryInListing     String?
+  usedTailoredResume  Boolean         @default(false)
 
-  // Phase 2: the delta recorded when the user actually applied. Absent until then.
-  application         Application?
+  // Every note on the vacancy — the analyzer's reasoning, the user's, an agent's.
+  comments            Comment[]
+  // Every status the vacancy has been in, with its date.
+  statusChanges       StatusChange[]
 
   @@index([recommendation])
-  @@index([userAction])
+  @@index([status, statusChangedAt])
   @@index([company(ops: raw("gin_trgm_ops"))], type: Gin)
-  // /tracker searches company OR title as ILIKE '%term%' via this relation — same
-  // reason company has a trigram GIN index, title now needs one too.
+  // /applications searches company OR title as ILIKE '%term%' — same reason company has
+  // a trigram GIN index, title needs one too.
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
-// One row per submitted application. Deliberately minimal: it stores only what the
-// analyzer's row can't (status, salary in the listing, whether a tailored CV was
-// used, the user's own comment). Company / title / applyUrl / matchScore /
-// recommendation / analyzer comment are read from the linked EstimatedVacancy — see
-// ADR-0017. Strict 1:1: estimatedVacancyId is unique. A never-analyzed application
-// still gets a real EstimatedVacancy row (placeholder analyzer fields) — ADR-0019.
-model Application {
-  id                 Int               @id @default(autoincrement())
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @default(now()) @updatedAt
+// One row per status change, append-only. The applied date is the latest APPLIED row's
+// createdAt.
+model StatusChange {
+  id        Int           @id @default(autoincrement())
+  createdAt DateTime      @default(now())
+  status    VacancyStatus
+  vacancyId Int
+  vacancy   Vacancy       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
 
-  estimatedVacancyId Int               @unique
-  estimatedVacancy   EstimatedVacancy  @relation(fields: [estimatedVacancyId], references: [id], onDelete: Cascade)
-
-  // The real submission date. Distinct from EstimatedVacancy.createdAt (date analyzed);
-  // the tracker import backfills historical values here.
-  appliedAt          DateTime          @default(now())
-  status             ApplicationStatus @default(APPLIED)
-  // "When I last moved this in the pipeline". Set at creation to `appliedAt` — a fresh
-  // application has already moved once, into the pipeline — then stamped by
-  // updateStatus(). Never null; the DB enforces it.
-  statusUpdatedAt    DateTime
-  salaryInListing    String?
-  usedTailoredResume Boolean           @default(false)
-  // "The note about this application" — one editable field. What happened since is
-  // `comments` (ADR-0028).
-  userComment        String?           @db.Text
-
-  comments           Comment[]
-
-  @@index([status])
-  @@index([appliedAt])
+  @@index([vacancyId, createdAt])
 }
 
-// An append-only timeline note on an application — a status move's note, or one added
-// at any time. No edit, no delete (ADR-0028). Named `Comment`, not
-// `ApplicationComment`, so a nullable vacancy FK can join it later without a rename.
+// One note on a vacancy, append-only: no edit, no delete. `source` says who wrote it —
+// the analyzer's reasoning (written once, with the analysis), the user's, or an agent's
+// (MCP). Read oldest first, `id` breaking a tie.
 model Comment {
-  id            Int         @id @default(autoincrement())
-  createdAt     DateTime    @default(now())
-  body          String      @db.Text
-  applicationId Int
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  id        Int           @id @default(autoincrement())
+  createdAt DateTime      @default(now())
+  body      String        @db.Text
+  source    CommentSource
+  vacancyId Int
+  vacancy   Vacancy       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
 
-  @@index([applicationId, createdAt])
+  @@index([vacancyId, createdAt])
 }
 
 // Every posting seen before analysis — the dedup log (ADR-0026). Written only through
@@ -107,17 +92,19 @@ enum Recommendation {
   SKIP
 }
 
-enum UserAction {
-  NOT_REVIEWED
-  READY_TO_APPLY
-  APPLIED
-  DECLINED
+enum CommentSource {
+  ANALYZER
+  USER
+  AGENT
 }
 
-// The pipeline stage of a submitted application. Separate axis from UserAction (which
-// is triage on an analyzed vacancy) — see ADR-0018. REJECTED = the company said no,
-// which is a different thing from UserAction.DECLINED ("I chose not to apply").
-enum ApplicationStatus {
+// Triage (NOT_REVIEWED, SAVED_FOR_LATER, DECLINED), then the pipeline (APPLIED …
+// REJECTED — PIPELINE_STATUSES). REJECTED = the company said no; DECLINED = "I chose not
+// to apply".
+enum VacancyStatus {
+  NOT_REVIEWED
+  SAVED_FOR_LATER
+  DECLINED
   APPLIED
   RECRUITER_SCREEN
   REPLIED

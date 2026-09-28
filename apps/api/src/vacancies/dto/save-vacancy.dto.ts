@@ -1,7 +1,7 @@
 import { RECOMMENDATION_INPUT_VALUES } from '@job-search-copilot/core';
 import { IsIn, IsInt, IsNotEmpty, IsString, Max, Min } from 'class-validator';
 
-export class SaveEstimatedVacancyDto {
+export class SaveVacancyDto {
   @IsString()
   @IsNotEmpty()
   company!: string;
@@ -23,7 +23,7 @@ export class SaveEstimatedVacancyDto {
   @Max(100)
   matchScore!: number;
 
-  /** Accepts the canonical English value or its Ukrainian equivalent — normalized in EstimatedVacancyService.save(). */
+  /** Accepts the canonical English value or its Ukrainian equivalent — normalized in VacancyService.save(). */
   @IsIn(RECOMMENDATION_INPUT_VALUES)
   recommendation!: string;
 

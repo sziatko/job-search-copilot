@@ -6,7 +6,7 @@ import type { Env } from '../config/env.validation';
 /**
  * Owns the app's single PrismaClient and ties its connection lifecycle to Nest's:
  * connect on module init, disconnect on shutdown (so `app.enableShutdownHooks()`
- * in main.ts actually drains the pool on SIGTERM instead of dropping connections).
+ * in setup-app.ts actually drains the pool on SIGTERM instead of dropping connections).
  */
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {

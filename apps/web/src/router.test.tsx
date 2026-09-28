@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { routeTree } from './router';
-import { buildApplicationHandlers, buildHandlers } from './test/msw/handlers';
+import { buildHandlers } from './test/msw/handlers';
 import { mswServer } from './test/msw/server';
 
 function renderAt(path: string) {
@@ -25,7 +25,7 @@ function renderAt(path: string) {
 // around it either way — which is exactly how this file used to stay green while
 // asserting nothing about the route it was named after.
 function renderIndex() {
-  mswServer.use(...buildHandlers([]), ...buildApplicationHandlers([]));
+  mswServer.use(...buildHandlers([]));
   return renderAt('/');
 }
 
@@ -57,9 +57,9 @@ describe('router', () => {
     expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
   });
 
-  it('ignores a junk ?status= on /tracker instead of dropping the page', async () => {
-    mswServer.use(...buildApplicationHandlers([]));
-    renderAt('/tracker?status=BOGUS');
+  it('ignores a junk ?status= on /applications instead of dropping the page', async () => {
+    mswServer.use(...buildHandlers([]));
+    renderAt('/applications?status=BOGUS');
 
     // No coercion could make `BOGUS` a status, so it falls back to what an absent
     // value means: no filter.
@@ -67,8 +67,8 @@ describe('router', () => {
     expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
   });
 
-  it('navigates from the index to /tracker', async () => {
-    mswServer.use(...buildApplicationHandlers([]), ...buildHandlers([]));
+  it('navigates from the index to /applications', async () => {
+    mswServer.use(...buildHandlers([]));
     const user = userEvent.setup();
     renderAt('/');
     await user.click(await screen.findByRole('link', { name: /application tracker/i }));

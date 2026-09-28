@@ -18,9 +18,9 @@ Two problems from the early scaffold:
    repo — env silently not loaded, or a stray `~/Desktop/.env` picked up.
 
 ## Decision
-- **Validation:** `apps/api/src/config/env.validation.ts` exports a `zod` schema
-  (`NODE_ENV`, `DATABASE_URL` as `z.url()`, `API_PORT` coerced int default 3000,
-  `CORS_ORIGINS` default `''`) and `validateEnv()`. `ConfigModule.forRoot({
+- **Validation:** `apps/api/src/config/env.validation.ts` holds a `zod` schema
+  (`DATABASE_URL` as `z.url()`, `API_PORT` coerced int default 3000,
+  `CORS_ORIGINS` default `''`) and exports `validateEnv()`. `ConfigModule.forRoot({
   isGlobal: true, ignoreEnvFile: true, validate: validateEnv })` runs it at boot;
   a bad value throws a readable multi-line message and the app doesn't start.
   `main.ts` and `PrismaService` read via `ConfigService.get(..., { infer: true })`.

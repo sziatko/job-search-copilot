@@ -13,15 +13,15 @@ set of domain errors. Duplicating that across two transports would drift.
 All of it lives in `packages/core`, which is **framework-agnostic** — no
 `@nestjs/*`, no MCP SDK, no HTTP. Its public surface (`src/index.ts`):
 
-- `EstimatedVacancyService` — a plain class; every DB query goes through it.
+- `VacancyService` — a plain class; every DB query goes through it.
   Constructor takes a `PrismaClient` (defaulting to a lazy process-wide one) so
   Nest can inject its lifecycle-managed client and tests can pass their own.
 - `createPrismaClient(url)` / `getPrisma()` — client construction + a lazy
   singleton for DI-less callers.
 - `normalizeRecommendation` + `RECOMMENDATION_INPUT_VALUES` — the EN/UA mapping.
 - `DomainError` / `InvalidRecommendationError` — the caller-mistake error type.
-- Re-exported Prisma types/enums (`EstimatedVacancy`, `Recommendation`,
-  `UserAction`, `PrismaClient`) so consumers don't depend on `@prisma/client`
+- Re-exported Prisma types/enums (`Vacancy`, `Recommendation`,
+  `VacancyStatus`, `PrismaClient`) so consumers don't depend on `@prisma/client`
   directly.
 
 `apps/api` and `apps/mcp` are then thin adapters: validate input, call a service
@@ -51,10 +51,10 @@ method, shape the response.
 - Writing a Prisma query in `apps/api` (a controller) or `apps/mcp` (a tool
   handler) → bypasses the one place that's tested against the real DB; the
   "core is the only DB client" invariant breaks.
-- Changing an `EstimatedVacancyService` method signature → both transports and the
+- Changing an `VacancyService` method signature → both transports and the
   `packages/core` + `apps/mcp` specs.
 
 ## Related
 [ADR-0001](0001-monorepo-npm-workspaces.md), [ADR-0004](0004-one-service-two-transports.md),
 [ADR-0006](0006-nest-di-prisma-lifecycle.md),
-`packages/core/src/estimated-vacancy.service.ts`, `packages/core/src/index.ts`.
+`packages/core/src/vacancy.service.ts`, `packages/core/src/index.ts`.

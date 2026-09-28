@@ -1,25 +1,20 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ApplicationComment } from '../types';
+import type { ApplicationComment, CommentSource } from '../types';
 import { MergedComment } from './MergedComment';
 
-type Props = {
-  userComment: string | null;
-  estimationComment: string;
-  comments: ApplicationComment[];
-};
+const comment = (
+  id: number,
+  createdAt: string,
+  body: string,
+  source: CommentSource,
+): ApplicationComment => ({ id, createdAt, body, source });
 
-const comment = (id: number, createdAt: string, body: string): ApplicationComment => ({
-  id,
-  createdAt,
-  body,
-});
-
-/** The sources in render order, by their own classes rather than by text — the
- * point of the order is who wrote it, which the text alone cannot show. */
-function partsOf(container: HTMLElement): (string | null)[] {
+/** Each comment's class and text, in render order — the class is who wrote it, which
+ * the text alone cannot show. */
+function partsOf(container: HTMLElement): [string, string | null][] {
   return [...container.querySelectorAll('.comment-user, .comment-status, .comment-analyzer')].map(
-    (el) => el.textContent,
+    (el) => [el.className, el.textContent],
   );
 }
 
@@ -27,63 +22,40 @@ const clampedTextOf = (container: HTMLElement) =>
   container.querySelector('.clamp')?.textContent ?? '';
 
 describe('MergedComment', () => {
-  it('merges user note → analyzer → dated comments, oldest first', () => {
+  it('renders every comment in the order given, dated, styled by its source', () => {
     const { container } = render(
       <MergedComment
-        userComment="My own note"
-        estimationComment="Strong match."
         comments={[
-          comment(1, '2026-09-14T10:00:00Z', 'Recruiter called'),
-          comment(2, '2026-09-20T10:00:00Z', 'Interview booked'),
+          comment(1, '2026-09-10T10:00:00Z', 'Strong match.', 'ANALYZER'),
+          comment(2, '2026-09-12T10:00:00Z', 'My own note', 'USER'),
+          comment(3, '2026-09-14T10:00:00Z', 'Recruiter called', 'AGENT'),
         ]}
       />,
     );
 
     expect(partsOf(container)).toEqual([
-      'My own note',
-      'Strong match.',
-      'Sep 14: Recruiter called',
-      'Sep 20: Interview booked',
+      ['comment-analyzer', 'Sep 10: Strong match.'],
+      ['comment-user', 'Sep 12: My own note'],
+      ['comment-status', 'Sep 14: Recruiter called'],
     ]);
     // Collapsed, the parts are joined on one line — so the separator is the only
-    // thing marking where one source stops and the next begins.
+    // thing marking where one comment stops and the next begins.
     expect(clampedTextOf(container)).toBe(
-      'My own note — Strong match. — Sep 14: Recruiter called — Sep 20: Interview booked',
+      'Sep 10: Strong match. — Sep 12: My own note — Sep 14: Recruiter called',
     );
-    expect(container.querySelectorAll('time')).toHaveLength(2);
   });
 
-  it('treats the analyzer placeholder "N/A" as empty', () => {
-    // The backend writes 'N/A' for a vacancy that was never analysed. Rendered
-    // literally it reads as a comment somebody actually wrote.
+  it('renders a lone comment with no separator', () => {
     const { container } = render(
-      <MergedComment userComment="My own note" estimationComment="N/A" comments={[]} />,
+      <MergedComment comments={[comment(1, '2026-09-14T10:00:00Z', 'Only one', 'USER')]} />,
     );
-
-    expect(partsOf(container)).toEqual(['My own note']);
-    expect(clampedTextOf(container)).toBe('My own note');
-  });
-
-  it.each<[string, Props]>([
-    ['userComment', { userComment: 'Only a note', estimationComment: 'N/A', comments: [] }],
-    [
-      'comment',
-      {
-        userComment: null,
-        estimationComment: 'N/A',
-        comments: [comment(1, '2026-09-14T10:00:00Z', 'Only one')],
-      },
-    ],
-    ['estimationComment', { userComment: null, estimationComment: 'Only analysis', comments: [] }],
-  ])('renders a lone %s with no separator', (_label, props) => {
-    const { container } = render(<MergedComment {...props} />);
 
     expect(partsOf(container)).toHaveLength(1);
     expect(clampedTextOf(container)).not.toContain('—');
   });
 
-  it('falls back to an em dash when there is nothing to merge', () => {
-    render(<MergedComment userComment={null} estimationComment="N/A" comments={[]} />);
+  it('falls back to an em dash when there are no comments', () => {
+    render(<MergedComment comments={[]} />);
 
     expect(screen.getByText('—')).toBeInTheDocument();
   });

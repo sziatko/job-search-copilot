@@ -5,19 +5,19 @@
 
 ## Context
 `apps/web` needs the TypeScript shape of what the API returns. `packages/core`
-already has `EstimatedVacancyListItem` and the enums. The obvious move is to
+already has `VacancyListItem` and the enums. The obvious move is to
 import them.
 
 ## Decision
 Don't. `apps/web/src/pages/vacancies/types.ts` defines `zod` schemas
-(`recommendationSchema`, `userActionSchema`, `estimatedVacancyListItemSchema`,
+(`recommendationSchema`, `vacancyStatusSchema`, `vacancyListItemSchema`,
 `listResponseSchema`) by hand; the TS types are `z.infer`'d from them.
 `apps/web/src/pages/vacancies/api.ts` parses **every** response through them
 (`parseResponse()` — logs the detail, throws a short message). The file carries a
 comment saying exactly this and why.
 
 ## Why this and not the alternatives
-- **`import { EstimatedVacancyListItem } from '@job-search-copilot/core'`** —
+- **`import { VacancyListItem } from '@job-search-copilot/core'`** —
   `core`'s entrypoint pulls in `@prisma/client` and `pg`. Even a type-only import
   risks a bundler following the module graph; and it couples the browser build to
   a Node/DB package. Not worth it.
@@ -29,8 +29,8 @@ comment saying exactly this and why.
 
 ## Consequences
 - **Accepted parallel maintenance:** a field added to the API list-item shape must
-  be added to `EstimatedVacancyListItem` + `LIST_SELECT` in `core` **and** to
-  `estimatedVacancyListItemSchema` here. This is the one place the repo tolerates
+  be added to `VacancyListItem` + `LIST_SELECT` in `core` **and** to
+  `vacancyListItemSchema` here. This is the one place the repo tolerates
   hand-kept duplication.
 - The web build never sees Prisma/pg.
 - Runtime validation: a contract drift fails loudly (`parseResponse` throws) with
@@ -43,7 +43,7 @@ comment saying exactly this and why.
   throws "the server returned data in an unexpected format" (intended failure
   mode — fix the schema).
 - Adding an enum value in `core` without adding it here → `recommendationSchema` /
-  `userActionSchema` reject the new value; the row fails to parse.
+  `vacancyStatusSchema` reject the new value; the row fails to parse.
 
 ## Related
 [ADR-0011](0011-web-tanstack-query.md), [`../contracts.md`](../contracts.md)

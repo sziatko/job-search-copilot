@@ -10,20 +10,14 @@ function application(id: number, appliedAt: string): ApplicationListItem {
     id,
     appliedAt,
     status: 'APPLIED',
-    statusUpdatedAt: appliedAt,
+    statusChangedAt: appliedAt,
     comments: [],
     salaryInListing: null,
     usedTailoredResume: false,
-    userComment: null,
-    createdAt: appliedAt,
-    updatedAt: appliedAt,
-    estimatedVacancyId: id,
     company: `Company ${id}`,
     title: `Role ${id}`,
     applyUrl: `https://example.com/${id}`,
     matchScore: 80,
-    recommendation: 'APPLY',
-    estimationComment: 'Strong match.',
   };
 }
 

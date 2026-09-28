@@ -29,18 +29,6 @@ export const APPLICATION_STATUS_ORDER = {
   REJECTED: 5,
 } satisfies Record<ApplicationStatus, number>;
 
-/** Drives the `.tag <variant>` classes in index.css. The variant carries the
- * signal (progressing / attention / closed) and the label carries the rest —
- * Offer, Interview and Recruiter screen all read as "good", as in the mockup. */
-export const APPLICATION_STATUS_TAG_VARIANTS = {
-  APPLIED: 'neutral',
-  RECRUITER_SCREEN: 'good',
-  REPLIED: 'accent',
-  INTERVIEW: 'good',
-  OFFER: 'good',
-  REJECTED: 'bad',
-} satisfies Record<ApplicationStatus, 'good' | 'warn' | 'bad' | 'neutral' | 'accent'>;
-
 /** Labels for the derived filter values. The strip's tiles and the dropdown both read
  * these, so a tile can never disagree with the dropdown entry it selects. */
 export const FILTER_LABELS = {
@@ -54,10 +42,10 @@ const MS_PER_DAY = 86_400_000;
 /** Closed outcomes. An application that reached one of these isn't stuck, it's finished. */
 const CLOSED_STATUSES = new Set<ApplicationStatus>(['REJECTED', 'OFFER']);
 
-/** Days since the application last moved in the pipeline. `statusUpdatedAt` is never
- * null — it starts at `appliedAt` and updateStatus() restamps it. */
+/** Days since the application last moved: from applying while APPLIED, from the
+ * interview after INTERVIEW (ADR-0022). */
 export function daysSinceLastMove(item: ApplicationListItem): number {
-  return Math.floor((Date.now() - new Date(item.statusUpdatedAt).getTime()) / MS_PER_DAY);
+  return Math.floor((Date.now() - new Date(item.statusChangedAt).getTime()) / MS_PER_DAY);
 }
 
 /** In flight, but silent for longer than TIMEOUT_DAYS. */

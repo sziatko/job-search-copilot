@@ -3,7 +3,6 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import {
   type ApplicationPage,
-  addApplicationComment,
   listApplications,
   updateApplication,
   updateApplicationStatus,
@@ -26,8 +25,8 @@ interface StatusChange {
 
 export function useApplications() {
   const queryClient = useQueryClient();
-  const search = useSearch({ from: '/tracker' });
-  const navigate = useNavigate({ from: '/tracker' });
+  const search = useSearch({ from: '/applications' });
+  const navigate = useNavigate({ from: '/applications' });
 
   const q = search.q ?? '';
   const statusFilter: ApplicationStatusFilter = search.status ?? STATUS_FILTER_ALL;
@@ -58,15 +57,23 @@ export function useApplications() {
     // Trimmed here, not on write: the URL keeps what was typed (so a trailing
     // space is typeable), the comparison ignores it.
     const needle = q.trim().toLowerCase();
-    return items
-      .filter((item) => matchesFilter(item, statusFilter))
-      .filter(
-        (item) =>
-          needle === '' ||
-          item.company.toLowerCase().includes(needle) ||
-          item.title.toLowerCase().includes(needle),
-      )
-      .sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
+    return (
+      items
+        .filter((item) => matchesFilter(item, statusFilter))
+        .filter(
+          (item) =>
+            needle === '' ||
+            item.company.toLowerCase().includes(needle) ||
+            item.title.toLowerCase().includes(needle),
+        )
+        // The server's order — the last move first, `id` breaking a tie — kept here so
+        // an optimistic move jumps to the top before the refetch lands.
+        .sort(
+          (a, b) =>
+            new Date(b.statusChangedAt).getTime() - new Date(a.statusChangedAt).getTime() ||
+            b.id - a.id,
+        )
+    );
   }, [items, q, statusFilter]);
 
   // Counts over the WHOLE log, not the filtered view — the strip is an overview.
@@ -85,7 +92,7 @@ export function useApplications() {
   /**
    * One optimistic row write: patch the cached row at once, roll the whole page back
    * if the server refuses, show the error under that row, and refetch either way.
-   * Status, edit and comment are the same shape; only the request and the patch differ.
+   * Status and edit are the same shape; only the request and the patch differ.
    */
   function rowMutation<V extends { id: number }>(
     request: (vars: V) => Promise<ApplicationListItem>,
@@ -125,6 +132,8 @@ export function useApplications() {
           return next;
         });
         void queryClient.invalidateQueries({ queryKey: APPLICATIONS_KEY });
+        // Same rows: /vacancies tags each with its real pipeline status.
+        void queryClient.invalidateQueries({ queryKey: ['vacancies'] });
       },
     };
   }
@@ -132,41 +141,49 @@ export function useApplications() {
   const statusMutation = useMutation(
     rowMutation<StatusChange>(
       ({ id, status }) => updateApplicationStatus(id, status),
-      // Mirror what updateStatus() does server-side, or the row keeps its old
-      // last-move stamp until the refetch lands.
-      (item, { status }) => ({ ...item, status, statusUpdatedAt: new Date().toISOString() }),
+      // Mirror writeStatus() server-side, or the row keeps its old last-move stamp
+      // (and its place) until the refetch lands.
+      // A new APPLIED journal row is the new applied date too.
+      (item, { status }) => {
+        const now = new Date().toISOString();
+        return {
+          ...item,
+          status,
+          statusChangedAt: now,
+          appliedAt: status === 'APPLIED' ? now : item.appliedAt,
+        };
+      },
     ),
   );
 
   const editMutation = useMutation(
     rowMutation<{ id: number; input: UpdateApplicationInput }>(
       ({ id, input }) => updateApplication(id, input),
-      // As on the server: absent is untouched, blank clears.
+      // As on the server: absent is untouched, blank clears, and a non-blank comment
+      // is appended.
       (item, { input }) => {
         const text = (value: string | null | undefined, current: string | null) =>
           value === undefined ? current : value?.trim() || null;
+        const comment = input.comment?.trim();
         return {
           ...item,
           salaryInListing: text(input.salaryInListing, item.salaryInListing),
           usedTailoredResume: input.usedTailoredResume ?? item.usedTailoredResume,
-          userComment: text(input.userComment, item.userComment),
+          comments: comment
+            ? [
+                ...item.comments,
+                // A stand-in until the refetch brings the real row; the negative id
+                // cannot collide with a stored one.
+                {
+                  id: -Date.now(),
+                  createdAt: new Date().toISOString(),
+                  body: comment,
+                  source: 'USER',
+                },
+              ]
+            : item.comments,
         };
       },
-    ),
-  );
-
-  const commentMutation = useMutation(
-    rowMutation<{ id: number; body: string }>(
-      ({ id, body }) => addApplicationComment(id, body),
-      // A stand-in until the refetch brings the real row; the negative id cannot
-      // collide with a stored one.
-      (item, { body }) => ({
-        ...item,
-        comments: [
-          ...item.comments,
-          { id: -Date.now(), createdAt: new Date().toISOString(), body: body.trim() },
-        ],
-      }),
     ),
   );
 
@@ -186,6 +203,5 @@ export function useApplications() {
     changeStatus: (id: number, status: ApplicationStatus) => statusMutation.mutate({ id, status }),
     editApplication: (id: number, input: UpdateApplicationInput) =>
       editMutation.mutate({ id, input }),
-    addComment: (id: number, body: string) => commentMutation.mutate({ id, body }),
   };
 }

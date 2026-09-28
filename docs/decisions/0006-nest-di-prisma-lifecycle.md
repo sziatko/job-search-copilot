@@ -4,7 +4,7 @@
 - Phase: 1 · Date: 2026-09
 
 ## Context
-The initial `apps/api` scaffold `new`'d a module-level `EstimatedVacancyService`
+The initial `apps/api` scaffold `new`'d a module-level `VacancyService`
 singleton and imported it directly into the controller, and `packages/core`
 created a `PrismaClient` at import time. That bypassed Nest's DI container
 entirely: no way to swap the service in tests (`overrideProvider`), no lifecycle
@@ -17,9 +17,9 @@ Use Nest DI properly:
   `implements OnModuleInit, OnModuleDestroy`. Builds its `PrismaClient` via
   `core`'s `createPrismaClient(config.get('DATABASE_URL'))`; `$connect()` on init,
   `$disconnect()` on destroy. Exposed as a `@Global` `PrismaModule`.
-- `EstimatedVacancyService` stays a plain `core` class (framework-agnostic —
+- `VacancyService` stays a plain `core` class (framework-agnostic —
   [ADR-0002](0002-core-shared-domain-layer.md)) but is registered in
-  `EstimatedVacanciesModule` via a `useFactory` provider that constructs it with
+  `VacanciesModule` via a `useFactory` provider that constructs it with
   `PrismaService`'s client.
 - `main.ts` calls `app.enableShutdownHooks()` so Nest forwards `SIGTERM`/`SIGINT`
   to `onModuleDestroy`.
@@ -38,15 +38,15 @@ Use Nest DI properly:
 - **`@Injectable()` on the `core` class** — would couple `core` to `@nestjs/*`.
 
 ## Consequences
-- Tests can `overrideProvider(EstimatedVacancyService)` or run against a real
+- Tests can `overrideProvider(VacancyService)` or run against a real
   client; the e2e suite boots the real `AppModule`.
 - `$disconnect()` runs on shutdown → the pool drains instead of dropping
   connections.
 - The provider wiring is explicit (a `useFactory` in
-  `estimated-vacancies.module.ts`) rather than decorator magic on a foreign class.
+  `vacancies.module.ts`) rather than decorator magic on a foreign class.
 
 ## What this constrains — breaks if you change it
-- Reintroducing a module-level `new EstimatedVacancyService()` in `apps/api` →
+- Reintroducing a module-level `new VacancyService()` in `apps/api` →
   it stops using the lifecycle-managed client; two clients, two pools.
 - Removing `enableShutdownHooks()` → `onModuleDestroy` never fires;
   `$disconnect()` is dead code again.
@@ -55,4 +55,4 @@ Use Nest DI properly:
 
 ## Related
 [ADR-0002](0002-core-shared-domain-layer.md), [ADR-0007](0007-env-config-and-loading.md),
-`apps/api/src/prisma/`, `apps/api/src/estimated-vacancies/estimated-vacancies.module.ts`.
+`apps/api/src/prisma/`, `apps/api/src/vacancies/vacancies.module.ts`.

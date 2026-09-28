@@ -35,7 +35,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         icon: IconChecklist,
       },
       {
-        to: '/tracker',
+        to: '/applications',
         label: 'Application tracker',
         title: 'Application tracker',
         icon: IconSend,

@@ -52,14 +52,7 @@ The `contracts.md` rows land with the step that builds each surface.
 
 ## Out of scope
 
-- **Auth and an HTTP MCP transport.** MCP is stdio-only and the API has no auth. Nothing
-  may be exposed to the cloud before that phase lands.
-- **A web view of the log.** `LogPage` stays "coming soon".
-- **Comments on vacancies.** The table is named so it can grow the FK later.
-- **MCP tools for edit / add-comment.** `update_application_status` already takes the
-  agent's note.
-- **Rewriting the external `all-vacancy-log` skill** to call `check_vacancy_log*` instead
-  of the file. The user does that after step 3.
+Moved to [`../backlog.md`](../backlog.md) (rows marked "phase 3").
 
 ## Decisions introduced this phase
 

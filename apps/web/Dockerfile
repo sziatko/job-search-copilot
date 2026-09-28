@@ -24,6 +24,6 @@ RUN npm run build --workspace=@job-search-copilot/web
 # Production: just the static files behind nginx — no Node runtime needed at all.
 FROM nginx:alpine AS production
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
-# SPA fallback: without it, reloading /tracker hits nginx's 404 (see nginx.conf).
+# SPA fallback: without it, reloading /applications hits nginx's 404 (see nginx.conf).
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

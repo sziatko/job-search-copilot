@@ -6,17 +6,17 @@
 ## Context
 
 Phase 1's `apps/web` had no router — `App.tsx` rendered `<VacanciesPage />`
-unconditionally. Phase 2 adds a second page (`/tracker`) and an index page, and the
-`/tracker` search box + status filter should be shareable / back-button-correct,
+unconditionally. Phase 2 adds a second page (`/applications`) and an index page, and the
+`/applications` search box + status filter should be shareable / back-button-correct,
 i.e. in the URL.
 
 ## Decision
 
 Adopt **`@tanstack/react-router`**, code-based routes (no file-based plugin / route
 tree codegen), in `apps/web/src/router.tsx`: `/` (`IndexPage`, two nav cards),
-`/vacancies` (the Phase 1 page), `/tracker` (`ApplicationsPage`). `/tracker`'s
+`/vacancies` (the Phase 1 page), `/applications` (`ApplicationsPage`). `/applications`'s
 `validateSearch` parses `{ q?, status? }` with a zod schema; `useApplications`
-reads it via `useSearch({ from: '/tracker' })` and writes it via `useNavigate`.
+reads it via `useSearch({ from: '/applications' })` and writes it via `useNavigate`.
 `App.tsx` becomes `<RouterProvider router={router} />`; `QueryClientProvider` stays
 outer in `main.tsx`.
 
@@ -38,7 +38,7 @@ revisit at the first multi-step / dynamic form.
 
 - One new runtime dependency (`@tanstack/react-router`). Bundle grew from ~? to
   ~435 kB / 133 kB gzip — acceptable for a single-user local tool.
-- The `/tracker` view state is a URL, so `useApplications` has no local
+- The `/applications` view state is a URL, so `useApplications` has no local
   filter/search state — it derives from `useSearch` and navigates on change.
 - Route components are code-referenced, so `router.tsx` imports every page eagerly;
   no lazy boundaries yet.
@@ -48,9 +48,9 @@ revisit at the first multi-step / dynamic form.
 ## What this constrains — breaks if you change it
 
 - Renaming a route path → the `<Link to>` targets in `IndexPage` / the page
-  back-crumbs, `useSearch`/`useNavigate`'s `from: '/tracker'`, and the memory-history
-  paths in the router/tracker tests.
-- Changing the `/tracker` search schema → `trackerSearchSchema` in `router.tsx`
+  back-crumbs, `useSearch`/`useNavigate`'s `from: '/applications'`, and the memory-history
+  paths in the router/applications tests.
+- Changing the `/applications` search schema → `trackerSearchSchema` in `router.tsx`
   **and** `applicationStatusFilterSchema` in
   [`apps/web/src/pages/applications/types.ts`](../../apps/web/src/pages/applications/types.ts).
 - Adding a route without adding it to `routeTree` → it 404s and the tests that
