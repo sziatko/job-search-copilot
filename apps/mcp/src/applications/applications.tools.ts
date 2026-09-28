@@ -91,8 +91,9 @@ export function registerApplicationTools(
       },
     },
     async (filters) => {
-      const result = await applications.list(filters);
-      return json(result);
+      // `nextCursor` is the web's (ADR-0030); this tool pages by offset.
+      const { items, total } = await applications.list(filters);
+      return json({ items, total });
     },
   );
 

@@ -296,6 +296,8 @@ describe('job-search-copilot MCP server', () => {
     // web app leans on to use `limit=1` as a count endpoint.
     expect(body.items).toHaveLength(2);
     expect(body.total).toBe(5);
+    // The web's cursor paging (ADR-0030) does not leak into the tool's output.
+    expect(Object.keys(body)).toEqual(['items', 'total']);
   });
 
   it('update_vacancy_status triages a vacancy; list_vacancies filters by several statuses', async () => {

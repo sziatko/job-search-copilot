@@ -4,13 +4,6 @@
 import { APPLICATION_STATUS_LABELS } from '../applications/constants';
 import type { Recommendation, VacancyAction, VacancyStatus } from './types';
 
-/** List sort priority — lower sorts first (Apply before Skip). */
-export const RECOMMENDATION_ORDER = {
-  APPLY: 0,
-  APPLY_WITH_CAVEATS: 1,
-  SKIP: 2,
-} satisfies Record<Recommendation, number>;
-
 export const STATUS_LABELS = {
   NOT_REVIEWED: 'Not reviewed',
   SAVED_FOR_LATER: 'Saved for later',

@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { IconCheck, IconCross, IconHistory } from '@/components/icons';
+import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
@@ -42,6 +43,7 @@ export function VacancyTable({
   rowErrors,
   onActionChange,
   onShowCompanyHistory,
+  onEndReached,
 }: {
   items: VacancyListItem[];
   savingIds: Set<number>;
@@ -50,11 +52,14 @@ export function VacancyTable({
   /** Better than a per-row modal: the rows are virtualized, so anything mounted
    * inside one unmounts as soon as it scrolls out of the window. */
   onShowCompanyHistory: (company: string, vacancyId: number) => void;
+  /** The next page, when the last loaded row scrolls into the window (ADR-0030). */
+  onEndReached: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { virtualItems, paddingTop, paddingBottom, measureElement } = useVirtualRows(
     scrollRef,
     items.length,
+    onEndReached,
   );
 
   return (
@@ -68,7 +73,7 @@ export function VacancyTable({
             <th style={{ width: 120 }}>Rec.</th>
             <th>Comment</th>
             <th style={{ width: 150 }}>Status</th>
-            <th style={{ width: 180 }}>Action</th>
+            <th style={{ width: 210 }}>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -176,6 +181,7 @@ export function VacancyTable({
                       disabled={saving || applied}
                       onAction={(status) => onActionChange(item.id, status)}
                     />
+                    <DetailsLink id={item.id} />
                   </div>
                   {rowErrors.has(item.id) && (
                     <p className="mt-[4px] text-[11.5px] text-bad">{rowErrors.get(item.id)}</p>

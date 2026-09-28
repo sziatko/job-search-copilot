@@ -12,7 +12,8 @@ export function VacanciesPage() {
     loading,
     loadError,
     total,
-    visibleItems,
+    items,
+    loadMore,
     savingIds,
     rowErrors,
     pendingDecline,
@@ -40,9 +41,10 @@ export function VacanciesPage() {
     <section className="view">
       <div className="card">
         {/* Same shape as the tracker's card: the page title is the shell's, so there
-            is no head here and the toolbar carries the top padding. The search goes
-            to the server, so the count in the foot is the server's match count for
-            the term, not a filtered view — `total` and the loaded rows can differ. */}
+            is no head here and the toolbar carries the top padding. The search and
+            the status filter go to the server, so the count in the foot is the
+            server's match count — the loaded rows catch up with it as the table
+            scrolls. */}
         <div className="toolbar pt-[16px]">
           <SearchInput value={q} onChange={setSearchText} />
           <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
@@ -52,11 +54,12 @@ export function VacanciesPage() {
           <div className="empty-state">Failed to load vacancies: {loadError}</div>
         ) : loading ? (
           <div className="empty-state">Loading…</div>
-        ) : visibleItems.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="empty-state">No vacancies match this filter.</div>
         ) : (
           <VacancyTable
-            items={visibleItems}
+            items={items}
+            onEndReached={loadMore}
             savingIds={savingIds}
             rowErrors={rowErrors}
             onActionChange={requestActionChange}
@@ -68,8 +71,7 @@ export function VacanciesPage() {
             claim about the data, and there is no data yet. */}
         {!loadError && !loading && (
           <div className="table-foot">
-            Showing {visibleItems.length} of {total} vacancies · scores from the vacancy-evaluator
-            skill
+            Showing {items.length} of {total} vacancies · scores from the vacancy-evaluator skill
           </div>
         )}
       </div>

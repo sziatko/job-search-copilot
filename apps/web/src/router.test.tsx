@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { routeTree } from './router';
-import { buildHandlers } from './test/msw/handlers';
+import { buildHandlers, statsHandler } from './test/msw/handlers';
 import { mswServer } from './test/msw/server';
 
 function renderAt(path: string) {
@@ -19,13 +19,13 @@ function renderAt(path: string) {
   );
 }
 
-// `/` renders the dashboard now, and the dashboard fires two queries. Every test
-// that starts there registers handlers for both: with `onUnhandledRequest: 'error'`
+// `/` renders the dashboard, and the dashboard fires two queries (`/stats` and
+// `/vacancies`). Every test that starts there registers handlers for both: with `onUnhandledRequest: 'error'`
 // an unhandled request drops the page into its error branch, and the shell renders
 // around it either way — which is exactly how this file used to stay green while
 // asserting nothing about the route it was named after.
 function renderIndex() {
-  mswServer.use(...buildHandlers([]));
+  mswServer.use(...buildHandlers([]), statsHandler());
   return renderAt('/');
 }
 
@@ -68,7 +68,7 @@ describe('router', () => {
   });
 
   it('navigates from the index to /applications', async () => {
-    mswServer.use(...buildHandlers([]));
+    mswServer.use(...buildHandlers([]), statsHandler());
     const user = userEvent.setup();
     renderAt('/');
     await user.click(await screen.findByRole('link', { name: /application tracker/i }));

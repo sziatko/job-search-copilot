@@ -38,6 +38,8 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0027](0027-linkedin-site-rule.md) | LinkedIn site rule: one key per job id, locale host merged | Accepted |
 | 0028 | *Deleted in phase 3.1:* application comments as a `Comment` table on `Application` — replaced by 0029 | — |
 | [0029](0029-one-vacancy-table.md) | One `Vacancy` table: one status, a `StatusChange` journal, comments with a `source` | Accepted (replaces 0017, 0018, 0028) |
+| [0030](0030-cursor-paging.md) | The web's tables page by a Prisma cursor; MCP keeps offset | Accepted |
+| [0031](0031-stats-endpoint.md) | One stats endpoint; the funnel counts the journal, and timeout moves to core | Accepted |
 
 A gap in the numbers is a deleted ADR. The ADR that replaced it names it on its
 `Replaces:` line (an ADR whose code is simply gone has none), and

@@ -1,6 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { type InfiniteData, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
@@ -68,6 +68,23 @@ function menuItem(name: string) {
 }
 
 const SEARCH_BOX = /search company or role/i;
+
+/** A promise a test releases by hand — one held request, no timer to race. */
+function gate() {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { held, release: () => release() };
+}
+
+/** Row #1's cached status, out of an infinite query's `pages[]`. */
+function cachedStatus(client: QueryClient, key: readonly string[]) {
+  return client
+    .getQueryData<InfiniteData<{ items: VacancyListItem[] }>>(key)
+    ?.pages.flatMap((page) => page.items)
+    .find((item) => item.id === 1)?.status;
+}
 
 // The toast spies below are file-scoped: a spy that outlives the test it belongs
 // to makes the next one's assertion meaningless.
@@ -152,6 +169,91 @@ describe('VacanciesPage / useVacancies', () => {
     );
   });
 
+  it('sends the status filter to the server, Applied as the whole pipeline', async () => {
+    const lists: URLSearchParams[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      const url = new URL(request.url);
+      if (request.method === 'GET' && url.pathname.endsWith('/vacancies')) {
+        lists.push(url.searchParams);
+      }
+    };
+    mswServer.events.on('request:start', onRequest);
+    try {
+      mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
+      renderVacancies();
+      await screen.findByText('Acme');
+      expect(lists.at(-1)?.get('status')).toBe('NOT_REVIEWED');
+      expect(lists.at(-1)?.get('sort')).toBe('recommended');
+
+      const user = userEvent.setup();
+      await user.selectOptions(screen.getByLabelText('Status'), 'APPLIED');
+      await waitFor(() =>
+        expect(lists.at(-1)?.get('status')).toBe(
+          'APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,OFFER,REJECTED',
+        ),
+      );
+      await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
+      await waitFor(() => expect(lists.at(-1)?.has('status')).toBe(false));
+    } finally {
+      mswServer.events.removeListener('request:start', onRequest);
+    }
+  });
+
+  it('takes the status filter from the URL', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'Acme' }),
+        vacancy({ id: 2, company: 'Declined Co', status: 'DECLINED' }),
+      ]),
+    );
+    renderVacancies('/vacancies?status=DECLINED');
+
+    await screen.findByText('Declined Co');
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Status')).toHaveValue('DECLINED');
+  });
+
+  it('loads the next page on scroll, and an optimistic write reaches it', async () => {
+    // 130 rows tied on recommendation and score: `id desc`, so the last is #1.
+    mswServer.use(
+      ...buildHandlers(
+        Array.from({ length: 130 }, (_, i) =>
+          vacancy({ id: i + 1, company: `Co ${i + 1}`, applyUrl: `https://example.com/${i + 1}` }),
+        ),
+      ),
+    );
+    const patch = gate();
+    mswServer.use(
+      http.patch('http://localhost:3000/api/v1/vacancies/:id/status', async () => {
+        await patch.held;
+        return HttpResponse.json(null, { status: 500 });
+      }),
+    );
+    const { client } = renderVacancies();
+    await screen.findByText(/^Showing 100 of 130 vacancies/);
+
+    // jsdom lays nothing out: set the offset the virtualizer reads, then tell it.
+    const scroller = document.querySelector('.table-body-scroll') as HTMLElement;
+    Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 10_000_000 });
+    fireEvent.scroll(scroller);
+    await screen.findByText(/^Showing 130 of 130 vacancies/);
+
+    const user = userEvent.setup();
+    await user.click(rowOf('Co 1').getByRole('button', { name: 'More statuses' }));
+    await user.click(menuItem('Saved for later'));
+
+    const secondPage = () =>
+      client.getQueryData<InfiniteData<{ items: VacancyListItem[] }>>([
+        'vacancies',
+        '',
+        'NOT_REVIEWED',
+      ])?.pages[1].items;
+    await waitFor(() =>
+      expect(secondPage()?.find((item) => item.id === 1)?.status).toBe('SAVED_FOR_LATER'),
+    );
+    patch.release();
+  }, 20_000);
+
   it('sends the typed term to the server as `search` and renders the matches', async () => {
     mswServer.use(
       ...buildHandlers([
@@ -224,10 +326,9 @@ describe('VacanciesPage / useVacancies', () => {
     expect(
       screen.queryByRole('heading', { level: 2, name: 'Analyzed vacancies' }),
     ).not.toBeInTheDocument();
-    // 2 of 3: the status filter is client-side, so `total` (the server's match
-    // count for the term) and the rows on screen are deliberately different numbers.
+    // 2 of 2: the status filter is the server's now, so `total` counts it too.
     expect(
-      screen.getByText('Showing 2 of 3 vacancies · scores from the vacancy-evaluator skill'),
+      screen.getByText('Showing 2 of 2 vacancies · scores from the vacancy-evaluator skill'),
     ).toBeInTheDocument();
   });
 
@@ -503,7 +604,7 @@ describe('VacanciesPage / useVacancies', () => {
         const now = new Date().toISOString();
         Object.assign(items[0], { status: 'APPLIED', statusChangedAt: now, appliedAt: now });
         return HttpResponse.json({
-          application: items[0],
+          application: { ...items[0], timedOut: false },
           resolution: 'linked-by-id',
           vacancyCreated: false,
         });
@@ -582,15 +683,6 @@ describe('VacanciesPage / useVacancies', () => {
    * `passthrough()` is not "try the next handler", it is "make the **real** request",
    * which here would hit the dev API on :3000 and fill the test with real vacancies.
    */
-  /** A promise a test releases by hand — one held request, no timer to race. */
-  function gate() {
-    let release = () => {};
-    const held = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    return { held, release: () => release() };
-  }
-
   function holdTermRequest(term: string, items: FakeVacancy[]) {
     const held = gate();
     const state = { started: 0, release: held.release };
@@ -616,8 +708,8 @@ describe('VacanciesPage / useVacancies', () => {
     const { client } = renderVacancies();
     await screen.findByText('Acme');
 
-    // The status filter is client-side, and this row's status changes below: under
-    // NOT_REVIEWED it would leave the view before anything could be read.
+    // This row's status changes below: under NOT_REVIEWED the refetch would take it
+    // out of the view before anything could be read.
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
 
@@ -625,7 +717,7 @@ describe('VacanciesPage / useVacancies', () => {
     await waitFor(() => expect(gate.state.started).toBe(1));
     // The window finding 3 lives in: the term being typed has no cache entry, and
     // the rows on screen are the *older* term's page, held by `keepPreviousData`.
-    expect(client.getQueryData(['vacancies', 'beta'])).toBeUndefined();
+    expect(client.getQueryData(['vacancies', 'beta', 'ALL'])).toBeUndefined();
 
     await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
     await user.click(menuItem('Saved for later'));
@@ -636,11 +728,9 @@ describe('VacanciesPage / useVacancies', () => {
     // freezes the placeholder to the result it first produced and never re-reads the
     // entry underneath (see the comment in useVacancies.ts).
     await waitFor(() =>
-      expect(
-        client.getQueryData<{ items: VacancyListItem[] }>(['vacancies', ''])?.items[0].status,
-      ).toBe('SAVED_FOR_LATER'),
+      expect(cachedStatus(client, ['vacancies', '', 'ALL'])).toBe('SAVED_FOR_LATER'),
     );
-    expect(client.getQueryData(['vacancies', 'beta'])).toBeUndefined();
+    expect(client.getQueryData(['vacancies', 'beta', 'ALL'])).toBeUndefined();
     // …and the frozen page is still what is on screen, unchanged.
     expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
 
@@ -681,15 +771,14 @@ describe('VacanciesPage / useVacancies', () => {
     // Mid-flight: the optimistic write is *in* the cached page, which is what makes
     // the rollback below a real rollback rather than a no-op on an untouched entry.
     await waitFor(() => expect(patchState.started).toBe(1));
-    const cached = () =>
-      client.getQueryData<{ items: VacancyListItem[] }>(['vacancies', ''])?.items[0].status;
+    const cached = () => cachedStatus(client, ['vacancies', '', 'ALL']);
     expect(cached()).toBe('SAVED_FOR_LATER');
 
     // Now let it fail: the row says so, and the page it wrote is back to what it held.
     patch.release();
     await screen.findByText(/Failed to update vacancy 1/);
     expect(cached()).toBe('NOT_REVIEWED');
-    expect(client.getQueryData(['vacancies', 'beta'])).toBeUndefined();
+    expect(client.getQueryData(['vacancies', 'beta', 'ALL'])).toBeUndefined();
 
     list.state.release();
   });
@@ -817,7 +906,8 @@ describe('VacanciesPage / useVacancies', () => {
         ),
       );
       renderVacancies();
-      await screen.findByText('Role 1');
+      // Role 101 first: the rows tie on recommendation and score, so `id desc` orders them.
+      await screen.findByText('Role 101');
 
       const user = userEvent.setup();
       await user.click(screen.getAllByRole('button', { name: /other vacancies at Acme/i })[0]);
@@ -921,15 +1011,16 @@ describe('VacanciesPage / useVacancies', () => {
       renderVacancies();
       await screen.findByText('Backend Engineer');
 
-      // The *second* Acme row: a modal that just marked its own first row would
-      // pass against the first row's button and fail here.
+      // The *second* Acme row (Backend Engineer — the rows tie on score, so `id desc`
+      // puts #2 first): a modal that just marked its own first row, Data Engineer
+      // (newest first, the same tie), would fail here.
       const user = userEvent.setup();
       await user.click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[1]);
 
       const modal = within(await screen.findByRole('dialog'));
       const marked = modal.getByText('Current').closest('tr');
       expect(marked).toHaveClass('row-current');
-      expect(within(marked as HTMLElement).getByText('Data Engineer')).toBeInTheDocument();
+      expect(within(marked as HTMLElement).getByText('Backend Engineer')).toBeInTheDocument();
       expect(modal.getAllByText('Current')).toHaveLength(1);
     });
 
@@ -957,17 +1048,17 @@ describe('VacanciesPage / useVacancies', () => {
       // The controls are icons now, so the bubble is their only visible label.
       // Scoped by `.tip`: the Rec. column's tag also reads "Apply".
       const row = rowOf('Acme');
-      for (const label of ['Copy', 'Apply', 'Decline', 'More']) {
+      for (const label of ['Copy', 'Apply', 'Decline', 'More', 'Details']) {
         expect(row.getByText(label, { selector: '.tip' })).toBeInTheDocument();
       }
     });
 
-    it('sizes the column for four 30px buttons', async () => {
+    it('sizes the column for five 30px buttons', async () => {
       mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
       renderVacancies();
       await screen.findByText('Acme');
 
-      expect(screen.getByRole('columnheader', { name: 'Action' })).toHaveStyle({ width: '180px' });
+      expect(screen.getByRole('columnheader', { name: 'Action' })).toHaveStyle({ width: '210px' });
     });
 
     it('swaps the copy bubble to Copied once the text is on the clipboard', async () => {

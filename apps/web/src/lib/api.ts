@@ -1,7 +1,19 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 
 // The API serves everything under /api/v1 (see apps/api setup-app.ts).
 export const API_BASE = `${import.meta.env.VITE_API_URL ?? 'http://localhost:3000'}/api/v1`;
+
+/** A cursor page (ADR-0030). `total` is the rows matching the filter, not the page
+ * size; `nextCursor` is null on the last page. */
+export interface CursorPage<T> {
+  items: T[];
+  total: number;
+  nextCursor: number | null;
+}
+
+export function cursorPageSchema<T extends z.ZodType>(item: T) {
+  return z.object({ items: z.array(item), total: z.number(), nextCursor: z.number().nullable() });
+}
 
 /**
  * Validate a response body against its schema. On mismatch, log the detail for

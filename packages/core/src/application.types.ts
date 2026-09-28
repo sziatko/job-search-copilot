@@ -81,14 +81,27 @@ export interface ListApplicationsFilters {
   title?: string;
   /** Exact, after the same normalization `save` applies — see `applyUrlKey`. */
   applyUrl?: string;
+  /** The derived split (ADR-0031): `active` or `timedOut`; absent = both, and the
+   * closed statuses too. ANDs with `status`. */
+  state?: ApplicationState;
   /** Default 50, max 500. */
   limit?: number;
+  /** MCP's paging. Not with `cursor` — REST answers both with a 400. */
   offset?: number;
+  /** The web's paging (ADR-0030): the `id` of the last row the caller has. */
+  cursor?: number;
 }
+
+/** `/applications`' Active / Timeout filter — the timeout rule in `status.ts`. */
+export const APPLICATION_STATES = ['active', 'timedOut'] as const;
+export type ApplicationState = (typeof APPLICATION_STATES)[number];
 
 export interface ListApplicationsResult {
   items: ApplicationListItem[];
+  /** Rows matching the filter, not the page size. */
   total: number;
+  /** The last item's `id` when more rows follow, else null. */
+  nextCursor: number | null;
 }
 
 /**
@@ -102,6 +115,9 @@ export interface ApplicationListItem {
    * whatever it moved to, triage included. */
   status: VacancyStatus;
   statusChangedAt: Date;
+  /** The timeout rule (ADR-0031), as of the read: open and not moved for
+   * TIMEOUT_DAYS. */
+  timedOut: boolean;
   /** The latest APPLIED journal row's date; null when the vacancy reached the pipeline
    * without one (a status set straight past APPLIED). */
   appliedAt: Date | null;

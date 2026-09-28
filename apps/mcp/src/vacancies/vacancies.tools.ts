@@ -63,7 +63,8 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       title: 'Get vacancy by id',
       description:
         'Fetch one vacancy including its full text (e.g. for resume tailoring), its ' +
-        'status, and every comment — [{ id, createdAt, body, source }], oldest first.',
+        'status, every comment — [{ id, createdAt, body, source }], oldest first — and its ' +
+        'status timeline — [{ status, createdAt }], oldest first.',
       inputSchema: { id: z.number().int() },
     },
     async ({ id }) => {
@@ -98,8 +99,9 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       },
     },
     async (filters) => {
-      const result = await vacancies.list(filters);
-      return json(result);
+      // `nextCursor` is the web's (ADR-0030); this tool pages by offset.
+      const { items, total } = await vacancies.list(filters);
+      return json({ items, total });
     },
   );
 }

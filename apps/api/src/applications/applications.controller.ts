@@ -1,5 +1,6 @@
 import { ApplicationService } from '@job-search-copilot/core';
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -36,8 +37,12 @@ export class ApplicationsController {
     return result;
   }
 
+  /** `{ items, total, nextCursor }`; paged by `offset` or `cursor`, not both (ADR-0030). */
   @Get()
   list(@Query() query: ListApplicationsQueryDto) {
+    if (query.cursor !== undefined && query.offset !== undefined) {
+      throw new BadRequestException('cursor and offset cannot be combined');
+    }
     return this.applications.list(query);
   }
 

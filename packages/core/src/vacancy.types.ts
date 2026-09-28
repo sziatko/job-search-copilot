@@ -14,10 +14,12 @@ export interface SaveVacancyResult {
 }
 
 /** getById / updateStatus: the whole row and every comment, oldest first, plus the
- * analyzer's (the first `ANALYZER` one), or null when there is none. */
+ * analyzer's (the first `ANALYZER` one), or null when there is none; `timeline` is
+ * every `StatusChange`, oldest first. */
 export type VacancyDetail = Vacancy & {
   comments: VacancyComment[];
   estimationComment: string | null;
+  timeline: { status: VacancyStatus; createdAt: Date }[];
 };
 
 export interface SaveManyVacanciesResult {
@@ -51,12 +53,26 @@ export interface ListVacanciesFilters {
   /** ILIKE '%term%', case-insensitive — mirrors `company`; both have a trigram GIN index. */
   title?: string;
   limit?: number;
+  /** MCP's paging. Not with `cursor` — REST answers both with a 400. */
   offset?: number;
+  /** The web's paging (ADR-0030): the `id` of the last row the caller has. */
+  cursor?: number;
+  /** Default `newest`. */
+  sort?: VacancySort;
 }
+
+/** `newest`: `createdAt desc, id desc` — what `list_vacancies` promises.
+ * `recommended`: `recommendation asc` (the enum's declaration order — APPLY,
+ * APPLY_WITH_CAVEATS, SKIP), `matchScore desc, id desc` — the web's triage order. */
+export const VACANCY_SORTS = ['newest', 'recommended'] as const;
+export type VacancySort = (typeof VACANCY_SORTS)[number];
 
 export interface ListVacanciesResult {
   items: VacancyListItem[];
+  /** Rows matching the filter, not the page size. */
   total: number;
+  /** The last item's `id` when more rows follow, else null. */
+  nextCursor: number | null;
 }
 
 /** Lightweight shape for list/search results — omits fullText to keep responses small. */

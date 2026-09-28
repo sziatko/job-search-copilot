@@ -1,13 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  type InfiniteData,
+  type QueryKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
+import { useInfiniteList } from '@/lib/useInfiniteList';
+import { fetchStats } from '@/pages/dashboard/api';
 import {
   type ApplicationPage,
-  listApplications,
+  listApplicationsPage,
   updateApplication,
   updateApplicationStatus,
 } from './api';
-import { isActive, isTimedOut, matchesFilter } from './constants';
 import {
   type ApplicationListItem,
   type ApplicationStatus,
@@ -17,6 +24,10 @@ import {
 } from './types';
 
 const APPLICATIONS_KEY = ['applications'] as const;
+/** The dashboard's key: the KPI strip reads the same `GET /stats`. */
+const STATS_KEY = ['stats'] as const;
+
+type CachedPages = InfiniteData<ApplicationPage, number | undefined>;
 
 interface StatusChange {
   id: number;
@@ -28,7 +39,10 @@ export function useApplications() {
   const search = useSearch({ from: '/applications' });
   const navigate = useNavigate({ from: '/applications' });
 
+  // `q` is the box (the raw URL value); `term` is what the server is asked for and
+  // what the cache is keyed on — as on /vacancies.
   const q = search.q ?? '';
+  const term = q.trim();
   const statusFilter: ApplicationStatusFilter = search.status ?? STATUS_FILTER_ALL;
 
   const setSearchText = (value: string) => {
@@ -42,57 +56,38 @@ export function useApplications() {
     });
   };
 
-  const {
-    data,
-    isPending: loading,
-    error,
-  } = useQuery({ queryKey: APPLICATIONS_KEY, queryFn: listApplications });
-  const items = useMemo(() => data?.items ?? [], [data]);
-  const loadError = error ? (error instanceof Error ? error.message : String(error)) : null;
+  // The server filters, counts and pages (ADR-0030); a new term or filter is a new
+  // key, so a new list from its first page. Writes below go through the prefix.
+  const { query, items, total, loadMore } = useInfiniteList(
+    [...APPLICATIONS_KEY, term, statusFilter],
+    (cursor) => listApplicationsPage({ search: term, filter: statusFilter, cursor }),
+  );
+  const loading = query.isPending;
+  const loadError = query.error ? query.error.message : null;
+
+  // The strip counts the whole pipeline on the server (ADR-0031), not the loaded rows.
+  const stats = useQuery({ queryKey: STATS_KEY, queryFn: fetchStats }).data?.pipeline;
 
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
   const [rowErrors, setRowErrors] = useState<Map<number, string>>(new Map());
 
-  const visibleItems = useMemo(() => {
-    // Trimmed here, not on write: the URL keeps what was typed (so a trailing
-    // space is typeable), the comparison ignores it.
-    const needle = q.trim().toLowerCase();
-    return (
-      items
-        .filter((item) => matchesFilter(item, statusFilter))
-        .filter(
-          (item) =>
-            needle === '' ||
-            item.company.toLowerCase().includes(needle) ||
-            item.title.toLowerCase().includes(needle),
-        )
-        // The server's order — the last move first, `id` breaking a tie — kept here so
-        // an optimistic move jumps to the top before the refetch lands.
-        .sort(
-          (a, b) =>
-            new Date(b.statusChangedAt).getTime() - new Date(a.statusChangedAt).getTime() ||
-            b.id - a.id,
-        )
-    );
-  }, [items, q, statusFilter]);
-
-  // Counts over the WHOLE log, not the filtered view — the strip is an overview.
-  const stats = useMemo(() => {
-    const byStatus = {} as Record<ApplicationStatus, number>;
-    let active = 0;
-    let timedOut = 0;
-    for (const item of items) {
-      byStatus[item.status] = (byStatus[item.status] ?? 0) + 1;
-      if (isTimedOut(item)) timedOut += 1;
-      else if (isActive(item)) active += 1;
-    }
-    return { total: items.length, byStatus, active, timedOut };
-  }, [items]);
+  // The server's order — the last move first, `id` breaking a tie — kept here so an
+  // optimistic move jumps to the top before the refetch lands.
+  const visibleItems = useMemo(
+    () =>
+      [...items].sort(
+        (a, b) =>
+          new Date(b.statusChangedAt).getTime() - new Date(a.statusChangedAt).getTime() ||
+          b.id - a.id,
+      ),
+    [items],
+  );
 
   /**
-   * One optimistic row write: patch the cached row at once, roll the whole page back
-   * if the server refuses, show the error under that row, and refetch either way.
-   * Status and edit are the same shape; only the request and the patch differ.
+   * One optimistic row write: patch the row in every cached page at once, roll them
+   * back if the server refuses, show the error under that row, and refetch either
+   * way. Status and edit are the same shape; only the request and the patch differ.
+   * A row that leaves the filter keeps its place until the refetch drops it.
    */
   function rowMutation<V extends { id: number }>(
     request: (vars: V) => Promise<ApplicationListItem>,
@@ -108,20 +103,27 @@ export function useApplications() {
           next.delete(vars.id);
           return next;
         });
-        const previous = queryClient.getQueryData<ApplicationPage>(APPLICATIONS_KEY);
-        queryClient.setQueryData<ApplicationPage>(APPLICATIONS_KEY, (old) =>
+        const previous = queryClient.getQueriesData<CachedPages>({ queryKey: APPLICATIONS_KEY });
+        queryClient.setQueriesData<CachedPages>({ queryKey: APPLICATIONS_KEY }, (old) =>
           old
             ? {
                 ...old,
-                items: old.items.map((item) => (item.id === vars.id ? patch(item, vars) : item)),
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((item) => (item.id === vars.id ? patch(item, vars) : item)),
+                })),
               }
             : old,
         );
         return { previous };
       },
-      onError: (err: Error, { id }: V, context?: { previous?: ApplicationPage }) => {
-        if (context?.previous) {
-          queryClient.setQueryData(APPLICATIONS_KEY, context.previous);
+      onError: (
+        err: Error,
+        { id }: V,
+        context?: { previous: [QueryKey, CachedPages | undefined][] },
+      ) => {
+        for (const [key, data] of context?.previous ?? []) {
+          queryClient.setQueryData(key, data);
         }
         setRowErrors((prev) => new Map(prev).set(id, err.message || 'Failed to save'));
       },
@@ -132,8 +134,11 @@ export function useApplications() {
           return next;
         });
         void queryClient.invalidateQueries({ queryKey: APPLICATIONS_KEY });
+        // The strip and the dashboard count these rows.
+        void queryClient.invalidateQueries({ queryKey: STATS_KEY });
         // Same rows: /vacancies tags each with its real pipeline status.
         void queryClient.invalidateQueries({ queryKey: ['vacancies'] });
+        void queryClient.invalidateQueries({ queryKey: ['vacancy'] });
       },
     };
   }
@@ -143,13 +148,15 @@ export function useApplications() {
       ({ id, status }) => updateApplicationStatus(id, status),
       // Mirror writeStatus() server-side, or the row keeps its old last-move stamp
       // (and its place) until the refetch lands.
-      // A new APPLIED journal row is the new applied date too.
+      // A new APPLIED journal row is the new applied date too, and a move restarts
+      // the timeout clock.
       (item, { status }) => {
         const now = new Date().toISOString();
         return {
           ...item,
           status,
           statusChangedAt: now,
+          timedOut: false,
           appliedAt: status === 'APPLIED' ? now : item.appliedAt,
         };
       },
@@ -190,8 +197,8 @@ export function useApplications() {
   return {
     loading,
     loadError,
-    items,
-    total: data?.total ?? items.length,
+    total,
+    loadMore,
     visibleItems,
     stats,
     savingIds,

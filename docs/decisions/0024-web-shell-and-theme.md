@@ -33,7 +33,8 @@ between files that no compiler checks.
    `/log`, `/profile`. The sidebar carries navigation; the landing page answers
    what the app is opened for.
 3. **`/log` and `/profile` are placeholders** rendering `SoonPage` — no backend
-   behind either. `/log` describes the ingestion log that does not exist yet (every
+   behind either. (`/log` stopped being one in phase 4 step 1: the `VacancyLogEntry`
+   table, searched and scrolled.) `/log` describes the ingestion log that does not exist yet (every
    posting seen, including duplicates and below-threshold rejections), which is the
    same future work [ADR-0023](0023-canonical-applyurl.md) names in its Context.
 4. **The dashboard counts without a stats endpoint.** Four cached list calls, one of

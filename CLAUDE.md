@@ -87,3 +87,17 @@ worked in **steps**.
   [`docs/backlog.md`](docs/backlog.md), not into the phase doc.
 - Mid-step, `/compact` is the right tool. At a step boundary it is not: the next
   step needs none of the previous one, and the phase doc already carries it.
+
+**Chaining steps.** When the user says "виконуй кроки N–M ланцюжком", run each step in a
+fresh `general-purpose` subagent (never `fork`). The main session only coordinates:
+
+- Brief each subagent: this phase doc, step K only; reuse what earlier steps' checkbox
+  notes name; no commit, no dev-DB migration; STOP and return a question the plan
+  cannot answer.
+- Verify each step yourself: `git status`, lint, typecheck, the full `npm test` (summary
+  only). One rerun of a project that failed on a known flake; red again → stop.
+- Green → commit the step without asking (the user's chain request is the approval).
+- A subagent that stopped (a question, a rate limit) is resumed with `SendMessage`,
+  not restarted. A dev-DB migration waits for the user's go-ahead.
+- The next step may run in the background while the user answers about the last one.
+- End with one report: per step, stops and why, divergences, cost.

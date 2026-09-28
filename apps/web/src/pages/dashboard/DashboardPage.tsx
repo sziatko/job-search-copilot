@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router';
 import { KpiTile } from '@/components/ui/KpiTile';
 import { APPLICATION_STATUS_LABELS } from '../applications/constants';
-import type { ApplicationListItem, ApplicationStatus } from '../applications/types';
+import type { ApplicationStatus } from '../applications/types';
 import type { VacancyListItem } from '../vacancies/types';
+import type { RecentMove } from './types';
 import { useDashboard } from './useDashboard';
 
 /** What each status change reads as in the activity feed, and its dot colour. */
@@ -87,7 +88,7 @@ function ReviewQueue({ items }: { items: VacancyListItem[] }) {
             <div className="attn-title">{item.title}</div>
             <div className="attn-sub">{item.company}</div>
           </div>
-          <Link to="/vacancies" className="attn-go">
+          <Link to="/vacancies/$id" params={{ id: String(item.id) }} className="attn-go">
             Review
           </Link>
         </div>
@@ -96,7 +97,7 @@ function ReviewQueue({ items }: { items: VacancyListItem[] }) {
   );
 }
 
-function RecentActivity({ items }: { items: ApplicationListItem[] }) {
+function RecentActivity({ items }: { items: RecentMove[] }) {
   if (items.length === 0) {
     return <div className="empty-state">No status changes yet.</div>;
   }
@@ -111,10 +112,17 @@ function RecentActivity({ items }: { items: ApplicationListItem[] }) {
               {ACTIVITY[item.status].verb} — {item.company}
             </div>
             <div className="activity-sub">
-              {item.title} · {APPLICATION_STATUS_LABELS[item.status]}
+              <Link
+                to="/vacancies/$id"
+                params={{ id: String(item.vacancyId) }}
+                className="role-link"
+              >
+                {item.title}
+              </Link>{' '}
+              · {APPLICATION_STATUS_LABELS[item.status]}
             </div>
           </div>
-          <div className="activity-time">{timeAgo(item.statusChangedAt)}</div>
+          <div className="activity-time">{timeAgo(item.createdAt)}</div>
         </div>
       ))}
     </div>
@@ -122,7 +130,7 @@ function RecentActivity({ items }: { items: ApplicationListItem[] }) {
 }
 
 export function DashboardPage() {
-  const { loading, loadError, counts, metrics, reviewQueue, recentActivity } = useDashboard();
+  const { loading, loadError, stats, responseRate, reviewQueue } = useDashboard();
 
   if (loadError) {
     return (
@@ -134,7 +142,7 @@ export function DashboardPage() {
     );
   }
 
-  if (loading) {
+  if (loading || !stats) {
     return (
       <section className="view">
         <div className="card">
@@ -144,44 +152,37 @@ export function DashboardPage() {
     );
   }
 
-  // "Logged" and "Duplicates caught" in the mockup have no backing table — every
-  // number below is counted from Vacancy and Application. The first step is
-  // "Postings", not "Analyzed": the count includes importer placeholders, which were
-  // never analysed (phase 2.2, finding 11). Narrowing it needs a `hasAnalysis` list
-  // filter, which is deferred — see docs/backlog.md.
+  // Each stage past Analysed counts the journal — "ever reached", so a rejection
+  // never shrinks an earlier stage (ADR-0031).
   const steps: FunnelStep[] = [
-    { label: 'Postings', value: counts?.postings ?? 0 },
-    { label: 'Recommended', value: counts?.recommended ?? 0 },
-    { label: 'Applied', value: metrics.sent },
-    { label: 'Got a response', value: metrics.responded },
-    { label: 'Interview', value: metrics.interview },
+    { label: 'Logged', value: stats.logged },
+    { label: 'Analysed', value: stats.analysed },
+    { label: 'Applied', value: stats.applied },
+    { label: 'Got a response', value: stats.responded },
+    { label: 'Interview', value: stats.interview },
   ];
 
   return (
     <section className="view">
       <div className="kpi-row">
-        <KpiTile
-          label="Postings"
-          value={counts?.postings ?? 0}
-          note="in the database, deduped by URL"
-        />
+        <KpiTile label="Logged" value={stats.logged} note="postings seen, deduped by URL" />
         <KpiTile
           label="Awaiting triage"
-          value={counts?.awaitingTriage ?? 0}
+          value={stats.awaitingTriage}
           variant="accent"
           note="scored, not yet decided"
         />
-        <KpiTile label="Recommended" value={counts?.recommended ?? 0} note="analyzer says apply" />
+        <KpiTile label="Recommended" value={stats.recommended} note="analyzer says apply" />
         <KpiTile
           label="Applications sent"
-          value={metrics.sent}
-          note={`${metrics.responseRate}% response rate`}
+          value={stats.applied}
+          note={`${responseRate}% response rate`}
         />
         <KpiTile
           label="Interviews"
-          value={metrics.interview}
+          value={stats.interview}
           variant="good"
-          note={`${metrics.recruiterScreen} in recruiter screen`}
+          note={`${stats.recruiterScreen} in recruiter screen`}
         />
       </div>
 
@@ -190,7 +191,7 @@ export function DashboardPage() {
           <div className="card-head">
             <div>
               <h2>Pipeline funnel</h2>
-              <div className="count">From posting to interview</div>
+              <div className="count">From logged to interview</div>
             </div>
           </div>
           <Funnel steps={steps} />
@@ -200,7 +201,7 @@ export function DashboardPage() {
           <div className="card-head">
             <div>
               <h2>Needs your review</h2>
-              <div className="count">Highest-scored, not yet triaged</div>
+              <div className="count">Top recommended, not yet triaged</div>
             </div>
           </div>
           <ReviewQueue items={reviewQueue} />
@@ -214,7 +215,7 @@ export function DashboardPage() {
             <div className="count">Latest status changes across applications</div>
           </div>
         </div>
-        <RecentActivity items={recentActivity} />
+        <RecentActivity items={stats.recent} />
       </div>
     </section>
   );

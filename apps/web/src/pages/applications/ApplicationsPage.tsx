@@ -4,15 +4,15 @@ import { ApplyDialog } from '@/pages/vacancies/components/ApplyDialog';
 import { ApplicationStatusFilterSelect } from './components/ApplicationStatusFilterSelect';
 import { ApplicationsKpis } from './components/ApplicationsKpis';
 import { ApplicationsTable } from './components/ApplicationsTable';
-import type { ApplicationListItem } from './types';
+import { type ApplicationListItem, STATUS_FILTER_ALL } from './types';
 import { useApplications } from './useApplications';
 
 export function ApplicationsPage() {
   const {
     loading,
     loadError,
-    items,
     total,
+    loadMore,
     visibleItems,
     stats,
     savingIds,
@@ -27,11 +27,13 @@ export function ApplicationsPage() {
   const [editing, setEditing] = useState<ApplicationListItem | null>(null);
 
   const emptyMessage =
-    items.length === 0 ? 'No applications recorded yet.' : 'No applications match this filter.';
+    q.trim() === '' && statusFilter === STATUS_FILTER_ALL
+      ? 'No applications recorded yet.'
+      : 'No applications match this filter.';
 
   return (
     <section className="view">
-      {!loading && !loadError && (
+      {stats && (
         <ApplicationsKpis stats={stats} filter={statusFilter} onFilterChange={setStatusFilter} />
       )}
 
@@ -52,6 +54,7 @@ export function ApplicationsPage() {
             rowErrors={rowErrors}
             onStatusChange={changeStatus}
             onEdit={setEditing}
+            onEndReached={loadMore}
             emptyMessage={emptyMessage}
           />
         )}

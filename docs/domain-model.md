@@ -65,7 +65,8 @@ then `matchScore` desc; its "Applied" filter stands for the whole pipeline.
 >   `RECOMMENDATION_INPUT_VALUES` + `RECOMMENDATION_ALIASES` in
 >   [`recommendation.ts`](../packages/core/src/recommendation.ts), the MCP `zod`
 >   enums in [`vacancies.schemas.ts`](../apps/mcp/src/vacancies/vacancies.schemas.ts),
->   the `apps/api` DTOs, and the web `recommendationSchema` + `RECOMMENDATION_ORDER`.
+>   the `apps/api` DTOs, and the web `recommendationSchema`. Its place in the enum is
+  `/vacancies`' `sort=recommended` order (ADR-0030) — `ADD VALUE … BEFORE`/`AFTER`.
 > - Adding a `VacancyStatus` value → the Prisma enum (migration), `PIPELINE_STATUSES`
 >   in [`status.ts`](../packages/core/src/status.ts) if it is a pipeline stage, the MCP
 >   zod enums (`VacancyStatusEnum`, `PipelineStatusEnum`), the API DTOs
@@ -97,16 +98,20 @@ starts with a `NOT_REVIEWED` row (`firstStatus`).
 `/applications` item. A vacancy set straight past `APPLIED` has none (`null`).
 Migrated rows were backfilled from `userAction`, `appliedAt` and `statusUpdatedAt`.
 
-**Active / Timeout are derived, not stored.** `/applications` splits the log on the
-client from `statusChangedAt`: `REJECTED` and `OFFER` are *closed*; of the rest,
-anything not moved for more than 30 days is a *timeout*, and the remainder is
-*active*. So `total = active + timeout + rejected + offer`, with no overlap and no
-remainder. The window floats: from applying while `APPLIED`, from the interview after
-`INTERVIEW`. There is deliberately no column, no job, and no server-side filter for it —
-the rule lives in `apps/web/src/pages/applications/constants.ts`
-([ADR-0022](decisions/0022-timeout-derived-until-scheduled.md)). `/applications`'s
+**Active / Timeout are derived, not stored.** The pipeline splits on
+`statusChangedAt`: `REJECTED` and `OFFER` are *closed*; of the rest, anything whose last
+move is more than 30 days old (`statusChangedAt < now − 30 days`) is a *timeout*, and
+the remainder is *active*. So `total = active + timeout + rejected + offer`, with no
+overlap and no remainder. The window floats: from applying while `APPLIED`, from the
+interview after `INTERVIEW`. There is deliberately no column and no job for it — the
+rule lives in `core` (`TIMEOUT_DAYS`, `timedOutWhere` in `packages/core/src/status.ts`),
+`GET /stats`' `pipeline` counts it, and the `/applications` list filters on it and
+flags each item `timedOut`
+([ADR-0022](decisions/0022-timeout-derived-until-scheduled.md),
+[ADR-0031](decisions/0031-stats-endpoint.md)). `/applications`'s
 filter carries three values that are **not** stored statuses — `ALL`, `ACTIVE`,
-`TIMEOUT` — and none of them ever crosses the wire.
+`TIMEOUT` — and none of them is ever sent as a `status`: `ACTIVE` / `TIMEOUT` go out
+as the separate `state=active|timedOut` param, `ALL` as neither.
 
 > **What this constrains — breaks if you change it**
 > - Writing `status` anywhere but `writeStatus` → the cache and the journal disagree,
@@ -216,7 +221,7 @@ is always English.**
   DTO uses `@IsEnum(Recommendation)` (English only).
 
 > **Breaks if you change it:** storing the raw UA string → every downstream filter
-> (`@IsEnum`, the zod enums, the web `RECOMMENDATION_ORDER`) stops matching; the
+> (`@IsEnum`, the zod enums) stops matching; the
 > DB enum can't even hold it.
 
 ## DB-level rules (not expressible in the Prisma schema DSL)

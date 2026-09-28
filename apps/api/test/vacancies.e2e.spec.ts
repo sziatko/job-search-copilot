@@ -117,6 +117,47 @@ describe('Vacancies (e2e)', () => {
       await request(app.getHttpServer()).get('/api/v1/vacancies?limit=200').expect(400);
     });
 
+    it('pages by ?cursor= in ?sort=recommended order', async () => {
+      const server = app.getHttpServer();
+      for (const [n, recommendation, matchScore] of [
+        [1, 'SKIP', 90],
+        [2, 'APPLY', 60],
+        [3, 'APPLY_WITH_CAVEATS', 70],
+      ] as const) {
+        await request(server)
+          .post('/api/v1/vacancies')
+          .send({
+            ...validPayload,
+            company: `Co ${n}`,
+            applyUrl: `https://example.com/p/${n}`,
+            recommendation,
+            matchScore,
+          })
+          .expect(201);
+      }
+
+      const first = await request(server)
+        .get('/api/v1/vacancies?sort=recommended&limit=2')
+        .expect(200);
+      expect(first.body.items.map((item: { company: string }) => item.company)).toEqual([
+        'Co 2',
+        'Co 3',
+      ]);
+      expect(first.body).toMatchObject({ total: 3, nextCursor: first.body.items[1].id });
+
+      const next = await request(server)
+        .get(`/api/v1/vacancies?sort=recommended&limit=2&cursor=${first.body.nextCursor}`)
+        .expect(200);
+      expect(next.body).toMatchObject({ items: [{ company: 'Co 1' }], total: 3, nextCursor: null });
+    });
+
+    it('400s on cursor with offset, a bad cursor, or an unknown sort', async () => {
+      const server = app.getHttpServer();
+      await request(server).get('/api/v1/vacancies?cursor=5&offset=0').expect(400);
+      await request(server).get('/api/v1/vacancies?cursor=abc').expect(400);
+      await request(server).get('/api/v1/vacancies?sort=oldest').expect(400);
+    });
+
     it('filters by ?search= on either the company or the title', async () => {
       const server = app.getHttpServer();
       await request(server).post('/api/v1/vacancies').send(validPayload).expect(201);
@@ -193,6 +234,9 @@ describe('Vacancies (e2e)', () => {
         .expect(200);
       expect(res.body.fullText).toBe(validPayload.fullText);
       expect(res.body.estimationComment).toBe(validPayload.estimationComment);
+      expect(res.body.timeline).toEqual([
+        { status: 'NOT_REVIEWED', createdAt: res.body.statusChangedAt },
+      ]);
     });
   });
 

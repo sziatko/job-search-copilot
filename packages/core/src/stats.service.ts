@@ -1,0 +1,124 @@
+import type { PrismaClient, VacancyStatus } from '@prisma/client';
+import { getPrisma } from './prisma-client';
+import {
+  OPEN_PIPELINE_STATUSES,
+  PIPELINE_STATUSES,
+  type PipelineStatus,
+  timedOutWhere,
+} from './status';
+
+/** How many journal rows `recent` carries — the dashboard's activity feed. */
+const RECENT_SIZE = 6;
+
+/** Past a reply: the company has answered. */
+const RESPONDED: VacancyStatus[] = ['REPLIED', 'RECRUITER_SCREEN', 'INTERVIEW', 'OFFER'];
+const INTERVIEWED: VacancyStatus[] = ['INTERVIEW', 'OFFER'];
+
+/** `GET /stats` (ADR-0031). The funnel stages count the journal ("ever reached"),
+ * `pipeline` the current status. */
+export interface Stats {
+  logged: number;
+  analysed: number;
+  awaitingTriage: number;
+  recommended: number;
+  applied: number;
+  responded: number;
+  interview: number;
+  recruiterScreen: number;
+  pipeline: {
+    byStatus: Record<PipelineStatus, number>;
+    active: number;
+    timedOut: number;
+    total: number;
+  };
+  /** The latest pipeline moves, newest first. */
+  recent: {
+    id: number;
+    vacancyId: number;
+    status: PipelineStatus;
+    createdAt: Date;
+    company: string;
+    title: string;
+  }[];
+}
+
+export class StatsService {
+  /** @param db defaults (on construction, not import) to the lazy process-wide client —
+   *   same rationale as VacancyService. Nest passes its managed client. */
+  constructor(private readonly db: PrismaClient = getPrisma()) {}
+
+  /** @param now the timeout clock's "today"; a parameter so a test can pin it. */
+  async get(now = new Date()): Promise<Stats> {
+    const everReached = (statuses: VacancyStatus[]) =>
+      this.db.vacancy.count({ where: { statusChanges: { some: { status: { in: statuses } } } } });
+
+    const [
+      logged,
+      analysed,
+      awaitingTriage,
+      recommended,
+      applied,
+      responded,
+      interview,
+      groups,
+      timedOut,
+      recent,
+    ] = await Promise.all([
+      this.db.vacancyLogEntry.count(),
+      // hasAnalysis' rule: an ANALYZER comment exists.
+      this.db.vacancy.count({ where: { comments: { some: { source: 'ANALYZER' } } } }),
+      this.db.vacancy.count({ where: { status: 'NOT_REVIEWED' } }),
+      this.db.vacancy.count({ where: { recommendation: { in: ['APPLY', 'APPLY_WITH_CAVEATS'] } } }),
+      everReached(['APPLIED']),
+      everReached(RESPONDED),
+      everReached(INTERVIEWED),
+      this.db.vacancy.groupBy({
+        by: ['status'],
+        where: { status: { in: [...PIPELINE_STATUSES] } },
+        _count: { _all: true },
+      }),
+      this.db.vacancy.count({ where: timedOutWhere(now) }),
+      this.db.statusChange.findMany({
+        where: { status: { in: [...PIPELINE_STATUSES] } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: RECENT_SIZE,
+        select: {
+          id: true,
+          vacancyId: true,
+          status: true,
+          createdAt: true,
+          vacancy: { select: { company: true, title: true } },
+        },
+      }),
+    ]);
+
+    const byStatus = Object.fromEntries(PIPELINE_STATUSES.map((s) => [s, 0])) as Record<
+      PipelineStatus,
+      number
+    >;
+    for (const group of groups) byStatus[group.status as PipelineStatus] = group._count._all;
+    const open = OPEN_PIPELINE_STATUSES.reduce((sum, status) => sum + byStatus[status], 0);
+
+    return {
+      logged,
+      analysed,
+      awaitingTriage,
+      recommended,
+      applied,
+      responded,
+      interview,
+      recruiterScreen: byStatus.RECRUITER_SCREEN,
+      pipeline: {
+        byStatus,
+        active: open - timedOut,
+        timedOut,
+        total: Object.values(byStatus).reduce((sum, n) => sum + n, 0),
+      },
+      recent: recent.map(({ vacancy, ...row }) => ({
+        ...row,
+        status: row.status as PipelineStatus,
+        ...vacancy,
+      })),
+    };
+  }
+}

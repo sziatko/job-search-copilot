@@ -27,7 +27,7 @@ apps/web (React SPA)        vacancy-match-analyzer
 
 | Package | Responsibility | Depends on |
 | --- | --- | --- |
-| [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the schema (`Vacancy` with its `StatusChange` journal and `Comment`s, `VacancyLogEntry`) + migrations, the `VacancyService`, `ApplicationService` and `VacancyLogService` (all queries), `writeStatus` (the only writer of status), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
+| [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the schema (`Vacancy` with its `StatusChange` journal and `Comment`s, `VacancyLogEntry`) + migrations, the `VacancyService`, `ApplicationService`, `VacancyLogService` and `StatsService` (all queries), `writeStatus` (the only writer of status), the timeout rule (`TIMEOUT_DAYS`, `timedOutWhere` in `status.ts`), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
 | `apps/api` | Thin HTTP transport over the core services for the web app. NestJS: DI, DTO validation, versioned routes (`vacancies`, `applications`), a health check. | `core`, `@nestjs/*`, `class-validator`, `zod` |
 | `apps/mcp` | Thin stdio transport over the *same* services, exposing ten tools (4 for vacancies, 4 for applications incl. `update_vacancy_status`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. | `core`, `@modelcontextprotocol/sdk`, `zod` |
 | `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/applications`, `/log`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
@@ -81,7 +81,8 @@ Both transports call the same core service methods; there is no business logic i
 [`contracts.md`](contracts.md) for the exact surfaces.
 
 `apps/web` keeps one shared HTTP helper — `src/lib/api.ts` (`API_BASE`,
-`parseResponse`) — plus `src/lib/routeMeta.ts` (each route's title / subtitle /
+`parseResponse`, `cursorPageSchema`), `src/lib/useInfiniteList.ts` (a cursor-paged
+table's query, [ADR-0030](decisions/0030-cursor-paging.md)) — plus `src/lib/routeMeta.ts` (each route's title / subtitle /
 `rail` metadata, read by `RootLayout`) and the presentational pieces both features
 draw on under `src/components/ui/` (`ScorePill`, `KpiTile`, `Modal`, `Select`,
 `ExpandableText`, `SoonPage`). The shell is `src/components/RootLayout.tsx` +

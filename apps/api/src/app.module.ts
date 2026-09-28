@@ -5,6 +5,7 @@ import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { LogModule } from './log/log.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { StatsModule } from './stats/stats.module';
 import { VacanciesModule } from './vacancies/vacancies.module';
 
 @Module({
@@ -17,6 +18,7 @@ import { VacanciesModule } from './vacancies/vacancies.module';
     VacanciesModule,
     ApplicationsModule,
     LogModule,
+    StatsModule,
   ],
 })
 export class AppModule {}

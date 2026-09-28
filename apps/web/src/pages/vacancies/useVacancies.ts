@@ -1,18 +1,17 @@
 import {
-  keepPreviousData,
+  type InfiniteData,
   type QueryKey,
   useMutation,
-  useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+import { useInfiniteList } from '@/lib/useInfiniteList';
 import { recordApplication } from '../applications/api';
-import { isPipelineStatus } from '../applications/types';
+import { applicationStatusSchema, isPipelineStatus } from '../applications/types';
 import { listVacanciesPage, updateVacancyStatus, type VacancyPage } from './api';
 import type { ApplyDetails } from './components/ApplyDialog';
-import { RECOMMENDATION_ORDER } from './constants';
 import {
   STATUS_FILTER_ALL,
   type StatusFilterValue,
@@ -34,11 +33,14 @@ interface ActionChange {
   status: VacancyAction;
 }
 
-/** Applied stands for the whole pipeline: a row stays under it as it moves on. */
-function matchesStatusFilter(status: VacancyStatus, filter: StatusFilterValue): boolean {
-  if (filter === STATUS_FILTER_ALL) return true;
-  if (filter === VACANCY_ACTION.APPLIED) return isPipelineStatus(status);
-  return status === filter;
+type CachedPages = InfiniteData<VacancyPage, number | undefined>;
+
+/** The filter as the API's `status` — Applied stands for the whole pipeline, so a row
+ * stays under it as it moves on; All sends none. */
+function statusesFor(filter: StatusFilterValue): readonly VacancyStatus[] | undefined {
+  if (filter === STATUS_FILTER_ALL) return undefined;
+  if (filter === VACANCY_ACTION.APPLIED) return applicationStatusSchema.options;
+  return [filter];
 }
 
 export function useVacancies() {
@@ -57,12 +59,24 @@ export function useVacancies() {
       search: (prev) => ({ ...prev, q: value.trim() === '' ? undefined : value }),
     });
   };
+  // In the URL too, NOT_REVIEWED (the triage queue) being the absent value.
+  const statusFilter = search.status ?? VACANCY_ACTION.NOT_REVIEWED;
+  const setStatusFilter = (value: StatusFilterValue) => {
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        status: value === VACANCY_ACTION.NOT_REVIEWED ? undefined : value,
+      }),
+    });
+  };
 
-  // The term is part of the key, not just the request: a different search is a
-  // different page of results. Every write below therefore goes through the *prefix*
+  // The term and the filter are part of the key, not just the request: a different
+  // search is a different list, which starts again from its first page (ADR-0030). Every write below therefore goes through the *prefix*
   // (`{ queryKey: VACANCIES_KEY }`), never one exact key — `findAll` is a partial
   // match, and only a primitive in a key stops `['vacancies','foo']` from matching
   // `['vacancies','foobar']` (terms cannot collide here, so the prefix is safe).
+  // Each entry is an infinite query's `{ pages, pageParams }`, and the write patches
+  // every page.
   //
   // The exact-key write this replaced was a silent no-op in both directions (phase
   // 2.2, finding 3): while a new term is in flight its entry does not exist yet, so
@@ -77,21 +91,20 @@ export function useVacancies() {
   // rollback has something to put back — measured, not assumed. Doing it "properly"
   // would mean dropping keepPreviousData, which costs the blank-on-keystroke that
   // phase 2.1, step 2 added it for.
-  const queryKey = [...VACANCIES_KEY, term] as const;
+  const queryKey = [...VACANCIES_KEY, term, statusFilter] as const;
 
-  const {
-    data,
-    isPending: loading,
-    error,
-  } = useQuery({
-    queryKey,
-    queryFn: () => listVacanciesPage({ search: term }),
-    // A new term is a new key with no cache entry, so without this the table
-    // blanks to "Loading…" on every debounced keystroke.
-    placeholderData: keepPreviousData,
-  });
-  const items = useMemo(() => data?.items ?? [], [data]);
-  const loadError = error ? (error instanceof Error ? error.message : String(error)) : null;
+  // The server filters and sorts; `useInfiniteList` keeps the previous rows on screen
+  // while a new key loads, so the table does not blank on every debounced keystroke.
+  const { query, items, total, loadMore } = useInfiniteList(queryKey, (cursor) =>
+    listVacanciesPage({
+      search: term,
+      status: statusesFor(statusFilter),
+      sort: 'recommended',
+      cursor,
+    }),
+  );
+  const loading = query.isPending;
+  const loadError = query.error ? query.error.message : null;
 
   // Per-row UI bookkeeping. The cache is the source of truth for the data itself;
   // these just track which rows are mid-flight / errored so the table can show it.
@@ -99,34 +112,27 @@ export function useVacancies() {
   const [rowErrors, setRowErrors] = useState<Map<number, string>>(new Map());
   const [pendingDecline, setPendingDecline] = useState<PendingVacancy | null>(null);
   const [pendingApply, setPendingApply] = useState<PendingVacancy | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(VACANCY_ACTION.NOT_REVIEWED);
-
-  const visibleItems = useMemo(() => {
-    return items
-      .filter((item) => matchesStatusFilter(item.status, statusFilter))
-      .sort((a, b) => {
-        const byRecommendation =
-          RECOMMENDATION_ORDER[a.recommendation] - RECOMMENDATION_ORDER[b.recommendation];
-        if (byRecommendation !== 0) return byRecommendation;
-        return b.matchScore - a.matchScore;
-      });
-  }, [items, statusFilter]);
 
   /** Undo a `patchCachedItem` — every key it wrote, back to the snapshot.
    * `setQueryData` ignores `undefined`, so a page that had no data keeps none. */
-  function restorePages(previous: [QueryKey, VacancyPage | undefined][] | undefined) {
+  function restorePages(previous: [QueryKey, CachedPages | undefined][] | undefined) {
     for (const [key, data] of previous ?? []) {
       queryClient.setQueryData(key, data);
     }
   }
 
-  /** Optimistic write into **every** cached page, shared by both mutations. */
+  /** Optimistic write into **every** cached page, shared by both mutations. The row
+   * keeps its place even when it leaves the filter: the refetch in `onSettled` is what
+   * drops it. */
   function patchCachedItem(id: number, next: VacancyStatus) {
-    queryClient.setQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY }, (old) =>
+    queryClient.setQueriesData<CachedPages>({ queryKey: VACANCIES_KEY }, (old) =>
       old
         ? {
             ...old,
-            items: old.items.map((item) => (item.id === id ? { ...item, status: next } : item)),
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) => (item.id === id ? { ...item, status: next } : item)),
+            })),
           }
         : old,
     );
@@ -143,7 +149,7 @@ export function useVacancies() {
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY });
+      const previous = queryClient.getQueriesData<CachedPages>({ queryKey: VACANCIES_KEY });
       patchCachedItem(id, status);
       return { previous };
     },
@@ -160,6 +166,10 @@ export function useVacancies() {
         return next;
       });
       void queryClient.invalidateQueries({ queryKey: VACANCIES_KEY });
+      // The vacancy's own page shows the status too.
+      void queryClient.invalidateQueries({ queryKey: ['vacancy'] });
+      // Triage moves change the dashboard's counts.
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 
@@ -207,7 +217,7 @@ export function useVacancies() {
         next.delete(id);
         return next;
       });
-      const previous = queryClient.getQueriesData<VacancyPage>({ queryKey: VACANCIES_KEY });
+      const previous = queryClient.getQueriesData<CachedPages>({ queryKey: VACANCIES_KEY });
       patchCachedItem(id, VACANCY_ACTION.APPLIED);
       return { previous };
     },
@@ -229,6 +239,9 @@ export function useVacancies() {
       });
       void queryClient.invalidateQueries({ queryKey: VACANCIES_KEY });
       void queryClient.invalidateQueries({ queryKey: ['applications'] });
+      void queryClient.invalidateQueries({ queryKey: ['application-company'] });
+      void queryClient.invalidateQueries({ queryKey: ['vacancy'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 
@@ -241,8 +254,9 @@ export function useVacancies() {
   return {
     loading,
     loadError,
-    total: data?.total ?? items.length,
-    visibleItems,
+    total,
+    items,
+    loadMore,
     savingIds,
     rowErrors,
     pendingDecline,

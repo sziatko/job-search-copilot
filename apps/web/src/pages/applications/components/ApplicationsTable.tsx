@@ -1,9 +1,10 @@
 import { useRef } from 'react';
 import { IconEdit } from '@/components/icons';
+import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
-import { daysSinceLastMove, isTimedOut } from '../constants';
+import { daysSinceLastMove } from '../constants';
 import type { ApplicationListItem, ApplicationStatus } from '../types';
 import { ApplicationStatusSelect } from './ApplicationStatusSelect';
 import { CopyApplicationButton } from './CopyApplicationButton';
@@ -34,6 +35,7 @@ export function ApplicationsTable({
   rowErrors,
   onStatusChange,
   onEdit,
+  onEndReached,
   emptyMessage,
 }: {
   items: ApplicationListItem[];
@@ -41,12 +43,15 @@ export function ApplicationsTable({
   rowErrors: Map<number, string>;
   onStatusChange: (id: number, status: ApplicationStatus) => void;
   onEdit: (item: ApplicationListItem) => void;
+  /** The next page, when the last loaded row scrolls into the window (ADR-0030). */
+  onEndReached?: () => void;
   emptyMessage: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { virtualItems, paddingTop, paddingBottom, measureElement } = useVirtualRows(
     scrollRef,
     items.length,
+    onEndReached,
   );
 
   return (
@@ -60,7 +65,7 @@ export function ApplicationsTable({
             <th style={{ width: 120 }}>Salary</th>
             <th style={{ width: 80 }}>CV</th>
             <th>Comment</th>
-            <th style={{ width: 102 }}>Action</th>
+            <th style={{ width: 136 }}>Action</th>
             <th style={{ width: 190 }}>Status</th>
           </tr>
         </thead>
@@ -92,7 +97,7 @@ export function ApplicationsTable({
                 className="hover:bg-surface-alt"
               >
                 <td className="date-cell">
-                  {isTimedOut(item) && (
+                  {item.timedOut && (
                     <span className="timeout-mark mr-[4px]">
                       ⏳
                       <span className="tip">{daysSinceLastMove(item)} days since last update</span>
@@ -154,6 +159,7 @@ export function ApplicationsTable({
                       <IconEdit />
                       <span className="tip">Edit</span>
                     </button>
+                    <DetailsLink id={item.id} />
                   </div>
                 </td>
                 <td>

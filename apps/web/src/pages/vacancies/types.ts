@@ -10,6 +10,7 @@
 // Presentation metadata (labels, sort order) that can't live on a schema is in
 // ./constants.
 import { z } from 'zod';
+import { cursorPageSchema } from '@/lib/api';
 
 export const recommendationSchema = z.enum(['APPLY', 'APPLY_WITH_CAVEATS', 'SKIP']);
 export type Recommendation = z.infer<typeof recommendationSchema>;
@@ -42,14 +43,14 @@ export type VacancyAction = z.infer<typeof vacancyActionSchema>;
 /** Named access to the values, e.g. `VACANCY_ACTION.DECLINED`. */
 export const VACANCY_ACTION = vacancyActionSchema.enum;
 
-/** Extra option in the status dropdown — UI only, never crosses the wire. */
+/** Extra option in the status dropdown — UI only, never sent to the API (it sends no
+ * `status`), though it does appear in the page's URL. */
 export const STATUS_FILTER_ALL = 'ALL' as const;
-export type StatusFilterValue = VacancyAction | typeof STATUS_FILTER_ALL;
-/** Every action plus the "all" sentinel, in dropdown order. */
-export const statusFilterValues: readonly StatusFilterValue[] = [
-  ...vacancyActionSchema.options,
-  STATUS_FILTER_ALL,
-];
+/** Every action plus the "all" sentinel, in dropdown order — also the router's
+ * `?status=` schema. */
+export const statusFilterSchema = z.enum([...vacancyActionSchema.options, STATUS_FILTER_ALL]);
+export type StatusFilterValue = z.infer<typeof statusFilterSchema>;
+export const statusFilterValues = statusFilterSchema.options;
 
 export const vacancyListItemSchema = z.object({
   id: z.number(),
@@ -74,7 +75,38 @@ export const vacancyListItemSchema = z.object({
 });
 export type VacancyListItem = z.infer<typeof vacancyListItemSchema>;
 
-export const listResponseSchema = z.object({
-  items: z.array(vacancyListItemSchema),
-  total: z.number(),
+export const vacancyPageSchema = cursorPageSchema(vacancyListItemSchema);
+
+const commentSourceSchema = z.enum(['ANALYZER', 'USER', 'AGENT']);
+export type CommentSource = z.infer<typeof commentSourceSchema>;
+
+export const vacancyCommentSchema = z.object({
+  id: z.number(),
+  createdAt: z.string(),
+  body: z.string(),
+  source: commentSourceSchema,
 });
+export type VacancyComment = z.infer<typeof vacancyCommentSchema>;
+
+/** GET /vacancies/:id — the whole record: the posting text, every comment and the
+ * status journal, each oldest first. */
+export const vacancyDetailSchema = z.object({
+  id: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  company: z.string(),
+  title: z.string(),
+  applyUrl: z.string(),
+  fullText: z.string(),
+  matchScore: z.number(),
+  recommendation: recommendationSchema,
+  status: vacancyStatusSchema,
+  statusChangedAt: z.string(),
+  salaryInListing: z.string().nullable(),
+  usedTailoredResume: z.boolean(),
+  comments: z.array(vacancyCommentSchema),
+  /** The analyzer's comment; null on a placeholder that never had one — no score to show. */
+  estimationComment: z.string().nullable(),
+  timeline: z.array(z.object({ status: vacancyStatusSchema, createdAt: z.string() })),
+});
+export type VacancyDetail = z.infer<typeof vacancyDetailSchema>;

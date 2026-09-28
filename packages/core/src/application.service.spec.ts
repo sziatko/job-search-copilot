@@ -323,6 +323,82 @@ describe('ApplicationService', () => {
       expect(ids).toHaveLength(5);
       expect(new Set(ids).size).toBe(5);
     });
+
+    describe('Active / Timeout (state) and cursor', () => {
+      const DAY = 86_400_000;
+      const setLastMove = (id: number, daysAgo: number) =>
+        prisma.vacancy.update({
+          where: { id },
+          data: { statusChangedAt: new Date(Date.now() - daysAgo * DAY) },
+        });
+      const companies = (items: { company: string }[]) => items.map((item) => item.company);
+
+      beforeEach(async () => {
+        // Acme APPLIED and Beta Corp REJECTED, both silent for 40 days; Fresh Co moved
+        // today. The closed one is never timed out, however old.
+        const fresh = await seedVacancy({ company: 'Fresh Co' });
+        await applications.record({ vacancyId: fresh.id, status: 'INTERVIEW' });
+        const beta = (await applications.list({ status: 'REJECTED' })).items[0];
+        await setLastMove(acmeId, 40);
+        await setLastMove(beta.id, 40);
+      });
+
+      it('flags each item, and filters on the same rule', async () => {
+        const { items } = await applications.list();
+        expect(items.map((item) => [item.company, item.timedOut])).toEqual([
+          ['Fresh Co', false],
+          ['Beta Corp', false],
+          ['Acme', true],
+        ]);
+
+        const timedOut = await applications.list({ state: 'timedOut' });
+        expect(companies(timedOut.items)).toEqual(['Acme']);
+        expect(timedOut.total).toBe(1);
+        const active = await applications.list({ state: 'active' });
+        expect(companies(active.items)).toEqual(['Fresh Co']);
+        expect(active.total).toBe(1);
+      });
+
+      it('splits at 30 days: 29 is active, 31 timed out', async () => {
+        await setLastMove(acmeId, 29);
+        expect((await applications.list({ state: 'timedOut' })).total).toBe(0);
+        await setLastMove(acmeId, 31);
+        expect((await applications.list({ state: 'timedOut' })).total).toBe(1);
+      });
+
+      it('ANDs state with status', async () => {
+        expect((await applications.list({ status: 'APPLIED', state: 'timedOut' })).total).toBe(1);
+        expect((await applications.list({ status: 'INTERVIEW', state: 'timedOut' })).total).toBe(0);
+        expect((await applications.list({ status: 'REJECTED', state: 'active' })).total).toBe(0);
+      });
+
+      it('pages by cursor without gaps or repeats', async () => {
+        const seen: string[] = [];
+        let cursor: number | undefined;
+        do {
+          const page = await applications.list({ limit: 2, cursor });
+          seen.push(...companies(page.items));
+          cursor = page.nextCursor ?? undefined;
+        } while (cursor !== undefined);
+        expect(seen).toEqual(['Fresh Co', 'Beta Corp', 'Acme']);
+      });
+
+      it('pages on from a cursor row that a status write moved out of the filter', async () => {
+        // A second active row, older than Fresh Co, for the next page to find.
+        await setLastMove(acmeId, 5);
+        const first = await applications.list({ state: 'active', limit: 1 });
+        expect(companies(first.items)).toEqual(['Fresh Co']);
+        // The cursor row leaves `active`.
+        await applications.updateStatus(first.items[0].id, 'OFFER', undefined, 'USER');
+
+        const next = await applications.list({
+          state: 'active',
+          limit: 1,
+          cursor: first.nextCursor ?? undefined,
+        });
+        expect(companies(next.items)).toEqual(['Acme']);
+      });
+    });
   });
 
   describe('getById', () => {

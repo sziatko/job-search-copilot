@@ -3,6 +3,7 @@ export { CommentSource, Recommendation, VacancyStatus } from '@prisma/client';
 export { ApplicationService } from './application.service';
 export type {
   ApplicationListItem,
+  ApplicationState,
   ListApplicationsFilters,
   ListApplicationsResult,
   RecordApplicationByIdInput,
@@ -13,6 +14,7 @@ export type {
   UpdateApplicationInput,
   VacancyResolution,
 } from './application.types';
+export { APPLICATION_STATES } from './application.types';
 export {
   AlreadyAppliedError,
   AmbiguousVacancyMatchError,
@@ -29,6 +31,8 @@ export {
   normalizeRecommendation,
   RECOMMENDATION_INPUT_VALUES,
 } from './recommendation';
+export type { Stats } from './stats.service';
+export { StatsService } from './stats.service';
 export type { PipelineStatus } from './status';
 export { PIPELINE_STATUSES } from './status';
 export { VacancyService } from './vacancy.service';
@@ -41,7 +45,15 @@ export type {
   VacancyComment,
   VacancyDetail,
   VacancyListItem,
+  VacancySort,
 } from './vacancy.types';
-export type { CheckVacancyLogOptions, VacancyLogInput } from './vacancy-log';
+export { VACANCY_SORTS } from './vacancy.types';
+export type {
+  CheckVacancyLogOptions,
+  ListVacancyLogFilters,
+  ListVacancyLogResult,
+  VacancyLogInput,
+  VacancyLogListItem,
+} from './vacancy-log';
 export { normalizeCompanyKey, normalizeTitleKey } from './vacancy-log';
 export { VacancyLogService } from './vacancy-log.service';

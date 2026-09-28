@@ -52,4 +52,42 @@ describe('Vacancy log (e2e)', () => {
     }).expect(400);
     await check({ entries: [{ url: 42 }] }).expect(400);
   });
+
+  it('GET lists newest first, searches, and pages by cursor', async () => {
+    await check({
+      entries: [
+        { url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' },
+        { url: 'https://beta.com/jobs/2', company: 'Beta', title: 'QA' },
+        { url: 'https://acme.com/jobs/3', company: 'Acme', title: 'Lead' },
+      ],
+    }).expect(200);
+    const server = app.getHttpServer();
+
+    const first = await request(server).get('/api/v1/log?limit=2').expect(200);
+    expect(first.body.total).toBe(3);
+    expect(first.body.items.map((item: { url: string }) => item.url)).toEqual([
+      'https://acme.com/jobs/3',
+      'https://beta.com/jobs/2',
+    ]);
+    expect(first.body.nextCursor).toBe(first.body.items[1].id);
+
+    const next = await request(server)
+      .get(`/api/v1/log?limit=2&cursor=${first.body.nextCursor}`)
+      .expect(200);
+    expect(next.body).toMatchObject({
+      items: [{ url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' }],
+      total: 3,
+      nextCursor: null,
+    });
+
+    const search = await request(server).get('/api/v1/log?q=BETA').expect(200);
+    expect(search.body).toMatchObject({ items: [{ company: 'Beta' }], total: 1 });
+  });
+
+  it('GET 400s on a bad limit or cursor', async () => {
+    const server = app.getHttpServer();
+    await request(server).get('/api/v1/log?limit=101').expect(400);
+    await request(server).get('/api/v1/log?limit=0').expect(400);
+    await request(server).get('/api/v1/log?cursor=abc').expect(400);
+  });
 });

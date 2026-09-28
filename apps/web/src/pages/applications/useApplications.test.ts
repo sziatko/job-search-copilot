@@ -1,12 +1,19 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { type InfiniteData, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
+import type { Stats } from '@/pages/dashboard/types';
 import { routeTree } from '@/router';
-import { buildHandlers, type FakeVacancy, fakeVacancy } from '@/test/msw/handlers';
+import {
+  buildHandlers,
+  type FakeVacancy,
+  fakeStats,
+  fakeVacancy,
+  statsHandler,
+} from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import type { ApplicationPage } from './api';
 
@@ -25,6 +32,29 @@ function application(overrides: Partial<FakeVacancy> = {}): FakeVacancy {
     statusChangedAt: applied,
     ...overrides,
   });
+}
+
+/** The fake table plus `/stats` — the strip reads the server's counts, not the rows. */
+function serve(rows: FakeVacancy[], stats: Stats = fakeStats()) {
+  mswServer.use(...buildHandlers(rows), statsHandler(stats));
+}
+
+/** `GET /applications` answering one fixed page, for the tests that shadow the fake. */
+function onePage(...items: (FakeVacancy & { timedOut?: boolean })[]) {
+  return http.get('http://localhost:3000/api/v1/applications', () =>
+    HttpResponse.json({
+      items: items.map((item) => ({ timedOut: false, ...item })),
+      total: items.length,
+      nextCursor: null,
+    }),
+  );
+}
+
+/** Every cached row under the list prefix — the pages of every key. */
+function cachedRows(client: QueryClient) {
+  return client
+    .getQueriesData<InfiniteData<ApplicationPage>>({ queryKey: ['applications'] })
+    .flatMap(([, data]) => data?.pages.flatMap((page) => page.items) ?? []);
 }
 
 function renderApplications(path = '/applications') {
@@ -47,12 +77,10 @@ function renderApplications(path = '/applications') {
 
 describe('ApplicationsPage / useApplications', () => {
   it('lists applications and filters the search by company OR role', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        application({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
-        application({ id: 2, company: 'Beta Corp', title: 'Frontend Lead' }),
-      ]),
-    );
+    serve([
+      application({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
+      application({ id: 2, company: 'Beta Corp', title: 'Frontend Lead' }),
+    ]);
     renderApplications();
     await screen.findByText('Acme');
     expect(screen.getByText('Beta Corp')).toBeInTheDocument();
@@ -75,32 +103,28 @@ describe('ApplicationsPage / useApplications', () => {
       .map((cell) => cell.replace(/\s*#\d+$/, ''));
 
   it('orders rows by the last status move, newest first — not by the applied date', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        application({ id: 1, company: 'Older Co', statusChangedAt: daysAgo(40) }),
-        // Applied long ago, but moved yesterday: the move is what counts.
-        application({
-          id: 2,
-          company: 'Newest Co',
-          appliedAt: daysAgo(90),
-          statusChangedAt: daysAgo(1),
-          status: 'INTERVIEW',
-        }),
-        application({ id: 3, company: 'Middle Co', statusChangedAt: daysAgo(20) }),
-      ]),
-    );
+    serve([
+      application({ id: 1, company: 'Older Co', statusChangedAt: daysAgo(40) }),
+      // Applied long ago, but moved yesterday: the move is what counts.
+      application({
+        id: 2,
+        company: 'Newest Co',
+        appliedAt: daysAgo(90),
+        statusChangedAt: daysAgo(1),
+        status: 'INTERVIEW',
+      }),
+      application({ id: 3, company: 'Middle Co', statusChangedAt: daysAgo(20) }),
+    ]);
     renderApplications();
     await screen.findByText('Newest Co');
     expect(companyOrder()).toEqual(['Newest Co', 'Middle Co', 'Older Co']);
   });
 
   it('moves a row to the top as soon as its status changes', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        application({ id: 1, company: 'Older Co', statusChangedAt: daysAgo(40) }),
-        application({ id: 2, company: 'Newer Co', statusChangedAt: daysAgo(1) }),
-      ]),
-    );
+    serve([
+      application({ id: 1, company: 'Older Co', statusChangedAt: daysAgo(40) }),
+      application({ id: 2, company: 'Newer Co', statusChangedAt: daysAgo(1) }),
+    ]);
     renderApplications();
     await screen.findByText('Older Co');
     expect(companyOrder()).toEqual(['Newer Co', 'Older Co']);
@@ -113,12 +137,10 @@ describe('ApplicationsPage / useApplications', () => {
   });
 
   it('filters by status', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        application({ id: 1, company: 'Acme', status: 'APPLIED' }),
-        application({ id: 2, company: 'Beta Corp', status: 'REJECTED' }),
-      ]),
-    );
+    serve([
+      application({ id: 1, company: 'Acme', status: 'APPLIED' }),
+      application({ id: 2, company: 'Beta Corp', status: 'REJECTED' }),
+    ]);
     renderApplications();
     await screen.findByText('Acme');
 
@@ -129,89 +151,49 @@ describe('ApplicationsPage / useApplications', () => {
     expect(screen.getByText('Beta Corp')).toBeInTheDocument();
   });
 
-  it('shows a KPI row counting the whole (unfiltered) log', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        application({ id: 1, status: 'APPLIED' }),
-        application({ id: 2, status: 'REJECTED' }),
-        application({ id: 3, status: 'REJECTED' }),
-        application({ id: 4, status: 'OFFER' }),
-      ]),
-    );
-    renderApplications();
-    const totalLabel = await screen.findByText('Total');
-    const row = totalLabel.closest('.kpi-row') as HTMLElement;
-    const s = within(row);
-    expect(s.getByText('Offer')).toBeInTheDocument(); // non-zero, so shown
-    expect(s.queryByText('Interview')).not.toBeInTheDocument(); // zero, not shown
-    // Total + Active + Timeout (always) + Applied + Rejected (always) + Offer = 6 tiles.
-    expect(row.querySelectorAll('.kpi-value')).toHaveLength(6);
-  });
+  /** `stats.pipeline` with these counts; the rest zero. */
+  const pipeline = (counts: Partial<Stats['pipeline']['byStatus']>, active = 0, timedOut = 0) => {
+    const byStatus = { ...fakeStats().pipeline.byStatus, ...counts };
+    const total = Object.values(byStatus).reduce((sum, n) => sum + n, 0);
+    return fakeStats({ pipeline: { byStatus, active, timedOut, total } });
+  };
 
-  it('counts Active and Timeout, and the two close over the whole log', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        application({ id: 1, status: 'APPLIED' }),
-        application({
-          id: 2,
-          status: 'INTERVIEW',
-          appliedAt: daysAgo(90),
-          statusChangedAt: daysAgo(2), // moved recently — old application is not stale
-        }),
-        application({
-          id: 3,
-          status: 'REPLIED',
-          appliedAt: daysAgo(45),
-          statusChangedAt: daysAgo(45),
-        }),
-        application({
-          id: 4,
-          status: 'REJECTED',
-          appliedAt: daysAgo(90),
-          statusChangedAt: daysAgo(90),
-        }),
-        application({
-          id: 5,
-          status: 'OFFER',
-          appliedAt: daysAgo(90),
-          statusChangedAt: daysAgo(90),
-        }),
-      ]),
-    );
+  it('reads the KPI strip from /stats, not from the loaded rows', async () => {
+    // One row loaded; the server counts a pipeline of seven.
+    serve([application({ id: 1 })], pipeline({ APPLIED: 3, REJECTED: 2, OFFER: 2 }, 1, 2));
     renderApplications();
     const totalLabel = await screen.findByText('Total');
     const row = totalLabel.closest('.kpi-row') as HTMLElement;
     const s = within(row);
 
     // Each tile is a button labelled "<label>: <value>".
-    expect(s.getByRole('button', { name: 'Total: 5' })).toBeInTheDocument();
-    expect(s.getByRole('button', { name: 'Active: 2' })).toBeInTheDocument(); // 1 APPLIED + 2 INTERVIEW
-    // Any non-closed status ages out, not just APPLIED.
-    expect(s.getByRole('button', { name: 'Timeout: 1' })).toBeInTheDocument(); // 3 REPLIED
-    // Closed outcomes are never "stuck" — 4 and 5 are 90 days old and still not counted.
-    expect(s.getByRole('button', { name: 'Rejected: 1' })).toBeInTheDocument();
-    expect(s.getByRole('button', { name: 'Offer: 1' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: 'Total: 7' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: 'Active: 1' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: 'Timeout: 2' })).toBeInTheDocument();
+    expect(s.getByRole('button', { name: 'Offer: 2' })).toBeInTheDocument(); // non-zero, so shown
+    expect(s.queryByText('Interview')).not.toBeInTheDocument(); // zero, not shown
+    // Total + Active + Timeout (always) + Applied + Rejected (always) + Offer = 6 tiles.
+    expect(row.querySelectorAll('.kpi-value')).toHaveLength(6);
   });
 
-  it('filters from a KPI tile and keeps the dropdown in sync', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        application({
-          id: 1,
-          company: 'Fresh Co',
-          appliedAt: daysAgo(5),
-          statusChangedAt: daysAgo(5),
-        }),
-        application({
-          id: 2,
-          company: 'Stale Co',
-          appliedAt: daysAgo(60),
-          statusChangedAt: daysAgo(60),
-        }),
-      ]),
+  it('filters from a KPI tile through the server, and keeps the dropdown in sync', async () => {
+    const requests: string[] = [];
+    mswServer.events.on('request:start', ({ request }) => {
+      if (request.url.includes('/applications')) requests.push(request.url);
+    });
+    serve(
+      [
+        application({ id: 1, company: 'Fresh Co', statusChangedAt: daysAgo(5) }),
+        application({ id: 2, company: 'Stale Co', statusChangedAt: daysAgo(60) }),
+      ],
+      pipeline({ APPLIED: 2 }, 1, 1),
     );
     renderApplications();
     await screen.findByText('Fresh Co');
+    // The ⏳ is the server's `timedOut`, not a date sum in the browser.
+    const rowText = (company: string) =>
+      screen.getAllByRole('row').find((r) => r.textContent?.includes(company))?.textContent;
+    expect(rowText('Stale Co')).toContain('⏳');
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Timeout: 1' }));
@@ -219,10 +201,33 @@ describe('ApplicationsPage / useApplications', () => {
     await waitFor(() => expect(screen.queryByText('Fresh Co')).not.toBeInTheDocument());
     expect(screen.getByText('Stale Co')).toBeInTheDocument();
     expect(screen.getByLabelText('Status')).toHaveValue('TIMEOUT');
+    expect(requests.at(-1)).toMatch(/[?&]state=timedOut/);
+    expect(requests.at(-1)).not.toMatch(/[?&]status=/);
+
+    await user.click(screen.getByRole('button', { name: 'Active: 1' }));
+    await waitFor(() => expect(requests.at(-1)).toMatch(/[?&]state=active/));
+    mswServer.events.removeAllListeners();
+  });
+
+  it('loads the next page when the table scrolls to the last loaded row', async () => {
+    serve(
+      Array.from({ length: 130 }, (_, i) =>
+        application({ id: i + 1, company: `Co ${i + 1}`, statusChangedAt: daysAgo(i / 100) }),
+      ),
+    );
+    const { container } = renderApplications();
+    expect(await screen.findByText('Showing 100 of 130 applications')).toBeInTheDocument();
+
+    // jsdom lays nothing out: set the offset the virtualizer reads, then tell it.
+    const scroller = container.querySelector('.table-body-scroll') as HTMLElement;
+    Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 10_000_000 });
+    fireEvent.scroll(scroller);
+
+    expect(await screen.findByText('Showing 130 of 130 applications')).toBeInTheDocument();
   });
 
   it('optimistically changes a status and keeps it on success', async () => {
-    mswServer.use(...buildHandlers([application({ id: 1, status: 'APPLIED' })]));
+    serve([application({ id: 1, status: 'APPLIED' })]);
     renderApplications();
     await screen.findByText('Acme');
 
@@ -235,9 +240,8 @@ describe('ApplicationsPage / useApplications', () => {
 
   it('rolls the status back and shows a row error when the save fails', async () => {
     mswServer.use(
-      http.get('http://localhost:3000/api/v1/applications', () =>
-        HttpResponse.json({ items: [application({ id: 1, status: 'APPLIED' })], total: 1 }),
-      ),
+      statsHandler(),
+      onePage(application({ id: 1, status: 'APPLIED' })),
       http.patch('http://localhost:3000/api/v1/applications/:id/status', () =>
         HttpResponse.json(null, { status: 500 }),
       ),
@@ -255,6 +259,7 @@ describe('ApplicationsPage / useApplications', () => {
 
   it('shows a friendly error when the list response has the wrong shape', async () => {
     mswServer.use(
+      statsHandler(),
       http.get('http://localhost:3000/api/v1/applications', () =>
         HttpResponse.json({ items: 'not-an-array' }),
       ),
@@ -268,17 +273,15 @@ describe('ApplicationsPage / useApplications', () => {
     // table used to test only for `tracker://`; it now runs every value through
     // the scheme gate, and this is what that widening is supposed to mean in the
     // DOM: a real link stays a link, everything else becomes plain text.
-    mswServer.use(
-      ...buildHandlers([
-        application({ id: 1, title: 'Ordinary Role', applyUrl: 'https://acme.com/jobs/1' }),
-        application({
-          id: 2,
-          title: 'Synthetic Role',
-          applyUrl: 'tracker://acme/synthetic-role/2026-09-01',
-        }),
-        application({ id: 3, title: 'Hostile Role', applyUrl: 'javascript:alert(1)' }),
-      ]),
-    );
+    serve([
+      application({ id: 1, title: 'Ordinary Role', applyUrl: 'https://acme.com/jobs/1' }),
+      application({
+        id: 2,
+        title: 'Synthetic Role',
+        applyUrl: 'tracker://acme/synthetic-role/2026-09-01',
+      }),
+      application({ id: 3, title: 'Hostile Role', applyUrl: 'javascript:alert(1)' }),
+    ]);
     renderApplications();
     await screen.findByText('Ordinary Role');
 
@@ -294,14 +297,12 @@ describe('ApplicationsPage / useApplications', () => {
   });
 
   it('shows the last-move stamp on a row only once it has actually moved', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        // Freshly recorded: applying is the last move, so a second date line would
-        // just repeat the one above it.
-        application({ id: 1, title: 'Untouched Role' }),
-        application({ id: 2, title: 'Moved Role', statusChangedAt: daysAgo(2) }),
-      ]),
-    );
+    serve([
+      // Freshly recorded: applying is the last move, so a second date line would
+      // just repeat the one above it.
+      application({ id: 1, title: 'Untouched Role' }),
+      application({ id: 2, title: 'Moved Role', statusChangedAt: daysAgo(2) }),
+    ]);
     renderApplications();
     await screen.findByText('Untouched Role');
 
@@ -312,12 +313,10 @@ describe('ApplicationsPage / useApplications', () => {
   });
 
   it('marks a row that has gone quiet for more than thirty days', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        application({ id: 1, title: 'Stale Role', statusChangedAt: daysAgo(45) }),
-        application({ id: 2, title: 'Live Role', statusChangedAt: daysAgo(1) }),
-      ]),
-    );
+    serve([
+      application({ id: 1, title: 'Stale Role', statusChangedAt: daysAgo(45) }),
+      application({ id: 2, title: 'Live Role', statusChangedAt: daysAgo(1) }),
+    ]);
     renderApplications();
     await screen.findByText('Stale Role');
 
@@ -332,23 +331,27 @@ describe('ApplicationsPage / useApplications', () => {
   });
 
   it('writes the new last-move stamp into the cache optimistically', async () => {
-    // writeStatus() restamps statusChangedAt server-side, and the row's ⏳ mark and
-    // the Active/Timeout tiles both read that field. Without the mirror in
-    // useApplications, a changed row would keep its old bucket until the refetch
-    // landed. The PATCH is delayed so the refetch cannot be the one that moved it —
-    // otherwise the assertion would pass with the mirror deleted.
+    // writeStatus() restamps statusChangedAt server-side, which restarts the timeout
+    // clock. Without the mirror in useApplications, a changed row would keep its old
+    // place and its ⏳ until the refetch landed. The PATCH is delayed so the refetch
+    // cannot be the one that moved it — otherwise the assertion would pass with the
+    // mirror deleted.
     mswServer.use(
-      http.get('http://localhost:3000/api/v1/applications', () =>
-        HttpResponse.json({
-          items: [application({ id: 1, status: 'APPLIED' })],
-          total: 1,
-        }),
-      ),
+      statsHandler(),
+      onePage({
+        ...application({ id: 1, status: 'APPLIED', statusChangedAt: daysAgo(45) }),
+        timedOut: true,
+      }),
       http.patch('http://localhost:3000/api/v1/applications/:id/status', async ({ params }) => {
         await delay(500);
-        return HttpResponse.json(
-          application({ id: Number(params.id), status: 'INTERVIEW', statusChangedAt: daysAgo(0) }),
-        );
+        return HttpResponse.json({
+          ...application({
+            id: Number(params.id),
+            status: 'INTERVIEW',
+            statusChangedAt: daysAgo(0),
+          }),
+          timedOut: false,
+        });
       }),
     );
     const { client } = renderApplications();
@@ -360,26 +363,21 @@ describe('ApplicationsPage / useApplications', () => {
     // response is still half a second away.
     await act(async () => {});
 
-    const row = client
-      .getQueryData<ApplicationPage>(['applications'])
-      ?.items.find((i) => i.id === 1);
+    const row = cachedRows(client).find((i) => i.id === 1);
     expect(row?.status).toBe('INTERVIEW');
     expect(row?.statusChangedAt).not.toBe(row?.appliedAt);
+    expect(row?.timedOut).toBe(false);
   });
 
   it('writes a new applied date when a row is moved back to APPLIED', async () => {
     // The server journals a new APPLIED row, and appliedAt is the latest one — so
     // the cache must not keep the old date (and an "upd:" line) until the refetch.
     mswServer.use(
-      http.get('http://localhost:3000/api/v1/applications', () =>
-        HttpResponse.json({
-          items: [application({ id: 1, status: 'REJECTED', statusChangedAt: daysAgo(3) })],
-          total: 1,
-        }),
-      ),
+      statsHandler(),
+      onePage(application({ id: 1, status: 'REJECTED', statusChangedAt: daysAgo(3) })),
       http.patch('http://localhost:3000/api/v1/applications/:id/status', async ({ params }) => {
         await delay(500);
-        return HttpResponse.json(application({ id: Number(params.id) }));
+        return HttpResponse.json({ ...application({ id: Number(params.id) }), timedOut: false });
       }),
     );
     const { client } = renderApplications();
@@ -389,28 +387,36 @@ describe('ApplicationsPage / useApplications', () => {
     await user.selectOptions(within(screen.getByRole('table')).getByRole('combobox'), 'APPLIED');
     await act(async () => {});
 
-    const row = client
-      .getQueryData<ApplicationPage>(['applications'])
-      ?.items.find((i) => i.id === 1);
+    const row = cachedRows(client).find((i) => i.id === 1);
     expect(row?.status).toBe('APPLIED');
     expect(row?.appliedAt).toBe(row?.statusChangedAt);
   });
 
-  it('marks the /vacancies lists stale after a status move — they tag the same rows', async () => {
-    mswServer.use(...buildHandlers([application({ id: 1, status: 'APPLIED' })]));
+  it('refetches the stats and marks the /vacancies lists stale after a status move', async () => {
+    let statsRequests = 0;
+    mswServer.use(
+      ...buildHandlers([application({ id: 1, status: 'APPLIED' })]),
+      http.get('http://localhost:3000/api/v1/stats', () => {
+        statsRequests += 1;
+        return HttpResponse.json(fakeStats());
+      }),
+    );
     const { client } = renderApplications();
     await screen.findByText('Acme');
+    await waitFor(() => expect(statsRequests).toBe(1));
+    // /vacancies tags the same rows with their pipeline status.
     client.setQueryData(['vacancies', ''], { items: [], total: 0 });
 
     const user = userEvent.setup();
     await user.selectOptions(within(screen.getByRole('table')).getByRole('combobox'), 'INTERVIEW');
 
-    await waitFor(() => expect(client.getQueryState(['vacancies', ''])?.isInvalidated).toBe(true));
+    await waitFor(() => expect(statsRequests).toBe(2));
+    expect(client.getQueryState(['vacancies', ''])?.isInvalidated).toBe(true);
   });
 
   describe('the Action column', () => {
     it('has only Copy and Edit', async () => {
-      mswServer.use(...buildHandlers([application({ id: 1 })]));
+      serve([application({ id: 1 })]);
       renderApplications();
       await screen.findByText('Acme');
 
@@ -423,17 +429,15 @@ describe('ApplicationsPage / useApplications', () => {
     });
 
     it('re-opens the apply dialog pre-filled, with an empty comment that is added to the row', async () => {
-      mswServer.use(
-        ...buildHandlers([
-          application({
-            id: 1,
-            salaryInListing: '100 PLN/h',
-            comments: [
-              { id: 7, createdAt: '2026-09-01T10:00:00Z', body: 'First note', source: 'USER' },
-            ],
-          }),
-        ]),
-      );
+      serve([
+        application({
+          id: 1,
+          salaryInListing: '100 PLN/h',
+          comments: [
+            { id: 7, createdAt: '2026-09-01T10:00:00Z', body: 'First note', source: 'USER' },
+          ],
+        }),
+      ]);
       renderApplications();
       await screen.findByText('Acme');
 
@@ -460,7 +464,7 @@ describe('ApplicationsPage / useApplications', () => {
     });
 
     it('rolls a failed edit back, comment included, and shows the row error', async () => {
-      mswServer.use(...buildHandlers([application({ id: 1 })]));
+      serve([application({ id: 1 })]);
       // A later use() is prepended, so this refusal shadows the fake's own handler.
       mswServer.use(
         http.patch('http://localhost:3000/api/v1/applications/:id', () =>

@@ -24,7 +24,8 @@ flags as a ceiling; the mockup's filter is client-side too. `/vacancies` loads
 
 1. **Search is server-side, on `/vacancies` only, as one `search` param** matching
    `company` OR `title` (ILIKE `%term%`), ANDing with the existing filters. The
-   status filter stays client-side; the two pages now differ deliberately.
+   status filter stays client-side; the two pages now differ deliberately. (Phase 4
+   step 2 moved the status filter to the server too — [ADR-0030](0030-cursor-paging.md).)
 2. **`companyMatchCount` is a derived field on the list item**: the number of
    vacancies whose `company` contains this row's company, case-insensitively —
    i.e. exactly the semantics of the existing `company` filter, because there is

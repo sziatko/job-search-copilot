@@ -46,3 +46,28 @@ export interface CheckVacancyLogOptions {
   /** The date a new row is stamped with. Only the one-off import passes it. */
   recordedAt?: Date;
 }
+
+/** The `/log` table's query (ADR-0030). */
+export interface ListVacancyLogFilters {
+  /** Matches company OR title OR url, ILIKE '%term%', case-insensitive. */
+  search?: string;
+  /** The `id` of the last row the caller has; the page starts after it. */
+  cursor?: number;
+  limit?: number;
+}
+
+export interface VacancyLogListItem {
+  id: number;
+  createdAt: Date;
+  url: string;
+  company: string | null;
+  title: string | null;
+}
+
+export interface ListVacancyLogResult {
+  items: VacancyLogListItem[];
+  /** Rows matching `search`, not the page size. */
+  total: number;
+  /** The last item's `id` when more rows follow, else null. */
+  nextCursor: number | null;
+}

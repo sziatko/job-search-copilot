@@ -1,6 +1,7 @@
 import type { PrismaClient, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { escapeLikePattern } from './like';
+import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
 import { firstStatus, writeStatus } from './status';
@@ -13,6 +14,7 @@ import type {
   SaveVacancyResult,
   VacancyDetail,
   VacancyListItem,
+  VacancySort,
 } from './vacancy.types';
 
 /** The analyzer's comment: the first `ANALYZER` row. A relation read, so every
@@ -38,18 +40,32 @@ export const ALL_COMMENTS = {
   orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
 } satisfies Prisma.Vacancy$commentsArgs;
 
-const DETAIL_INCLUDE = { comments: ALL_COMMENTS } satisfies Prisma.VacancyInclude;
+const DETAIL_INCLUDE = {
+  comments: ALL_COMMENTS,
+  statusChanges: {
+    select: { status: true, createdAt: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
+} satisfies Prisma.VacancyInclude;
 
 /** The row with all its comments, plus the analyzer's (the first `ANALYZER` one)
- * flattened out as `estimationComment`. */
-function toDetail(
-  row: Prisma.VacancyGetPayload<{ include: typeof DETAIL_INCLUDE }>,
-): VacancyDetail {
+ * flattened out as `estimationComment`, and the status journal as `timeline`. */
+function toDetail({
+  statusChanges,
+  ...row
+}: Prisma.VacancyGetPayload<{ include: typeof DETAIL_INCLUDE }>): VacancyDetail {
   return {
     ...row,
     estimationComment: row.comments.find((c) => c.source === 'ANALYZER')?.body ?? null,
+    timeline: statusChanges,
   };
 }
+
+/** Each sort ends on `id`, so the order is total — Prisma's cursor needs that (ADR-0030). */
+const ORDER_BY = {
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+  recommended: [{ recommendation: 'asc' }, { matchScore: 'desc' }, { id: 'desc' }],
+} satisfies Record<VacancySort, Prisma.VacancyOrderByWithRelationInput[]>;
 
 const LIST_SELECT = {
   id: true,
@@ -173,21 +189,22 @@ export class VacancyService {
       }),
     };
 
-    const take = filters.limit ?? 20;
-    const skip = filters.offset ?? 0;
+    const limit = filters.limit ?? 20;
+    const { cursor } = filters;
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.db.vacancy.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
-        take,
-        skip,
+        orderBy: ORDER_BY[filters.sort ?? 'newest'],
+        ...(filters.offset && { skip: filters.offset }),
+        ...cursorArgs(cursor, limit),
         select: LIST_SELECT,
       }),
       this.db.vacancy.count({ where }),
     ]);
 
-    return { items: await this.withDerivedFields(items.map(withEstimation)), total };
+    const { items, nextCursor } = toCursorPage(rows, cursor, limit);
+    return { items: await this.withDerivedFields(items.map(withEstimation)), total, nextCursor };
   }
 
   /**

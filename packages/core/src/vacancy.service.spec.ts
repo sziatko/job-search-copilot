@@ -3,7 +3,7 @@ import { ApplicationService } from './application.service';
 import { InvalidRecommendationError } from './errors';
 import { getPrisma } from './prisma-client';
 import { VacancyService } from './vacancy.service';
-import type { SaveVacancyInput, VacancyListItem } from './vacancy.types';
+import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
 
 // Integration tests: hit the real (test) Postgres database instead of mocking
 // Prisma. A mocked Prisma client would just re-assert our own query calls and
@@ -264,6 +264,23 @@ describe('VacancyService', () => {
       });
       expect((await service.getById(application.id))?.estimationComment).toBeNull();
     });
+
+    it('carries the status journal as `timeline`, oldest first, a repeat included', async () => {
+      const { vacancy } = await service.save(input());
+      await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
+      const updated = await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
+
+      const found = await service.getById(vacancy.id);
+      expect(found?.timeline.map((step) => step.status)).toEqual([
+        'NOT_REVIEWED',
+        'SAVED_FOR_LATER',
+        'SAVED_FOR_LATER',
+      ]);
+      expect(found?.timeline[0].createdAt).toEqual(vacancy.statusChangedAt);
+      expect(found?.timeline.at(-1)?.createdAt).toEqual(found?.statusChangedAt);
+      // The PATCH answers with the same shape.
+      expect(updated?.timeline).toEqual(found?.timeline);
+    });
   });
 
   describe('list', () => {
@@ -339,6 +356,90 @@ describe('VacancyService', () => {
       const page = await service.list({ limit: 1, offset: 1 });
       expect(page.items).toHaveLength(1);
       expect(page.total).toBe(2);
+    });
+
+    describe('sort and cursor', () => {
+      // Beside the two rows above (Acme APPLY 80, Beta Corp SKIP 80): three more, and
+      // dates set by hand so the order has a createdAt tie (Beta Corp, Gamma, Delta)
+      // and a matchScore tie (Acme, Echo) that only `id` can break.
+      const NEWEST = ['Acme', 'Delta', 'Gamma', 'Beta Corp', 'Echo'];
+      const RECOMMENDED = ['Gamma', 'Echo', 'Acme', 'Delta', 'Beta Corp'];
+
+      beforeEach(async () => {
+        const more = [
+          { company: 'Gamma', recommendation: 'APPLY', matchScore: 95 },
+          { company: 'Delta', recommendation: 'APPLY_WITH_CAVEATS', matchScore: 70 },
+          { company: 'Echo', recommendation: 'APPLY', matchScore: 80 },
+        ];
+        for (const row of more) {
+          await service.save(
+            input({ ...row, applyUrl: `https://example.com/jobs/${row.company}` }),
+          );
+        }
+        const dates = {
+          Acme: '2026-09-03',
+          'Beta Corp': '2026-09-02',
+          Gamma: '2026-09-02',
+          Delta: '2026-09-02',
+          Echo: '2026-09-01',
+        };
+        for (const [company, date] of Object.entries(dates)) {
+          await getPrisma().vacancy.updateMany({
+            where: { company },
+            data: { createdAt: new Date(date) },
+          });
+        }
+      });
+
+      const companies = (items: VacancyListItem[]) => items.map((item) => item.company);
+
+      /** Every row, `limit` at a time, following `nextCursor` to the end. */
+      async function allPages(filters: ListVacanciesFilters) {
+        const seen: string[] = [];
+        let cursor: number | undefined;
+        do {
+          const page = await service.list({ ...filters, cursor });
+          seen.push(...companies(page.items));
+          cursor = page.nextCursor ?? undefined;
+        } while (cursor !== undefined);
+        return seen;
+      }
+
+      it('defaults to newest first, id breaking a createdAt tie', async () => {
+        expect(companies((await service.list()).items)).toEqual(NEWEST);
+        expect(companies((await service.list({ sort: 'newest' })).items)).toEqual(NEWEST);
+      });
+
+      it('sorts recommended: APPLY first, then score, then id', async () => {
+        const { items } = await service.list({ sort: 'recommended' });
+        expect(companies(items)).toEqual(RECOMMENDED);
+      });
+
+      it('pages by cursor without gaps or repeats, in either sort', async () => {
+        expect(await allPages({ limit: 2 })).toEqual(NEWEST);
+        expect(await allPages({ sort: 'recommended', limit: 2 })).toEqual(RECOMMENDED);
+        const last = await service.list({ limit: 5 });
+        expect(last).toMatchObject({ total: 5, nextCursor: null });
+      });
+
+      it('pages on from a cursor row that has left the filter', async () => {
+        // The /vacancies case: the last loaded row is triaged out of NOT_REVIEWED
+        // before the next page is asked for. Prisma's `skip: 1` assumes the cursor
+        // row is in the result — here it is not (ADR-0030).
+        const filters = {
+          status: ['NOT_REVIEWED' as const],
+          sort: 'recommended' as const,
+          limit: 2,
+        };
+        const first = await service.list(filters);
+        expect(companies(first.items)).toEqual(['Gamma', 'Echo']);
+
+        await service.updateStatus(first.items[1].id, 'SAVED_FOR_LATER');
+
+        const next = await service.list({ ...filters, cursor: first.nextCursor ?? undefined });
+        expect(companies(next.items)).toEqual(['Acme', 'Delta']);
+        expect(next.total).toBe(4);
+      });
     });
 
     describe('companyMatchCount', () => {

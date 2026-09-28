@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { RefObject } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 
 /**
  * Row virtualization for a scrollable `<table>`. Only the rows in (and near) the
@@ -20,20 +20,34 @@ import type { RefObject } from 'react';
  *       </tbody>
  *     </table>
  *   </div>
+ *
+ * `onEndReached` is the infinite-scroll trigger (ADR-0030): called when the last
+ * loaded row enters the rendered window — the overscan puts that ~12 rows before the
+ * user sees it. The caller decides whether a page is due (`useInfiniteList`'s
+ * `loadMore`).
  */
 export function useVirtualRows(
   scrollRef: RefObject<HTMLElement | null>,
   count: number,
-  estimateRowHeight = 60,
+  onEndReached?: () => void,
 ) {
   const virtualizer = useVirtualizer({
     count,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => estimateRowHeight,
+    estimateSize: () => 60,
     overscan: 12,
   });
 
   const virtualItems = virtualizer.getVirtualItems();
+
+  // A ref, so a new callback each render does not re-fire the effect: it runs when
+  // the window or the row count moves, which is when "reached the end" can change.
+  const onEndRef = useRef(onEndReached);
+  onEndRef.current = onEndReached;
+  const lastIndex = virtualItems.at(-1)?.index ?? -1;
+  useEffect(() => {
+    if (count > 0 && lastIndex >= count - 1) onEndRef.current?.();
+  }, [lastIndex, count]);
   const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
   const paddingBottom =
     virtualItems.length > 0

@@ -149,9 +149,41 @@ describe('Applications (e2e)', () => {
       expect(searched.body.total).toBe(1);
     });
 
-    it('400s for limit above 500, or a status outside the pipeline', async () => {
+    it('filters by ?state=, flags timedOut, and pages by ?cursor=', async () => {
+      const a = await seedVacancy({ applyUrl: 'https://example.com/a', company: 'Acme' });
+      const b = await seedVacancy({ applyUrl: 'https://example.com/b', company: 'Beta Corp' });
+      await request(app.getHttpServer()).post('/api/v1/applications').send({ vacancyId: a });
+      await request(app.getHttpServer()).post('/api/v1/applications').send({ vacancyId: b });
+      await prisma.vacancy.update({
+        where: { id: a },
+        data: { statusChangedAt: new Date(Date.now() - 40 * 86_400_000) },
+      });
+
+      const timedOut = await request(app.getHttpServer())
+        .get('/api/v1/applications?state=timedOut')
+        .expect(200);
+      expect(timedOut.body).toMatchObject({ total: 1, nextCursor: null });
+      expect(timedOut.body.items).toMatchObject([{ id: a, timedOut: true }]);
+      const active = await request(app.getHttpServer())
+        .get('/api/v1/applications?state=active&status=APPLIED')
+        .expect(200);
+      expect(active.body.items).toMatchObject([{ id: b, timedOut: false }]);
+
+      const first = await request(app.getHttpServer())
+        .get('/api/v1/applications?limit=1')
+        .expect(200);
+      expect(first.body.nextCursor).toBe(b);
+      const second = await request(app.getHttpServer())
+        .get(`/api/v1/applications?limit=1&cursor=${first.body.nextCursor}`)
+        .expect(200);
+      expect(second.body).toMatchObject({ items: [{ id: a }], total: 2, nextCursor: null });
+    });
+
+    it('400s for limit above 500, a status outside the pipeline, a bad state, or cursor with offset', async () => {
       await request(app.getHttpServer()).get('/api/v1/applications?limit=1000').expect(400);
       await request(app.getHttpServer()).get('/api/v1/applications?status=DECLINED').expect(400);
+      await request(app.getHttpServer()).get('/api/v1/applications?state=TIMEOUT').expect(400);
+      await request(app.getHttpServer()).get('/api/v1/applications?cursor=5&offset=0').expect(400);
     });
   });
 

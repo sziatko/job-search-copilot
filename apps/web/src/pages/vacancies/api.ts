@@ -1,29 +1,31 @@
-import { API_BASE, parseResponse } from '@/lib/api';
+import { API_BASE, type CursorPage, errorMessage, parseResponse } from '@/lib/api';
 import {
-  listResponseSchema,
   type Recommendation,
+  type VacancyDetail,
   type VacancyListItem,
   type VacancyStatus,
+  vacancyDetailSchema,
   vacancyListItemSchema,
+  vacancyPageSchema,
 } from './types';
 
-export interface VacancyPage {
-  items: VacancyListItem[];
-  /** Rows matching the filter, NOT the size of this page — the count endpoint
-   * `limit=1` is how the dashboard reads exact totals without a stats API. */
-  total: number;
-}
+/** `total` is the rows matching the filter, NOT the size of this page. */
+export type VacancyPage = CursorPage<VacancyListItem>;
 
 export async function listVacanciesPage(
   params: {
     limit?: number;
     /** Any of these. */
-    status?: VacancyStatus[];
+    status?: readonly VacancyStatus[];
     recommendation?: Recommendation;
     /** Free text over company OR title, filtered server-side (ADR-0025). */
     search?: string;
     /** ILIKE '%company%' — the company-history modal's filter. */
     company?: string;
+    /** The server's order (ADR-0030); it defaults to `newest`. */
+    sort?: 'newest' | 'recommended';
+    /** The `id` of the last row loaded; the page starts after it. */
+    cursor?: number;
   } = {},
 ): Promise<VacancyPage> {
   const query = new URLSearchParams({ limit: String(params.limit ?? 100) });
@@ -31,12 +33,14 @@ export async function listVacanciesPage(
   if (params.recommendation) query.set('recommendation', params.recommendation);
   if (params.search) query.set('search', params.search);
   if (params.company) query.set('company', params.company);
+  if (params.sort) query.set('sort', params.sort);
+  if (params.cursor !== undefined) query.set('cursor', String(params.cursor));
 
   const res = await fetch(`${API_BASE}/vacancies?${query}`);
   if (!res.ok) {
     throw new Error(`Failed to load vacancies: HTTP ${res.status}`);
   }
-  return parseResponse(listResponseSchema, await res.json(), 'Load vacancies');
+  return parseResponse(vacancyPageSchema, await res.json(), 'Load vacancies');
 }
 
 export async function updateVacancyStatus(
@@ -54,4 +58,30 @@ export async function updateVacancyStatus(
   // The PATCH endpoint returns the full record (including fullText); the schema
   // keeps only the list-item fields the UI uses and validates their shape.
   return parseResponse(vacancyListItemSchema, await res.json(), 'Update vacancy');
+}
+
+/** One vacancy, whole; null for an id the server does not know. */
+export async function getVacancy(id: number): Promise<VacancyDetail | null> {
+  const res = await fetch(`${API_BASE}/vacancies/${id}`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Failed to load vacancy ${id}: HTTP ${res.status}`);
+  }
+  return parseResponse(vacancyDetailSchema, await res.json(), 'Load vacancy');
+}
+
+/**
+ * Adds a USER comment through `PATCH /applications/:id` — core's `update` takes any
+ * vacancy, applied or not. The body is not parsed: it is the application shape, whose
+ * schema refuses a triage status, and the caller refetches the vacancy anyway.
+ */
+export async function addComment(id: number, comment: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/applications/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comment }),
+  });
+  if (!res.ok) {
+    throw await errorMessage(res, `Failed to add the comment: HTTP ${res.status}`);
+  }
 }

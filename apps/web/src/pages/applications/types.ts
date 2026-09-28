@@ -4,7 +4,13 @@
 // must not enter the browser bundle — ADR-0012). Enum values are never written as
 // bare literals elsewhere — map over `*.options`.
 import { z } from 'zod';
-import { type VacancyStatus, vacancyStatusSchema } from '../vacancies/types';
+import { cursorPageSchema } from '@/lib/api';
+import {
+  type VacancyComment,
+  type VacancyStatus,
+  vacancyCommentSchema,
+  vacancyStatusSchema,
+} from '../vacancies/types';
 
 /** The pipeline: the statuses /applications shows. */
 export const applicationStatusSchema = vacancyStatusSchema.extract([
@@ -21,8 +27,9 @@ export function isPipelineStatus(status: VacancyStatus): status is ApplicationSt
   return applicationStatusSchema.safeParse(status).success;
 }
 
-// Extra dropdown options — UI only, never cross the wire. ACTIVE and TIMEOUT are
-// derived from dates, not stored: see constants.ts for the rule.
+// Extra dropdown options — UI only, never sent as a `status`. ACTIVE and TIMEOUT are
+// derived from dates, not stored: the server owns the rule, and api.ts sends them as
+// `state` (ADR-0031).
 export const STATUS_FILTER_ALL = 'ALL' as const;
 export const STATUS_FILTER_ACTIVE = 'ACTIVE' as const;
 export const STATUS_FILTER_TIMEOUT = 'TIMEOUT' as const;
@@ -44,16 +51,12 @@ export const applicationStatusFilterSchema = z.enum([
   ...applicationStatusSchema.options,
 ]);
 
-const commentSourceSchema = z.enum(['ANALYZER', 'USER', 'AGENT']);
-export type CommentSource = z.infer<typeof commentSourceSchema>;
+// One comment schema for both views of a vacancy — it lives with the vacancy's (this
+// file imports that one, never the reverse).
+const applicationCommentSchema = vacancyCommentSchema;
 
-const applicationCommentSchema = z.object({
-  id: z.number(),
-  createdAt: z.string(),
-  body: z.string(),
-  source: commentSourceSchema,
-});
-export type ApplicationComment = z.infer<typeof applicationCommentSchema>;
+export type { CommentSource } from '../vacancies/types';
+export type ApplicationComment = VacancyComment;
 
 /** A vacancy in the pipeline; `id` is the vacancy's. */
 export const applicationListItemSchema = z.object({
@@ -61,6 +64,8 @@ export const applicationListItemSchema = z.object({
   status: applicationStatusSchema,
   /** The last status move — the list's order and the timeout clock. */
   statusChangedAt: z.string(),
+  /** The server's timeout rule (ADR-0031) — open and not moved for 30 days. */
+  timedOut: z.boolean(),
   /** The latest APPLIED move; null for a row set straight past it. */
   appliedAt: z.string().nullable(),
   /** Every comment on the vacancy, oldest first, the analyzer's included. */
@@ -74,10 +79,7 @@ export const applicationListItemSchema = z.object({
 });
 export type ApplicationListItem = z.infer<typeof applicationListItemSchema>;
 
-export const listApplicationsResponseSchema = z.object({
-  items: z.array(applicationListItemSchema),
-  total: z.number(),
-});
+export const applicationPageSchema = cursorPageSchema(applicationListItemSchema);
 
 export const recordApplicationResponseSchema = z.object({
   application: applicationListItemSchema,

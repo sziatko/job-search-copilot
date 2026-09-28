@@ -1,91 +1,49 @@
-import { API_BASE, errorMessage, parseResponse } from '@/lib/api';
+import { API_BASE, type CursorPage, errorMessage, parseResponse } from '@/lib/api';
 import {
   type ApplicationListItem,
   type ApplicationStatus,
+  type ApplicationStatusFilter,
   applicationListItemSchema,
-  listApplicationsResponseSchema,
+  applicationPageSchema,
   type RecordApplicationInput,
   type RecordApplicationResponse,
   recordApplicationResponseSchema,
+  STATUS_FILTER_ACTIVE,
+  STATUS_FILTER_ALL,
+  STATUS_FILTER_TIMEOUT,
   type UpdateApplicationInput,
 } from './types';
 
-export interface ApplicationPage {
-  items: ApplicationListItem[];
-  /** Rows in the log, independent of the page size — so the "N of M" footer stays
-   * truthful. Never below `items.length`: a row deleted mid-load shrinks `total`
-   * under a list that already holds more. */
-  total: number;
-}
-
-/** The endpoint's own ceiling (`@Max(500)` on the DTO) — the smallest number of
- * round-trips that is also the largest page the API will serve. */
-const PAGE_SIZE = 500;
-
-/** 200 pages is 100k applications: past that the loop is not converging, and a
- * silent stop would be the same lie (a truncated log reported as the whole log)
- * that the loop exists to remove. */
-const MAX_PAGES = 200;
+export type ApplicationPage = CursorPage<ApplicationListItem>;
 
 /**
- * Loads the entire log, page by page.
- *
- * The tracker filters, sorts and counts client-side, so a truncated log is not
- * "less data" — it is wrong answers: the footer's count and the status filter
- * both ignore whatever the cap cut. And what the cap cuts is the *oldest* rows,
- * because the server orders `statusChangedAt desc` — exactly the history the
- * company-history modal answers for.
- *
- * ponytail: offset paging over an order that every status write changes — a write
- * during a multi-page load shifts the windows and can skip a row. One page (≤500
- * rows) today; deferred in `docs/backlog.md` (infinite loading).
- *
- * ponytail: N serial round-trips instead of one. The server-side filter/sort/count
- * that would replace this is the same backlog item; at
- * ~300 rows this is one request.
+ * One page of the pipeline, `statusChangedAt desc, id desc`, filtered and counted by
+ * the server (ADR-0030). The dropdown's filter goes out as `status` for a stored
+ * status and as `state` for the derived Active / Timeout (ADR-0031); All sends neither.
  */
-export async function listApplications(): Promise<ApplicationPage> {
-  const items: ApplicationListItem[] = [];
-  const seen = new Set<number>();
-  let total = 0;
-  let exhausted = false;
+export async function listApplicationsPage(
+  params: {
+    filter?: ApplicationStatusFilter;
+    /** Free text over company OR title. */
+    search?: string;
+    /** The `id` of the last row loaded; the page starts after it. */
+    cursor?: number;
+    limit?: number;
+  } = {},
+): Promise<ApplicationPage> {
+  const query = new URLSearchParams({ limit: String(params.limit ?? 100) });
+  const { filter = STATUS_FILTER_ALL } = params;
+  if (filter === STATUS_FILTER_ACTIVE) query.set('state', 'active');
+  else if (filter === STATUS_FILTER_TIMEOUT) query.set('state', 'timedOut');
+  else if (filter !== STATUS_FILTER_ALL) query.set('status', filter);
+  if (params.search) query.set('search', params.search);
+  if (params.cursor !== undefined) query.set('cursor', String(params.cursor));
 
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const offset = page * PAGE_SIZE;
-    const res = await fetch(`${API_BASE}/applications?limit=${PAGE_SIZE}&offset=${offset}`);
-    if (!res.ok) {
-      throw new Error(`Failed to load applications: HTTP ${res.status}`);
-    }
-    const body = parseResponse(
-      listApplicationsResponseSchema,
-      await res.json(),
-      'Load applications',
-    );
-
-    // Re-read on every page: `total` is the count for the filter, and it is the
-    // last page's answer that covers the rows this loop has just walked past.
-    total = body.total;
-    for (const item of body.items) {
-      // A row can be served twice when the window shifts between requests (rows
-      // inserted or deleted mid-load) — the log holds rows once.
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      items.push(item);
-    }
-
-    // A short page is the end of the log, and so is reaching the count — the
-    // second check is what stops an empty page from looping on a `total` that
-    // still claims more.
-    if (body.items.length < PAGE_SIZE || items.length >= total) {
-      exhausted = true;
-      break;
-    }
+  const res = await fetch(`${API_BASE}/applications?${query}`);
+  if (!res.ok) {
+    throw new Error(`Failed to load applications: HTTP ${res.status}`);
   }
-
-  if (!exhausted) {
-    throw new Error(`Failed to load the whole log: still paging after ${MAX_PAGES} pages`);
-  }
-  return { items, total: Math.max(total, items.length) };
+  return parseResponse(applicationPageSchema, await res.json(), 'Load applications');
 }
 
 export async function recordApplication(

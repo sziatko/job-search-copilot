@@ -1,8 +1,15 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { InvalidVacancyLogEntryError } from './errors';
+import { escapeLikePattern } from './like';
+import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
 import { normalizeApplyUrl } from './url';
-import type { CheckVacancyLogOptions, VacancyLogInput } from './vacancy-log';
+import type {
+  CheckVacancyLogOptions,
+  ListVacancyLogFilters,
+  ListVacancyLogResult,
+  VacancyLogInput,
+} from './vacancy-log';
 import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-log';
 
 interface PreparedEntry {
@@ -70,6 +77,40 @@ export class VacancyLogService {
       // ponytail: fixed ceiling sized for BATCH_MAX entries over a remote DB.
       { timeout: 60_000 },
     );
+  }
+
+  /**
+   * The `/log` table, newest first, one cursor page at a time (ADR-0030). `id` is the
+   * last sort key: the one-off import stamped many rows with the same `createdAt`, and
+   * without a total order Prisma's cursor skips or repeats them at a page boundary.
+   */
+  async list({
+    search,
+    cursor,
+    limit = 50,
+  }: ListVacancyLogFilters = {}): Promise<ListVacancyLogResult> {
+    const term = search && escapeLikePattern(search);
+    const where: Prisma.VacancyLogEntryWhereInput = term
+      ? {
+          OR: [
+            { company: { contains: term, mode: 'insensitive' } },
+            { title: { contains: term, mode: 'insensitive' } },
+            { url: { contains: term, mode: 'insensitive' } },
+          ],
+        }
+      : {};
+
+    const [rows, total] = await Promise.all([
+      this.db.vacancyLogEntry.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        ...cursorArgs(cursor, limit),
+        select: { id: true, createdAt: true, url: true, company: true, title: true },
+      }),
+      this.db.vacancyLogEntry.count({ where }),
+    ]);
+
+    return { ...toCursorPage(rows, cursor, limit), total };
   }
 }
 

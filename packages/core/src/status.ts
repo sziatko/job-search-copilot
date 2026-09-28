@@ -13,6 +13,41 @@ export const PIPELINE_STATUSES = [
 
 export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
 
+/**
+ * The timeout rule (ADR-0022, ADR-0031) — derived, and in this one place. REJECTED and
+ * OFFER are closed; any other pipeline row whose last move is more than TIMEOUT_DAYS
+ * before `now` is timed out, and the rest is active. So the pipeline partitions:
+ * total = active + timedOut + REJECTED + OFFER.
+ */
+export const TIMEOUT_DAYS = 30;
+
+/** In the pipeline and not closed — what can time out. */
+export const OPEN_PIPELINE_STATUSES = PIPELINE_STATUSES.filter(
+  (status) => status !== 'REJECTED' && status !== 'OFFER',
+);
+
+function timeoutCutoff(now: Date): Date {
+  return new Date(now.getTime() - TIMEOUT_DAYS * 86_400_000);
+}
+
+/** The rule as a `where`: open, and not moved since `now − TIMEOUT_DAYS`. */
+export function timedOutWhere(now: Date): Prisma.VacancyWhereInput {
+  return { status: { in: OPEN_PIPELINE_STATUSES }, statusChangedAt: { lt: timeoutCutoff(now) } };
+}
+
+/** Its complement among the open rows: open, and moved since `now − TIMEOUT_DAYS`. */
+export function activeWhere(now: Date): Prisma.VacancyWhereInput {
+  return { status: { in: OPEN_PIPELINE_STATUSES }, statusChangedAt: { gte: timeoutCutoff(now) } };
+}
+
+/** The same rule for one row already read — an `/applications` item's `timedOut`. */
+export function isTimedOut(status: VacancyStatus, statusChangedAt: Date, now: Date): boolean {
+  return (
+    (OPEN_PIPELINE_STATUSES as readonly VacancyStatus[]).includes(status) &&
+    statusChangedAt < timeoutCutoff(now)
+  );
+}
+
 /** A new vacancy's journal: NOT_REVIEWED (the column's default), dated `at` along with
  * `statusChangedAt`. Explicit, not `now()`: `record` takes `at` before it creates a
  * placeholder, and its APPLIED dated `at` must not sort before this row. */

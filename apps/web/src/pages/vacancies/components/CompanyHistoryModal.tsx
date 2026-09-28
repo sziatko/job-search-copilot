@@ -3,8 +3,8 @@ import { useId } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { isSafeExternalUrl } from '@/lib/url';
-import { listApplications } from '@/pages/applications/api';
-import { daysSinceLastMove, isTimedOut } from '@/pages/applications/constants';
+import { listApplicationsPage } from '@/pages/applications/api';
+import { daysSinceLastMove } from '@/pages/applications/constants';
 import { listVacanciesPage } from '../api';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
@@ -37,8 +37,14 @@ export function CompanyHistoryModal({
     queryFn: () => listVacanciesPage({ company, limit: 100 }),
   });
 
-  // The tracker's own key, so arriving here from /tracker costs no request.
-  const applications = useQuery({ queryKey: ['applications'], queryFn: listApplications });
+  // This company's applications — `search` also matches titles, which the join by id
+  // below ignores. Not under ['applications']: those entries are the tracker's paged
+  // lists, and its optimistic writes patch every one of them as pages.
+  // ponytail: one page of 500; a company with more applications loses the oldest marks.
+  const applications = useQuery({
+    queryKey: ['application-company', company],
+    queryFn: () => listApplicationsPage({ search: company, limit: 500 }),
+  });
 
   const applicationsByVacancy = new Map(
     (applications.data?.items ?? []).map((item) => [item.id, item]),
@@ -106,7 +112,7 @@ export function CompanyHistoryModal({
                 return (
                   <tr key={item.id} className={isCurrent ? 'row-current' : undefined}>
                     <td className="date-cell">
-                      {!logUnknown && application && isTimedOut(application) && (
+                      {!logUnknown && application?.timedOut && (
                         <span className="timeout-mark mr-[4px]">
                           ⏳
                           <span className="tip">

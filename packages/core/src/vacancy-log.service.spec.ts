@@ -123,3 +123,74 @@ describe('VacancyLogService.checkMany', () => {
     expect((await prisma.vacancyLogEntry.findFirstOrThrow()).createdAt).toEqual(recordedAt);
   });
 });
+
+describe('VacancyLogService.list', () => {
+  const at = (day: number) => new Date(Date.UTC(2026, 8, day));
+  const seed = (rows: { url: string; company?: string; title?: string; createdAt: Date }[]) =>
+    prisma.vacancyLogEntry.createMany({ data: rows });
+
+  it('lists newest first, id breaking a createdAt tie', async () => {
+    await seed([
+      { url: 'https://a.com/old', createdAt: at(1) },
+      { url: 'https://a.com/tie-1', createdAt: at(2) },
+      { url: 'https://a.com/tie-2', createdAt: at(2) },
+    ]);
+    const { items, total, nextCursor } = await log.list();
+    expect(items.map((item) => item.url)).toEqual([
+      'https://a.com/tie-2',
+      'https://a.com/tie-1',
+      'https://a.com/old',
+    ]);
+    expect(total).toBe(3);
+    expect(nextCursor).toBeNull();
+    expect(Object.keys(items[0]).sort()).toEqual(['company', 'createdAt', 'id', 'title', 'url']);
+  });
+
+  it('searches company, title or url, case-insensitive, % literal', async () => {
+    await seed([
+      { url: 'https://a.com/1', company: 'Acme', createdAt: at(1) },
+      { url: 'https://a.com/2', title: 'ACME Dev', createdAt: at(1) },
+      { url: 'https://acme.io/3', createdAt: at(1) },
+      { url: 'https://a.com/4', company: '100% Remote', createdAt: at(1) },
+      { url: 'https://a.com/5', company: 'Other', createdAt: at(1) },
+    ]);
+    const acme = await log.list({ search: 'acme' });
+    expect(acme.items.map((item) => item.url).sort()).toEqual([
+      'https://a.com/1',
+      'https://a.com/2',
+      'https://acme.io/3',
+    ]);
+    expect(acme.total).toBe(3);
+    expect((await log.list({ search: '%' })).items.map((item) => item.url)).toEqual([
+      'https://a.com/4',
+    ]);
+  });
+
+  it('pages by cursor without gaps or repeats across rows tied on createdAt', async () => {
+    // Every row on one createdAt — the import's shape — so only `id` orders them.
+    await seed(
+      Array.from({ length: 7 }, (_, i) => ({ url: `https://a.com/${i}`, createdAt: at(3) })),
+    );
+    const all = (await log.list({ limit: 100 })).items.map((item) => item.id);
+
+    const paged: number[] = [];
+    let cursor: number | undefined;
+    for (;;) {
+      const page = await log.list({ cursor, limit: 3 });
+      expect(page.total).toBe(7);
+      paged.push(...page.items.map((item) => item.id));
+      if (page.nextCursor === null) break;
+      expect(page.nextCursor).toBe(page.items.at(-1)?.id);
+      cursor = page.nextCursor;
+    }
+    expect(paged).toEqual(all);
+  });
+
+  it('has no next page when the last page is exactly full', async () => {
+    await seed([
+      { url: 'https://a.com/1', createdAt: at(1) },
+      { url: 'https://a.com/2', createdAt: at(2) },
+    ]);
+    expect((await log.list({ limit: 2 })).nextCursor).toBeNull();
+  });
+});

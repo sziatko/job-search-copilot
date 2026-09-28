@@ -7,7 +7,9 @@ import { applicationStatusFilterSchema } from './pages/applications/types';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { LogPage } from './pages/log/LogPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
+import { statusFilterSchema as vacancyStatusFilterSchema } from './pages/vacancies/types';
 import { VacanciesPage } from './pages/vacancies/VacanciesPage';
+import { VacancyPage } from './pages/vacancy/VacancyPage';
 
 const rootRoute = createRootRoute({ component: RootLayout });
 
@@ -39,6 +41,11 @@ const LOG_META: RouteMeta = {
   subtitle: 'Dedup cache of every posting the pipeline has ever seen',
   rail: true,
 };
+const VACANCY_META: RouteMeta = {
+  title: 'Vacancy details',
+  subtitle: 'Full posting, history, and other roles at this company',
+  rail: false,
+};
 const PROFILE_META: RouteMeta = {
   title: 'Profile & forms',
   subtitle: 'Coming soon',
@@ -62,11 +69,17 @@ const indexRoute = createRoute({
 const termSchema = z.coerce.string().optional();
 const statusFilterSchema = applicationStatusFilterSchema.optional().catch(undefined);
 
-// /vacancies' search box. Unlike the tracker's, the term is not used to filter in
-// the browser: it is sent to the API (ADR-0025), so it is the only filter that has
-// to survive in the URL. The status filter stays component state.
+// The search box of /log. Unlike the tracker's, the term is not used to filter in the
+// browser: it is sent to the API (ADR-0030).
+const termSearchSchema = z.object({
+  q: termSchema,
+});
+
+// /vacancies: the term and the status filter both go to the API (ADR-0025, ADR-0030).
+// An absent `status` is the NOT_REVIEWED default.
 const vacanciesSearchSchema = z.object({
   q: termSchema,
+  status: vacancyStatusFilterSchema.optional().catch(undefined),
 });
 
 const vacanciesRoute = createRoute({
@@ -78,14 +91,23 @@ const vacanciesRoute = createRoute({
     vacanciesSearchSchema.parse(search),
 });
 
-// No backend behind either of these yet — see the pages for what is missing.
+// One vacancy. A sibling of /vacancies, not its child: /vacancies renders no <Outlet />.
+const vacancyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/vacancies/$id',
+  component: VacancyPage,
+  staticData: VACANCY_META,
+});
+
 const logRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/log',
   component: LogPage,
   staticData: LOG_META,
+  validateSearch: (search): z.infer<typeof termSearchSchema> => termSearchSchema.parse(search),
 });
 
+// No backend behind this one yet — see the page for what is missing.
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profile',
@@ -112,6 +134,7 @@ const applicationsRoute = createRoute({
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   vacanciesRoute,
+  vacancyRoute,
   applicationsRoute,
   logRoute,
   profileRoute,

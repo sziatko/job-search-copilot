@@ -17,10 +17,18 @@ import {
   InvalidApplicationInputError,
 } from './errors';
 import { escapeLikePattern } from './like';
+import { cursorArgs, toCursorPage } from './paging';
 import { PLACEHOLDER_COMMENT } from './placeholder';
 import { getPrisma } from './prisma-client';
 import { deriveRecommendationFromScore } from './recommendation';
-import { firstStatus, PIPELINE_STATUSES, writeStatus } from './status';
+import {
+  activeWhere,
+  firstStatus,
+  isTimedOut,
+  PIPELINE_STATUSES,
+  timedOutWhere,
+  writeStatus,
+} from './status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
 import { ALL_COMMENTS } from './vacancy.service';
 
@@ -54,8 +62,13 @@ type Db = PrismaClient | Prisma.TransactionClient;
 
 const PIPELINE: VacancyStatus[] = [...PIPELINE_STATUSES];
 
-function flatten({ statusChanges, ...row }: ApplicationRow): ApplicationListItem {
-  return { ...row, appliedAt: statusChanges[0]?.createdAt ?? null };
+/** `now` is the timeout clock's; a list passes the one its `where` used. */
+function flatten({ statusChanges, ...row }: ApplicationRow, now = new Date()): ApplicationListItem {
+  return {
+    ...row,
+    timedOut: isTimedOut(row.status, row.statusChangedAt, now),
+    appliedAt: statusChanges[0]?.createdAt ?? null,
+  };
 }
 
 /** A nested write that adds `body` to the vacancy as a `source` comment; nothing when
@@ -153,6 +166,12 @@ export class ApplicationService {
         title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
       });
     }
+    // One clock for the filter and each item's flag, so a row cannot match
+    // `timedOut` and come back `timedOut: false`.
+    const now = new Date();
+    if (filters.state) {
+      vacancyFilters.push(filters.state === 'active' ? activeWhere(now) : timedOutWhere(now));
+    }
 
     const where: Prisma.VacancyWhereInput = {
       status: { in: filters.status ? [filters.status] : PIPELINE },
@@ -160,8 +179,8 @@ export class ApplicationService {
       ...(vacancyFilters.length > 0 && { AND: vacancyFilters }),
     };
 
-    const take = filters.limit ?? 50;
-    const skip = filters.offset ?? 0;
+    const limit = filters.limit ?? 50;
+    const { cursor } = filters;
 
     const [rows, total] = await Promise.all([
       this.db.vacancy.findMany({
@@ -169,16 +188,17 @@ export class ApplicationService {
         // The last move first — a fresh application tops the list; a comment or an
         // edit does not reorder. `statusChangedAt` alone is not a total order (a
         // migrated batch shares one date), and offset paging over a tie has no defined
-        // window, so `id` breaks it. The web reads this list as consecutive pages.
+        // window, so `id` breaks it — and Prisma's cursor needs a total order (ADR-0030).
         orderBy: [{ statusChangedAt: 'desc' }, { id: 'desc' }],
-        take,
-        skip,
+        ...(filters.offset && { skip: filters.offset }),
+        ...cursorArgs(cursor, limit),
         select: APPLICATION_SELECT,
       }),
       this.db.vacancy.count({ where }),
     ]);
 
-    return { items: rows.map(flatten), total };
+    const { items, nextCursor } = toCursorPage(rows, cursor, limit);
+    return { items: items.map((row) => flatten(row, now)), total, nextCursor };
   }
 
   /**
