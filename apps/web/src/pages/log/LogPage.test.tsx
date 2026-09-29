@@ -42,7 +42,9 @@ describe('LogPage', () => {
       'href',
       'https://beta.com/jobs/2',
     );
-    expect(screen.getByText('Showing 2 of 2 entries')).toBeInTheDocument();
+    // The count leads the toolbar; the table has no foot.
+    expect(screen.getByText('Showing 2 of 2').closest('.toolbar')).not.toBeNull();
+    expect(document.querySelector('.table-foot')).toBeNull();
   });
 
   it('sends the search to the server and keeps it in the URL', async () => {
@@ -77,13 +79,13 @@ describe('LogPage', () => {
       ),
     );
     renderLog();
-    expect(await screen.findByText('Showing 100 of 130 entries')).toBeInTheDocument();
+    expect(await screen.findByText('Showing 100 of 130')).toBeInTheDocument();
 
     // jsdom lays nothing out: set the offset the virtualizer reads, then tell it.
     const scroller = screen.getByTestId('log-scroll');
     Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 10_000_000 });
     fireEvent.scroll(scroller);
 
-    expect(await screen.findByText('Showing 130 of 130 entries')).toBeInTheDocument();
+    expect(await screen.findByText('Showing 130 of 130')).toBeInTheDocument();
   });
 });

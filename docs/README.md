@@ -20,6 +20,7 @@ and *what a change here breaks over there*.
 | [`phases/phase-3.md`](phases/phase-3.md) | The vacancy log in the DB (check-and-record over MCP and REST, the one-off import, the LinkedIn URL rule), application comments as a table, and editing an application on `/applications`. Its `## Status` is the live checklist. |
 | [`phases/phase-3.1.md`](phases/phase-3.1.md) | One `Vacancy` table: `Application` merged in, one status enum with a `StatusChange` journal, every comment in one table with a `source`, one apply/edit modal, the renames, and a dead-code sweep. Its `## Status` is the live checklist. |
 | [`phases/phase-4.md`](phases/phase-4.md) | Web: infinite scroll on every table (Prisma cursor paging), the `/log` page, the dashboard counted from the journal through `GET /stats`, and a page for one vacancy. Its `## Status` is the live checklist. |
+| [`phases/phase-4.1.md`](phases/phase-4.1.md) | Fixes after phase 4: the dashboard funnel from Recommended with a "Dropped out" block and its styles, the table count in the toolbar with full-height tables, a two-state theme toggle, the CV tick. Its `## Status` is the live checklist. |
 | [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions

@@ -318,10 +318,10 @@ export function logHandler(entries: LogEntry[]) {
 export function fakeStats(overrides: Partial<Stats> = {}): Stats {
   return {
     logged: 0,
-    analysed: 0,
     awaitingTriage: 0,
     recommended: 0,
     applied: 0,
+    declined: 0,
     responded: 0,
     interview: 0,
     recruiterScreen: 0,

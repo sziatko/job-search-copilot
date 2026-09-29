@@ -22,9 +22,8 @@ async function seed(
   statuses: VacancyStatus[] = [],
   {
     lastMoveAt = NOW,
-    analysed = true,
     recommendation = 'APPLY',
-  }: { lastMoveAt?: Date; analysed?: boolean; recommendation?: string } = {},
+  }: { lastMoveAt?: Date; recommendation?: string } = {},
 ) {
   urlSeq += 1;
   const { vacancy } = await vacancies.save({
@@ -34,7 +33,7 @@ async function seed(
     fullText: 'Text.',
     matchScore: 80,
     recommendation,
-    estimationComment: analysed ? 'Strong match.' : '',
+    estimationComment: 'Strong match.',
   });
   await prisma.$transaction(async (tx) => {
     for (const [i, status] of statuses.entries()) {
@@ -50,10 +49,10 @@ describe('StatsService.get', () => {
   it('is all zeros on an empty database', async () => {
     expect(await stats.get(NOW)).toEqual({
       logged: 0,
-      analysed: 0,
       awaitingTriage: 0,
       recommended: 0,
       applied: 0,
+      declined: 0,
       responded: 0,
       interview: 0,
       recruiterScreen: 0,
@@ -74,18 +73,27 @@ describe('StatsService.get', () => {
     });
   });
 
-  it('counts the log, the analysed (an ANALYZER comment), triage and the recommended', async () => {
+  it('counts the log, triage and the recommended', async () => {
     await new VacancyLogService().checkMany([
       { url: 'https://a.com/1' },
       { url: 'https://a.com/2' },
     ]);
     await seed([], { recommendation: 'APPLY' });
-    await seed([], { recommendation: 'APPLY_WITH_CAVEATS', analysed: false });
+    await seed([], { recommendation: 'APPLY_WITH_CAVEATS' });
     await seed(['DECLINED'], { recommendation: 'SKIP' });
 
     const result = await stats.get(NOW);
 
-    expect(result).toMatchObject({ logged: 2, analysed: 2, awaitingTriage: 2, recommended: 2 });
+    expect(result).toMatchObject({ logged: 2, awaitingTriage: 2, recommended: 2 });
+  });
+
+  it('counts declined by the current status only', async () => {
+    await seed(['DECLINED']);
+    await seed(['DECLINED', 'SAVED_FOR_LATER']); // changed their mind: not declined now
+    await seed(['APPLIED', 'REJECTED']); // the company's no, not the user's
+    await seed(['SAVED_FOR_LATER']);
+
+    expect((await stats.get(NOW)).declined).toBe(1);
   });
 
   it('counts a funnel stage from the journal: a reply then a rejection still responded', async () => {

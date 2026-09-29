@@ -230,13 +230,13 @@ describe('VacanciesPage / useVacancies', () => {
       }),
     );
     const { client } = renderVacancies();
-    await screen.findByText(/^Showing 100 of 130 vacancies/);
+    await screen.findByText('Showing 100 of 130');
 
     // jsdom lays nothing out: set the offset the virtualizer reads, then tell it.
     const scroller = document.querySelector('.table-body-scroll') as HTMLElement;
     Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 10_000_000 });
     fireEvent.scroll(scroller);
-    await screen.findByText(/^Showing 130 of 130 vacancies/);
+    await screen.findByText('Showing 130 of 130');
 
     const user = userEvent.setup();
     await user.click(rowOf('Co 1').getByRole('button', { name: 'More statuses' }));
@@ -327,9 +327,9 @@ describe('VacanciesPage / useVacancies', () => {
       screen.queryByRole('heading', { level: 2, name: 'Analyzed vacancies' }),
     ).not.toBeInTheDocument();
     // 2 of 2: the status filter is the server's now, so `total` counts it too.
-    expect(
-      screen.getByText('Showing 2 of 2 vacancies · scores from the vacancy-evaluator skill'),
-    ).toBeInTheDocument();
+    // The count leads the toolbar; the table has no foot.
+    expect(screen.getByText('Showing 2 of 2').closest('.toolbar')).not.toBeNull();
+    expect(document.querySelector('.table-foot')).toBeNull();
   });
 
   it('shows — for a posting the analyzer never saw', async () => {

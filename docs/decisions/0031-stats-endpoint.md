@@ -31,18 +31,26 @@ dashboard and the `/applications` KPI strip read it; neither loads a list to cou
 | Field | Meaning |
 | --- | --- |
 | `logged` | `VacancyLogEntry` count |
-| `analysed` | vacancies with an `ANALYZER` comment (`hasAnalysis`' rule) |
 | `awaitingTriage` | `status = NOT_REVIEWED` |
 | `recommended` | `recommendation in (APPLY, APPLY_WITH_CAVEATS)` |
 | `applied` | vacancies with an `APPLIED` journal row, ever |
+| `declined` | … currently `DECLINED` (the user's no) |
 | `responded` | … with a `REPLIED`, `RECRUITER_SCREEN`, `INTERVIEW` or `OFFER` row, ever |
 | `interview` | … with an `INTERVIEW` or `OFFER` row, ever |
 | `recruiterScreen` | … currently in `RECRUITER_SCREEN` |
 | `pipeline` | the `/applications` strip: `byStatus` (current), `active`, `timedOut`, `total` |
 | `recent` | the latest `StatusChange` rows, with company and title |
 
-The funnel is Logged → Analysed → Applied → Got a response → Interview. Its stages
-count the journal ("ever reached"); `pipeline` counts the current status.
+The funnel is Logged → Recommended → Applied → Got a response → Interview. Its
+stages past Recommended count the journal ("ever reached"); `pipeline` counts the
+current status. Under it, "Dropped out": not recommended (`logged − recommended`,
+floored at 0), declined (`declined`), rejected (`pipeline.byStatus.REJECTED`), timed
+out (`pipeline.timedOut`).
+
+*Amended in phase 4.1 step 4:* the funnel's second stage was Analysed (`analysed`,
+vacancies with an `ANALYZER` comment). The importer's placeholders
+([ADR-0019](0019-record-or-create-vacancy.md)) have none, so it came out smaller than
+Recommended; `analysed` was dropped and `declined` added.
 
 **The timeout rule moves to `core`.** Still derived, still 30 days, still
 `statusChangedAt` and "not `REJECTED` / `OFFER`" — but `TIMEOUT_DAYS` lives in core.
@@ -83,8 +91,6 @@ All.
 - **A funnel stage must count the journal, not `status`.** Switching `responded` to
   `status in (…)` passes every test that never rejects a replied vacancy — the core
   test for a replied-then-rejected vacancy is the guard.
-- **`analysed` must stay `hasAnalysis`' rule** (an `ANALYZER` comment). Two rules for
-  "analysed" make the funnel and the `/vacancies` badge disagree.
 - **`pipeline` must still partition**: `total = active + timedOut + REJECTED + OFFER`.
   A rule change that breaks that shows as a strip that does not add up.
 - **`TIMEOUT_DAYS` exists once, in core.** A web copy would let the strip, the filter

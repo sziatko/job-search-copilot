@@ -42,8 +42,7 @@ interface FunnelStep {
 
 /**
  * Five stages, each bar scaled against the first and each label against the one
- * above it. The mockup fades each bar a little further; that is decoration, kept
- * because it is what makes the narrowing visible at a glance.
+ * above it. Each stage has its own colour (`--funnel-1…5` in index.css, by row).
  */
 function Funnel({ steps }: { steps: FunnelStep[] }) {
   const baseline = steps[0]?.value ?? 0;
@@ -63,7 +62,7 @@ function Funnel({ steps }: { steps: FunnelStep[] }) {
           <div className="funnel-row" key={step.label}>
             <div className="funnel-name">{step.label}</div>
             <div className="funnel-track">
-              <div className="funnel-fill" style={{ width: `${width}%`, opacity: 1 - i * 0.12 }} />
+              <div className="funnel-fill" style={{ width: `${width}%` }} />
             </div>
             <div className="funnel-value">{step.value}</div>
             <div className="funnel-conv">{conversion}</div>
@@ -152,14 +151,24 @@ export function DashboardPage() {
     );
   }
 
-  // Each stage past Analysed counts the journal — "ever reached", so a rejection
+  // Each stage past Recommended counts the journal — "ever reached", so a rejection
   // never shrinks an earlier stage (ADR-0031).
   const steps: FunnelStep[] = [
     { label: 'Logged', value: stats.logged },
-    { label: 'Analysed', value: stats.analysed },
+    { label: 'Recommended', value: stats.recommended },
     { label: 'Applied', value: stats.applied },
     { label: 'Got a response', value: stats.responded },
     { label: 'Interview', value: stats.interview },
+  ];
+  // Floored: a vacancy saved without a log check (ADR-0026) can make it negative.
+  const dropped: { label: string; value: number }[] = [
+    {
+      label: 'Not recommended by the analyzer',
+      value: Math.max(stats.logged - stats.recommended, 0),
+    },
+    { label: 'Declined by you', value: stats.declined },
+    { label: 'Rejected', value: stats.pipeline.byStatus.REJECTED },
+    { label: 'Timed out (no move for 30+ days)', value: stats.pipeline.timedOut },
   ];
 
   return (
@@ -195,6 +204,20 @@ export function DashboardPage() {
             </div>
           </div>
           <Funnel steps={steps} />
+          <div className="card-head border-t border-border">
+            <div>
+              <h2>Dropped out</h2>
+              <div className="count">Where the rest went</div>
+            </div>
+          </div>
+          <div className="fact-list">
+            {dropped.map((row) => (
+              <div className="fact-row" key={row.label}>
+                <span className="fact-label">{row.label}</span>
+                <span className="fact-value">{row.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="card">

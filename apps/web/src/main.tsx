@@ -7,11 +7,11 @@ import './index.css';
 import { queryClient } from './lib/queryClient';
 import { useTheme } from './lib/theme';
 
-/** Sonner takes the same three values the theme module does, so the preference
- * passes straight through — otherwise toasts stay light on a dark shell. */
+/** Nothing stored → Sonner's own 'system', which follows the OS live as index.css
+ * does — otherwise toasts stay light on a dark shell. */
 function ThemedToaster() {
-  const { preference } = useTheme();
-  return <Toaster position="bottom-right" theme={preference} />;
+  const { stored } = useTheme();
+  return <Toaster position="bottom-right" theme={stored ?? 'system'} />;
 }
 
 const rootElement = document.getElementById('root');

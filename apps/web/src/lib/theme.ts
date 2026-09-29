@@ -1,64 +1,52 @@
 import { useCallback, useState } from 'react';
 
 /**
- * Three states, not two:
- *   'system' — no data-theme attribute; index.css's prefers-color-scheme block
- *              decides. This is the default and the only state that follows the
- *              OS live.
- *   'light' / 'dark' — an explicit attribute pinning the theme.
+ * Two themes, and the OS picks the first:
+ *   nothing stored — no data-theme attribute; index.css's prefers-color-scheme
+ *                    block decides, and follows the OS live.
+ *   'light' / 'dark' — stored after the first click, pinned by the attribute.
+ * There is no way back to "follow the OS" but clearing storage.
  *
  * The attribute is the whole mechanism; the stored value just remembers which
  * one to write. The no-flash boot script in index.html reads the same key.
  */
-export type ThemePreference = 'system' | 'light' | 'dark';
+export type Theme = 'light' | 'dark';
 
 const STORAGE_KEY = 'jsc-theme';
-export function getStoredPreference(): ThemePreference {
+export function getStoredTheme(): Theme | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw === 'light' || raw === 'dark' ? raw : 'system';
+    return raw === 'light' || raw === 'dark' ? raw : null;
   } catch {
-    return 'system';
+    return null;
   }
 }
 
-export function applyPreference(preference: ThemePreference): void {
-  const root = document.documentElement;
-  if (preference === 'system') {
-    root.removeAttribute('data-theme');
-  } else {
-    root.setAttribute('data-theme', preference);
-  }
-}
-
-export function setStoredPreference(preference: ThemePreference): void {
+export function setStoredTheme(theme: Theme): void {
   try {
-    if (preference === 'system') {
-      localStorage.removeItem(STORAGE_KEY);
-    } else {
-      localStorage.setItem(STORAGE_KEY, preference);
-    }
+    localStorage.setItem(STORAGE_KEY, theme);
   } catch {
     /* storage disabled — the choice just won't survive a reload */
   }
 }
 
-const NEXT: Record<ThemePreference, ThemePreference> = {
-  system: 'light',
-  light: 'dark',
-  dark: 'system',
-};
+function osTheme(): Theme {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 
 export function useTheme() {
-  const [preference, setPreference] = useState<ThemePreference>(getStoredPreference);
+  const [stored, setStored] = useState<Theme | null>(getStoredTheme);
+  /** The theme on screen. */
+  const theme = stored ?? osTheme();
 
-  const cycle = useCallback(() => {
-    const next = NEXT[preference];
+  const toggle = useCallback(() => {
+    // Read the OS now, not at render: it may have flipped under an open tab.
+    const next: Theme = (stored ?? osTheme()) === 'dark' ? 'light' : 'dark';
     // The attribute first, so the paint and the stored value can't disagree.
-    applyPreference(next);
-    setStoredPreference(next);
-    setPreference(next);
-  }, [preference]);
+    document.documentElement.setAttribute('data-theme', next);
+    setStoredTheme(next);
+    setStored(next);
+  }, [stored]);
 
-  return { preference, cycle };
+  return { theme, stored, toggle };
 }

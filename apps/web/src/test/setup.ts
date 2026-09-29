@@ -31,6 +31,13 @@ if (!('ResizeObserver' in globalThis)) {
   } as unknown as typeof ResizeObserver;
 }
 
+// jsdom has no matchMedia; the theme toggle reads the OS theme through it on every
+// page's shell. Light, as an OS with no preference reports; theme.test.ts spies on
+// it to answer both ways.
+if (!window.matchMedia) {
+  window.matchMedia = ((media: string) => ({ matches: false, media })) as typeof window.matchMedia;
+}
+
 // jsdom *does* define window.scrollTo — but its body only reports "Not implemented"
 // to the virtual console. RootLayout resets scroll on every navigation, and every
 // page in this suite renders that shell, so the notice printed dozens of times a run

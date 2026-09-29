@@ -5,11 +5,12 @@ import { applicationStatusSchema } from '../applications/types';
 
 export const statsSchema = z.object({
   logged: z.number(),
-  analysed: z.number(),
   awaitingTriage: z.number(),
   recommended: z.number(),
   /** The funnel: vacancies that ever reached the stage (the journal). */
   applied: z.number(),
+  /** Currently DECLINED — the user said no. */
+  declined: z.number(),
   responded: z.number(),
   interview: z.number(),
   /** Currently in RECRUITER_SCREEN. */

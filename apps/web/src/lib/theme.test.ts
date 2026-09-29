@@ -1,12 +1,18 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyPreference, getStoredPreference, setStoredPreference, useTheme } from './theme';
+import { getStoredTheme, setStoredTheme, useTheme } from './theme';
 
 // The attribute is the whole mechanism and the stored value only remembers which
 // one to write, so a bug here is silent in a specific way: the user picks dark,
-// the preference is remembered, and the app still paints light. The no-flash boot
+// the choice is remembered, and the app still paints light. The no-flash boot
 // script in index.html reads the same key, which is the other half of the contract.
 const STORAGE_KEY = 'jsc-theme';
+
+function mockOs(theme: 'light' | 'dark') {
+  vi.spyOn(window, 'matchMedia').mockImplementation(
+    (media) => ({ matches: theme === 'dark', media }) as MediaQueryList,
+  );
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -19,22 +25,22 @@ afterEach(() => {
   document.documentElement.removeAttribute('data-theme');
 });
 
-describe('getStoredPreference', () => {
+describe('getStoredTheme', () => {
   it('reads back an explicit choice', () => {
     localStorage.setItem(STORAGE_KEY, 'dark');
-    expect(getStoredPreference()).toBe('dark');
+    expect(getStoredTheme()).toBe('dark');
     localStorage.setItem(STORAGE_KEY, 'light');
-    expect(getStoredPreference()).toBe('light');
+    expect(getStoredTheme()).toBe('light');
   });
 
   it.each([['DARK'], [''], ['blue'], ['system'], ['null']])(
     'treats %j as no choice at all',
     (raw) => {
-      // Only the two exact strings are acknowledged. Anything else — a stale value,
-      // a hand-edited key, a case variant — falls back to following the OS rather
-      // than pinning a theme nobody asked for.
+      // Only the two exact strings are acknowledged. Anything else — a stale value
+      // (including the old 'system'), a hand-edited key, a case variant — falls
+      // back to following the OS rather than pinning a theme nobody asked for.
       localStorage.setItem(STORAGE_KEY, raw);
-      expect(getStoredPreference()).toBe('system');
+      expect(getStoredTheme()).toBeNull();
     },
   );
 
@@ -43,74 +49,49 @@ describe('getStoredPreference', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('denied');
     });
-    expect(getStoredPreference()).toBe('system');
+    expect(getStoredTheme()).toBeNull();
   });
 });
 
-describe('applyPreference', () => {
-  it('pins an explicit theme with the attribute', () => {
-    applyPreference('dark');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
-    applyPreference('light');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
-  });
-
-  it('removes the attribute for "system" rather than writing a third value', () => {
-    // The *absence* of the attribute is what lets index.css's
-    // prefers-color-scheme block decide — and what lets it keep following the OS
-    // live. Writing data-theme="system" would freeze the page on whatever the
-    // media query said at load.
-    applyPreference('dark');
-    applyPreference('system');
-    expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
-  });
-});
-
-describe('setStoredPreference', () => {
-  it('remembers an explicit choice and forgets "system"', () => {
-    setStoredPreference('dark');
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
-    setStoredPreference('system');
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
-  });
-
+describe('setStoredTheme', () => {
   it('swallows a storage failure — the choice just will not survive a reload', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('denied');
     });
-    expect(() => setStoredPreference('dark')).not.toThrow();
+    expect(() => setStoredTheme('dark')).not.toThrow();
   });
 });
 
 describe('useTheme', () => {
-  it('starts from the stored choice', () => {
+  it('starts from the stored choice, whatever the OS says', () => {
+    mockOs('light');
     localStorage.setItem(STORAGE_KEY, 'dark');
     const { result } = renderHook(() => useTheme());
-    expect(result.current.preference).toBe('dark');
+    expect(result.current.theme).toBe('dark');
   });
 
-  it("starts on 'system' when nothing is stored", () => {
-    const { result } = renderHook(() => useTheme());
-    expect(result.current.preference).toBe('system');
-  });
+  it.each([
+    ['light', 'dark'],
+    ['dark', 'light'],
+  ] as const)(
+    'with nothing stored, on a %s OS: shows it, and the first click flips to %s',
+    (os, flipped) => {
+      mockOs(os);
+      const { result } = renderHook(() => useTheme());
+      expect(result.current.theme).toBe(os);
+      // Nothing is written until a click: the CSS media query decides meanwhile.
+      expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
 
-  it('cycles system → light → dark → system, writing the attribute each step', () => {
-    const { result } = renderHook(() => useTheme());
-    expect(result.current.preference).toBe('system');
+      act(() => result.current.toggle());
+      expect(result.current.theme).toBe(flipped);
+      expect(document.documentElement.getAttribute('data-theme')).toBe(flipped);
+      expect(localStorage.getItem(STORAGE_KEY)).toBe(flipped);
 
-    act(() => result.current.cycle());
-    expect(result.current.preference).toBe('light');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('light');
-
-    act(() => result.current.cycle());
-    expect(result.current.preference).toBe('dark');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
-
-    act(() => result.current.cycle());
-    expect(result.current.preference).toBe('system');
-    expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
-  });
+      // A second click flips back — pinned now, not "follow the OS" again.
+      act(() => result.current.toggle());
+      expect(result.current.theme).toBe(os);
+      expect(document.documentElement.getAttribute('data-theme')).toBe(os);
+      expect(localStorage.getItem(STORAGE_KEY)).toBe(os);
+    },
+  );
 });

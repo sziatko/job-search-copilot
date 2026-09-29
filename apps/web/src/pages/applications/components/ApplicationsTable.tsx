@@ -134,7 +134,7 @@ export function ApplicationsTable({
                 </td>
                 <td className="mono text-[12px]">{item.salaryInListing ?? '—'}</td>
                 <td className="text-[12px] text-ink-muted">
-                  {item.usedTailoredResume ? 'Sent' : '—'}
+                  {item.usedTailoredResume ? '✓' : '—'}
                 </td>
                 <td>
                   <MergedComment comments={item.comments} />

@@ -18,10 +18,11 @@ const INTERVIEWED: VacancyStatus[] = ['INTERVIEW', 'OFFER'];
  * `pipeline` the current status. */
 export interface Stats {
   logged: number;
-  analysed: number;
   awaitingTriage: number;
   recommended: number;
   applied: number;
+  /** Current `status = DECLINED` — the user said no. */
+  declined: number;
   responded: number;
   interview: number;
   recruiterScreen: number;
@@ -54,10 +55,10 @@ export class StatsService {
 
     const [
       logged,
-      analysed,
       awaitingTriage,
       recommended,
       applied,
+      declined,
       responded,
       interview,
       groups,
@@ -65,11 +66,10 @@ export class StatsService {
       recent,
     ] = await Promise.all([
       this.db.vacancyLogEntry.count(),
-      // hasAnalysis' rule: an ANALYZER comment exists.
-      this.db.vacancy.count({ where: { comments: { some: { source: 'ANALYZER' } } } }),
       this.db.vacancy.count({ where: { status: 'NOT_REVIEWED' } }),
       this.db.vacancy.count({ where: { recommendation: { in: ['APPLY', 'APPLY_WITH_CAVEATS'] } } }),
       everReached(['APPLIED']),
+      this.db.vacancy.count({ where: { status: 'DECLINED' } }),
       everReached(RESPONDED),
       everReached(INTERVIEWED),
       this.db.vacancy.groupBy({
@@ -101,10 +101,10 @@ export class StatsService {
 
     return {
       logged,
-      analysed,
       awaitingTriage,
       recommended,
       applied,
+      declined,
       responded,
       interview,
       recruiterScreen: byStatus.RECRUITER_SCREEN,

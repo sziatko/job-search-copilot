@@ -61,11 +61,6 @@ const SOURCE_META = {
   AGENT: { label: 'Agent', className: 'src-agent' },
 } satisfies Record<CommentSource, { label: string; className: string }>;
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return parts.length === 0 ? '?' : (parts[0][0] + (parts[1]?.[0] ?? '')).toUpperCase();
-}
-
 function hostname(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
@@ -202,9 +197,6 @@ function Header({
     <div className="detail-header">
       <div>
         <div className="detail-company-row">
-          <div className="company-mark" aria-hidden>
-            {initials(vacancy.company)}
-          </div>
           <div className="detail-company-name">{vacancy.company}</div>
         </div>
         <h1 className="detail-title">{vacancy.title}</h1>

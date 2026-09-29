@@ -32,13 +32,18 @@ export function ApplicationsPage() {
       : 'No applications match this filter.';
 
   return (
-    <section className="view">
+    <section className="view view-fill">
       {stats && (
         <ApplicationsKpis stats={stats} filter={statusFilter} onFilterChange={setStatusFilter} />
       )}
 
       <div className="card">
         <div className="toolbar pt-[16px]">
+          {!loadError && !loading && (
+            <span className="toolbar-count">
+              Showing {visibleItems.length} of {total}
+            </span>
+          )}
           <SearchInput value={q} onChange={setSearchText} />
           <ApplicationStatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         </div>
@@ -57,12 +62,6 @@ export function ApplicationsPage() {
             onEndReached={loadMore}
             emptyMessage={emptyMessage}
           />
-        )}
-
-        {!loadError && !loading && (
-          <div className="table-foot">
-            Showing {visibleItems.length} of {total} applications
-          </div>
         )}
       </div>
 

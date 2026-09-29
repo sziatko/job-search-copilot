@@ -55,12 +55,13 @@ describe('Stats (e2e)', () => {
 
     const res = await request(server).get('/api/v1/stats').expect(200);
 
+    expect(res.body).not.toHaveProperty('analysed');
     expect(res.body).toMatchObject({
       logged: 1,
-      analysed: 1,
       awaitingTriage: 0,
       recommended: 1,
       applied: 1,
+      declined: 0,
       responded: 1,
       interview: 0,
       recruiterScreen: 0,

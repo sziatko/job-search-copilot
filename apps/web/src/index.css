@@ -211,6 +211,30 @@
   .view {
     @apply px-[28px] pb-[56px] pt-[24px];
   }
+  /* The table pages (/vacancies, /applications, /log): the table's scroll box runs
+     to the window's bottom, so the page itself does not scroll. A flex column from
+     .main down — .main takes the window's height, the view and the card fill it,
+     the scroll box takes what is left. `min-height: 320px` is the floor for short
+     windows (the page scrolls then). `contain: size` keeps the rows out of the
+     box's intrinsic height, so the view and the card size to that floor rather
+     than to every loaded row, and grow around it instead of letting it spill out.
+     Child combinators: a modal's scroll box inside the view (the company history)
+     keeps its 560px. */
+  .main:has(> .view-fill) {
+    height: 100vh;
+  }
+  .view.view-fill {
+    @apply flex flex-1 flex-col pb-[24px];
+  }
+  .view-fill > .card {
+    @apply flex flex-1 flex-col;
+  }
+  .view-fill > .card > .table-body-scroll {
+    flex: 1;
+    min-height: 320px;
+    max-height: none;
+    contain: size;
+  }
 
   /* ---------- shared bits ---------- */
   .kpi-row {
@@ -461,8 +485,8 @@
   .empty-state {
     @apply px-[18px] py-[46px] text-center text-[13px] text-ink-muted;
   }
-  .table-foot {
-    @apply border-t border-border px-[18px] pb-[16px] pt-[12px] text-[11.5px] text-ink-faint;
+  .toolbar-count {
+    @apply whitespace-nowrap text-[12px] text-ink-muted;
   }
 
   /* ---------- dashboard ---------- */
@@ -470,28 +494,45 @@
     @apply grid items-start gap-[16px];
     grid-template-columns: 1.3fr 1fr;
   }
+  /* Name · value · conversion, then the bar at the card's full width: on one
+     line the card (~330px at 1100 wide) left the bar nothing. When even the text
+     line is too wide, the conversion wraps under the name — never out of the card. */
   .funnel {
-    @apply flex flex-col gap-[10px] px-[18px] pb-[18px] pt-[6px];
+    @apply flex flex-col gap-[12px] px-[18px] pb-[18px] pt-[6px];
   }
   .funnel-row {
-    @apply grid items-center gap-[10px];
-    grid-template-columns: 118px 1fr 64px 70px;
+    @apply flex flex-wrap items-baseline gap-x-[8px] gap-y-[6px];
   }
   .funnel-name {
-    @apply text-[12.5px] font-bold text-ink-soft;
+    @apply whitespace-nowrap text-[12.5px] font-bold text-ink-soft;
   }
   .funnel-track {
-    @apply h-[20px] overflow-hidden rounded-[7px] bg-surface-sunken;
+    @apply order-1 h-[28px] basis-full overflow-hidden rounded-[7px] bg-surface-sunken;
   }
   .funnel-fill {
-    @apply h-full rounded-[7px] bg-accent;
+    @apply h-full rounded-[7px];
     min-width: 3%;
   }
+  .funnel-row:nth-child(1) .funnel-fill {
+    background: var(--funnel-1);
+  }
+  .funnel-row:nth-child(2) .funnel-fill {
+    background: var(--funnel-2);
+  }
+  .funnel-row:nth-child(3) .funnel-fill {
+    background: var(--funnel-3);
+  }
+  .funnel-row:nth-child(4) .funnel-fill {
+    background: var(--funnel-4);
+  }
+  .funnel-row:nth-child(5) .funnel-fill {
+    background: var(--funnel-5);
+  }
   .funnel-value {
-    @apply text-right font-mono text-[13px] font-semibold;
+    @apply font-mono text-[13px] font-semibold;
   }
   .funnel-conv {
-    @apply whitespace-nowrap text-right font-mono text-[11px] text-ink-faint;
+    @apply ml-auto whitespace-nowrap font-mono text-[11px] text-ink-faint;
   }
 
   .attn-list,
@@ -664,9 +705,6 @@
   }
   .detail-company-row {
     @apply mb-[6px] flex items-center gap-[8px];
-  }
-  .company-mark {
-    @apply flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[6px] bg-surface-sunken text-[10px] font-bold text-ink-muted;
   }
   .detail-company-name {
     @apply text-[13px] font-semibold text-ink-muted;
@@ -917,11 +955,11 @@
     .view {
       @apply px-[14px] pb-[44px] pt-[18px];
     }
+    .view.view-fill {
+      @apply pb-[18px];
+    }
     .kpi-row {
       grid-template-columns: repeat(2, 1fr);
-    }
-    .funnel-row {
-      grid-template-columns: 84px 1fr 44px;
     }
     .funnel-conv {
       @apply hidden;
@@ -952,6 +990,14 @@
 :root {
   --rail-w: 72px;
   color-scheme: light;
+  /* The funnel's five stages, one hue each: the dataviz skill's categorical
+     slots 1–5 (blue, orange, aqua, yellow, magenta), light and dark steps,
+     validated for adjacent-pair colour-blind separation on the funnel track. */
+  --funnel-1: #2a78d6;
+  --funnel-2: #eb6834;
+  --funnel-3: #1baf7a;
+  --funnel-4: #eda100;
+  --funnel-5: #e87ba4;
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -985,6 +1031,11 @@
     --color-bad-soft-border: #5e2e2e;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
+    --funnel-1: #3987e5;
+    --funnel-2: #d95926;
+    --funnel-3: #199e70;
+    --funnel-4: #c98500;
+    --funnel-5: #d55181;
   }
 }
 :root[data-theme="dark"] {
@@ -1014,4 +1065,9 @@
   --color-bad-soft-border: #5e2e2e;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
+  --funnel-1: #3987e5;
+  --funnel-2: #d95926;
+  --funnel-3: #199e70;
+  --funnel-4: #c98500;
+  --funnel-5: #d55181;
 }

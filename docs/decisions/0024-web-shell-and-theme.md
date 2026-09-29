@@ -27,6 +27,12 @@ between files that no compiler checks.
    - `apps/web/src/lib/theme.ts` — `applyPreference()` writes `data-theme` for
      light/dark and **removes** it for `system`; `setStoredPreference()` writes or
      removes the same key;
+
+   *Amended in phase 4.1 step 2:* the toggle has **two** states. Nothing stored is
+   still "follow the OS" (no attribute), but only until the first click, which stores
+   and pins the opposite of the theme on screen; the way back is clearing storage.
+   `theme.ts` is now `getStoredTheme()` / `setStoredTheme()` / `useTheme().toggle`;
+   the boot script and the CSS are unchanged.
    - `apps/web/src/index.css` — `:root` is the OS media query, `data-theme="light"`
      blocks it with a `:not()` guard, `data-theme="dark"` overrides everything.
 2. **`/` is the dashboard.** The route set becomes `/`, `/vacancies`, `/applications`,

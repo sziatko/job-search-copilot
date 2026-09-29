@@ -5,6 +5,8 @@ history, not read when planning. Newest at the top.
 
 | Item | Kind | Outcome | From | Notes |
 | --- | --- | --- | --- | --- |
+| **`hasAnalysis` list filter** | fix | not relevant (2026-09-29) | phase 2.2 | Its one reason was the dashboard's analysed-count tile; phase 4.1 step 4 dropped `analysed` from `/stats` and starts the funnel at Recommended. |
+| **Store the application timeout in the DB, set by an automation** | fix | not relevant (2026-09-28) | 2026-09-28 | The timeout stays derived in core (`timedOutWhere` in `packages/core/src/status.ts`, 30 days): it never writes `status` or a `StatusChange` row, so a timed-out application never shows in Recent activity. A job writing a stored value is what the user did not want. Phase 4.1 shows the count on the dashboard instead. |
 | **`/log` page — a web view of the vacancy log** | idea | done — phase 4 step 1 | phase 2, phase 3 | `/log`: a searchable, infinitely scrolled table of `VacancyLogEntry`. No add-entry form — the search box is the whole form; the mockup's Source / Status / Score / Note columns stay out (nothing stores them). |
 | **Dashboard on real data** | idea | done — phase 4 step 3 | 2026-09-28 | `GET /stats` counts in core over the `StatusChange` journal ("ever reached this stage"); the first KPI tile is Logged (ADR-0031). |
 | **A page for one vacancy** | idea | done — phase 4 step 5 | 2026-09-28 | `/vacancies/$id`: posting text, status timeline (`GET /vacancies/:id` `timeline`), comments with an add form, details, the company's other vacancies, status actions. Reached by the → button in the tables; the title stays the posting link. |

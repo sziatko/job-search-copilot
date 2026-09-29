@@ -216,14 +216,16 @@ describe('ApplicationsPage / useApplications', () => {
       ),
     );
     const { container } = renderApplications();
-    expect(await screen.findByText('Showing 100 of 130 applications')).toBeInTheDocument();
+    // The count leads the toolbar; the table has no foot.
+    expect((await screen.findByText('Showing 100 of 130')).closest('.toolbar')).not.toBeNull();
+    expect(container.querySelector('.table-foot')).toBeNull();
 
     // jsdom lays nothing out: set the offset the virtualizer reads, then tell it.
     const scroller = container.querySelector('.table-body-scroll') as HTMLElement;
     Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 10_000_000 });
     fireEvent.scroll(scroller);
 
-    expect(await screen.findByText('Showing 130 of 130 applications')).toBeInTheDocument();
+    expect(await screen.findByText('Showing 130 of 130')).toBeInTheDocument();
   });
 
   it('optimistically changes a status and keeps it on success', async () => {

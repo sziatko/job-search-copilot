@@ -38,14 +38,20 @@ export function VacanciesPage() {
   } | null>(null);
 
   return (
-    <section className="view">
+    <section className="view view-fill">
       <div className="card">
         {/* Same shape as the tracker's card: the page title is the shell's, so there
             is no head here and the toolbar carries the top padding. The search and
-            the status filter go to the server, so the count in the foot is the
-            server's match count — the loaded rows catch up with it as the table
-            scrolls. */}
+            the status filter go to the server, so the count is the server's match
+            count — the loaded rows catch up with it as the table scrolls. Gated like
+            the tracker's: "Showing 0 of 0" during the first load is a claim about
+            the data, and there is no data yet. */}
         <div className="toolbar pt-[16px]">
+          {!loadError && !loading && (
+            <span className="toolbar-count">
+              Showing {items.length} of {total}
+            </span>
+          )}
           <SearchInput value={q} onChange={setSearchText} />
           <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         </div>
@@ -65,14 +71,6 @@ export function VacanciesPage() {
             onActionChange={requestActionChange}
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
           />
-        )}
-
-        {/* Gated like the tracker's: "Showing 0 of 0" during the first load is a
-            claim about the data, and there is no data yet. */}
-        {!loadError && !loading && (
-          <div className="table-foot">
-            Showing {items.length} of {total} vacancies · scores from the vacancy-evaluator skill
-          </div>
         )}
       </div>
 

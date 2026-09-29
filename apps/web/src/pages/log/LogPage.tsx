@@ -32,9 +32,14 @@ export function LogPage() {
   );
 
   return (
-    <section className="view">
+    <section className="view view-fill">
       <div className="card">
         <div className="toolbar pt-[16px]">
+          {!query.error && !query.isPending && (
+            <span className="toolbar-count">
+              Showing {items.length} of {total}
+            </span>
+          )}
           <SearchInput value={q} onChange={setSearchText} />
         </div>
 
@@ -48,12 +53,6 @@ export function LogPage() {
             onEndReached={loadMore}
             emptyMessage={term ? 'No entries match this search.' : 'The log is empty.'}
           />
-        )}
-
-        {!query.error && !query.isPending && (
-          <div className="table-foot">
-            Showing {items.length} of {total} entries
-          </div>
         )}
       </div>
     </section>

@@ -41,6 +41,14 @@ async function funnelRows() {
   );
 }
 
+/** Each "Dropped out" row's text: label, value. */
+async function droppedRows() {
+  await screen.findByRole('heading', { name: /dropped out/i });
+  return Array.from(document.querySelectorAll('.fact-row')).map((row) =>
+    Array.from(row.children).map((cell) => cell.textContent),
+  );
+}
+
 describe('DashboardPage', () => {
   afterEach(() => {
     mswServer.events.removeAllListeners();
@@ -48,16 +56,37 @@ describe('DashboardPage', () => {
 
   it('draws the funnel Logged → Interview, each stage against the one above', async () => {
     renderDashboard(
-      fakeStats({ logged: 200, analysed: 150, applied: 30, responded: 10, interview: 4 }),
+      fakeStats({ logged: 200, recommended: 150, applied: 30, responded: 10, interview: 4 }),
     );
 
     expect(await funnelRows()).toEqual([
       ['Logged', '', '200', 'baseline'],
-      ['Analysed', '', '150', '75% of logged'],
-      ['Applied', '', '30', '20% of analysed'],
+      ['Recommended', '', '150', '75% of logged'],
+      ['Applied', '', '30', '20% of recommended'],
       ['Got a response', '', '10', '33% of applied'],
       ['Interview', '', '4', '40% of got a response'],
     ]);
+  });
+
+  it('lists what dropped out under the funnel', async () => {
+    const stats = fakeStats({ logged: 1248, recommended: 524, declined: 40 });
+    stats.pipeline.byStatus.REJECTED = 90;
+    stats.pipeline.timedOut = 70;
+    renderDashboard(stats);
+
+    expect(await droppedRows()).toEqual([
+      ['Not recommended by the analyzer', '724'],
+      ['Declined by you', '40'],
+      ['Rejected', '90'],
+      ['Timed out (no move for 30+ days)', '70'],
+    ]);
+  });
+
+  it('floors "not recommended" at 0 when more are recommended than logged', async () => {
+    // A vacancy saved without a log check (ADR-0026) is recommended but never logged.
+    renderDashboard(fakeStats({ logged: 3, recommended: 5 }));
+
+    expect((await droppedRows())[0]).toEqual(['Not recommended by the analyzer', '0']);
   });
 
   it('shows a dash, not NaN or Infinity, below an empty stage', async () => {

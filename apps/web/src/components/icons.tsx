@@ -103,15 +103,6 @@ export function IconMenu(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function IconMonitor(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <rect x="2" y="4" width="20" height="13" rx="2" />
-      <path d="M8 21h8M12 17v4" />
-    </Icon>
-  );
-}
-
 export function IconSun(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
