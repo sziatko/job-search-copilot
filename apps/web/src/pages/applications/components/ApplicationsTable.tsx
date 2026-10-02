@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { IconEdit, IconHistory } from '@/components/icons';
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ScorePill } from '@/components/ui/ScorePill';
+import { SkeletonRows } from '@/components/ui/SkeletonRows';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
 import { daysSinceLastMove } from '../constants';
@@ -30,6 +31,7 @@ const COL_COUNT = 8;
  */
 
 export function ApplicationsTable({
+  loading,
   items,
   savingIds,
   rowErrors,
@@ -39,6 +41,8 @@ export function ApplicationsTable({
   onEndReached,
   emptyMessage,
 }: {
+  /** The first page is on its way — VacancyTable's `loading`. */
+  loading: boolean;
   items: ApplicationListItem[];
   savingIds: Set<number>;
   rowErrors: Map<number, string>;
@@ -58,7 +62,7 @@ export function ApplicationsTable({
 
   return (
     <div ref={scrollRef} className="table-body-scroll">
-      <table className="min-w-[1210px] table-fixed">
+      <table className="min-w-[1210px] table-fixed" aria-busy={loading}>
         <thead>
           <tr>
             <th style={{ width: 110 }}>Date</th>
@@ -72,7 +76,8 @@ export function ApplicationsTable({
           </tr>
         </thead>
         <tbody>
-          {items.length === 0 && (
+          {loading && <SkeletonRows rows={8} cols={COL_COUNT} />}
+          {!loading && items.length === 0 && (
             <tr>
               <td colSpan={COL_COUNT}>
                 <div className="empty-state">{emptyMessage}</div>

@@ -55,10 +55,9 @@ export function ApplicationsPage() {
 
         {loadError ? (
           <div className="empty-state">Failed to load applications: {loadError}</div>
-        ) : loading ? (
-          <div className="empty-state">Loading…</div>
         ) : (
           <ApplicationsTable
+            loading={loading}
             items={visibleItems}
             savingIds={savingIds}
             rowErrors={rowErrors}

@@ -81,7 +81,8 @@ All.
 ## Consequences
 
 - The dashboard costs one request plus the review queue
-  (`GET /vacancies?status=NOT_REVIEWED&sort=recommended&limit=5`).
+  (`GET /vacancies?status=NOT_REVIEWED&sort=recommended&limit=10` since phase 4.3,
+  enough to fill the funnel card's height).
 - The funnel only grows; a rejection no longer shrinks earlier stages.
 - `/stats` is a new shape in the hand-written web contract
   ([ADR-0012](0012-web-hand-written-contract.md)).

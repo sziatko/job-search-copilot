@@ -16,6 +16,7 @@ import type {
   VacancyListItem,
   VacancySort,
 } from './vacancy.types';
+import { normalizeCompanyKey } from './vacancy-log';
 
 /** The analyzer's comment: the first `ANALYZER` row. A relation read, so every
  * reader selects it through here and flattens it with `withEstimation`. */
@@ -81,49 +82,57 @@ const LIST_SELECT = {
   statusChangedAt: true,
 } satisfies Prisma.VacancySelect;
 
+// Matched after normalizeCompanyKey's collapse, the way it matches legal forms: a
+// trailing country or region names an office, not another company.
+const PLACE_SUFFIX =
+  / (?:polska|poland|spain|españa|espana|latam|germany|deutschland|uk|usa|ukraine|netherlands|emea|europe)$/;
+
 /**
- * For each name, how many vacancies have a `company` containing it (case-insensitive
- * substring) — the duplicates button's count (ADR-0025), on /vacancies and
- * /applications alike. Every vacancy counts, whatever its status: the modal lists them
- * all.
+ * Same company ⇔ equal keys (ADR-0032), so every spelling of a company sees the same
+ * rows and the same count. The log's key (case, punctuation, legal forms), with a note
+ * in parentheses (`Fabrikam (partner company)`) and a trailing country
+ * (`contoso Polska`) dropped too. A name that is nothing but those keeps itself.
+ */
+export function companyKey(company: string): string {
+  let key = normalizeCompanyKey(company.replace(/\([^)]*\)/g, ' ')) ?? '';
+  // `Acme Polska Sp. z o.o.` carries both, in either order.
+  for (let prev = ''; prev !== key; ) {
+    prev = key;
+    key = normalizeCompanyKey(key.replace(PLACE_SUFFIX, '')) ?? '';
+  }
+  return key || company.trim().toLowerCase();
+}
+
+// ponytail: both helpers below read every distinct company on each call — fine at a
+// few hundred names; past that, store `companyKey` in an indexed column.
+
+/** Every stored spelling of `company`'s company — the `sameCompanyAs` filter. */
+export async function sameCompanyNames(db: PrismaClient, company: string): Promise<string[]> {
+  const key = companyKey(company);
+  const rows = await db.vacancy.findMany({ distinct: ['company'], select: { company: true } });
+  return rows.map((row) => row.company).filter((name) => companyKey(name) === key);
+}
+
+/**
+ * For each name, how many vacancies are the same company (`companyKey`) — the
+ * duplicates button's count, on /vacancies and /applications alike, and exactly the
+ * rows `sameCompanyAs` lists. Every vacancy counts, whatever its status: the modal
+ * lists them all.
  */
 export async function companyMatchCounts(
   db: PrismaClient,
   companies: string[],
 ): Promise<Map<string, number>> {
-  const names = [...new Set(companies)];
-  if (names.length === 0) {
+  if (companies.length === 0) {
     return new Map();
   }
-
-  // Prefilter so the scan below only sees candidates. One OR over the page's
-  // distinct companies, each escaped (a company named `A_B` must reach `A_B`, not
-  // `AXB`) — so it selects exactly the superset the JS count then narrows, and the
-  // count itself stays in JS. Under-selecting here is the failure that matters:
-  // it would report 0 matches for a company's own rows and hide the button.
-  //
-  // ponytail: a second round-trip plus an O(distinct companies x candidates) scan
-  // on every list call. Fine while a page is a hundred rows; if the table grows,
-  // do the counting in SQL (a lateral join over the same index) instead of pulling
-  // candidate company names into the process.
-  const candidates = await db.vacancy.findMany({
-    where: {
-      OR: names.map((name) => ({
-        company: { contains: escapeLikePattern(name), mode: 'insensitive' },
-      })),
-    },
-    select: { company: true },
-  });
-
-  const counts = new Map<string, number>();
-  for (const name of names) {
-    const needle = name.toLowerCase();
-    counts.set(
-      name,
-      candidates.filter((candidate) => candidate.company.toLowerCase().includes(needle)).length,
-    );
+  const groups = await db.vacancy.groupBy({ by: ['company'], _count: { _all: true } });
+  const perKey = new Map<string, number>();
+  for (const group of groups) {
+    const key = companyKey(group.company);
+    perKey.set(key, (perKey.get(key) ?? 0) + group._count._all);
   }
-  return counts;
+  return new Map(companies.map((name) => [name, perKey.get(companyKey(name)) ?? 0]));
 }
 
 export class VacancyService {
@@ -231,6 +240,10 @@ export class VacancyService {
       }),
       ...(filters.title && {
         title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
+      }),
+      // Under AND, so it narrows `company` rather than replacing it.
+      ...(filters.sameCompanyAs && {
+        AND: [{ company: { in: await sameCompanyNames(this.db, filters.sameCompanyAs) } }],
       }),
     };
 

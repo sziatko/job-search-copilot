@@ -36,7 +36,7 @@ export type { Stats } from './stats.service';
 export { StatsService } from './stats.service';
 export type { PipelineStatus } from './status';
 export { PIPELINE_STATUSES } from './status';
-export { VacancyService } from './vacancy.service';
+export { companyKey, VacancyService } from './vacancy.service';
 export type {
   ListVacanciesFilters,
   ListVacanciesResult,

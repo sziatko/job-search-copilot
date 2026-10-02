@@ -11,9 +11,11 @@ import {
   buildHandlers,
   type FakeVacancy,
   fakeVacancy,
+  holdGet,
   vacanciesResolver,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import { expectLoadedTable, expectSkeletonTable } from '@/test/skeleton';
 import type { VacancyListItem } from './types';
 
 const vacancy = fakeVacancy;
@@ -339,6 +341,17 @@ describe('VacanciesPage / useVacancies', () => {
     expect(document.querySelector('.table-foot')).toBeNull();
   });
 
+  it('draws skeleton rows under its header while the first page loads', async () => {
+    mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
+    const hold = holdGet('/vacancies');
+    mswServer.use(hold.handler);
+    renderVacancies();
+
+    const table = await expectSkeletonTable('Vacancy');
+    hold.release();
+    await expectLoadedTable(table, 'Backend Engineer');
+  });
+
   it('shows — for a posting the analyzer never saw', async () => {
     mswServer.use(
       ...buildHandlers([
@@ -387,7 +400,8 @@ describe('VacanciesPage / useVacancies', () => {
     expect(rowOf('Beta Corp').getByText('Declined', { selector: '.tag' })).toBeInTheDocument();
   });
 
-  it('saves Save for later straight away, with no dialog', async () => {
+  it('saves Save for later straight away, with no dialog, and says so', async () => {
+    const success = vi.spyOn(toast, 'success');
     mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
     renderVacancies();
     await screen.findByText('Acme');
@@ -397,6 +411,10 @@ describe('VacanciesPage / useVacancies', () => {
 
     // NOT_REVIEWED filter still active -> nothing to confirm, the row just drops out.
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
+    // The row is gone from view, so the toast names it.
+    expect(success).toHaveBeenCalledWith('Moved to Saved for later', {
+      description: expect.stringMatching(/ — Acme$/),
+    });
   });
 
   it('sets Unavailable with no confirm, and filters by it', async () => {
@@ -544,6 +562,7 @@ describe('VacanciesPage / useVacancies', () => {
   });
 
   it('requires confirmation before persisting DECLINED', async () => {
+    const success = vi.spyOn(toast, 'success');
     mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
     renderVacancies();
     await screen.findByText('Acme');
@@ -552,11 +571,15 @@ describe('VacanciesPage / useVacancies', () => {
     await user.click(rowOf('Acme').getByRole('button', { name: 'Decline' }));
 
     expect(screen.getByText('Decline this vacancy?')).toBeInTheDocument();
-    // Nothing saved yet — the row is still listed.
+    // Nothing saved yet — the row is still listed, and nothing announced.
     expect(screen.getByText('Acme')).toBeInTheDocument();
+    expect(success).not.toHaveBeenCalledWith('Moved to Declined', expect.anything());
 
     await user.click(screen.getByRole('button', { name: 'Yes, decline' }));
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
+    expect(success).toHaveBeenCalledWith('Moved to Declined', {
+      description: expect.stringMatching(/ — Acme$/),
+    });
   });
 
   it('cancels a pending decline without saving it', async () => {
@@ -601,7 +624,7 @@ describe('VacanciesPage / useVacancies', () => {
     await user.click(rowOf('Acme').getByRole('button', { name: 'Apply' }));
     expect(screen.getByText('Mark as applied')).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText('Salary / rate in the listing'), '130 PLN/h');
+    await user.type(screen.getByLabelText('Salary / rate'), '130 PLN/h');
     await user.click(screen.getByLabelText('Used a tailored resume'));
     await user.type(screen.getByLabelText('Comment'), 'Adapted CV.');
     await user.click(screen.getByRole('button', { name: 'OK' }));
@@ -651,7 +674,7 @@ describe('VacanciesPage / useVacancies', () => {
       await screen.findByText('Already recorded.');
       // …and the row is back where it was, not optimistically applied.
       expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
-      expect(success).not.toHaveBeenCalled();
+      expect(success).not.toHaveBeenCalledWith('Application submitted!');
     } finally {
       success.mockRestore();
     }
@@ -765,6 +788,7 @@ describe('VacanciesPage / useVacancies', () => {
   });
 
   it('surfaces a row error and rolls the row back when the save fails', async () => {
+    const success = vi.spyOn(toast, 'success');
     mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
     mswServer.use(
       http.patch('http://localhost:3000/api/v1/vacancies/:id/status', () =>
@@ -781,6 +805,7 @@ describe('VacanciesPage / useVacancies', () => {
     // has to bring it back, tag and all.
     await screen.findByText(/Failed to update vacancy 1/);
     expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+    expect(success).not.toHaveBeenCalledWith('Moved to Saved for later', expect.anything());
   });
 
   it('surfaces a friendly loadError when the list response has the wrong shape', async () => {
@@ -853,6 +878,25 @@ describe('VacanciesPage / useVacancies', () => {
       expect(
         modalRow('Data Engineer').getByRole('button', { name: /copy data engineer/i }),
       ).toBeInTheDocument();
+    });
+
+    it('draws skeleton rows under its header while the company loads', async () => {
+      mswServer.use(...buildHandlers(companyFixtures()));
+      // The modal's request only: the page's own list carries no `sameCompanyAs`.
+      const hold = holdGet('/vacancies', (url) => url.searchParams.has('sameCompanyAs'));
+      mswServer.use(hold.handler);
+      renderVacancies();
+      await screen.findByText('Backend Engineer');
+
+      await userEvent
+        .setup()
+        .click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[0]);
+      const modal = within(await screen.findByRole('dialog'));
+      const table = await expectSkeletonTable('Vacancy', modal);
+      // The subtitle keeps its visible "Loading…" too.
+      expect(modal.getByText('Loading…', { selector: '.dialog-sub' })).toBeInTheDocument();
+      hold.release();
+      await expectLoadedTable(table, 'Data Engineer');
     });
 
     it('refetches on every open, so a status changed since shows', async () => {
@@ -989,15 +1033,19 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.queryByText('80%')).toBeInTheDocument(); // the safe row keeps its pill
       expect(modal.getByText('Imported Role')).toBeInTheDocument();
       expect(modal.queryByRole('link', { name: 'Imported Role' })).not.toBeInTheDocument();
-      // One dash, for the importer row's score — the safe row shows a pill.
-      expect(modal.getAllByText('—')).toHaveLength(1);
+      // The importer row's score cell — not a page-wide count of dashes: the CV
+      // column draws one on both rows, neither of them applied to.
+      const imported = modal.getByText('Imported Role').closest('tr') as HTMLTableRowElement;
+      expect(imported.cells[2]).toHaveTextContent('—');
     });
 
     it('fetches the company history when the modal opens, not with the list', async () => {
       const companyRequests: string[] = [];
       const onRequestStart = ({ request }: { request: Request }) => {
         const url = new URL(request.url);
-        if (url.searchParams.has('company')) companyRequests.push(url.search);
+        if (url.pathname.endsWith('/vacancies') && url.searchParams.has('sameCompanyAs')) {
+          companyRequests.push(url.search);
+        }
       };
       mswServer.events.on('request:start', onRequestStart);
       try {
@@ -1011,7 +1059,7 @@ describe('VacanciesPage / useVacancies', () => {
         await screen.findByRole('dialog');
 
         await waitFor(() => expect(companyRequests).toHaveLength(1));
-        expect(companyRequests[0]).toContain('company=Acme');
+        expect(companyRequests[0]).toContain('sameCompanyAs=Acme');
       } finally {
         mswServer.events.removeListener('request:start', onRequestStart);
       }
@@ -1033,6 +1081,80 @@ describe('VacanciesPage / useVacancies', () => {
       expect(marked).toHaveClass('row-current');
       expect(within(marked as HTMLElement).getByText('Backend Engineer')).toBeInTheDocument();
       expect(modal.getAllByText('Current')).toHaveLength(1);
+    });
+
+    it('shows whether a tailored CV went with each application', async () => {
+      mswServer.use(
+        ...buildHandlers([
+          vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
+          vacancy({
+            id: 2,
+            company: 'Acme',
+            title: 'Data Engineer',
+            status: 'APPLIED',
+            usedTailoredResume: true,
+          }),
+          vacancy({ id: 3, company: 'Acme', title: 'Frontend Lead', status: 'APPLIED' }),
+        ]),
+      );
+      renderVacancies();
+      await screen.findByText('Backend Engineer');
+
+      await userEvent
+        .setup()
+        .click(screen.getByRole('button', { name: /other vacancies at Acme/i }));
+      const modal = within(await screen.findByRole('dialog'));
+      // Date, Vacancy, Score, Status, CV, Actions.
+      const cv = (title: string) =>
+        (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[4];
+      // The ✓ waits for the applications query, which lands after the rows.
+      await waitFor(() => expect(cv('Data Engineer')).toHaveTextContent('✓'));
+      expect(cv('Frontend Lead')).toHaveTextContent('—');
+      expect(cv('Backend Engineer')).toHaveTextContent('—'); // never applied to
+    });
+
+    it('opens Details in a new tab, where the table opens it in place', async () => {
+      mswServer.use(...buildHandlers(companyFixtures()));
+      renderVacancies();
+      await screen.findByText('Backend Engineer');
+      // A modal's context would be lost to an in-place navigation; a table's is not.
+      expect(
+        rowOf('Backend Engineer').getByRole('link', { name: /open vacancy details/i }),
+      ).not.toHaveAttribute('target');
+
+      await userEvent
+        .setup()
+        .click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[0]);
+      const modal = within(await screen.findByRole('dialog'));
+      await modal.findByText('Data Engineer');
+      for (const link of modal.getAllByRole('link', { name: /open vacancy details/i })) {
+        expect(link).toHaveAttribute('target', '_blank');
+      }
+    });
+
+    it('scrolls the row it was opened from into view once, not on a refetch', async () => {
+      const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+      const rows = companyFixtures();
+      mswServer.use(...buildHandlers(rows));
+      const { client } = renderVacancies();
+      await screen.findByText('Backend Engineer');
+
+      // The second Acme row, Backend Engineer: not the modal's first row either.
+      await userEvent
+        .setup()
+        .click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[1]);
+      const modal = within(await screen.findByRole('dialog'));
+      const current = modal.getByText('Current').closest('tr');
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(current);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+
+      // Changed data, so the refetch really re-renders the row (an equal payload
+      // keeps the old reference and renders nothing).
+      rows[1].title = 'Data Engineer II';
+      await client.refetchQueries({ queryKey: ['vacancy-company'] });
+      await modal.findByText('Data Engineer II');
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
     });
 
     it('caps its own height, so a long history still fits the viewport', async () => {

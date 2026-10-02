@@ -58,12 +58,11 @@ export function VacanciesPage() {
 
         {loadError ? (
           <div className="empty-state">Failed to load vacancies: {loadError}</div>
-        ) : loading ? (
-          <div className="empty-state">Loading…</div>
-        ) : items.length === 0 ? (
+        ) : !loading && items.length === 0 ? (
           <div className="empty-state">No vacancies match this filter.</div>
         ) : (
           <VacancyTable
+            loading={loading}
             items={items}
             onEndReached={loadMore}
             savingIds={savingIds}

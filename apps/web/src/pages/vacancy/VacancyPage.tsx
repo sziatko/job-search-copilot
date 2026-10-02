@@ -11,6 +11,8 @@ import { IconCheck, IconChevronLeft, IconCross, IconExternal } from '@/component
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { Select } from '@/components/ui/Select';
+import { SkeletonCard } from '@/components/ui/SkeletonCard';
+import { SkeletonRows } from '@/components/ui/SkeletonRows';
 import { isSafeExternalUrl } from '@/lib/url';
 import { ApplicationStatusSelect } from '../applications/components/ApplicationStatusSelect';
 import { isPipelineStatus } from '../applications/types';
@@ -102,7 +104,7 @@ function VacancyView() {
     );
   }
   if (isPending) {
-    return <div className="empty-state">Loading…</div>;
+    return <VacancySkeleton />;
   }
 
   return (
@@ -160,6 +162,46 @@ function VacancyView() {
         <OtherVacancies items={page.others} pending={page.othersPending} />
       </div>
     </>
+  );
+}
+
+/** The rows `Facts` lists, so its skeleton has as many. */
+const FACT_COUNT = 8;
+
+/** The page while the vacancy loads: the real Back link, then its header and cards as
+ * bars — the status history, the description, the details. */
+function VacancySkeleton() {
+  return (
+    <div aria-busy="true">
+      <span className="sr-only">Loading…</span>
+      <BackLink />
+      <div aria-hidden className="detail-header">
+        <div className="w-full max-w-[520px]">
+          <span className="skeleton h-[13px] w-[30%]" />
+          <span className="skeleton mt-[10px] h-[22px] w-[80%]" />
+          <span className="skeleton mt-[14px] h-[12px] w-[40%]" />
+        </div>
+        <span className="skeleton h-[32px] w-[200px]" />
+      </div>
+      <SkeletonCard lines={1} className="mb-[16px]" />
+      <div className="dash-grid">
+        <SkeletonCard lines={6} />
+        <div aria-hidden className="card">
+          <div className="card-head">
+            <span className="skeleton h-[15px] w-[35%]" />
+          </div>
+          <div className="fact-list">
+            {Array.from({ length: FACT_COUNT }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
+              <div key={i} className="fact-row">
+                <span className="skeleton w-[35%]" />
+                <span className="skeleton w-[25%]" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -487,7 +529,7 @@ function Facts({ vacancy }: { vacancy: VacancyDetail }) {
       <Fact label="Recommendation">
         {analysed ? <RecommendationTag recommendation={vacancy.recommendation} /> : '—'}
       </Fact>
-      <Fact label="Salary in listing">{vacancy.salaryInListing ?? 'not listed'}</Fact>
+      <Fact label="Salary">{vacancy.salaryInListing ?? 'not listed'}</Fact>
       <Fact label="Tailored resume used">{vacancy.usedTailoredResume ? 'Yes' : 'No'}</Fact>
       <Fact label="Source">{hostname(vacancy.applyUrl)}</Fact>
       <Fact label="Status changed">
@@ -502,13 +544,12 @@ function Facts({ vacancy }: { vacancy: VacancyDetail }) {
 }
 
 function OtherVacancies({ items, pending }: { items: VacancyListItem[]; pending: boolean }) {
-  if (pending) return null;
-  if (items.length === 0) {
+  if (!pending && items.length === 0) {
     return <div className="empty-state">No other vacancies</div>;
   }
   return (
     <div className="overflow-x-auto">
-      <table>
+      <table aria-busy={pending}>
         <thead>
           <tr>
             <th style={{ width: 120 }}>Added</th>
@@ -518,6 +559,7 @@ function OtherVacancies({ items, pending }: { items: VacancyListItem[]; pending:
           </tr>
         </thead>
         <tbody>
+          {pending && <SkeletonRows rows={3} cols={4} />}
           {items.map((item) => (
             <tr key={item.id}>
               <td className="date-cell">{dateFormatter.format(new Date(item.createdAt))}</td>

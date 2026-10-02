@@ -26,6 +26,11 @@ export class ListVacanciesQueryDto {
   @IsString()
   company?: string;
 
+  /** Every row of this name's company, whatever its spelling (ADR-0032). */
+  @IsOptional()
+  @IsString()
+  sameCompanyAs?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

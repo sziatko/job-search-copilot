@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 /**
  * Two themes, and the OS picks the first:
@@ -34,19 +34,36 @@ function osTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+/**
+ * One copy for the whole app, read once at load. Each `useTheme` used to hold its
+ * own `useState`, so the toaster kept the old theme after a click on the toggle
+ * until a reload. Kept in memory, not re-read from storage, so a click still
+ * works for the session when storage is disabled.
+ */
+let stored: Theme | null = getStoredTheme();
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot() {
+  return stored;
+}
+
+function toggle() {
+  // Read the OS now, not at render: it may have flipped under an open tab.
+  const next: Theme = (stored ?? osTheme()) === 'dark' ? 'light' : 'dark';
+  // The attribute first, so the paint and the stored value can't disagree.
+  document.documentElement.setAttribute('data-theme', next);
+  setStoredTheme(next);
+  stored = next;
+  for (const listener of listeners) listener();
+}
+
 export function useTheme() {
-  const [stored, setStored] = useState<Theme | null>(getStoredTheme);
-  /** The theme on screen. */
-  const theme = stored ?? osTheme();
-
-  const toggle = useCallback(() => {
-    // Read the OS now, not at render: it may have flipped under an open tab.
-    const next: Theme = (stored ?? osTheme()) === 'dark' ? 'light' : 'dark';
-    // The attribute first, so the paint and the stored value can't disagree.
-    document.documentElement.setAttribute('data-theme', next);
-    setStoredTheme(next);
-    setStored(next);
-  }, [stored]);
-
-  return { theme, stored, toggle };
+  const current = useSyncExternalStore(subscribe, getSnapshot);
+  /** `theme` is the one on screen. */
+  return { theme: current ?? osTheme(), stored: current, toggle };
 }

@@ -40,6 +40,7 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0029](0029-one-vacancy-table.md) | One `Vacancy` table: one status, a `StatusChange` journal, comments with a `source` | Accepted (replaces 0017, 0018, 0028) |
 | [0030](0030-cursor-paging.md) | The web's tables page by a Prisma cursor; MCP keeps offset | Accepted |
 | [0031](0031-stats-endpoint.md) | One stats endpoint; the funnel counts the journal, and timeout moves to core | Accepted |
+| [0032](0032-same-company-normalised-name.md) | Same company = an equal normalised name | Accepted (amends 0025) |
 
 A gap in the numbers is a deleted ADR. The ADR that replaced it names it on its
 `Replaces:` line (an ADR whose code is simply gone has none), and

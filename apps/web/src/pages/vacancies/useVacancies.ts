@@ -12,6 +12,7 @@ import { recordApplication } from '../applications/api';
 import { applicationStatusSchema, isPipelineStatus } from '../applications/types';
 import { listVacanciesPage, updateVacancyStatus, type VacancyPage } from './api';
 import type { ApplyDetails } from './components/ApplyDialog';
+import { toastMoved } from './constants';
 import {
   STATUS_FILTER_ALL,
   type StatusFilterValue,
@@ -159,6 +160,7 @@ export function useVacancies() {
         new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
       );
     },
+    onSuccess: (item) => toastMoved(item.status, item),
     onSettled: (_data, _err, { id }) => {
       setSavingIds((prev) => {
         const next = new Set(prev);

@@ -530,6 +530,33 @@
   .empty-state {
     @apply px-[18px] py-[46px] text-center text-[13px] text-ink-muted;
   }
+  /* A loading bar in the shape of what loads (SkeletonRows). The gradient is twice
+     the bar's width and repeats, so sliding it one full width is a seamless loop. */
+  .skeleton {
+    @apply block h-[12px] rounded-[6px];
+    background:
+      linear-gradient(
+        90deg,
+        var(--color-surface-sunken) 25%,
+        var(--color-surface-alt) 50%,
+        var(--color-surface-sunken) 75%
+      )
+      0 0 / 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes skeleton-shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      animation: none;
+    }
+  }
   .toolbar-count {
     @apply whitespace-nowrap text-[12px] text-ink-muted;
   }
@@ -540,8 +567,15 @@
      the column past the window (the phone's sideways scroll), before its ellipsis
      could cut it. */
   .dash-grid {
-    @apply grid items-start gap-[16px];
+    @apply grid gap-[16px];
     grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  }
+  /* The grid stretches both cards to one row height. `contain: size` keeps the review
+     list out of that height, so the funnel card alone sets it, and the list fills
+     what is left under its heading and scrolls. One column resets it below. */
+  .review-scroll {
+    @apply min-h-0 flex-1 overflow-y-auto;
+    contain: size;
   }
   /* Name · value · conversion, then the bar at the card's full width: on one
      line the card (~330px at 1100 wide) left the bar nothing. When even the text
@@ -1007,6 +1041,10 @@
   @media (max-width: 980px) {
     .dash-grid {
       grid-template-columns: minmax(0, 1fr);
+    }
+    /* Its own row now: sized by its rows again, or it would collapse to nothing. */
+    .review-scroll {
+      contain: none;
     }
   }
 }

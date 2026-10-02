@@ -151,11 +151,25 @@ describe('Applications (e2e)', () => {
 
     it('carries the derived companyMatchCount, counted over every vacancy', async () => {
       const a = await seedVacancy({ company: 'Acme' });
-      await seedVacancy({ company: 'Acme Labs' }); // not applied to — still counted
+      await seedVacancy({ company: 'Acme Polska' }); // not applied to — still counted
       await request(app.getHttpServer()).post('/api/v1/applications').send({ vacancyId: a });
 
       const res = await request(app.getHttpServer()).get('/api/v1/applications').expect(200);
       expect(res.body.items[0].companyMatchCount).toBe(2);
+    });
+
+    it('filters by ?sameCompanyAs=, whatever the spelling', async () => {
+      const a = await seedVacancy({ company: 'Acme' });
+      const b = await seedVacancy({ company: 'Acme Polska' });
+      const c = await seedVacancy({ company: 'Beta Corp' });
+      for (const vacancyId of [a, b, c]) {
+        await request(app.getHttpServer()).post('/api/v1/applications').send({ vacancyId });
+      }
+
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/applications?sameCompanyAs=acme%20polska')
+        .expect(200);
+      expect(res.body.items.map((i: { id: number }) => i.id).sort()).toEqual([a, b].sort());
     });
 
     it('filters by ?state=, flags timedOut, and pages by ?cursor=', async () => {

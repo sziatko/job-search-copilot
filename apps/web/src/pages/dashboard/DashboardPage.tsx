@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { KpiTile } from '@/components/ui/KpiTile';
+import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { APPLICATION_STATUS_LABELS } from '../applications/constants';
 import type { ApplicationStatus } from '../applications/types';
 import type { VacancyListItem } from '../vacancies/types';
@@ -128,6 +129,30 @@ function RecentActivity({ items }: { items: RecentMove[] }) {
   );
 }
 
+/** The page while it loads: its five KPI tiles and its three cards, as bars. */
+function DashboardSkeleton() {
+  return (
+    <section className="view" aria-busy="true">
+      <span className="sr-only">Loading…</span>
+      <div aria-hidden className="kpi-row">
+        {Array.from({ length: 5 }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
+          <div key={i} className="kpi-tile">
+            <span className="skeleton h-[11px] w-[60%]" />
+            <span className="skeleton mt-[12px] h-[28px] w-[40%]" />
+            <span className="skeleton mt-[8px] h-[11px] w-[80%]" />
+          </div>
+        ))}
+      </div>
+      <div className="dash-grid">
+        <SkeletonCard lines={14} />
+        <SkeletonCard lines={9} />
+      </div>
+      <SkeletonCard lines={5} className="mt-[16px]" />
+    </section>
+  );
+}
+
 export function DashboardPage() {
   const { loading, loadError, stats, responseRate, reviewQueue } = useDashboard();
 
@@ -142,13 +167,7 @@ export function DashboardPage() {
   }
 
   if (loading || !stats) {
-    return (
-      <section className="view">
-        <div className="card">
-          <div className="empty-state">Loading…</div>
-        </div>
-      </section>
-    );
+    return <DashboardSkeleton />;
   }
 
   // Each stage past Recommended counts the journal — "ever reached", so a rejection
@@ -221,14 +240,16 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="card">
+        <div className="card flex flex-col">
           <div className="card-head">
             <div>
               <h2>Needs your review</h2>
               <div className="count">Top recommended, not yet triaged</div>
             </div>
           </div>
-          <ReviewQueue items={reviewQueue} />
+          <div className="review-scroll">
+            <ReviewQueue items={reviewQueue} />
+          </div>
         </div>
       </div>
 

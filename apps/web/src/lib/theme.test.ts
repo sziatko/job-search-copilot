@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getStoredTheme, setStoredTheme, useTheme } from './theme';
+import { getStoredTheme, setStoredTheme } from './theme';
 
 // The attribute is the whole mechanism and the stored value only remembers which
 // one to write, so a bug here is silent in a specific way: the user picks dark,
@@ -63,11 +63,47 @@ describe('setStoredTheme', () => {
 });
 
 describe('useTheme', () => {
-  it('starts from the stored choice, whatever the OS says', () => {
+  // The choice is read from storage once, when the module loads — a page load. Each
+  // test sets storage up first, then loads a fresh copy.
+  async function loadUseTheme() {
+    vi.resetModules();
+    return (await import('./theme')).useTheme;
+  }
+
+  it('starts from the stored choice, whatever the OS says', async () => {
     mockOs('light');
     localStorage.setItem(STORAGE_KEY, 'dark');
+    const useTheme = await loadUseTheme();
     const { result } = renderHook(() => useTheme());
     expect(result.current.theme).toBe('dark');
+  });
+
+  it('a click repaints every consumer, not only the one clicked', async () => {
+    // The header's toggle and the toaster each call useTheme; with a copy each, the
+    // toaster kept the old theme until a reload.
+    mockOs('light');
+    const useTheme = await loadUseTheme();
+    const toggle = renderHook(() => useTheme());
+    const toaster = renderHook(() => useTheme());
+    expect(toaster.result.current.stored).toBeNull();
+
+    act(() => toggle.result.current.toggle());
+    expect(toaster.result.current.stored).toBe('dark');
+    expect(toaster.result.current.theme).toBe('dark');
+  });
+
+  it('a click still works for the session when storage is disabled', async () => {
+    mockOs('light');
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    const useTheme = await loadUseTheme();
+    const { result } = renderHook(() => useTheme());
+
+    act(() => result.current.toggle());
+    expect(result.current.theme).toBe('dark');
+    act(() => result.current.toggle());
+    expect(result.current.theme).toBe('light');
   });
 
   it.each([
@@ -75,8 +111,9 @@ describe('useTheme', () => {
     ['dark', 'light'],
   ] as const)(
     'with nothing stored, on a %s OS: shows it, and the first click flips to %s',
-    (os, flipped) => {
+    async (os, flipped) => {
       mockOs(os);
+      const useTheme = await loadUseTheme();
       const { result } = renderHook(() => useTheme());
       expect(result.current.theme).toBe(os);
       // Nothing is written until a click: the CSS media query decides meanwhile.

@@ -5,8 +5,9 @@ import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { routeTree } from '@/router';
-import { fakeLogEntry, logHandler } from '@/test/msw/handlers';
+import { fakeLogEntry, holdGet, logHandler } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import { expectLoadedTable, expectSkeletonTable } from '@/test/skeleton';
 
 function renderLog(path = '/log') {
   const router = createRouter({
@@ -45,6 +46,17 @@ describe('LogPage', () => {
     // The count leads the toolbar; the table has no foot.
     expect(screen.getByText('Showing 2 of 2').closest('.toolbar')).not.toBeNull();
     expect(document.querySelector('.table-foot')).toBeNull();
+  });
+
+  it('draws skeleton rows under its header while the first page loads', async () => {
+    mswServer.use(logHandler([fakeLogEntry({ id: 1, company: 'Acme' })]));
+    const hold = holdGet('/log');
+    mswServer.use(hold.handler);
+    renderLog();
+
+    const table = await expectSkeletonTable('Seen');
+    hold.release();
+    await expectLoadedTable(table, 'Acme');
   });
 
   it('sends the search to the server and keeps it in the URL', async () => {

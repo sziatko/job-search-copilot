@@ -32,7 +32,9 @@ flags as a ceiling; the mockup's filter is client-side too. `/vacancies` loads
    no `Company` entity to key on. It is computed inside `core` `list()` with one
    extra query scoped to the page's distinct companies, and counted exactly in JS.
    It is **optional** in the web zod schema: that schema also parses the `PATCH`
-   response, which carries no derived field.
+   response, which carries no derived field. *(Phase 4.3: the count is by an equal
+   normalised name now, not a substring, and the modal lists by `sameCompanyAs` —
+   [ADR-0032](0032-same-company-normalised-name.md).)*
 3. **Application data does not enter the list item.** The company-history modal
    fetches, when it opens, the company's vacancies and the applications list in
    parallel, and joins them client-side on `vacancyId`.
@@ -78,10 +80,10 @@ flags as a ceiling; the mockup's filter is client-side too. `/vacancies` loads
 - **`search` must stay an OR of `company` and `title`.** Making it an AND means a
   term that names a company and a term that names a role stop matching anything —
   silently, since a miss is an empty list.
-- **`companyMatchCount` must stay "rows whose company *contains* this row's
-  company".** The button's visibility rule (`>= 2`) and its badge (`count - 1`)
-  both read it; switching it to an exact-match count makes the button disappear on
-  companies the modal — using the substring filter — would still list.
+- **`companyMatchCount` must count exactly the rows the modal lists.** The button's
+  visibility rule (`>= 2`) and its badge (`count - 1`) both read it. Since phase 4.3
+  both are "the same company" by [ADR-0032](0032-same-company-normalised-name.md)'s
+  key; changing one rule without the other brings the mismatch back.
 - **The web field must stay `.optional()`** in
   `apps/web/src/pages/vacancies/types.ts`. `pages/vacancies/api.ts` parses the
   `PATCH /:id/status` response with `vacancyListItemSchema`, and that

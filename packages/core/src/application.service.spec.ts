@@ -253,12 +253,25 @@ describe('ApplicationService', () => {
     });
 
     it('carries companyMatchCount: every vacancy of the company, triage ones included', async () => {
-      await seedVacancy({ company: 'ACME Labs', title: 'Triage', status: 'DECLINED' });
+      await seedVacancy({ company: 'ACME Polska', title: 'Triage', status: 'DECLINED' });
       const { items } = await applications.list();
       const counts = Object.fromEntries(
         items.map((item) => [item.company, item.companyMatchCount]),
       );
       expect(counts).toEqual({ Acme: 2, 'Beta Corp': 1 });
+    });
+
+    it('sameCompanyAs lists the applications of every spelling of the company', async () => {
+      const polska = await seedVacancy({ company: 'Acme Polska', status: 'APPLIED' });
+      const ids = async (sameCompanyAs: string) =>
+        (await applications.list({ sameCompanyAs })).items.map((item) => item.id).sort();
+
+      const acme = await ids('Acme');
+      expect(acme).toHaveLength(2);
+      expect(acme).toContain(polska.id);
+      expect(await ids('ACME Polska')).toEqual(acme);
+      // Only the pipeline: the triage rows of other companies stay out regardless.
+      expect(await ids('Beta Corp')).toHaveLength(1);
     });
 
     it('filters by status', async () => {

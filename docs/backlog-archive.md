@@ -5,6 +5,12 @@ history, not read when planning. Newest at the top.
 
 | Item | Kind | Outcome | From | Notes |
 | --- | --- | --- | --- | --- |
+| **Skeleton rows while the company modal loads** | fix | done — phase 4.3 steps 1, 2 | 2026-10-01 | Widened to every "Loading…" in the app: the four tables and the company modal draw their real header over `SkeletonRows`; the dashboard and the vacancy page draw `SkeletonCard`s. One `.skeleton` rule in `index.css`, no shimmer under `prefers-reduced-motion`. |
+| **A CV column in the company modal** | fix | done — phase 4.3 step 3 | 2026-10-01 | ✓ / — from `applicationsByVacancy`'s `usedTailoredResume`, — on a row with no application. The dialog widened to `max-w-3xl`. |
+| **Details from the company modal opens in a new tab** | fix | done — phase 4.3 step 3 | 2026-10-01 | `DetailsLink`'s `newTab`, passed only by `CompanyHistoryModal`; the tables still open the page in place. |
+| **`scrollIntoView` for the marked row in the company-history modal** | fix | done — phase 4.3 step 3 | phase 2.1 step 8, phase 2.2 | `scrollIntoView({ block: 'nearest' })` on the current row once the rows arrive, once per open; the newest-first order stays. |
+| **The salary label says "in the listing"** | fix | done — phase 4.3 step 4 | 2026-10-01 | "Salary" on the vacancy page, "Salary / rate" in the apply dialog. The field rename is its own open backlog row. |
+| **The toaster misses a theme click until reload** | fix | done — phase 4.3 step 4 | phase 4.1 step 2 | One module-level store in `lib/theme.ts`, read through `useSyncExternalStore`: the toggle and the toaster see the same click. |
 | **Arrow keys and the `role="menu"` contract** | fix | not relevant (2026-10-01) | phase 2.2 (finding 7) | The ⋯ menu is gone (phase 4.2 step 9): every status has its own row button, so there is no `role="menu"` to honour. |
 | **`hasAnalysis` list filter** | fix | not relevant (2026-09-29) | phase 2.2 | Its one reason was the dashboard's analysed-count tile; phase 4.1 step 4 dropped `analysed` from `/stats` and starts the funnel at Recommended. |
 | **Store the application timeout in the DB, set by an automation** | fix | not relevant (2026-09-28) | 2026-09-28 | The timeout stays derived in core (`timedOutWhere` in `packages/core/src/status.ts`, 30 days): it never writes `status` or a `StatusChange` row, so a timed-out application never shows in Recent activity. A job writing a stored value is what the user did not want. Phase 4.1 shows the count on the dashboard instead. |

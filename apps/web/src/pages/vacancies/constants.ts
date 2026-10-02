@@ -1,6 +1,7 @@
 // Presentation metadata keyed by the enum types from ./types. `satisfies Record<…>`
 // makes a missing/typo'd key a compile error, so adding a Recommendation / status
 // value forces every map here to be updated too.
+import { toast } from 'sonner';
 import { APPLICATION_STATUS_LABELS } from '../applications/constants';
 import type { Recommendation, VacancyStatus } from './types';
 
@@ -11,6 +12,15 @@ export const STATUS_LABELS = {
   UNAVAILABLE: 'Unavailable',
   ...APPLICATION_STATUS_LABELS,
 } satisfies Record<VacancyStatus, string>;
+
+/** The toast after a status move — one wording for /vacancies, /applications and the
+ * vacancy page. Called from a mutation's success, never next to `mutate()`. */
+export function toastMoved(
+  status: VacancyStatus,
+  { title, company }: { title: string; company: string },
+) {
+  toast.success(`Moved to ${STATUS_LABELS[status]}`, { description: `${title} — ${company}` });
+}
 
 /** The Status column's tags — a pipeline row shows its real stage. Variants name the
  * `.tag.*` classes in index.css; `text` reuses the labels so a tag can never disagree

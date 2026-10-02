@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApplicationService } from './application.service';
 import { InvalidRecommendationError, SameStatusError } from './errors';
 import { getPrisma } from './prisma-client';
-import { VacancyService } from './vacancy.service';
+import { companyKey, VacancyService } from './vacancy.service';
 import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
 
 // Integration tests: hit the real (test) Postgres database instead of mocking
@@ -38,6 +38,38 @@ function input(overrides: Partial<SaveVacancyInput> = {}): SaveVacancyInput {
 function countsByCompany(items: VacancyListItem[]): Record<string, number> {
   return Object.fromEntries(items.map((item) => [item.company, item.companyMatchCount]));
 }
+
+// Pairs and near-misses from the dev DB's 448 company names (2026-10-02).
+describe('companyKey', () => {
+  it.each([
+    ['contoso', 'contoso Polska'],
+    ['Sii Polska', 'Sii Poland'],
+    ['ALTEN', 'ALTEN Spain'],
+    ['UST', 'UST España & Latam'],
+    ['Fabrikam', 'Fabrikam (partner company, anonymized)'],
+    ['7N', '7N Sp. z o. o.'],
+    ['Exadel', 'Exadel Inc'],
+    ['Connectis', 'Connectis_'],
+    ['iTeamly', 'Iteamly'],
+  ])('%j and %j are one company', (a, b) => {
+    expect(companyKey(a)).toBe(companyKey(b));
+  });
+
+  it.each([
+    ['iO', 'Apollo.io'],
+    ['Box', 'Mapbox'],
+    ['Hays', 'Haystack People'],
+    ['Tailspin', 'Tenth Tailspinion Group'],
+    ['Software Mind', 'Software Mansion'],
+  ])('%j and %j are not', (a, b) => {
+    expect(companyKey(a)).not.toBe(companyKey(b));
+  });
+
+  it('keeps a name that is nothing but a country or a note', () => {
+    expect(companyKey('Polska')).toBe('polska');
+    expect(companyKey('(stealth)')).toBe('(stealth)');
+  });
+});
 
 describe('VacancyService', () => {
   describe('save', () => {
@@ -458,21 +490,30 @@ describe('VacancyService', () => {
         expect(countsByCompany(items).Acme).toBe(2);
       });
 
-      it('is a case-insensitive substring, in one direction only', async () => {
-        // 'Acme' contains itself in 'Acme Recruiting', but not the reverse — the
-        // needle is this row's own company, which is what the button reports.
+      it('is the same from every spelling of the company (ADR-0032)', async () => {
+        // The substring rule this replaced counted 'Acme Polska' into Acme's 2 and
+        // gave 'Acme Polska' itself 1 — #807 / #761 on the dev DB, 11 vs 4.
         await service.save(
-          input({ applyUrl: 'https://example.com/jobs/d', company: 'Acme Recruiting' }),
+          input({ applyUrl: 'https://example.com/jobs/d', company: 'Acme Polska' }),
+        );
+        // A longer name is another company now, not a match from the short side.
+        await service.save(
+          input({ applyUrl: 'https://example.com/jobs/d2', company: 'Acme Recruiting' }),
         );
 
         const { items } = await service.list();
 
-        expect(countsByCompany(items)).toEqual({ Acme: 2, 'Acme Recruiting': 1, 'Beta Corp': 1 });
+        expect(countsByCompany(items)).toEqual({
+          Acme: 2,
+          'Acme Polska': 2,
+          'Acme Recruiting': 1,
+          'Beta Corp': 1,
+        });
       });
 
-      it('matches a differently-cased company name', async () => {
+      it('matches a differently-cased name with a legal form', async () => {
         await service.save(
-          input({ applyUrl: 'https://example.com/jobs/e', company: 'acme consulting' }),
+          input({ applyUrl: 'https://example.com/jobs/e', company: 'ACME Sp. z o.o.' }),
         );
 
         const { items } = await service.list();
@@ -490,6 +531,38 @@ describe('VacancyService', () => {
 
         expect(items).toHaveLength(1);
         expect(items[0].companyMatchCount).toBe(2);
+      });
+    });
+
+    describe('sameCompanyAs', () => {
+      it('lists the same rows from either spelling', async () => {
+        const polska = await service.save(
+          input({ applyUrl: 'https://example.com/jobs/s1', company: 'Acme Polska' }),
+        );
+        await service.save(
+          input({ applyUrl: 'https://example.com/jobs/s2', company: 'Acme Recruiting' }),
+        );
+        const ids = async (sameCompanyAs: string) =>
+          (await service.list({ sameCompanyAs })).items.map((item) => item.id).sort();
+
+        const acme = await ids('Acme');
+        expect(acme).toHaveLength(2);
+        expect(acme).toContain(polska.vacancy.id);
+        expect(await ids('Acme Polska')).toEqual(acme);
+        expect(await ids('acme sp. z o.o.')).toEqual(acme);
+      });
+
+      it('ANDs with the other filters, `company` included', async () => {
+        await service.save(
+          input({ applyUrl: 'https://example.com/jobs/s3', company: 'Acme Polska' }),
+        );
+
+        expect((await service.list({ sameCompanyAs: 'Acme', company: 'polska' })).total).toBe(1);
+        expect((await service.list({ sameCompanyAs: 'Acme', status: ['DECLINED'] })).total).toBe(0);
+      });
+
+      it('lists nothing for a company with no vacancies', async () => {
+        expect((await service.list({ sameCompanyAs: 'Nobody' })).total).toBe(0);
       });
     });
 
@@ -609,9 +682,9 @@ describe('VacancyService', () => {
       });
 
       it('counts a company whose own name contains a backslash', async () => {
-        // The companyMatchCount prefilter feeds each row's company back through
-        // `contains`; unescaped, that pattern missed the row it came from, so the
-        // duplicates button hid on a company's own page (phase 2.2, finding 12).
+        // The count once fed each row's company back through `contains`; unescaped,
+        // that pattern missed the row it came from, so the duplicates button hid on
+        // a company's own page (phase 2.2, finding 12).
         await service.save(input({ applyUrl: 'https://example.com/jobs/bs', company: 'A\\B' }));
 
         const { items } = await service.list({ company: 'A\\B' });

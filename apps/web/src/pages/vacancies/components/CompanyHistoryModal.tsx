@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { Modal } from '@/components/ui/Modal';
 import { ScorePill } from '@/components/ui/ScorePill';
+import { SkeletonRows } from '@/components/ui/SkeletonRows';
 import { isSafeExternalUrl } from '@/lib/url';
 import { listApplicationsPage } from '@/pages/applications/api';
 import { daysSinceLastMove } from '@/pages/applications/constants';
@@ -33,23 +34,31 @@ export function CompanyHistoryModal({
   onClose: () => void;
 }) {
   const titleId = useId();
+  // Once per open, not on every render: a refetch re-renders the row, and pulling
+  // the list back to it would undo the user's own scrolling.
+  const scrolledToCurrent = useRef(false);
+  const scrollToCurrent = (row: HTMLTableRowElement | null) => {
+    if (!row || scrolledToCurrent.current) return;
+    scrolledToCurrent.current = true;
+    row.scrollIntoView({ block: 'nearest' });
+  };
 
   const { data, isPending, error } = useQuery({
     // Deliberately NOT under ['vacancies']: useVacancies invalidates that prefix
     // after every action change, which would refetch this for nothing.
     queryKey: ['vacancy-company', company],
-    queryFn: () => listVacanciesPage({ company, limit: 100 }),
+    queryFn: () => listVacanciesPage({ sameCompanyAs: company, limit: 100 }),
     staleTime: 0,
   });
 
-  // This company's applications, for the ⏳ timeout mark only — `search` also
-  // matches titles, which the join by id below ignores. Not under ['applications']:
+  // This company's applications, every spelling (ADR-0032), for the ⏳ mark and the
+  // CV column — joined by id below. Not under ['applications']:
   // those entries are the tracker's paged lists, and its optimistic writes patch
   // every one of them as pages.
   // ponytail: one page of 500; a company with more applications loses the oldest marks.
   const applications = useQuery({
     queryKey: ['application-company', company],
-    queryFn: () => listApplicationsPage({ search: company, limit: 500 }),
+    queryFn: () => listApplicationsPage({ sameCompanyAs: company, limit: 500 }),
     staleTime: 0,
   });
 
@@ -58,13 +67,12 @@ export function CompanyHistoryModal({
   );
   const items = data?.items ?? [];
   // `total` is the server's count of this company's vacancies, not the size of the
-  // page it sent (the company filter is a substring match, so it can count more
-  // than the table shows). The subtitle said "in the log" off `items.length`, so a
-  // 250-vacancy company read "100 in the log" under a button saying 249.
+  // page it sent (100 at most). The subtitle said "in the log" off `items.length`, so
+  // a 250-vacancy company read "100 in the log" under a button saying 249.
   const total = data?.total ?? 0;
 
   return (
-    <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName="max-w-2xl">
+    <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName="max-w-3xl">
       <h2 id={titleId} className="dialog-title">
         All vacancies at {company}
       </h2>
@@ -87,17 +95,19 @@ export function CompanyHistoryModal({
         <div className="max-h-[60vh] overflow-y-auto">
           {/* `min-w-0` overrides the global `table { min-width: 760px }`, which
               would burst the dialog's own width. */}
-          <table className="min-w-0">
+          <table className="min-w-0" aria-busy={isPending}>
             <thead>
               <tr>
                 <th>Date</th>
                 <th>Vacancy</th>
                 <th>Score</th>
                 <th>Status</th>
+                <th>CV</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
+              {isPending && <SkeletonRows rows={4} cols={6} />}
               {items.map((item) => {
                 const application = applicationsByVacancy.get(item.id);
                 // Two independent questions, and they used to be one variable: can
@@ -107,7 +117,11 @@ export function CompanyHistoryModal({
                 const linkable = isSafeExternalUrl(item.applyUrl);
                 const isCurrent = item.id === currentId;
                 return (
-                  <tr key={item.id} className={isCurrent ? 'row-current' : undefined}>
+                  <tr
+                    key={item.id}
+                    ref={isCurrent ? scrollToCurrent : undefined}
+                    className={isCurrent ? 'row-current' : undefined}
+                  >
                     <td className="date-cell">
                       {application?.timedOut && (
                         <span className="timeout-mark mr-[4px]">
@@ -132,9 +146,8 @@ export function CompanyHistoryModal({
                       ) : (
                         <span className="role-title">{item.title}</span>
                       )}
-                      {/* Which of these rows is the one you clicked — the company
-                          filter matches substrings, so a sibling here can be a
-                          different company too. */}
+                      {/* Which of these rows is the one you clicked — a sibling
+                          can carry another spelling of the company. */}
                       {isCurrent && (
                         <span className="tag accent ml-[7px] align-middle">Current</span>
                       )}
@@ -149,6 +162,10 @@ export function CompanyHistoryModal({
                         {STATUS_TAGS[item.status].text}
                       </span>
                     </td>
+                    {/* /applications' CV column; a row never applied to has no CV. */}
+                    <td className="text-[12px] text-ink-muted">
+                      {application?.usedTailoredResume ? '✓' : '—'}
+                    </td>
                     <td>
                       <div className="flex gap-[6px]">
                         <CopyVacancyButton
@@ -157,7 +174,7 @@ export function CompanyHistoryModal({
                           title={item.title}
                           applyUrl={item.applyUrl}
                         />
-                        <DetailsLink id={item.id} />
+                        <DetailsLink id={item.id} newTab />
                       </div>
                     </td>
                   </tr>

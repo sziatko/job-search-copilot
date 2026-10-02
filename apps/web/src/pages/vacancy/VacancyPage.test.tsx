@@ -2,14 +2,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { RequestHandler } from 'msw';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { routeTree } from '@/router';
-import { buildHandlers, type FakeVacancy, fakeVacancy } from '@/test/msw/handlers';
+import { buildHandlers, type FakeVacancy, fakeVacancy, holdGet } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import {
+  expectLoadedPage,
+  expectLoadedTable,
+  expectSkeletonPage,
+  expectSkeletonTable,
+} from '@/test/skeleton';
 
-function renderAt(path: string, rows: FakeVacancy[]) {
-  mswServer.use(...buildHandlers(rows));
+/** `first` go in front of the fake's own handlers — a `holdGet` must. */
+function renderAt(path: string, rows: FakeVacancy[], ...first: RequestHandler[]) {
+  mswServer.use(...first, ...buildHandlers(rows));
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
@@ -56,6 +65,7 @@ const applied = () =>
 describe('VacancyPage', () => {
   afterEach(() => {
     mswServer.events.removeAllListeners();
+    vi.restoreAllMocks();
   });
 
   it('shows the header, the timeline, the comments, the details and the other vacancies', async () => {
@@ -82,7 +92,8 @@ describe('VacancyPage', () => {
     expect(comments.getByText('Sent the CV.')).toBeInTheDocument();
 
     const details = await card(/^details$/i);
-    expect(details.getByText('130 PLN/h')).toBeInTheDocument();
+    // What the user entered when applying, not necessarily the listing's figure.
+    expect(details.getByText('Salary').closest('.fact-row')).toHaveTextContent('130 PLN/h');
     expect(details.getByText('example.com')).toBeInTheDocument();
 
     // The company's others, this one left out.
@@ -94,6 +105,54 @@ describe('VacancyPage', () => {
       'href',
       '/vacancies/2',
     );
+  });
+
+  it('asks for the other vacancies by company, whatever its spelling (ADR-0032)', async () => {
+    const asked: (string | null)[] = [];
+    mswServer.events.on('request:start', ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname.endsWith('/vacancies')) asked.push(url.searchParams.get('sameCompanyAs'));
+    });
+    renderAt('/vacancies/1', [applied()]);
+
+    await card(/other vacancies at acme/i);
+    await waitFor(() => expect(asked).toEqual(['Acme']));
+  });
+
+  it('draws a skeleton of the header and the cards while the vacancy loads', async () => {
+    const hold = holdGet('/vacancies/1');
+    renderAt(
+      '/vacancies/1',
+      [applied(), fakeVacancy({ id: 2, company: 'Acme', title: 'Frontend Engineer' })],
+      hold.handler,
+    );
+
+    const page = await expectSkeletonPage();
+    const facts = page.querySelectorAll('.fact-row').length;
+    hold.release();
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Backend Engineer' }),
+    ).toBeInTheDocument();
+    // The other vacancies load after it, with skeleton rows of their own.
+    await (await card(/other vacancies at acme/i)).findByText('Frontend Engineer');
+    expectLoadedPage();
+    // A skeleton row for each fact the details card lists.
+    expect(document.querySelectorAll('.fact-row')).toHaveLength(facts);
+  });
+
+  it('draws skeleton rows under the other vacancies header while they load', async () => {
+    const hold = holdGet('/vacancies');
+    renderAt(
+      '/vacancies/1',
+      [applied(), fakeVacancy({ id: 2, company: 'Acme', title: 'Data Engineer' })],
+      hold.handler,
+    );
+
+    const others = await card(/other vacancies at acme/i);
+    const table = await expectSkeletonTable('Vacancy', others);
+    hold.release();
+    await expectLoadedTable(table, 'Data Engineer');
   });
 
   it('shows a placeholder for the text of a vacancy recorded without a posting', async () => {
@@ -109,6 +168,7 @@ describe('VacancyPage', () => {
   });
 
   it('moves a triage status through the vacancy endpoint', async () => {
+    const success = vi.spyOn(toast, 'success');
     const rows = [fakeVacancy({ id: 1, status: 'NOT_REVIEWED' })];
     const writes = recordWrites();
     renderAt('/vacancies/1', rows);
@@ -119,6 +179,9 @@ describe('VacancyPage', () => {
     expect(await timeline.findByText('Saved for later')).toBeInTheDocument();
     expect(writes).toEqual(['PATCH /api/v1/vacancies/1/status']);
     expect(rows[0].status).toBe('SAVED_FOR_LATER');
+    expect(success).toHaveBeenCalledWith('Moved to Saved for later', {
+      description: expect.stringContaining(' — '),
+    });
   });
 
   it('applies through the apply dialog, which records the application', async () => {
@@ -136,6 +199,7 @@ describe('VacancyPage', () => {
   });
 
   it('moves a pipeline status through the applications endpoint', async () => {
+    const success = vi.spyOn(toast, 'success');
     const rows = [applied()];
     const writes = recordWrites();
     renderAt('/vacancies/1', rows);
@@ -144,9 +208,15 @@ describe('VacancyPage', () => {
 
     await waitFor(() => expect(rows[0].status).toBe('INTERVIEW'));
     expect(writes).toEqual(['PATCH /api/v1/applications/1/status']);
+    await waitFor(() =>
+      expect(success).toHaveBeenCalledWith('Moved to Interview', {
+        description: 'Backend Engineer — Acme',
+      }),
+    );
   });
 
   it('adds a comment, then shows it', async () => {
+    const success = vi.spyOn(toast, 'success');
     const rows = [fakeVacancy({ id: 1, status: 'NOT_REVIEWED' })];
     const writes = recordWrites();
     renderAt('/vacancies/1', rows);
@@ -160,6 +230,7 @@ describe('VacancyPage', () => {
     expect(await comments.findByText('Ask about the rate.')).toBeInTheDocument();
     expect(writes).toEqual(['PATCH /api/v1/applications/1']);
     expect(comments.getByRole('textbox', { name: /add a comment/i })).toHaveValue('');
+    expect(success).toHaveBeenCalledWith('Comment added');
   });
 
   it('is linked from each row of both tables', async () => {

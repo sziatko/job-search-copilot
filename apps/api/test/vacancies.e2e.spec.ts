@@ -218,6 +218,22 @@ describe('Vacancies (e2e)', () => {
       expect(res.body.items).toHaveLength(1);
       expect(res.body.items[0].companyMatchCount).toBe(2);
     });
+
+    it('lists every spelling of a company with ?sameCompanyAs=', async () => {
+      const server = app.getHttpServer();
+      await request(server).post('/api/v1/vacancies').send(validPayload).expect(201);
+      await request(server)
+        .post('/api/v1/vacancies')
+        .send({ ...validPayload, company: 'Acme Polska', applyUrl: 'https://example.com/jobs/4' })
+        .expect(201);
+
+      for (const name of ['Acme', 'Acme Polska']) {
+        const res = await request(server)
+          .get(`/api/v1/vacancies?sameCompanyAs=${encodeURIComponent(name)}`)
+          .expect(200);
+        expect(res.body.total).toBe(2);
+      }
+    });
   });
 
   describe('GET /api/v1/vacancies/:id', () => {

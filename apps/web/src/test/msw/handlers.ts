@@ -63,11 +63,15 @@ function asApplication(row: FakeVacancy) {
   return { ...row, timedOut: isTimedOut(row) };
 }
 
-/** Core's `companyMatchCounts`: every row whose company contains this one's. */
+/** Core's `companyKey` equality (ADR-0032), cut down to case: core's tests own the
+ * rule, these only need one company to be one company. */
+function sameCompany(a: string, b: string) {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
+/** Core's `companyMatchCounts`: every row of the same company, this one included. */
 function companyMatchCount(rows: FakeVacancy[], row: FakeVacancy) {
-  return rows.filter((candidate) =>
-    candidate.company.toLowerCase().includes(row.company.toLowerCase()),
-  ).length;
+  return rows.filter((candidate) => sameCompany(candidate.company, row.company)).length;
 }
 
 /** A row as GET /vacancies/:id — the journal starts at NOT_REVIEWED on `createdAt`,
@@ -118,7 +122,7 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
     const statuses = query.get('status')?.split(',');
     const recommendation = query.get('recommendation');
     const search = query.get('search');
-    const company = query.get('company');
+    const sameCompanyAs = query.get('sameCompanyAs');
     const cursor = query.get('cursor');
     // The server's two orders (ADR-0030), each ending on `id`.
     const byOrder =
@@ -131,7 +135,7 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
     const matches = (row: FakeVacancy) =>
       (!statuses || statuses.includes(row.status)) &&
       (!recommendation || row.recommendation === recommendation) &&
-      (!company || row.company.toLowerCase().includes(company.toLowerCase())) &&
+      (!sameCompanyAs || sameCompany(row.company, sameCompanyAs)) &&
       // /vacancies sends its term here rather than filtering client-side, so
       // without this the page's search tests would pass while doing nothing.
       (!search ||
@@ -164,6 +168,23 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
       nextCursor: more ? (page.at(-1)?.id ?? null) : null,
     });
   };
+}
+
+/**
+ * Holds each GET to `path` that `when` picks until the test calls `release()` — a
+ * page caught mid-load, with no timer to race. The resolver then returns nothing,
+ * which in MSW 2 falls through to the next matching handler (unlike `passthrough()`,
+ * which makes the real request), so it must be registered in front of that one.
+ */
+export function holdGet(path: string, when: (url: URL) => boolean = () => true) {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const handler = http.get(`${API_URL}${path}`, async ({ request }) => {
+    if (when(new URL(request.url))) await held;
+  });
+  return { handler, release: () => release() };
 }
 
 /** Builds handlers backed by one mutable in-memory table, mirroring what the real API
@@ -225,8 +246,10 @@ export function buildHandlers(rows: FakeVacancy[]) {
       const status = query.get('status');
       const state = query.get('state');
       const search = query.get('search')?.toLowerCase();
+      const sameCompanyAs = query.get('sameCompanyAs');
       const matches = (row: FakeVacancy) =>
         isPipelineStatus(row.status) &&
+        (!sameCompanyAs || sameCompany(row.company, sameCompanyAs)) &&
         (!status || row.status === status) &&
         (!state ||
           (state === 'timedOut'

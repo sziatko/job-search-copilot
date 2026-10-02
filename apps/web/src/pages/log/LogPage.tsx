@@ -1,6 +1,7 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useRef } from 'react';
 import { SearchInput } from '@/components/ui/SearchInput';
+import { SkeletonRows } from '@/components/ui/SkeletonRows';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
 import { useInfiniteList } from '@/lib/useInfiniteList';
@@ -45,10 +46,9 @@ export function LogPage() {
 
         {query.error ? (
           <div className="empty-state">Failed to load the log: {query.error.message}</div>
-        ) : query.isPending ? (
-          <div className="empty-state">Loading…</div>
         ) : (
           <LogTable
+            loading={query.isPending}
             items={items}
             onEndReached={loadMore}
             emptyMessage={term ? 'No entries match this search.' : 'The log is empty.'}
@@ -60,10 +60,13 @@ export function LogPage() {
 }
 
 function LogTable({
+  loading,
   items,
   onEndReached,
   emptyMessage,
 }: {
+  /** The first page is on its way — VacancyTable's `loading`. */
+  loading: boolean;
   items: LogEntry[];
   onEndReached: () => void;
   emptyMessage: string;
@@ -77,7 +80,7 @@ function LogTable({
 
   return (
     <div ref={scrollRef} className="table-body-scroll" data-testid="log-scroll">
-      <table className="min-w-[900px] table-fixed">
+      <table className="min-w-[900px] table-fixed" aria-busy={loading}>
         <thead>
           <tr>
             <th style={{ width: 110 }}>Seen</th>
@@ -87,7 +90,8 @@ function LogTable({
           </tr>
         </thead>
         <tbody>
-          {items.length === 0 && (
+          {loading && <SkeletonRows rows={8} cols={COL_COUNT} />}
+          {!loading && items.length === 0 && (
             <tr>
               <td colSpan={COL_COUNT}>
                 <div className="empty-state">{emptyMessage}</div>

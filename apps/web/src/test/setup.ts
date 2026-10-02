@@ -48,6 +48,10 @@ if (!window.matchMedia) {
 // would see jsdom's function and skip.
 window.scrollTo = (() => {}) as typeof window.scrollTo;
 
+// jsdom has no scrollIntoView at all; the company modal calls it on the row it was
+// opened from. A no-op, so a test can `vi.spyOn` it.
+Element.prototype.scrollIntoView = () => {};
+
 // jsdom lays nothing out — every measurement is 0, which makes the row virtualizer
 // render an empty window. Give elements a usable box so tests that render a
 // virtualized table see rows.

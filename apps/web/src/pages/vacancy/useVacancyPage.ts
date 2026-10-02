@@ -4,6 +4,7 @@ import { recordApplication, updateApplicationStatus } from '../applications/api'
 import type { ApplicationStatus } from '../applications/types';
 import { addComment, getVacancy, listVacanciesPage, updateVacancyStatus } from '../vacancies/api';
 import type { ApplyDetails } from '../vacancies/components/ApplyDialog';
+import { toastMoved } from '../vacancies/constants';
 import type { VacancyAction } from '../vacancies/types';
 
 /** Every cache a write on this page can make stale — this record, the tables that list
@@ -34,7 +35,7 @@ export function useVacancyPage(id: number) {
   // The key CompanyHistoryModal uses for the same request, so the two share a cache.
   const others = useQuery({
     queryKey: ['vacancy-company', company],
-    queryFn: () => listVacanciesPage({ company, limit: 100 }),
+    queryFn: () => listVacanciesPage({ sameCompanyAs: company, limit: 100 }),
     enabled: company !== undefined,
   });
 
@@ -57,6 +58,11 @@ export function useVacancyPage(id: number) {
     onSettled: refetchAffected,
   });
 
+  // The controls are drawn from the loaded vacancy, so its data is there by now.
+  const moved = (status: VacancyAction | ApplicationStatus) => () => {
+    if (vacancy.data) toastMoved(status, vacancy.data);
+  };
+
   return {
     vacancy,
     others: (others.data?.items ?? []).filter((item) => item.id !== id),
@@ -64,9 +70,11 @@ export function useVacancyPage(id: number) {
     statusSaving: statusWrite.isPending,
     statusError: statusWrite.error?.message ?? null,
     moveTriage: (status: VacancyAction) =>
-      statusWrite.mutate(() => updateVacancyStatus(id, status)),
+      statusWrite.mutate(() => updateVacancyStatus(id, status), { onSuccess: moved(status) }),
     movePipeline: (status: ApplicationStatus) =>
-      statusWrite.mutate(() => updateApplicationStatus(id, status)),
+      statusWrite.mutate(() => updateApplicationStatus(id, status), {
+        onSuccess: moved(status),
+      }),
     apply: (details: ApplyDetails) =>
       statusWrite.mutate(
         () =>
@@ -79,7 +87,12 @@ export function useVacancyPage(id: number) {
         { onSuccess: () => toast.success('Application submitted!') },
       ),
     addComment: (body: string, onDone: () => void) =>
-      commentWrite.mutate(body, { onSuccess: onDone }),
+      commentWrite.mutate(body, {
+        onSuccess: () => {
+          onDone();
+          toast.success('Comment added');
+        },
+      }),
     commentSaving: commentWrite.isPending,
     commentError: commentWrite.error?.message ?? null,
   };

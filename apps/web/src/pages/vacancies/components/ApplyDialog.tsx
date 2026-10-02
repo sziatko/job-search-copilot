@@ -59,7 +59,7 @@ export function ApplyDialog({
         <div className="mt-[16px] space-y-[16px]">
           <div>
             <label htmlFor={salaryId} className="field-label">
-              Salary / rate in the listing
+              Salary / rate
             </label>
             <input
               id={salaryId}

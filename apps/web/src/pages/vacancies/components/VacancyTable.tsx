@@ -10,6 +10,7 @@ import {
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
+import { SkeletonRows } from '@/components/ui/SkeletonRows';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
 import { isPipelineStatus } from '../../applications/types';
@@ -50,6 +51,7 @@ const COL_COUNT = 7;
  */
 
 export function VacancyTable({
+  loading,
   items,
   savingIds,
   rowErrors,
@@ -57,6 +59,9 @@ export function VacancyTable({
   onShowCompanyHistory,
   onEndReached,
 }: {
+  /** The first page is on its way: skeleton rows under the real header. `items` is
+   * empty until then, so `onEndReached` cannot fire over the skeleton. */
+  loading: boolean;
   items: VacancyListItem[];
   savingIds: Set<number>;
   rowErrors: Map<number, string>;
@@ -76,7 +81,7 @@ export function VacancyTable({
 
   return (
     <div ref={scrollRef} className="table-body-scroll">
-      <table className="min-w-[1200px] table-fixed">
+      <table className="min-w-[1200px] table-fixed" aria-busy={loading}>
         <thead>
           <tr>
             <th style={{ width: 90 }}>Added</th>
@@ -89,6 +94,7 @@ export function VacancyTable({
           </tr>
         </thead>
         <tbody>
+          {loading && <SkeletonRows rows={8} cols={COL_COUNT} />}
           {paddingTop > 0 && (
             <tr aria-hidden className="hover:bg-transparent">
               <td colSpan={COL_COUNT} className="border-0 p-0" style={{ height: paddingTop }} />

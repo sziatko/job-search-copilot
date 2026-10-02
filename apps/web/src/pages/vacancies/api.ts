@@ -20,8 +20,9 @@ export async function listVacanciesPage(
     recommendation?: Recommendation;
     /** Free text over company OR title, filtered server-side (ADR-0025). */
     search?: string;
-    /** ILIKE '%company%' — the company-history modal's filter. */
-    company?: string;
+    /** Every vacancy of this name's company, whatever its spelling (ADR-0032) — the
+     * company modal and the vacancy page's other vacancies. */
+    sameCompanyAs?: string;
     /** The server's order (ADR-0030); it defaults to `newest`. */
     sort?: 'newest' | 'recommended';
     /** The `id` of the last row loaded; the page starts after it. */
@@ -32,7 +33,7 @@ export async function listVacanciesPage(
   if (params.status?.length) query.set('status', params.status.join(','));
   if (params.recommendation) query.set('recommendation', params.recommendation);
   if (params.search) query.set('search', params.search);
-  if (params.company) query.set('company', params.company);
+  if (params.sameCompanyAs) query.set('sameCompanyAs', params.sameCompanyAs);
   if (params.sort) query.set('sort', params.sort);
   if (params.cursor !== undefined) query.set('cursor', String(params.cursor));
 

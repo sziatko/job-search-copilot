@@ -4,7 +4,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Stats } from '@/pages/dashboard/types';
 import { routeTree } from '@/router';
 import {
@@ -12,9 +13,11 @@ import {
   type FakeVacancy,
   fakeStats,
   fakeVacancy,
+  holdGet,
   statsHandler,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import { expectLoadedTable, expectSkeletonTable } from '@/test/skeleton';
 import type { ApplicationPage } from './api';
 
 const DAY = 86_400_000;
@@ -75,6 +78,8 @@ function renderApplications(path = '/applications') {
   };
 }
 
+afterEach(() => vi.restoreAllMocks());
+
 describe('ApplicationsPage / useApplications', () => {
   it('lists applications and filters the search by company OR role', async () => {
     serve([
@@ -90,6 +95,19 @@ describe('ApplicationsPage / useApplications', () => {
 
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
     expect(screen.getByText('Beta Corp')).toBeInTheDocument();
+  });
+
+  it('draws skeleton rows under its header while the first page loads', async () => {
+    serve([application({ id: 1, company: 'Acme', title: 'Backend Engineer' })]);
+    const hold = holdGet('/applications');
+    mswServer.use(hold.handler);
+    renderApplications();
+
+    const table = await expectSkeletonTable('Role');
+    // The skeleton stands in for the empty state too, until there is data to judge.
+    expect(screen.queryByText('No applications recorded yet.')).not.toBeInTheDocument();
+    hold.release();
+    await expectLoadedTable(table, 'Backend Engineer');
   });
 
   it("opens the company's history from the duplicates button", async () => {
@@ -252,7 +270,8 @@ describe('ApplicationsPage / useApplications', () => {
     expect(await screen.findByText('Showing 130 of 130')).toBeInTheDocument();
   });
 
-  it('optimistically changes a status and keeps it on success', async () => {
+  it('optimistically changes a status and keeps it on success, and says so', async () => {
+    const success = vi.spyOn(toast, 'success');
     serve([application({ id: 1, status: 'APPLIED' })]);
     renderApplications();
     await screen.findByText('Acme');
@@ -262,9 +281,15 @@ describe('ApplicationsPage / useApplications', () => {
     await user.selectOptions(rowSelect, 'INTERVIEW');
 
     await waitFor(() => expect((rowSelect as HTMLSelectElement).value).toBe('INTERVIEW'));
+    await waitFor(() =>
+      expect(success).toHaveBeenCalledWith('Moved to Interview', {
+        description: expect.stringMatching(/ — Acme$/),
+      }),
+    );
   });
 
   it('rolls the status back and shows a row error when the save fails', async () => {
+    const success = vi.spyOn(toast, 'success');
     mswServer.use(
       statsHandler(),
       onePage(application({ id: 1, status: 'APPLIED' })),
@@ -281,6 +306,7 @@ describe('ApplicationsPage / useApplications', () => {
 
     await screen.findByText(/failed to save|HTTP 500/i);
     expect((rowSelect as HTMLSelectElement).value).toBe('APPLIED');
+    expect(success).not.toHaveBeenCalledWith('Moved to Interview', expect.anything());
   });
 
   it('shows a friendly error when the list response has the wrong shape', async () => {
@@ -455,6 +481,7 @@ describe('ApplicationsPage / useApplications', () => {
     });
 
     it('re-opens the apply dialog pre-filled, with an empty comment that is added to the row', async () => {
+      const success = vi.spyOn(toast, 'success');
       serve([
         application({
           id: 1,
@@ -487,6 +514,11 @@ describe('ApplicationsPage / useApplications', () => {
       expect(
         [...table.querySelectorAll('.comment-user')].map((el) => el.lastChild?.textContent),
       ).toEqual(['First note', 'Went well.']);
+      await waitFor(() =>
+        expect(success).toHaveBeenCalledWith('Application updated', {
+          description: 'Backend Engineer — Acme',
+        }),
+      );
     });
 
     it('rolls a failed edit back, comment included, and shows the row error', async () => {

@@ -7,8 +7,10 @@ import {
 } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { useInfiniteList } from '@/lib/useInfiniteList';
 import { fetchStats } from '@/pages/dashboard/api';
+import { toastMoved } from '@/pages/vacancies/constants';
 import {
   type ApplicationPage,
   listApplicationsPage,
@@ -207,8 +209,17 @@ export function useApplications() {
     setSearchText,
     statusFilter,
     setStatusFilter,
-    changeStatus: (id: number, status: ApplicationStatus) => statusMutation.mutate({ id, status }),
+    changeStatus: (id: number, status: ApplicationStatus) =>
+      statusMutation.mutate({ id, status }, { onSuccess: (item) => toastMoved(item.status, item) }),
     editApplication: (id: number, input: UpdateApplicationInput) =>
-      editMutation.mutate({ id, input }),
+      editMutation.mutate(
+        { id, input },
+        {
+          onSuccess: (item) =>
+            toast.success('Application updated', {
+              description: `${item.title} — ${item.company}`,
+            }),
+        },
+      ),
   };
 }

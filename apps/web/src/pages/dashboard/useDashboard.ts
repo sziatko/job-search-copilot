@@ -3,7 +3,8 @@ import { listVacanciesPage } from '../vacancies/api';
 import { VACANCY_ACTION } from '../vacancies/types';
 import { fetchStats } from './api';
 
-const REVIEW_QUEUE_SIZE = 5;
+/** Enough to fill the funnel card's height on a desktop; the rest scrolls in the card. */
+const REVIEW_QUEUE_SIZE = 10;
 
 /** Two requests: the numbers, and the top of the triage queue in the server's order. */
 export function useDashboard() {

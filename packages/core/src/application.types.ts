@@ -79,6 +79,9 @@ export interface ListApplicationsFilters {
   company?: string;
   /** Matches Vacancy.title, ILIKE '%term%', case-insensitive. See `company`. */
   title?: string;
+  /** Every application at this name's company, whatever its spelling (`companyKey`,
+   * ADR-0032). ANDs with the rest. */
+  sameCompanyAs?: string;
   /** Exact, after the same normalization `save` applies — see `applyUrlKey`. */
   applyUrl?: string;
   /** The derived split (ADR-0031): `active` or `timedOut`; absent = both, and the

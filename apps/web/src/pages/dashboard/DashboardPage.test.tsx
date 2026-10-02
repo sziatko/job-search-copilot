@@ -5,8 +5,16 @@ import { HttpResponse, http } from 'msw';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { routeTree } from '@/router';
-import { API_URL, buildHandlers, fakeStats, fakeVacancy, statsHandler } from '@/test/msw/handlers';
+import {
+  API_URL,
+  buildHandlers,
+  fakeStats,
+  fakeVacancy,
+  holdGet,
+  statsHandler,
+} from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import { expectLoadedPage, expectSkeletonPage } from '@/test/skeleton';
 import { timeAgo } from './DashboardPage';
 import type { Stats } from './types';
 
@@ -109,7 +117,7 @@ describe('DashboardPage', () => {
     expect(screen.getByText('1 in recruiter screen')).toBeInTheDocument();
   });
 
-  it('asks the server for the top five untriaged, recommended first, and keeps its order', async () => {
+  it('asks the server for the top ten untriaged, recommended first, and keeps its order', async () => {
     const requests: URLSearchParams[] = [];
     mswServer.events.on('request:start', ({ request }) => {
       const url = new URL(request.url);
@@ -125,8 +133,19 @@ describe('DashboardPage', () => {
     const titles = Array.from(document.querySelectorAll('.attn-title')).map((t) => t.textContent);
     expect(titles).toEqual(['Apply me', 'Skip me']);
     expect(requests.map((q) => Object.fromEntries(q))).toEqual([
-      { status: 'NOT_REVIEWED', sort: 'recommended', limit: '5' },
+      { status: 'NOT_REVIEWED', sort: 'recommended', limit: '10' },
     ]);
+  });
+
+  it('lists ten of a longer queue', async () => {
+    // Ten fill the funnel card's height on a desktop; the card scrolls past that.
+    renderDashboard(
+      fakeStats(),
+      Array.from({ length: 12 }, (_, i) => fakeVacancy({ id: i + 1, title: `Role ${i + 1}` })),
+    );
+
+    await screen.findByText('Role 12');
+    expect(document.querySelectorAll('.review-scroll .attn-item')).toHaveLength(10);
   });
 
   it('lists recent moves from the stats', async () => {
@@ -155,6 +174,23 @@ describe('DashboardPage', () => {
     expect(document.querySelector('.activity-sub')).toHaveTextContent(
       'Backend Engineer · Interview',
     );
+  });
+
+  it('draws skeleton tiles and cards while it loads, the numbers after', async () => {
+    const hold = holdGet('/stats');
+    mswServer.use(hold.handler, ...buildHandlers([fakeVacancy()]), statsHandler(fakeStats()));
+    renderIndex();
+
+    const page = await expectSkeletonPage();
+    const tiles = page.querySelectorAll('.kpi-tile').length;
+    const cards = page.querySelectorAll('.card').length;
+    hold.release();
+
+    expect(await screen.findByRole('heading', { name: /pipeline funnel/i })).toBeInTheDocument();
+    expectLoadedPage();
+    // A skeleton for each tile and card the page draws, so a new one is not missed.
+    expect(document.querySelectorAll('.kpi-tile')).toHaveLength(tiles);
+    expect(document.querySelectorAll('.card')).toHaveLength(cards);
   });
 
   it('surfaces a load error instead of throwing', async () => {

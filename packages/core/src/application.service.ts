@@ -30,7 +30,7 @@ import {
   writeStatus,
 } from './status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
-import { ALL_COMMENTS, companyMatchCounts } from './vacancy.service';
+import { ALL_COMMENTS, companyMatchCounts, sameCompanyNames } from './vacancy.service';
 
 /** The Vacancy fields the /applications page reads. */
 const APPLICATION_SELECT = {
@@ -164,6 +164,11 @@ export class ApplicationService {
     if (filters.title) {
       vacancyFilters.push({
         title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
+      });
+    }
+    if (filters.sameCompanyAs) {
+      vacancyFilters.push({
+        company: { in: await sameCompanyNames(this.db, filters.sameCompanyAs) },
       });
     }
     // One clock for the filter and each item's flag, so a row cannot match

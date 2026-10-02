@@ -48,6 +48,9 @@ export interface ListVacanciesFilters {
   search?: string;
   /** ILIKE '%term%', case-insensitive. */
   company?: string;
+  /** Every vacancy of this name's company, whatever its spelling (`companyKey`,
+   * ADR-0032) — the company modal and the vacancy page's other vacancies. */
+  sameCompanyAs?: string;
   /** Exact, after the same normalization `save` applies — see `applyUrlKey`. */
   applyUrl?: string;
   /** ILIKE '%term%', case-insensitive — mirrors `company`; both have a trigram GIN index. */

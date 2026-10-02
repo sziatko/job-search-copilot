@@ -26,6 +26,8 @@ export async function listApplicationsPage(
     filter?: ApplicationStatusFilter;
     /** Free text over company OR title. */
     search?: string;
+    /** This name's company, whatever its spelling (ADR-0032) — the company modal. */
+    sameCompanyAs?: string;
     /** The `id` of the last row loaded; the page starts after it. */
     cursor?: number;
     limit?: number;
@@ -37,6 +39,7 @@ export async function listApplicationsPage(
   else if (filter === STATUS_FILTER_TIMEOUT) query.set('state', 'timedOut');
   else if (filter !== STATUS_FILTER_ALL) query.set('status', filter);
   if (params.search) query.set('search', params.search);
+  if (params.sameCompanyAs) query.set('sameCompanyAs', params.sameCompanyAs);
   if (params.cursor !== undefined) query.set('cursor', String(params.cursor));
 
   const res = await fetch(`${API_BASE}/applications?${query}`);
