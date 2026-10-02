@@ -6,18 +6,10 @@ import { ThemeToggle } from './ThemeToggle';
  * inherits font-size/weight, and `.topbar-title` sets both), but keeps a real
  * page heading for screen readers and for the router test.
  */
-export function Topbar({
-  title,
-  subtitle,
-  onOpenMobile,
-}: {
-  title: string;
-  subtitle: string;
-  onOpenMobile: () => void;
-}) {
+export function Topbar({ title, onOpenMobile }: { title: string; onOpenMobile: () => void }) {
   return (
     <header className="topbar">
-      <div className="flex items-end gap-[12px]">
+      <div className="flex items-center gap-[12px]">
         <button
           type="button"
           className="menu-toggle"
@@ -26,10 +18,7 @@ export function Topbar({
         >
           <IconMenu />
         </button>
-        <div>
-          <h1 className="topbar-title">{title}</h1>
-          <div className="topbar-sub">{subtitle}</div>
-        </div>
+        <h1 className="topbar-title">{title}</h1>
       </div>
       <div className="flex items-center gap-[14px]">
         <ThemeToggle />

@@ -22,6 +22,7 @@ export {
   InvalidApplicationInputError,
   InvalidRecommendationError,
   InvalidVacancyLogEntryError,
+  SameStatusError,
 } from './errors';
 export { escapeLikePattern } from './like';
 export { PLACEHOLDER_COMMENT } from './placeholder';

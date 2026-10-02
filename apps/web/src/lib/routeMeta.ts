@@ -12,7 +12,6 @@
  */
 export interface RouteMeta {
   title: string;
-  subtitle: string;
   rail: boolean;
 }
 

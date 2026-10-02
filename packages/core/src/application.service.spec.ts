@@ -252,6 +252,15 @@ describe('ApplicationService', () => {
       expect((await applications.list({ applyUrl: 'https://example.com/nope' })).total).toBe(0);
     });
 
+    it('carries companyMatchCount: every vacancy of the company, triage ones included', async () => {
+      await seedVacancy({ company: 'ACME Labs', title: 'Triage', status: 'DECLINED' });
+      const { items } = await applications.list();
+      const counts = Object.fromEntries(
+        items.map((item) => [item.company, item.companyMatchCount]),
+      );
+      expect(counts).toEqual({ Acme: 2, 'Beta Corp': 1 });
+    });
+
     it('filters by status', async () => {
       const { items, total } = await applications.list({ status: 'REJECTED' });
       expect(total).toBe(1);

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -58,7 +58,7 @@ describe('router', () => {
   });
 
   it('ignores a junk ?status= on /applications instead of dropping the page', async () => {
-    mswServer.use(...buildHandlers([]));
+    mswServer.use(...buildHandlers([]), statsHandler());
     renderAt('/applications?status=BOGUS');
 
     // No coercion could make `BOGUS` a status, so it falls back to what an absent
@@ -75,5 +75,38 @@ describe('router', () => {
     expect(
       await screen.findByRole('heading', { name: /application tracker/i }),
     ).toBeInTheDocument();
+  });
+
+  it('renders the page title with no subtitle', async () => {
+    mswServer.use(...buildHandlers([]));
+    renderAt('/vacancies');
+    const title = await screen.findByRole('heading', { level: 1, name: 'Analyzed vacancies' });
+    const header = screen.getByRole('banner');
+    expect(header).toContainElement(title);
+    expect(header.querySelector('.topbar-sub')).toBeNull();
+    expect(screen.queryByText(/review the analyzer's shortlist/i)).not.toBeInTheDocument();
+  });
+
+  it("compacts the header on any element's scroll, and restores it only at the top", async () => {
+    mswServer.use(...buildHandlers([]));
+    const { container } = renderAt('/vacancies');
+    await screen.findByRole('heading', { level: 1, name: 'Analyzed vacancies' });
+    const main = container.querySelector('.main') as HTMLElement;
+    // Any scroll box, not only the window: scroll does not bubble, the shell
+    // listens in the capture phase.
+    const box = document.createElement('div');
+    document.body.append(box);
+    const scrollTo = (top: number) => {
+      Object.defineProperty(box, 'scrollTop', { value: top, configurable: true });
+      fireEvent.scroll(box);
+    };
+
+    scrollTo(30);
+    expect(main).toHaveAttribute('data-compact');
+    scrollTo(10); // inside the gap: stays compact
+    expect(main).toHaveAttribute('data-compact');
+    scrollTo(0);
+    expect(main).not.toHaveAttribute('data-compact');
+    box.remove();
   });
 });

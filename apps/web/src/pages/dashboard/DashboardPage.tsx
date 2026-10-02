@@ -167,6 +167,7 @@ export function DashboardPage() {
       value: Math.max(stats.logged - stats.recommended, 0),
     },
     { label: 'Declined by you', value: stats.declined },
+    { label: 'No longer accepting applications', value: stats.unavailable },
     { label: 'Rejected', value: stats.pipeline.byStatus.REJECTED },
     { label: 'Timed out (no move for 30+ days)', value: stats.pipeline.timedOut },
   ];

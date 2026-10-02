@@ -92,6 +92,30 @@ describe('ApplicationsPage / useApplications', () => {
     expect(screen.getByText('Beta Corp')).toBeInTheDocument();
   });
 
+  it("opens the company's history from the duplicates button", async () => {
+    serve([
+      application({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
+      // Never applied to: off this table, still one of Acme's vacancies.
+      fakeVacancy({ id: 2, company: 'Acme', title: 'Data Engineer', status: 'DECLINED' }),
+      application({ id: 3, company: 'Beta Corp', title: 'Frontend Lead' }),
+    ]);
+    renderApplications();
+    await screen.findByText('Backend Engineer');
+    expect(screen.queryByText('Data Engineer')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /other vacancies? at Beta Corp/i }),
+    ).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '1 other vacancy at Acme' }));
+
+    const modal = within(await screen.findByRole('dialog'));
+    expect(modal.getByText('All vacancies at Acme')).toBeInTheDocument();
+    expect(await modal.findByText('Data Engineer')).toBeInTheDocument();
+    expect(modal.getByText('Backend Engineer')).toBeInTheDocument();
+    expect(modal.getByText('Current')).toBeInTheDocument();
+  });
+
   /** The companies down the table, top to bottom. Read out of each row's meta cell
    * rather than off a text node: the cell also carries the id, and matching text
    * nodes couples the test to how JSX happens to lay the whitespace out. */

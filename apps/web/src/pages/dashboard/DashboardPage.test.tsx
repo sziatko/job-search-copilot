@@ -69,7 +69,7 @@ describe('DashboardPage', () => {
   });
 
   it('lists what dropped out under the funnel', async () => {
-    const stats = fakeStats({ logged: 1248, recommended: 524, declined: 40 });
+    const stats = fakeStats({ logged: 1248, recommended: 524, declined: 40, unavailable: 12 });
     stats.pipeline.byStatus.REJECTED = 90;
     stats.pipeline.timedOut = 70;
     renderDashboard(stats);
@@ -77,6 +77,7 @@ describe('DashboardPage', () => {
     expect(await droppedRows()).toEqual([
       ['Not recommended by the analyzer', '724'],
       ['Declined by you', '40'],
+      ['No longer accepting applications', '12'],
       ['Rejected', '90'],
       ['Timed out (no move for 30+ days)', '70'],
     ]);

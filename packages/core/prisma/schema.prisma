@@ -98,13 +98,14 @@ enum CommentSource {
   AGENT
 }
 
-// Triage (NOT_REVIEWED, SAVED_FOR_LATER, DECLINED), then the pipeline (APPLIED …
-// REJECTED — PIPELINE_STATUSES). REJECTED = the company said no; DECLINED = "I chose not
-// to apply".
+// Triage (NOT_REVIEWED, SAVED_FOR_LATER, DECLINED, UNAVAILABLE), then the pipeline
+// (APPLIED … REJECTED — PIPELINE_STATUSES). REJECTED = the company said no; DECLINED = "I
+// chose not to apply"; UNAVAILABLE = the posting no longer takes applications.
 enum VacancyStatus {
   NOT_REVIEWED
   SAVED_FOR_LATER
   DECLINED
+  UNAVAILABLE
   APPLIED
   RECRUITER_SCREEN
   REPLIED

@@ -1,4 +1,14 @@
 import type { Prisma, VacancyStatus } from '@prisma/client';
+import { SameStatusError } from './errors';
+
+/** The statuses before the pipeline: the user's triage. A repeat of one carries no
+ * event, so writeStatus refuses it (ADR-0029). */
+export const TRIAGE_STATUSES = [
+  'NOT_REVIEWED',
+  'SAVED_FOR_LATER',
+  'DECLINED',
+  'UNAVAILABLE',
+] as const satisfies readonly VacancyStatus[];
 
 /** The statuses /applications shows: the vacancy has been applied to. Everything before
  * is triage. */
@@ -60,11 +70,12 @@ export function firstStatus(at: Date) {
 
 /**
  * The only writer of `Vacancy.status`. Moves the vacancy to `status` and journals it
- * (a `StatusChange` dated `at`). Every call is an event — the status the vacancy already
- * has is journaled too and moves `statusChangedAt` (the next interview round is
- * INTERVIEW again), so a caller writes once per real event. An unknown id writes
- * nothing. Two writes, so `tx` must be a transaction — the caller's, which its other
- * writes share.
+ * (a `StatusChange` dated `at`). A pipeline status is always an event — the one the
+ * vacancy already has is journaled too and moves `statusChangedAt` (the next interview
+ * round is INTERVIEW again), so a caller writes once per real event. A triage status the
+ * vacancy already has carries no event: it throws SameStatusError and writes nothing.
+ * An unknown id writes nothing. Two writes, so `tx` must be a transaction — the
+ * caller's, which its other writes share.
  */
 export async function writeStatus(
   tx: Prisma.TransactionClient,
@@ -72,11 +83,14 @@ export async function writeStatus(
   status: VacancyStatus,
   at = new Date(),
 ): Promise<void> {
+  const triage = (TRIAGE_STATUSES as readonly VacancyStatus[]).includes(status);
   const { count } = await tx.vacancy.updateMany({
-    where: { id: vacancyId },
+    where: triage ? { id: vacancyId, status: { not: status } } : { id: vacancyId },
     data: { status, statusChangedAt: at },
   });
   if (count > 0) {
     await tx.statusChange.create({ data: { vacancyId, status, createdAt: at } });
+  } else if (triage && (await tx.vacancy.count({ where: { id: vacancyId } })) > 0) {
+    throw new SameStatusError(`Vacancy ${vacancyId} is already ${status}`);
   }
 }

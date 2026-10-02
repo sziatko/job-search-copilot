@@ -1,28 +1,40 @@
 import { useRef } from 'react';
-import { IconCheck, IconCross, IconHistory } from '@/components/icons';
+import {
+  IconBan,
+  IconBookmark,
+  IconCheck,
+  IconCross,
+  IconHistory,
+  IconUndo,
+} from '@/components/icons';
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
 import { isPipelineStatus } from '../../applications/types';
-import { type ButtonStatus, STATUS_TAGS } from '../constants';
+import { STATUS_TAGS } from '../constants';
 import { VACANCY_ACTION, type VacancyAction, type VacancyListItem } from '../types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { RecommendationTag } from './RecommendationTag';
-import { RowActionMenu } from './RowActionMenu';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
-/** The verbs for the two statuses this cell gives a button to. Typed by
- * `Record<ButtonStatus, string>`, so it is `ACTION_CONTROL` that decides which
- * buttons exist: moving a status out of the button half leaves an excess key here,
- * and moving one in leaves this map short of a key. A status's *tag* text ("Applied")
- * is a state, not an instruction — hence separate words. */
-const BUTTON_VERBS = {
-  APPLIED: 'Apply',
-  DECLINED: 'Decline',
-} satisfies Record<ButtonStatus, string>;
+/** One button per action, in the order they render. Total over `VacancyAction`, so a
+ * new action cannot ship without a control (phase 2.2, finding 14). A status's *tag*
+ * text ("Applied") is a state, not an instruction — hence separate verbs. Which ones
+ * confirm first is `useVacancies`' call, not this map's. */
+const ROW_BUTTONS: Record<
+  VacancyAction,
+  { verb: string; Icon: typeof IconCheck; danger?: boolean }
+> = {
+  APPLIED: { verb: 'Apply', Icon: IconCheck },
+  DECLINED: { verb: 'Decline', Icon: IconCross, danger: true },
+  SAVED_FOR_LATER: { verb: 'Save for later', Icon: IconBookmark },
+  UNAVAILABLE: { verb: 'Mark unavailable', Icon: IconBan },
+  NOT_REVIEWED: { verb: 'Mark not reviewed', Icon: IconUndo },
+};
+const ROW_ACTIONS = Object.keys(ROW_BUTTONS) as VacancyAction[];
 
 const COL_COUNT = 7;
 
@@ -73,7 +85,7 @@ export function VacancyTable({
             <th style={{ width: 120 }}>Rec.</th>
             <th>Comment</th>
             <th style={{ width: 150 }}>Status</th>
-            <th style={{ width: 210 }}>Action</th>
+            <th style={{ width: 246 }}>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -90,6 +102,10 @@ export function VacancyTable({
             const saving = savingIds.has(item.id);
             // Once applied, the row's status moves on /applications only.
             const applied = isPipelineStatus(item.status);
+            // The button the row does not get: its own status — a triage repeat
+            // carries no event, and the server refuses it. A pipeline row counts as
+            // Applied, as in the status filter.
+            const rowAction = applied ? VACANCY_ACTION.APPLIED : item.status;
             return (
               <tr
                 key={item.id}
@@ -146,11 +162,11 @@ export function VacancyTable({
                   </span>
                 </td>
                 <td>
-                  {/* Four controls that all mean the same thing — a status change —
+                  {/* The status buttons all mean the same thing — a status change —
                       so they save and disable together. Only Apply and Decline
                       confirm first; see requestActionChange. Icons rather than text
-                      (the `.tip` bubble is the label): four words per row, repeated
-                      down every row, is what made this column the widest one. */}
+                      (the `.tip` bubble is the label): words per row, repeated down
+                      every row, are what made this column the widest one. */}
                   <div className="flex flex-wrap items-center gap-[6px]">
                     <CopyVacancyButton
                       id={item.id}
@@ -159,28 +175,21 @@ export function VacancyTable({
                       applyUrl={item.applyUrl}
                       disabled={saving}
                     />
-                    <button
-                      type="button"
-                      disabled={saving || applied}
-                      onClick={() => onActionChange(item.id, VACANCY_ACTION.APPLIED)}
-                      className="icon-btn disabled:opacity-50"
-                    >
-                      <IconCheck />
-                      <span className="tip">{BUTTON_VERBS.APPLIED}</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving || applied}
-                      onClick={() => onActionChange(item.id, VACANCY_ACTION.DECLINED)}
-                      className="icon-btn icon-btn-danger disabled:opacity-50"
-                    >
-                      <IconCross />
-                      <span className="tip">{BUTTON_VERBS.DECLINED}</span>
-                    </button>
-                    <RowActionMenu
-                      disabled={saving || applied}
-                      onAction={(status) => onActionChange(item.id, status)}
-                    />
+                    {ROW_ACTIONS.filter((action) => action !== rowAction).map((action) => {
+                      const { verb, Icon, danger } = ROW_BUTTONS[action];
+                      return (
+                        <button
+                          key={action}
+                          type="button"
+                          disabled={saving || applied}
+                          onClick={() => onActionChange(item.id, action)}
+                          className={`icon-btn ${danger ? 'icon-btn-danger ' : ''}disabled:opacity-50`}
+                        >
+                          <Icon />
+                          <span className="tip">{verb}</span>
+                        </button>
+                      );
+                    })}
                     <DetailsLink id={item.id} />
                   </div>
                   {rowErrors.has(item.id) && (

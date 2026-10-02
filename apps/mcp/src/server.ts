@@ -17,12 +17,14 @@ export const SERVER_INSTRUCTIONS = [
   'Order: check_vacancy_log before analysing a posting — only a new one is analysed — ' +
     'then save_vacancy. save_vacancy does not write the log.',
   'Status, one per vacancy: triage NOT_REVIEWED, SAVED_FOR_LATER, DECLINED (the ' +
-    'applicant chose not to apply); then the pipeline APPLIED, RECRUITER_SCREEN, ' +
+    'applicant chose not to apply), UNAVAILABLE (the posting no longer takes ' +
+    'applications); then the pipeline APPLIED, RECRUITER_SCREEN, ' +
     'REPLIED, INTERVIEW, OFFER, REJECTED (the company said no). `recommendation` is the ' +
     "analyzer's verdict — never derive one from the other. Record applying with " +
-    'record_application; make every other move with update_vacancy_status. Each status write is an event, ' +
-    'dated by the server — the same status again too (the next interview round) — so ' +
-    'write once per real event.',
+    'record_application; make every other move with update_vacancy_status. Each pipeline ' +
+    'status write is an event, dated by the server — the same status again too (the next ' +
+    'interview round) — so write once per real event. A triage status the vacancy ' +
+    'already has is refused as an error: it carries no event.',
   'Comments are append-only notes with a source (ANALYZER, USER, AGENT). Write each ' +
     'one as a note of its own; never repeat an earlier one.',
 ].join('\n\n');

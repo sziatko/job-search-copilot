@@ -25,7 +25,7 @@ pipeline.
 | `matchScore` | `Int` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. |
 | `recommendation` | `Recommendation` enum | **The analyzer's call.** `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`. |
 | `comments` | `Comment[]` | Every note on the vacancy — see [`Comment`](#comment) below. The analyzer's reasoning is its `ANALYZER` row: reads still return it as `estimationComment` (`string \| null`), derived from the first one. |
-| `status` | `VacancyStatus` enum, default `NOT_REVIEWED` | **The user's call.** Triage — `NOT_REVIEWED` \| `SAVED_FOR_LATER` \| `DECLINED` — then the pipeline, `PIPELINE_STATUSES`: `APPLIED` \| `RECRUITER_SCREEN` \| `REPLIED` \| `INTERVIEW` \| `OFFER` \| `REJECTED`. A cache of the latest [`StatusChange`](#statuschange). `REJECTED` = the company said no; `DECLINED` = "I chose not to apply". |
+| `status` | `VacancyStatus` enum, default `NOT_REVIEWED` | **The user's call.** Triage, `TRIAGE_STATUSES` — `NOT_REVIEWED` \| `SAVED_FOR_LATER` \| `DECLINED` \| `UNAVAILABLE` — then the pipeline, `PIPELINE_STATUSES`: `APPLIED` \| `RECRUITER_SCREEN` \| `REPLIED` \| `INTERVIEW` \| `OFFER` \| `REJECTED`. A cache of the latest [`StatusChange`](#statuschange). `REJECTED` = the company said no; `DECLINED` = "I chose not to apply"; `UNAVAILABLE` = the posting no longer takes applications (triage only — never on `/applications`). |
 | `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. Timeout and the `/applications` sort read it. |
 | `salaryInListing` | `String?` | Free text ("130 PLN/h"), entered when applying. |
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
@@ -50,7 +50,8 @@ including back to `NOT_REVIEWED`):
 ```
                ┌─▶ SAVED_FOR_LATER ─┬─▶ APPLIED ─▶ RECRUITER_SCREEN ─▶ REPLIED ─▶ INTERVIEW ─┬─▶ OFFER
 NOT_REVIEWED ──┼────────────────────┘      (any pipeline status) ────────────────────────────┴─▶ REJECTED
-               └─▶ DECLINED ◀── (from SAVED_FOR_LATER too)
+               ├─▶ DECLINED ◀── (from SAVED_FOR_LATER too)
+               └─▶ UNAVAILABLE ◀── (from SAVED_FOR_LATER too)
 ```
 
 `/vacancies` defaults to `NOT_REVIEWED` and sorts by `recommendation` (APPLY first),
@@ -67,12 +68,17 @@ then `matchScore` desc; its "Applied" filter stands for the whole pipeline.
 >   enums in [`vacancies.schemas.ts`](../apps/mcp/src/vacancies/vacancies.schemas.ts),
 >   the `apps/api` DTOs, and the web `recommendationSchema`. Its place in the enum is
   `/vacancies`' `sort=recommended` order (ADR-0030) — `ADD VALUE … BEFORE`/`AFTER`.
-> - Adding a `VacancyStatus` value → the Prisma enum (migration), `PIPELINE_STATUSES`
->   in [`status.ts`](../packages/core/src/status.ts) if it is a pipeline stage, the MCP
->   zod enums (`VacancyStatusEnum`, `PipelineStatusEnum`), the API DTOs
->   (`@IsEnum(VacancyStatus)`, `@IsIn(PIPELINE_STATUSES)`), and on the web
->   `vacancyStatusSchema` (+ the `extract` lists for the row actions and the pipeline),
->   `STATUS_LABELS` / `STATUS_TAGS`, and the `APPLICATION_STATUS_*` maps. There is no
+> - Adding a `VacancyStatus` value → the Prisma enum (migration, `ADD VALUE … AFTER`;
+>   on the dev stack, `docker compose restart api mcp core` after it),
+>   `TRIAGE_STATUSES` or `PIPELINE_STATUSES` in
+>   [`status.ts`](../packages/core/src/status.ts), a `StatsService` count if the
+>   dashboard shows it, the MCP zod enums (`VacancyStatusEnum` follows the Prisma enum;
+>   `PipelineStatusEnum`) and the tool descriptions and `SERVER_INSTRUCTIONS` that list
+>   the statuses, the API DTOs (`@IsEnum(VacancyStatus)`, `@IsIn(PIPELINE_STATUSES)`),
+>   and on the web `vacancyStatusSchema` (+ the `extract` lists for the row actions and
+>   the pipeline), `STATUS_LABELS` / `STATUS_TAGS`, `VacancyTable`'s `ROW_BUTTONS` and
+>   `StatusFilterSelect`'s labels for a triage status, `VacancyPage`'s `CLOSED_BAD` if
+>   it ends a vacancy, and the `APPLICATION_STATUS_*` maps for a pipeline one. There is no
 >   single source — see [ADR-0012](decisions/0012-web-hand-written-contract.md).
 
 ## `StatusChange`
@@ -88,11 +94,14 @@ The status journal: one row per change of status. Append-only.
 
 **`writeStatus(tx, vacancyId, status, at = now)` is the only writer of status.** In the
 caller's transaction it moves `status` + `statusChangedAt` and inserts the row, both
-dated `at`. **Every call is an event** — the status the vacancy already has is journaled
-too and moves the date: the next interview round is `INTERVIEW` again, and the timeout
-clock restarts from it. So a caller writes once per real event (the web sends nothing
-when a row is set to the status it has; the email sync skips reminders). A new vacancy
-starts with a `NOT_REVIEWED` row (`firstStatus`).
+dated `at`. **Every pipeline call is an event** — the status the vacancy already has is
+journaled too and moves the date: the next interview round is `INTERVIEW` again, and the
+timeout clock restarts from it. So a caller writes once per real event (the email sync
+skips reminders). **A triage repeat is refused:** a `TRIAGE_STATUSES` status the vacancy
+already has carries no event, so `writeStatus` throws `SameStatusError` (API 422, MCP
+`isError`) and writes nothing; the web does not offer a row's current status
+([ADR-0029](decisions/0029-one-vacancy-table.md), amended). A new vacancy starts with a
+`NOT_REVIEWED` row (`firstStatus`).
 
 **The applied date** is the `createdAt` of the latest `APPLIED` row — `appliedAt` on an
 `/applications` item. A vacancy set straight past `APPLIED` has none (`null`).

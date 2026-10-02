@@ -23,6 +23,8 @@ export interface Stats {
   applied: number;
   /** Current `status = DECLINED` — the user said no. */
   declined: number;
+  /** Current `status = UNAVAILABLE` — the posting closed before the user applied. */
+  unavailable: number;
   responded: number;
   interview: number;
   recruiterScreen: number;
@@ -59,6 +61,7 @@ export class StatsService {
       recommended,
       applied,
       declined,
+      unavailable,
       responded,
       interview,
       groups,
@@ -70,6 +73,7 @@ export class StatsService {
       this.db.vacancy.count({ where: { recommendation: { in: ['APPLY', 'APPLY_WITH_CAVEATS'] } } }),
       everReached(['APPLIED']),
       this.db.vacancy.count({ where: { status: 'DECLINED' } }),
+      this.db.vacancy.count({ where: { status: 'UNAVAILABLE' } }),
       everReached(RESPONDED),
       everReached(INTERVIEWED),
       this.db.vacancy.groupBy({
@@ -105,6 +109,7 @@ export class StatsService {
       recommended,
       applied,
       declined,
+      unavailable,
       responded,
       interview,
       recruiterScreen: byStatus.RECRUITER_SCREEN,

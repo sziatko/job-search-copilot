@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { ApplyDialog } from '@/pages/vacancies/components/ApplyDialog';
+import { CompanyHistoryModal } from '@/pages/vacancies/components/CompanyHistoryModal';
 import { ApplicationStatusFilterSelect } from './components/ApplicationStatusFilterSelect';
 import { ApplicationsKpis } from './components/ApplicationsKpis';
 import { ApplicationsTable } from './components/ApplicationsTable';
@@ -25,6 +26,10 @@ export function ApplicationsPage() {
     editApplication,
   } = useApplications();
   const [editing, setEditing] = useState<ApplicationListItem | null>(null);
+  const [companyHistory, setCompanyHistory] = useState<{
+    company: string;
+    vacancyId: number;
+  } | null>(null);
 
   const emptyMessage =
     q.trim() === '' && statusFilter === STATUS_FILTER_ALL
@@ -59,11 +64,20 @@ export function ApplicationsPage() {
             rowErrors={rowErrors}
             onStatusChange={changeStatus}
             onEdit={setEditing}
+            onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
             onEndReached={loadMore}
             emptyMessage={emptyMessage}
           />
         )}
       </div>
+
+      {companyHistory && (
+        <CompanyHistoryModal
+          company={companyHistory.company}
+          currentId={companyHistory.vacancyId}
+          onClose={() => setCompanyHistory(null)}
+        />
+      )}
 
       {editing && (
         <ApplyDialog

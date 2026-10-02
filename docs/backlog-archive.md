@@ -5,6 +5,7 @@ history, not read when planning. Newest at the top.
 
 | Item | Kind | Outcome | From | Notes |
 | --- | --- | --- | --- | --- |
+| **Arrow keys and the `role="menu"` contract** | fix | not relevant (2026-10-01) | phase 2.2 (finding 7) | The ⋯ menu is gone (phase 4.2 step 9): every status has its own row button, so there is no `role="menu"` to honour. |
 | **`hasAnalysis` list filter** | fix | not relevant (2026-09-29) | phase 2.2 | Its one reason was the dashboard's analysed-count tile; phase 4.1 step 4 dropped `analysed` from `/stats` and starts the funnel at Recommended. |
 | **Store the application timeout in the DB, set by an automation** | fix | not relevant (2026-09-28) | 2026-09-28 | The timeout stays derived in core (`timedOutWhere` in `packages/core/src/status.ts`, 30 days): it never writes `status` or a `StatusChange` row, so a timed-out application never shows in Recent activity. A job writing a stored value is what the user did not want. Phase 4.1 shows the count on the dashboard instead. |
 | **`/log` page — a web view of the vacancy log** | idea | done — phase 4 step 1 | phase 2, phase 3 | `/log`: a searchable, infinitely scrolled table of `VacancyLogEntry`. No add-entry form — the search box is the whole form; the mockup's Source / Status / Score / Note columns stay out (nothing stores them). |

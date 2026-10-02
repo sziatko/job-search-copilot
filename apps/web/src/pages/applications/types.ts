@@ -76,6 +76,10 @@ export const applicationListItemSchema = z.object({
   title: z.string(),
   applyUrl: z.string(),
   matchScore: z.number(),
+  /** How many vacancies (any status) share this row's company — derived by the list
+   * endpoint only, so optional: the PATCH / POST responses parse through this schema
+   * too and carry none (the /vacancies schema's trap, ADR-0025). */
+  companyMatchCount: z.number().optional(),
 });
 export type ApplicationListItem = z.infer<typeof applicationListItemSchema>;
 

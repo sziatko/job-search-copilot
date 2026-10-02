@@ -149,6 +149,15 @@ describe('Applications (e2e)', () => {
       expect(searched.body.total).toBe(1);
     });
 
+    it('carries the derived companyMatchCount, counted over every vacancy', async () => {
+      const a = await seedVacancy({ company: 'Acme' });
+      await seedVacancy({ company: 'Acme Labs' }); // not applied to — still counted
+      await request(app.getHttpServer()).post('/api/v1/applications').send({ vacancyId: a });
+
+      const res = await request(app.getHttpServer()).get('/api/v1/applications').expect(200);
+      expect(res.body.items[0].companyMatchCount).toBe(2);
+    });
+
     it('filters by ?state=, flags timedOut, and pages by ?cursor=', async () => {
       const a = await seedVacancy({ applyUrl: 'https://example.com/a', company: 'Acme' });
       const b = await seedVacancy({ applyUrl: 'https://example.com/b', company: 'Beta Corp' });

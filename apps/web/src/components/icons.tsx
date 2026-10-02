@@ -120,12 +120,28 @@ export function IconMoon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function IconMore(props: SVGProps<SVGSVGElement>) {
+export function IconBookmark(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
-      <circle cx="5" cy="12" r="1.3" fill="currentColor" />
-      <circle cx="12" cy="12" r="1.3" fill="currentColor" />
-      <circle cx="19" cy="12" r="1.3" fill="currentColor" />
+      <path d="M6.5 4h11v16.5L12 16.5l-5.5 4z" />
+    </Icon>
+  );
+}
+
+export function IconBan(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M6 6l12 12" />
+    </Icon>
+  );
+}
+
+export function IconUndo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
     </Icon>
   );
 }

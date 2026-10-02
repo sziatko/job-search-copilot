@@ -30,7 +30,7 @@ import {
   writeStatus,
 } from './status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
-import { ALL_COMMENTS } from './vacancy.service';
+import { ALL_COMMENTS, companyMatchCounts } from './vacancy.service';
 
 /** The Vacancy fields the /applications page reads. */
 const APPLICATION_SELECT = {
@@ -198,12 +198,24 @@ export class ApplicationService {
     ]);
 
     const { items, nextCursor } = toCursorPage(rows, cursor, limit);
-    return { items: items.map((row) => flatten(row, now)), total, nextCursor };
+    const counts = await companyMatchCounts(
+      this.db,
+      items.map((row) => row.company),
+    );
+    return {
+      items: items.map((row) => ({
+        ...flatten(row, now),
+        companyMatchCount: counts.get(row.company) ?? 0,
+      })),
+      total,
+      nextCursor,
+    };
   }
 
   /**
-   * Moves the vacancy to `status` through writeStatus — any status, triage included,
-   * and the same one is an event too. `note`, when not blank, becomes a new `source`
+   * Moves the vacancy to `status` through writeStatus — any status, triage included; a
+   * repeated pipeline status is an event, a repeated triage one throws SameStatusError.
+   * `note`, when not blank, becomes a new `source`
    * comment in the same transaction. `source` is the
    * caller's: AGENT over MCP, USER over REST. Returns null when no vacancy has this id.
    */

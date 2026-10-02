@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { IconEdit } from '@/components/icons';
+import { IconEdit, IconHistory } from '@/components/icons';
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { useVirtualRows } from '@/components/useVirtualRows';
@@ -35,6 +35,7 @@ export function ApplicationsTable({
   rowErrors,
   onStatusChange,
   onEdit,
+  onShowCompanyHistory,
   onEndReached,
   emptyMessage,
 }: {
@@ -43,6 +44,7 @@ export function ApplicationsTable({
   rowErrors: Map<number, string>;
   onStatusChange: (id: number, status: ApplicationStatus) => void;
   onEdit: (item: ApplicationListItem) => void;
+  onShowCompanyHistory: (company: string, vacancyId: number) => void;
   /** The next page, when the last loaded row scrolls into the window (ADR-0030). */
   onEndReached?: () => void;
   emptyMessage: string;
@@ -89,6 +91,8 @@ export function ApplicationsTable({
             const item = items[virtualRow.index];
             const linkable = isSafeExternalUrl(item.applyUrl);
             const moved = item.statusChangedAt !== item.appliedAt;
+            // As on /vacancies: 1 means "no siblings" — the count includes this row.
+            const others = (item.companyMatchCount ?? 0) - 1;
             return (
               <tr
                 key={item.id}
@@ -127,6 +131,19 @@ export function ApplicationsTable({
                   )}
                   <div className="role-meta">
                     {item.company} <span className="id">#{item.id}</span>
+                    {others >= 1 && (
+                      <button
+                        type="button"
+                        onClick={() => onShowCompanyHistory(item.company, item.id)}
+                        className="meta-btn"
+                      >
+                        <IconHistory />
+                        <span aria-hidden>{others}</span>
+                        <span className="tip">
+                          {others} other {others === 1 ? 'vacancy' : 'vacancies'} at {item.company}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </td>
                 <td>

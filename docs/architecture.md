@@ -122,11 +122,13 @@ container, not just `core`:
 
 - new dependency → `docker compose exec <svc> npm install` in each service that
   imports it (e.g. `web` for a new web dep).
-- `schema.prisma` change → `docker compose exec <svc> npx prisma generate --schema
-  packages/core/prisma/schema.prisma` in `core` **and** `api` **and** `mcp`, then
-  `docker compose restart api mcp`. Symptom of a missed `api`/`mcp` regen: an
-  `@IsEnum(<NewEnum>)` DTO crashes on boot because `core`'s re-export of the enum
-  resolves to `undefined`.
+- `schema.prisma` change → `docker compose restart api mcp core`. Each of the three
+  runs `prisma generate` into its own volume before it starts (its `command` in
+  `docker-compose.yml`). By hand: `docker compose exec <svc> npm --prefix /repo run
+  generate`. Symptoms of a missed
+  regen: an `@IsEnum(<NewEnum>)` DTO crashes on boot (`core`'s re-export resolves to
+  `undefined`); a new enum *value* fails quieter — 400 from `@IsEnum`, 500 from a
+  query that names it (phase 4.2, `UNAVAILABLE`).
 - or just `docker compose up -d --build`.
 
 ## System invariants

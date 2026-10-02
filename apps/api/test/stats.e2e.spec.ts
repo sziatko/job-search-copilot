@@ -62,6 +62,7 @@ describe('Stats (e2e)', () => {
       recommended: 1,
       applied: 1,
       declined: 0,
+      unavailable: 0,
       responded: 1,
       interview: 0,
       recruiterScreen: 0,
@@ -73,5 +74,29 @@ describe('Stats (e2e)', () => {
       expect.objectContaining({ status: 'APPLIED', title: 'Backend Engineer' }),
     ]);
     expect(typeof res.body.recent[0].createdAt).toBe('string');
+  });
+
+  it('GET counts unavailable by the current status', async () => {
+    const server = app.getHttpServer();
+    const created = await request(server)
+      .post('/api/v1/vacancies')
+      .send({
+        company: 'Acme',
+        title: 'Backend Engineer',
+        applyUrl: 'https://acme.com/jobs/2',
+        fullText: 'Text.',
+        matchScore: 80,
+        recommendation: 'APPLY',
+        estimationComment: 'Strong match.',
+      })
+      .expect(201);
+    await request(server)
+      .patch(`/api/v1/vacancies/${created.body.id}/status`)
+      .send({ status: 'UNAVAILABLE' })
+      .expect(200);
+
+    const res = await request(server).get('/api/v1/stats').expect(200);
+
+    expect(res.body).toMatchObject({ unavailable: 1, declined: 0, awaitingTriage: 0 });
   });
 });

@@ -38,6 +38,11 @@ The web showed two places to write a note. And once comments and dates move out,
   a cache of the latest row. One function, `writeStatus`, writes the row and the cache in
   one transaction. Every write is an event, the status the vacancy already has included
   (the next interview round), so a caller writes once per real event.
+
+  *Amended in phase 4.2 step 7:* only a **pipeline** repeat is an event. A **triage**
+  status the vacancy already has (`TRIAGE_STATUSES` in `status.ts`) carries none, so
+  `writeStatus` refuses it — `SameStatusError`, a `DomainError` (API 422, MCP `isError`)
+  — and writes nothing. The web does not offer a row's current status.
 - **`Comment`** `(vacancyId, source, body, createdAt)` holds every note. `source` is
   `ANALYZER | USER | AGENT`. Comments are append-only; a CRUD page may come later. The
   analyzer still sends `estimationComment`, and vacancy reads still return it, derived from

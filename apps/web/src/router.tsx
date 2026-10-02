@@ -23,32 +23,26 @@ const rootRoute = createRootRoute({ component: RootLayout });
  */
 const DASHBOARD_META: RouteMeta = {
   title: 'Dashboard',
-  subtitle: 'Your job search, at a glance',
   rail: false,
 };
 const VACANCIES_META: RouteMeta = {
   title: 'Analyzed vacancies',
-  subtitle: "Review the analyzer's shortlist and triage what to apply to",
   rail: true,
 };
 const APPLICATIONS_META: RouteMeta = {
   title: 'Application tracker',
-  subtitle: "Every application you've sent and where it stands",
   rail: true,
 };
 const LOG_META: RouteMeta = {
   title: 'Vacancy log',
-  subtitle: 'Dedup cache of every posting the pipeline has ever seen',
   rail: true,
 };
 const VACANCY_META: RouteMeta = {
   title: 'Vacancy details',
-  subtitle: 'Full posting, history, and other roles at this company',
   rail: false,
 };
 const PROFILE_META: RouteMeta = {
   title: 'Profile & forms',
-  subtitle: 'Coming soon',
   rail: false,
 };
 

@@ -35,6 +35,7 @@ dashboard and the `/applications` KPI strip read it; neither loads a list to cou
 | `recommended` | `recommendation in (APPLY, APPLY_WITH_CAVEATS)` |
 | `applied` | vacancies with an `APPLIED` journal row, ever |
 | `declined` | … currently `DECLINED` (the user's no) |
+| `unavailable` | … currently `UNAVAILABLE` (the posting stopped taking applications) |
 | `responded` | … with a `REPLIED`, `RECRUITER_SCREEN`, `INTERVIEW` or `OFFER` row, ever |
 | `interview` | … with an `INTERVIEW` or `OFFER` row, ever |
 | `recruiterScreen` | … currently in `RECRUITER_SCREEN` |
@@ -44,7 +45,8 @@ dashboard and the `/applications` KPI strip read it; neither loads a list to cou
 The funnel is Logged → Recommended → Applied → Got a response → Interview. Its
 stages past Recommended count the journal ("ever reached"); `pipeline` counts the
 current status. Under it, "Dropped out": not recommended (`logged − recommended`,
-floored at 0), declined (`declined`), rejected (`pipeline.byStatus.REJECTED`), timed
+floored at 0), declined (`declined`), no longer accepting applications
+(`unavailable`, added in phase 4.2 step 8), rejected (`pipeline.byStatus.REJECTED`), timed
 out (`pipeline.timedOut`).
 
 *Amended in phase 4.1 step 4:* the funnel's second stage was Analysed (`analysed`,

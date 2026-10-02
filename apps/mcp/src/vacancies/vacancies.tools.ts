@@ -85,7 +85,8 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       title: 'List / search vacancies',
       description:
         'List vacancies, newest first, with optional filters: recommendation; status, ' +
-        'any of a list (NOT_REVIEWED, SAVED_FOR_LATER, DECLINED, then the pipeline: ' +
+        'any of a list (NOT_REVIEWED, SAVED_FOR_LATER, DECLINED, UNAVAILABLE, then the ' +
+        'pipeline: ' +
         'APPLIED … REJECTED); company, title — ILIKE %term%, case-insensitive; applyUrl — ' +
         'the vacancy with that posting link, raw is fine (normalized as saved). Does not ' +
         'include fullText — use get_vacancy for that.',

@@ -61,10 +61,17 @@ function rowOf(company: string) {
   return within(row);
 }
 
-/** The ⋯ menu's items. The popover is inside the row, so this scopes to it too —
- * and while the menu is closed it is `display: none`, hence invisible to queries. */
-function menuItem(name: string) {
-  return within(screen.getByRole('menu')).getByRole('menuitem', { name });
+/** The status buttons a row offers, by their bubbles, in the order the row renders
+ * them. Copy and Details are not status changes, so they are not in the list. */
+const STATUS_VERBS = [
+  'Apply',
+  'Decline',
+  'Save for later',
+  'Mark unavailable',
+  'Mark not reviewed',
+];
+function offered(company: string) {
+  return STATUS_VERBS.filter((name) => rowOf(company).queryByRole('button', { name }));
 }
 
 const SEARCH_BOX = /search company or role/i;
@@ -126,6 +133,7 @@ describe('VacanciesPage / useVacancies', () => {
       'Not reviewed',
       'Saved for later',
       'Declined',
+      'Unavailable',
       'Applied',
       'All',
     ]);
@@ -239,8 +247,7 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Showing 130 of 130');
 
     const user = userEvent.setup();
-    await user.click(rowOf('Co 1').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Saved for later'));
+    await user.click(rowOf('Co 1').getByRole('button', { name: 'Save for later' }));
 
     const secondPage = () =>
       client.getQueryData<InfiniteData<{ items: VacancyListItem[] }>>([
@@ -252,7 +259,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(secondPage()?.find((item) => item.id === 1)?.status).toBe('SAVED_FOR_LATER'),
     );
     patch.release();
-  }, 20_000);
+  });
 
   it('sends the typed term to the server as `search` and renders the matches', async () => {
     mswServer.use(
@@ -375,26 +382,44 @@ describe('VacanciesPage / useVacancies', () => {
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
 
-    // Scoped by `.tag`: the ⋯ menu holds the same wording, and it stays in the DOM
-    // (hidden) whether or not it is open.
+    // Scoped by `.tag`: the Status column, not a button's bubble.
     expect(rowOf('Acme').getByText('Saved for later', { selector: '.tag' })).toBeInTheDocument();
     expect(rowOf('Beta Corp').getByText('Declined', { selector: '.tag' })).toBeInTheDocument();
   });
 
-  it('saves a status picked from the ⋯ menu straight away, with no dialog', async () => {
+  it('saves Save for later straight away, with no dialog', async () => {
     mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
     renderVacancies();
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Saved for later'));
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
 
     // NOT_REVIEWED filter still active -> nothing to confirm, the row just drops out.
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
   });
 
-  it('sets a reviewed row back to Not reviewed from the ⋯ menu', async () => {
+  it('sets Unavailable with no confirm, and filters by it', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'Acme' }),
+        vacancy({ id: 2, company: 'Beta Corp', status: 'DECLINED' }),
+      ]),
+    );
+    renderVacancies();
+    await screen.findByText('Acme');
+
+    const user = userEvent.setup();
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Mark unavailable' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
+
+    await user.selectOptions(screen.getByLabelText('Status'), 'UNAVAILABLE');
+    expect(await rowOf('Acme').findByText('Unavailable', { selector: '.tag' })).toBeInTheDocument();
+    expect(screen.queryByText('Beta Corp')).not.toBeInTheDocument();
+  });
+
+  it('sets a reviewed row back to Not reviewed', async () => {
     mswServer.use(
       ...buildHandlers([vacancy({ id: 1, company: 'Acme', status: 'SAVED_FOR_LATER' })]),
     );
@@ -406,100 +431,57 @@ describe('VacanciesPage / useVacancies', () => {
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
     expect(rowOf('Acme').getByText('Saved for later', { selector: '.tag' })).toBeInTheDocument();
 
-    await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Not reviewed'));
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Mark not reviewed' }));
 
     await waitFor(() =>
       expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument(),
     );
   });
 
-  it('sends nothing when the ⋯ menu picks the status the row already has', async () => {
-    const patches: string[] = [];
-    const onRequest = ({ request }: { request: Request }) => {
-      if (request.method === 'PATCH') patches.push(request.url);
-    };
-    mswServer.events.on('request:start', onRequest);
-    try {
-      mswServer.use(
-        ...buildHandlers([vacancy({ id: 1, company: 'Acme', status: 'SAVED_FOR_LATER' })]),
-      );
-      renderVacancies();
-      await screen.findByText(/no vacancies match this filter/i);
-
-      const user = userEvent.setup();
-      await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-      await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-      await user.click(menuItem('Saved for later'));
-
-      expect(rowOf('Acme').getByRole('button', { name: 'Apply' })).toBeEnabled();
-      expect(patches).toEqual([]);
-    } finally {
-      mswServer.events.removeListener('request:start', onRequest);
-    }
-  });
-
-  it('closes the ⋯ menu on a second click of its own trigger', async () => {
-    mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
-    renderVacancies();
-    await screen.findByText('Acme');
-
-    const trigger = rowOf('Acme').getByRole('button', { name: 'More statuses' });
-    const user = userEvent.setup();
-    await user.click(trigger);
-    expect(await screen.findByRole('menu')).toBeInTheDocument();
-
-    // The trigger is a declarative invoker, so the browser's activation behaviour
-    // owns hide as well as show. A click handler could never do this: the menu is
-    // already closed by the time one runs (light dismiss is on pointerup).
-    await user.click(trigger);
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-
-    // …and it still opens on a third click.
-    await user.click(trigger);
-    expect(await screen.findByRole('menu')).toBeInTheDocument();
-  });
-
-  it('measures the menu on every open, not once', async () => {
-    mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
-    renderVacancies();
-    await screen.findByText('Acme');
-
-    // The trigger moves between opens — a row above it grows, the list scrolls —
-    // so a position computed once and reused points at nothing. jsdom's rect stub
-    // returns a fixed box (`bottom: 768`, `right: 1024`, window 1024 wide); this one
-    // is moved, which is what makes a cached position visible.
-    const trigger = rowOf('Acme').getByRole('button', { name: 'More statuses' });
-    trigger.getBoundingClientRect = () => ({ bottom: 100, right: 400 }) as DOMRect;
-
-    const user = userEvent.setup();
-    await user.click(trigger);
-    await screen.findByRole('menu');
-    const menu = document.querySelector<HTMLElement>('.row-menu');
-    expect(menu?.style.top).toBe('104px'); // trigger.bottom + 4
-    expect(menu?.style.right).toBe('624px'); // innerWidth 1024 - trigger.right
-  });
-
-  it('opens only the menu of the row that was clicked', async () => {
+  it('offers every status but the one the row already has', async () => {
     mswServer.use(
       ...buildHandlers([
-        vacancy({ id: 1, company: 'Acme' }),
-        vacancy({ id: 2, company: 'Beta Corp' }),
-        vacancy({ id: 3, company: 'Gamma' }),
+        vacancy({ id: 1, company: 'Fresh Co' }),
+        vacancy({ id: 2, company: 'Saved Co', status: 'SAVED_FOR_LATER' }),
+        vacancy({ id: 3, company: 'Declined Co', status: 'DECLINED' }),
+        vacancy({ id: 4, company: 'Closed Co', status: 'UNAVAILABLE' }),
+        vacancy({ id: 5, company: 'Interview Co', status: 'INTERVIEW' }),
       ]),
     );
     renderVacancies();
-    await screen.findByText('Acme');
+    await screen.findByText('Fresh Co');
 
     const user = userEvent.setup();
-    await user.click(rowOf('Beta Corp').getByRole('button', { name: 'More statuses' }));
+    await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
+    await screen.findByText('Interview Co');
 
-    // The invoker resolves its target by id, and the id is per instance — with one
-    // shared id every row would open the same menu.
-    const open = document.querySelectorAll('.row-menu.popover-open');
-    expect(open).toHaveLength(1);
-    const trigger = rowOf('Beta Corp').getByRole('button', { name: 'More statuses' });
-    expect(open[0].id).toBe(trigger.getAttribute('popovertarget'));
+    // Four quick actions on every row: the server refuses a triage repeat.
+    expect(offered('Fresh Co')).toEqual(['Apply', 'Decline', 'Save for later', 'Mark unavailable']);
+    expect(offered('Saved Co')).toEqual([
+      'Apply',
+      'Decline',
+      'Mark unavailable',
+      'Mark not reviewed',
+    ]);
+    expect(offered('Declined Co')).toEqual([
+      'Apply',
+      'Save for later',
+      'Mark unavailable',
+      'Mark not reviewed',
+    ]);
+    expect(offered('Closed Co')).toEqual([
+      'Apply',
+      'Decline',
+      'Save for later',
+      'Mark not reviewed',
+    ]);
+    // A pipeline row counts as Applied, as in the status filter.
+    expect(offered('Interview Co')).toEqual([
+      'Decline',
+      'Save for later',
+      'Mark unavailable',
+      'Mark not reviewed',
+    ]);
   });
 
   it('locks the status controls of a row already applied to, and only those', async () => {
@@ -516,14 +498,15 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Interview Co');
 
     // Its status moves on /applications; copying it is still useful here.
-    expect(rowOf('Interview Co').getByRole('button', { name: 'Apply' })).toBeDisabled();
-    expect(rowOf('Interview Co').getByRole('button', { name: 'Decline' })).toBeDisabled();
-    expect(rowOf('Interview Co').getByRole('button', { name: 'More statuses' })).toBeDisabled();
+    for (const name of offered('Interview Co')) {
+      expect(rowOf('Interview Co').getByRole('button', { name })).toBeDisabled();
+    }
     expect(rowOf('Interview Co').getByRole('button', { name: /^Copy / })).toBeEnabled();
     // A triage row keeps all of them.
-    expect(rowOf('Saved Co').getByRole('button', { name: 'Apply' })).toBeEnabled();
-    expect(rowOf('Saved Co').getByRole('button', { name: 'Decline' })).toBeEnabled();
-    expect(rowOf('Saved Co').getByRole('button', { name: 'More statuses' })).toBeEnabled();
+    expect(offered('Saved Co')).toHaveLength(4);
+    for (const name of offered('Saved Co')) {
+      expect(rowOf('Saved Co').getByRole('button', { name })).toBeEnabled();
+    }
   });
 
   it('disables every control in a row while its save is in flight', async () => {
@@ -542,16 +525,16 @@ describe('VacanciesPage / useVacancies', () => {
 
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-    await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Saved for later'));
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
 
     // All four in one `waitFor`: they come from the same `saving` flag, so they
     // have to agree on a single render — checking them one at a time can catch the
-    // first disabled and the second already back.
+    // first disabled and the second already back. Only buttons both statuses offer:
+    // the write is optimistic, so Save for later may already have left the row.
     await waitFor(() => {
       expect(rowOf('Acme').getByRole('button', { name: 'Apply' })).toBeDisabled();
       expect(rowOf('Acme').getByRole('button', { name: 'Decline' })).toBeDisabled();
-      expect(rowOf('Acme').getByRole('button', { name: 'More statuses' })).toBeDisabled();
+      expect(rowOf('Acme').getByRole('button', { name: 'Mark unavailable' })).toBeDisabled();
       expect(rowOf('Acme').getByRole('button', { name: /^Copy / })).toBeDisabled();
     });
 
@@ -719,8 +702,7 @@ describe('VacanciesPage / useVacancies', () => {
     // the rows on screen are the *older* term's page, held by `keepPreviousData`.
     expect(client.getQueryData(['vacancies', 'beta', 'ALL'])).toBeUndefined();
 
-    await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Saved for later'));
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
 
     // The optimistic write lands on the entry that exists — the exact-key write it
     // replaced hit the absent one and did nothing. Asserted on the cache, not the
@@ -765,8 +747,7 @@ describe('VacanciesPage / useVacancies', () => {
     await user.type(screen.getByPlaceholderText(SEARCH_BOX), 'beta');
     await waitFor(() => expect(list.state.started).toBe(1));
 
-    await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Saved for later'));
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
 
     // Mid-flight: the optimistic write is *in* the cached page, which is what makes
     // the rollback below a real rollback rather than a no-op on an untouched entry.
@@ -794,8 +775,7 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    await user.click(rowOf('Acme').getByRole('button', { name: 'More statuses' }));
-    await user.click(menuItem('Saved for later'));
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
 
     // The optimistic write put the row out of the NOT_REVIEWED view; the rollback
     // has to bring it back, tag and all.
@@ -847,8 +827,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(buttons[0]).toHaveAccessibleName('1 other vacancy at Acme');
     });
 
-    it('lists every vacancy of that company, with its applied state', async () => {
-      // One table: #2 is applied to, and the log the modal reads is its pipeline.
+    it('lists every vacancy of that company, with its status and row actions', async () => {
       const rows = companyFixtures();
       rows[1].status = 'INTERVIEW';
       mswServer.use(...buildHandlers(rows));
@@ -863,14 +842,50 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.getByText('Backend Engineer')).toBeInTheDocument();
       expect(modal.getByText('Data Engineer')).toBeInTheDocument();
       expect(modal.queryByText('Frontend Lead')).not.toBeInTheDocument();
-      expect(modal.getByRole('columnheader', { name: 'Action' })).toBeInTheDocument();
-      // Only #2 has an application in the log. The column reads "—" until the log
-      // has loaded, so this waits rather than asserting on the first paint.
-      await waitFor(() => expect(modal.getByText('Applied')).toBeInTheDocument());
-      expect(modal.getByText('Not applied')).toBeInTheDocument();
+      // The vacancy's own status, not a join against the applications query.
+      const modalRow = (title: string) =>
+        within(modal.getByText(title).closest('tr') as HTMLElement);
+      expect(modalRow('Backend Engineer').getByText('Not reviewed')).toHaveClass('tag');
+      expect(modalRow('Data Engineer').getByText('Interview')).toHaveClass('tag');
+      expect(
+        modalRow('Data Engineer').getByRole('link', { name: /open vacancy details/i }),
+      ).toHaveAttribute('href', '/vacancies/2');
+      expect(
+        modalRow('Data Engineer').getByRole('button', { name: /copy data engineer/i }),
+      ).toBeInTheDocument();
     });
 
-    it('claims nothing about the log when the applications request fails', async () => {
+    it('refetches on every open, so a status changed since shows', async () => {
+      mswServer.use(...buildHandlers(companyFixtures()));
+      // Every status, so the row stays in the table once it leaves NOT_REVIEWED.
+      const { client } = renderVacancies('/vacancies?status=ALL');
+      // The app's own 30s (lib/queryClient.ts), not the library's 0 — under which
+      // any reopen refetches whatever the modal's options say.
+      client.setDefaultOptions({ queries: { retry: false, staleTime: 30_000 } });
+      await screen.findByText('Backend Engineer');
+      const user = userEvent.setup();
+      const openModal = async () => {
+        await user.click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[0]);
+        return within(await screen.findByRole('dialog'));
+      };
+
+      let modal = await openModal();
+      await modal.findByText('Data Engineer');
+      await user.click(modal.getByRole('button', { name: 'Close' }));
+
+      await user.click(rowOf('Backend Engineer').getByRole('button', { name: 'Save for later' }));
+      await waitFor(() =>
+        expect(
+          rowOf('Backend Engineer').getByText('Saved for later', { selector: '.tag' }),
+        ).toBeInTheDocument(),
+      );
+
+      modal = await openModal();
+      const row = within(modal.getByText('Backend Engineer').closest('tr') as HTMLElement);
+      expect(await row.findByText('Saved for later')).toHaveClass('tag');
+    });
+
+    it('shows the statuses when the applications request fails', async () => {
       // First in the list, so the refusal shadows the fake's own /applications.
       mswServer.use(
         http.get('http://localhost:3000/api/v1/applications', () =>
@@ -885,14 +900,9 @@ describe('VacanciesPage / useVacancies', () => {
       await user.click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[0]);
 
       const modal = within(await screen.findByRole('dialog'));
-      // Wait for the failure itself: until then the cells are dashed for being
-      // pending, which is the same paint for the opposite reason.
-      await modal.findByText(/load your applications/i);
-      // Both Acme rows. A failed log is not an empty one, and "Not applied" is the
-      // claim a stopped API used to make for every row here.
-      expect(modal.getAllByText('—')).toHaveLength(2);
-      expect(modal.queryByText('Not applied')).not.toBeInTheDocument();
-      expect(modal.queryByText('Applied')).not.toBeInTheDocument();
+      // That query only feeds the ⏳ mark; the status comes with the vacancy.
+      expect(await modal.findAllByText('Not reviewed')).toHaveLength(2);
+      expect(modal.queryByText(/load your applications/i)).not.toBeInTheDocument();
     });
 
     it('reports the server’s count when the page under it is short', async () => {
@@ -910,7 +920,10 @@ describe('VacanciesPage / useVacancies', () => {
       await screen.findByText('Role 101');
 
       const user = userEvent.setup();
-      await user.click(screen.getAllByRole('button', { name: /other vacancies at Acme/i })[0]);
+      // Scoped to one row: a page-wide `getAllByRole` names every button in every
+      // rendered row, ~1.5 s of this test in jsdom.
+      const first = within(screen.getByText('Role 101').closest('tr') as HTMLElement);
+      await user.click(first.getByRole('button', { name: /other vacancies at Acme/i }));
 
       const modal = within(await screen.findByRole('dialog'));
       // Both numbers, so the count under the button and the rows on screen can no
@@ -918,7 +931,7 @@ describe('VacanciesPage / useVacancies', () => {
       await modal.findByText('Showing 100 of 101 vacancies, newest first');
       // 101 fixtures is the honest minimum for a short page (the modal's own
       // `limit=100`), and jsdom paints all of them in two tables to get there.
-    }, 20_000);
+    });
 
     it('marks a stale application with the tracker’s hourglass', async () => {
       mswServer.use(
@@ -976,10 +989,8 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.queryByText('80%')).toBeInTheDocument(); // the safe row keeps its pill
       expect(modal.getByText('Imported Role')).toBeInTheDocument();
       expect(modal.queryByRole('link', { name: 'Imported Role' })).not.toBeInTheDocument();
-      // One dash, for the importer row's score — the safe row shows a pill, and
-      // both Action cells say "Not applied" now that the log has loaded.
-      await waitFor(() => expect(modal.getAllByText('—')).toHaveLength(1));
-      expect(modal.getAllByText('Not applied')).toHaveLength(2);
+      // One dash, for the importer row's score — the safe row shows a pill.
+      expect(modal.getAllByText('—')).toHaveLength(1);
     });
 
     it('fetches the company history when the modal opens, not with the list', async () => {
@@ -1048,17 +1059,24 @@ describe('VacanciesPage / useVacancies', () => {
       // The controls are icons now, so the bubble is their only visible label.
       // Scoped by `.tip`: the Rec. column's tag also reads "Apply".
       const row = rowOf('Acme');
-      for (const label of ['Copy', 'Apply', 'Decline', 'More', 'Details']) {
+      for (const label of [
+        'Copy',
+        'Apply',
+        'Decline',
+        'Save for later',
+        'Mark unavailable',
+        'Details',
+      ]) {
         expect(row.getByText(label, { selector: '.tip' })).toBeInTheDocument();
       }
     });
 
-    it('sizes the column for five 30px buttons', async () => {
+    it('sizes the column for six 30px buttons', async () => {
       mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
       renderVacancies();
       await screen.findByText('Acme');
 
-      expect(screen.getByRole('columnheader', { name: 'Action' })).toHaveStyle({ width: '210px' });
+      expect(screen.getByRole('columnheader', { name: 'Action' })).toHaveStyle({ width: '246px' });
     });
 
     it('swaps the copy bubble to Copied once the text is on the clipboard', async () => {

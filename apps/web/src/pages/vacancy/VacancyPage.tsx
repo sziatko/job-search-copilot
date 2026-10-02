@@ -49,7 +49,7 @@ const TRIAGE_OPTIONS = Object.values(VACANCY_ACTION).map((value) => ({
 }));
 
 /** The statuses that end a vacancy: a bad one, and the good one. */
-const CLOSED_BAD: readonly VacancyStatus[] = ['DECLINED', 'REJECTED'];
+const CLOSED_BAD: readonly VacancyStatus[] = ['DECLINED', 'UNAVAILABLE', 'REJECTED'];
 const CLOSED_GOOD: VacancyStatus = 'OFFER';
 
 /** Core's `PLACEHOLDER_COMMENT` — the text a vacancy recorded without a posting carries. */

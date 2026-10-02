@@ -81,6 +81,51 @@ const LIST_SELECT = {
   statusChangedAt: true,
 } satisfies Prisma.VacancySelect;
 
+/**
+ * For each name, how many vacancies have a `company` containing it (case-insensitive
+ * substring) — the duplicates button's count (ADR-0025), on /vacancies and
+ * /applications alike. Every vacancy counts, whatever its status: the modal lists them
+ * all.
+ */
+export async function companyMatchCounts(
+  db: PrismaClient,
+  companies: string[],
+): Promise<Map<string, number>> {
+  const names = [...new Set(companies)];
+  if (names.length === 0) {
+    return new Map();
+  }
+
+  // Prefilter so the scan below only sees candidates. One OR over the page's
+  // distinct companies, each escaped (a company named `A_B` must reach `A_B`, not
+  // `AXB`) — so it selects exactly the superset the JS count then narrows, and the
+  // count itself stays in JS. Under-selecting here is the failure that matters:
+  // it would report 0 matches for a company's own rows and hide the button.
+  //
+  // ponytail: a second round-trip plus an O(distinct companies x candidates) scan
+  // on every list call. Fine while a page is a hundred rows; if the table grows,
+  // do the counting in SQL (a lateral join over the same index) instead of pulling
+  // candidate company names into the process.
+  const candidates = await db.vacancy.findMany({
+    where: {
+      OR: names.map((name) => ({
+        company: { contains: escapeLikePattern(name), mode: 'insensitive' },
+      })),
+    },
+    select: { company: true },
+  });
+
+  const counts = new Map<string, number>();
+  for (const name of names) {
+    const needle = name.toLowerCase();
+    counts.set(
+      name,
+      candidates.filter((candidate) => candidate.company.toLowerCase().includes(needle)).length,
+    );
+  }
+  return counts;
+}
+
 export class VacancyService {
   /**
    * @param db PrismaClient to run against. Defaults (evaluated on construction, not
@@ -212,9 +257,7 @@ export class VacancyService {
    * both are computed on every list call because they are read from the page that
    * came back rather than from the database:
    *
-   * - `companyMatchCount`: for each row, how many vacancies have a `company`
-   *   containing that row's company (case-insensitive substring — the /vacancies
-   *   duplicates button, ADR-0025).
+   * - `companyMatchCount`: see `companyMatchCounts`.
    * - `hasAnalysis`: whether the analyzer ever saw the posting — whether it has an
    *   `ANALYZER` comment (see the type's own comment for the ceiling). One place
    *   decides this, which is the point: before it, the modal inferred it from the
@@ -224,39 +267,10 @@ export class VacancyService {
   private async withDerivedFields(
     items: Omit<VacancyListItem, 'companyMatchCount' | 'hasAnalysis'>[],
   ): Promise<VacancyListItem[]> {
-    const names = [...new Set(items.map((item) => item.company))];
-    if (names.length === 0) {
-      return [];
-    }
-
-    // Prefilter so the scan below only sees candidates. One OR over the page's
-    // distinct companies, each escaped (a company named `A_B` must reach `A_B`, not
-    // `AXB`) — so it selects exactly the superset the JS count then narrows, and the
-    // count itself stays in JS. Under-selecting here is the failure that matters:
-    // it would report 0 matches for a company's own rows and hide the button.
-    //
-    // ponytail: a second round-trip plus an O(distinct companies x candidates) scan
-    // on every list call. Fine while a page is a hundred rows; if the table grows,
-    // do the counting in SQL (a lateral join over the same index) instead of pulling
-    // candidate company names into the process.
-    const candidates = await this.db.vacancy.findMany({
-      where: {
-        OR: names.map((name) => ({
-          company: { contains: escapeLikePattern(name), mode: 'insensitive' },
-        })),
-      },
-      select: { company: true },
-    });
-
-    const counts = new Map<string, number>();
-    for (const name of names) {
-      const needle = name.toLowerCase();
-      counts.set(
-        name,
-        candidates.filter((candidate) => candidate.company.toLowerCase().includes(needle)).length,
-      );
-    }
-
+    const counts = await companyMatchCounts(
+      this.db,
+      items.map((item) => item.company),
+    );
     return items.map((item) => ({
       ...item,
       companyMatchCount: counts.get(item.company) ?? 0,
@@ -264,8 +278,9 @@ export class VacancyService {
     }));
   }
 
-  /** Moves the vacancy to `status` through writeStatus — the same status is an event
-   * too. Returns null when no vacancy has this id. */
+  /** Moves the vacancy to `status` through writeStatus — a repeated pipeline status is
+   * an event, a repeated triage one throws SameStatusError. Returns null when no vacancy
+   * has this id. */
   updateStatus(id: number, status: VacancyStatus): Promise<VacancyDetail | null> {
     return this.db.$transaction(async (tx) => {
       await writeStatus(tx, id, status);

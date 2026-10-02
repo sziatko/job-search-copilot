@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApplicationService } from './application.service';
-import { InvalidRecommendationError } from './errors';
+import { InvalidRecommendationError, SameStatusError } from './errors';
 import { getPrisma } from './prisma-client';
 import { VacancyService } from './vacancy.service';
 import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
@@ -267,14 +267,14 @@ describe('VacancyService', () => {
 
     it('carries the status journal as `timeline`, oldest first, a repeat included', async () => {
       const { vacancy } = await service.save(input());
-      await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
-      const updated = await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
+      await service.updateStatus(vacancy.id, 'INTERVIEW');
+      const updated = await service.updateStatus(vacancy.id, 'INTERVIEW');
 
       const found = await service.getById(vacancy.id);
       expect(found?.timeline.map((step) => step.status)).toEqual([
         'NOT_REVIEWED',
-        'SAVED_FOR_LATER',
-        'SAVED_FOR_LATER',
+        'INTERVIEW',
+        'INTERVIEW',
       ]);
       expect(found?.timeline[0].createdAt).toEqual(vacancy.statusChangedAt);
       expect(found?.timeline.at(-1)?.createdAt).toEqual(found?.statusChangedAt);
@@ -643,21 +643,48 @@ describe('VacancyService', () => {
       expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'DECLINED']);
     });
 
-    it('journals the status the vacancy already has as a new event', async () => {
+    it('journals a pipeline status the vacancy already has as a new event', async () => {
       const { vacancy } = await service.save(input());
-      await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
+      await service.updateStatus(vacancy.id, 'INTERVIEW');
       const before = await service.getById(vacancy.id);
 
-      const same = await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
+      const same = await service.updateStatus(vacancy.id, 'INTERVIEW');
 
       expect(same?.statusChangedAt.getTime()).toBeGreaterThanOrEqual(
         before?.statusChangedAt.getTime() ?? 0,
       );
-      expect(await journal(vacancy.id)).toEqual([
-        'NOT_REVIEWED',
-        'SAVED_FOR_LATER',
-        'SAVED_FOR_LATER',
-      ]);
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'INTERVIEW', 'INTERVIEW']);
+    });
+
+    it('refuses a triage status the vacancy already has, and journals nothing', async () => {
+      const { vacancy } = await service.save(input());
+      await service.updateStatus(vacancy.id, 'DECLINED');
+      const before = await service.getById(vacancy.id);
+
+      await expect(service.updateStatus(vacancy.id, 'DECLINED')).rejects.toThrow(SameStatusError);
+      expect((await service.getById(vacancy.id))?.statusChangedAt).toEqual(before?.statusChangedAt);
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'DECLINED']);
+    });
+
+    it('moves to UNAVAILABLE, a triage status: a repeat is refused', async () => {
+      const { vacancy } = await service.save(input());
+      expect((await service.updateStatus(vacancy.id, 'UNAVAILABLE'))?.status).toBe('UNAVAILABLE');
+      expect((await service.list({ status: ['UNAVAILABLE'] })).total).toBe(1);
+
+      await expect(service.updateStatus(vacancy.id, 'UNAVAILABLE')).rejects.toThrow(
+        SameStatusError,
+      );
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'UNAVAILABLE']);
+    });
+
+    it('refuses NOT_REVIEWED on a vacancy that was never moved', async () => {
+      const { vacancy } = await service.save(input());
+      await expect(service.updateStatus(vacancy.id, 'NOT_REVIEWED')).rejects.toThrow(
+        SameStatusError,
+      );
+      const found = await service.getById(vacancy.id);
+      expect(found?.statusChangedAt).toEqual(vacancy.statusChangedAt);
+      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED']);
     });
 
     it('can set a vacancy back to NOT_REVIEWED', async () => {

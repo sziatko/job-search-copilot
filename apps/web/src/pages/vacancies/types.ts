@@ -22,6 +22,7 @@ export const vacancyStatusSchema = z.enum([
   'NOT_REVIEWED',
   'SAVED_FOR_LATER',
   'DECLINED',
+  'UNAVAILABLE',
   'APPLIED',
   'RECRUITER_SCREEN',
   'REPLIED',
@@ -37,6 +38,7 @@ const vacancyActionSchema = vacancyStatusSchema.extract([
   'NOT_REVIEWED',
   'SAVED_FOR_LATER',
   'DECLINED',
+  'UNAVAILABLE',
   'APPLIED',
 ]);
 export type VacancyAction = z.infer<typeof vacancyActionSchema>;

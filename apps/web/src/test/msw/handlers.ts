@@ -63,6 +63,13 @@ function asApplication(row: FakeVacancy) {
   return { ...row, timedOut: isTimedOut(row) };
 }
 
+/** Core's `companyMatchCounts`: every row whose company contains this one's. */
+function companyMatchCount(rows: FakeVacancy[], row: FakeVacancy) {
+  return rows.filter((candidate) =>
+    candidate.company.toLowerCase().includes(row.company.toLowerCase()),
+  ).length;
+}
+
 /** A row as GET /vacancies/:id — the journal starts at NOT_REVIEWED on `createdAt`,
  * as `firstStatus` writes it. */
 function asDetail(row: FakeVacancy): VacancyDetail {
@@ -145,9 +152,7 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
     const more = matching.length > limit;
     const page = matching.slice(0, limit).map((row) => ({
       ...row,
-      companyMatchCount: rows.filter((candidate) =>
-        candidate.company.toLowerCase().includes(row.company.toLowerCase()),
-      ).length,
+      companyMatchCount: companyMatchCount(rows, row),
       // Derived the same way the endpoint derives it (phase 2.2, step 7) rather than
       // hand-set per fixture: a fixture is a placeholder by having no analyzer
       // comment, which is what `ApplicationService` actually writes.
@@ -239,7 +244,9 @@ export function buildHandlers(rows: FakeVacancy[]) {
         ? sorted.slice(sorted.findIndex((row) => row.id === Number(cursor)) + 1)
         : sorted;
       const matching = after.filter(matches);
-      const page = matching.slice(0, limit).map(asApplication);
+      const page = matching
+        .slice(0, limit)
+        .map((row) => ({ ...asApplication(row), companyMatchCount: companyMatchCount(rows, row) }));
       return HttpResponse.json({
         items: page,
         total: sorted.filter(matches).length,
@@ -322,6 +329,7 @@ export function fakeStats(overrides: Partial<Stats> = {}): Stats {
     recommended: 0,
     applied: 0,
     declined: 0,
+    unavailable: 0,
     responded: 0,
     interview: 0,
     recruiterScreen: 0,

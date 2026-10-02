@@ -50,7 +50,11 @@ services:
       target: dev
     restart: unless-stopped
     working_dir: /repo/packages/core
-    command: npm run watch
+    # core, api and mcp each regenerate the Prisma client on start: each has its own
+    # node_modules volume, so a client generated on the host or in another container
+    # never reaches it. After a schema.prisma change, `docker compose restart api mcp
+    # core` is the whole fix. `exec` makes the real process PID 1, so it gets SIGTERM.
+    command: sh -c "npm --prefix /repo run generate && exec npm run watch"
     environment:
       <<: *watch-env
       DATABASE_URL: *database-url
@@ -67,6 +71,8 @@ services:
         condition: service_healthy
       core:
         condition: service_started
+    # Prisma client regenerated on start — see `core`.
+    command: sh -c "npm --prefix /repo run generate && exec npm run start:dev"
     environment:
       <<: *watch-env
       DATABASE_URL: *database-url
@@ -101,7 +107,8 @@ services:
     environment:
       DATABASE_URL: *database-url
     volumes: *repo-volumes
-    command: sleep infinity
+    # Prisma client regenerated on start — see `core`.
+    command: sh -c "npm --prefix /repo run generate && exec sleep infinity"
 
   web:
     build:

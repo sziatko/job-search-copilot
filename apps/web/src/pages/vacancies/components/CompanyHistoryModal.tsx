@@ -1,22 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
 import { useId } from 'react';
+import { DetailsLink } from '@/components/ui/DetailsLink';
 import { Modal } from '@/components/ui/Modal';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { isSafeExternalUrl } from '@/lib/url';
 import { listApplicationsPage } from '@/pages/applications/api';
 import { daysSinceLastMove } from '@/pages/applications/constants';
 import { listVacanciesPage } from '../api';
+import { STATUS_TAGS } from '../constants';
+import { CopyVacancyButton } from './CopyVacancyButton';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
 /**
- * Every vacancy of one company, joined against the tracker's log to say which of
- * them were applied to — the answer to "have I dealt with these people before?"
- * without leaving the triage screen.
+ * Every vacancy of one company with its status — the answer to "have I dealt with
+ * these people before?" without leaving the triage screen.
  *
  * Fetched when it opens, not with the table: the list only needs
  * `companyMatchCount` to draw the button, and the modal's rows are a different
- * query (a different scope, and up to 100 of them).
+ * query (a different scope, and up to 100 of them). `staleTime: 0` on both
+ * queries, so every open refetches: neither key is invalidated by the tables'
+ * writes, and the app's default 30s kept a status changed a moment ago stale.
  */
 export function CompanyHistoryModal({
   company,
@@ -35,15 +39,18 @@ export function CompanyHistoryModal({
     // after every action change, which would refetch this for nothing.
     queryKey: ['vacancy-company', company],
     queryFn: () => listVacanciesPage({ company, limit: 100 }),
+    staleTime: 0,
   });
 
-  // This company's applications — `search` also matches titles, which the join by id
-  // below ignores. Not under ['applications']: those entries are the tracker's paged
-  // lists, and its optimistic writes patch every one of them as pages.
+  // This company's applications, for the ⏳ timeout mark only — `search` also
+  // matches titles, which the join by id below ignores. Not under ['applications']:
+  // those entries are the tracker's paged lists, and its optimistic writes patch
+  // every one of them as pages.
   // ponytail: one page of 500; a company with more applications loses the oldest marks.
   const applications = useQuery({
     queryKey: ['application-company', company],
     queryFn: () => listApplicationsPage({ search: company, limit: 500 }),
+    staleTime: 0,
   });
 
   const applicationsByVacancy = new Map(
@@ -55,11 +62,6 @@ export function CompanyHistoryModal({
   // than the table shows). The subtitle said "in the log" off `items.length`, so a
   // 250-vacancy company read "100 in the log" under a button saying 249.
   const total = data?.total ?? 0;
-
-  // One gate for both claims this row makes about the log: nothing is known until
-  // the tracker's own query has loaded, and on failure it is not "empty" — it never
-  // arrived. Without `isError`, a stopped API painted every row "Not applied".
-  const logUnknown = applications.isPending || applications.isError;
 
   return (
     <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName="max-w-2xl">
@@ -73,12 +75,6 @@ export function CompanyHistoryModal({
             ? `Showing ${items.length} of ${total} vacancies, newest first`
             : `${total} vacancies, newest first`}
       </p>
-
-      {applications.isError && (
-        <p className="mt-[6px] text-[12.5px] text-bad">
-          Couldn’t load your applications, so the Action column is hidden.
-        </p>
-      )}
 
       {error ? (
         <div className="empty-state">
@@ -97,7 +93,8 @@ export function CompanyHistoryModal({
                 <th>Date</th>
                 <th>Vacancy</th>
                 <th>Score</th>
-                <th>Action</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -112,7 +109,7 @@ export function CompanyHistoryModal({
                 return (
                   <tr key={item.id} className={isCurrent ? 'row-current' : undefined}>
                     <td className="date-cell">
-                      {!logUnknown && application?.timedOut && (
+                      {application?.timedOut && (
                         <span className="timeout-mark mr-[4px]">
                           ⏳
                           <span className="tip">
@@ -147,11 +144,21 @@ export function CompanyHistoryModal({
                     </td>
                     {/* A placeholder has no analysis behind its score number. */}
                     <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
-                    {/* Nothing until the log has loaded, and nothing if it never
-                        did — "Not applied" is a claim, wrong for one round-trip and
-                        false for a failed request. */}
-                    <td className="text-[12.5px]">
-                      {logUnknown ? '—' : application ? 'Applied' : 'Not applied'}
+                    <td>
+                      <span className={`tag ${STATUS_TAGS[item.status].variant}`}>
+                        {STATUS_TAGS[item.status].text}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex gap-[6px]">
+                        <CopyVacancyButton
+                          id={item.id}
+                          company={item.company}
+                          title={item.title}
+                          applyUrl={item.applyUrl}
+                        />
+                        <DetailsLink id={item.id} />
+                      </div>
                     </td>
                   </tr>
                 );

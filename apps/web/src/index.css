@@ -60,6 +60,27 @@
   button {
     font-family: inherit;
   }
+  /* Thin, token-coloured scrollbars everywhere (the window, the table boxes, the
+     KPI strip). Native CSS, not a library: one wraps the scroll element, which
+     `useVirtualRows` reads through `scrollRef`. `scrollbar-width` does not inherit,
+     hence `*`. Chrome/Edge/Firefox take the two standard properties and then ignore
+     the ::-webkit-scrollbar rules below, which are Safari's. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    border-radius: 8px;
+  }
 }
 
 @layer components {
@@ -197,12 +218,18 @@
   .topbar {
     @apply sticky top-0 z-20 flex items-end justify-between gap-[16px] border-b border-border px-[28px] py-[16px] backdrop-blur-[8px];
     background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+    transition: padding 0.18s ease;
   }
   .topbar-title {
     @apply text-[20px] font-extrabold tracking-[-0.01em];
+    transition: font-size 0.18s ease;
   }
-  .topbar-sub {
-    @apply mt-[3px] text-[12.5px] text-ink-muted;
+  /* RootLayout sets data-compact once anything on the page scrolls. */
+  .main[data-compact] .topbar {
+    @apply py-[8px];
+  }
+  .main[data-compact] .topbar-title {
+    @apply text-[16px];
   }
   .menu-toggle {
     @apply hidden h-[34px] w-[34px] flex-none cursor-pointer items-center justify-center rounded-[8px] border border-border bg-surface text-ink-soft;
@@ -220,8 +247,10 @@
      than to every loaded row, and grow around it instead of letting it spill out.
      Child combinators: a modal's scroll box inside the view (the company history)
      keeps its 560px. */
+  /* dvh: a phone's collapsing URL bar would otherwise leave the page a bar's height
+     to scroll. */
   .main:has(> .view-fill) {
-    height: 100vh;
+    height: 100dvh;
   }
   .view.view-fill {
     @apply flex flex-1 flex-col pb-[24px];
@@ -276,6 +305,22 @@
   }
   button.kpi-tile:hover {
     @apply border-border-strong;
+  }
+  /* /applications' tiles once the page scrolls (and always at ≤ 860px, below): one
+     row of chips — "Applied 12" — that scrolls sideways inside itself, so the table
+     gets the height back. Scoped to .view-fill, so the dashboard's tiles keep their
+     grid. The same rules are repeated in the media query. */
+  .main[data-compact] .view-fill .kpi-row {
+    @apply mb-[12px] flex gap-[8px] overflow-x-auto;
+  }
+  .main[data-compact] .view-fill .kpi-tile {
+    @apply flex flex-none items-baseline gap-[6px] rounded-full px-[12px] py-[5px];
+  }
+  .main[data-compact] .view-fill .kpi-value {
+    @apply mt-0 text-[14px];
+  }
+  .main[data-compact] .view-fill .kpi-note {
+    @apply hidden;
   }
 
   .card {
@@ -490,9 +535,13 @@
   }
 
   /* ---------- dashboard ---------- */
+  /* minmax(0, …), not a bare fr: a bare fr's floor is the card's min-content, and an
+     `.attn-title`'s nowrap text counts at full length there — a long title widened
+     the column past the window (the phone's sideways scroll), before its ellipsis
+     could cut it. */
   .dash-grid {
     @apply grid items-start gap-[16px];
-    grid-template-columns: 1.3fr 1fr;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   }
   /* Name · value · conversion, then the bar at the card's full width: on one
      line the card (~330px at 1100 wide) left the bar nothing. When even the text
@@ -635,32 +684,6 @@
      button. Invisible in a lone dialog; not in a column of them. */
   .btn-danger:hover {
     @apply bg-bad-ink;
-  }
-
-  /* The closed state of any popover. The UA stylesheet's own
-     `[popover]:not(:popover-open) { display: none }` is a *user-agent* rule and is
-     not `!important` (only `:popover-open::backdrop` is), so author CSS beats it —
-     which `.row-menu`'s `flex` below does, leaving every closed menu on screen.
-     This must sit in this layer, not in `base`: layers are compared before
-     specificity, so a base-layer rule would lose to that same `flex`. */
-  [popover]:not(:popover-open) {
-    display: none;
-  }
-
-  /* The row's ⋯ menu: a native popover, so it lands in the top layer and is not
-     clipped by .table-body-scroll. `inset: auto` is load-bearing — the UA
-     stylesheet sets `inset: 0; margin: auto` on [popover] and Preflight does not
-     neutralise it; the component then sets top/left from getBoundingClientRect(). */
-  .row-menu {
-    @apply m-0 flex flex-col gap-[2px] rounded-[10px] border border-border bg-surface p-[6px] shadow-pop;
-    position: fixed;
-    inset: auto;
-  }
-  .row-menu button {
-    @apply cursor-pointer rounded-[7px] px-[12px] py-[6px] text-left text-[12.5px] font-semibold whitespace-nowrap text-ink;
-  }
-  .row-menu button:hover {
-    @apply bg-surface-alt;
   }
 
   .field-label {
@@ -961,6 +984,19 @@
     .kpi-row {
       grid-template-columns: repeat(2, 1fr);
     }
+    /* /applications' compact strip, always on here — see .main[data-compact] above. */
+    .view-fill .kpi-row {
+      @apply mb-[12px] flex gap-[8px] overflow-x-auto;
+    }
+    .view-fill .kpi-tile {
+      @apply flex flex-none items-baseline gap-[6px] rounded-full px-[12px] py-[5px];
+    }
+    .view-fill .kpi-value {
+      @apply mt-0 text-[14px];
+    }
+    .view-fill .kpi-note {
+      @apply hidden;
+    }
     .funnel-conv {
       @apply hidden;
     }
@@ -970,7 +1006,7 @@
   }
   @media (max-width: 980px) {
     .dash-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 }
@@ -990,6 +1026,7 @@
 :root {
   --rail-w: 72px;
   color-scheme: light;
+  --scroll-thumb: #c3cddc;
   /* The funnel's five stages, one hue each: the dataviz skill's categorical
      slots 1–5 (blue, orange, aqua, yellow, magenta), light and dark steps,
      validated for adjacent-pair colour-blind separation on the funnel track. */
@@ -1031,6 +1068,7 @@
     --color-bad-soft-border: #5e2e2e;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
+    --scroll-thumb: #3f4757;
     --funnel-1: #3987e5;
     --funnel-2: #d95926;
     --funnel-3: #199e70;
@@ -1065,6 +1103,7 @@
   --color-bad-soft-border: #5e2e2e;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
+  --scroll-thumb: #3f4757;
   --funnel-1: #3987e5;
   --funnel-2: #d95926;
   --funnel-3: #199e70;

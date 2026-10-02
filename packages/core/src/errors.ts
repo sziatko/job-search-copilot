@@ -25,3 +25,6 @@ export class AlreadyAppliedError extends DomainError {}
 
 /** A vacancy-log check without an http(s) url — the log's key. */
 export class InvalidVacancyLogEntryError extends DomainError {}
+
+/** A triage status the vacancy already has — a repeat carries no event (ADR-0029). */
+export class SameStatusError extends DomainError {}

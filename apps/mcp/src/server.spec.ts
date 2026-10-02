@@ -326,6 +326,14 @@ describe('job-search-copilot MCP server', () => {
     });
     expect(JSON.parse(textOf(got)).status).toBe('SAVED_FOR_LATER');
 
+    // A triage repeat carries no event: refused.
+    const repeat = await client.callTool({
+      name: 'update_vacancy_status',
+      arguments: { id: vacancy.id, status: 'SAVED_FOR_LATER' },
+    });
+    expect(repeat.isError).toBe(true);
+    expect(textOf(repeat)).toContain('already SAVED_FOR_LATER');
+
     const saved = await client.callTool({
       name: 'list_vacancies',
       arguments: { status: ['SAVED_FOR_LATER', 'DECLINED'] },

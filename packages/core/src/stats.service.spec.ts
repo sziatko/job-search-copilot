@@ -53,6 +53,7 @@ describe('StatsService.get', () => {
       recommended: 0,
       applied: 0,
       declined: 0,
+      unavailable: 0,
       responded: 0,
       interview: 0,
       recruiterScreen: 0,
@@ -94,6 +95,15 @@ describe('StatsService.get', () => {
     await seed(['SAVED_FOR_LATER']);
 
     expect((await stats.get(NOW)).declined).toBe(1);
+  });
+
+  it('counts unavailable by the current status only', async () => {
+    await seed(['UNAVAILABLE']);
+    await seed(['SAVED_FOR_LATER', 'UNAVAILABLE']);
+    await seed(['UNAVAILABLE', 'NOT_REVIEWED']); // set back: not unavailable now
+    await seed(['DECLINED']);
+
+    expect(await stats.get(NOW)).toMatchObject({ unavailable: 2, declined: 1 });
   });
 
   it('counts a funnel stage from the journal: a reply then a rejection still responded', async () => {

@@ -1,5 +1,5 @@
 import { Outlet, useMatches, useRouterState } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sidebar } from './shell/Sidebar';
 import { Topbar } from './shell/Topbar';
 
@@ -18,6 +18,8 @@ export function RootLayout() {
   const [override, setOverride] = useState<{ path: string; value: boolean } | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const mainRef = useRef<HTMLDivElement>(null);
+
   const collapsed = override?.path === pathname ? override.value : (meta.rail ?? false);
 
   // The mockup resets scroll on every view switch. These are real routes now, so
@@ -26,7 +28,27 @@ export function RootLayout() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the trigger for the reset, not a value the body reads
   useEffect(() => {
     window.scrollTo(0, 0);
+    mainRef.current?.removeAttribute('data-compact');
   }, [pathname]);
+
+  // The header goes compact once anything scrolls — the window or a table's own
+  // scroll box. Scroll does not bubble, but a capture listener on the document
+  // sees every element's. On past 24px, off only back at 0: the header's own
+  // shrink moves the scroll, and one threshold would make it jitter.
+  useEffect(() => {
+    const onScroll = (event: Event) => {
+      const main = mainRef.current;
+      if (!main) return;
+      const top =
+        event.target instanceof Element
+          ? event.target.scrollTop
+          : (document.scrollingElement?.scrollTop ?? 0);
+      if (top > 24) main.setAttribute('data-compact', '');
+      else if (top <= 0) main.removeAttribute('data-compact');
+    };
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', onScroll, { capture: true });
+  }, []);
 
   return (
     <div className="app">
@@ -43,12 +65,8 @@ export function RootLayout() {
         onToggleRail={() => setOverride({ path: pathname, value: !collapsed })}
         onCloseMobile={() => setMobileOpen(false)}
       />
-      <div className={`main ${collapsed ? 'rail' : ''}`}>
-        <Topbar
-          title={meta.title ?? ''}
-          subtitle={meta.subtitle ?? ''}
-          onOpenMobile={() => setMobileOpen(true)}
-        />
+      <div ref={mainRef} className={`main ${collapsed ? 'rail' : ''}`}>
+        <Topbar title={meta.title ?? ''} onOpenMobile={() => setMobileOpen(true)} />
         <Outlet />
       </div>
     </div>

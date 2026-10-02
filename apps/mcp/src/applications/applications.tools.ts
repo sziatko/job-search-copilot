@@ -103,7 +103,7 @@ export function registerApplicationTools(
       title: 'Update a vacancy status',
       description:
         "Move a vacancy to a new status — the user's triage (NOT_REVIEWED, SAVED_FOR_LATER, " +
-        'DECLINED) or a pipeline stage (APPLIED … REJECTED); separate from the ' +
+        'DECLINED, UNAVAILABLE — the posting no longer takes applications) or a pipeline stage (APPLIED … REJECTED); separate from the ' +
         "analyzer's recommendation. To record applying, prefer record_application. " +
         'Identify the vacancy either by `id` (from list_vacancies / list_applications), ' +
         'or by `company` + `title` — the latter is for a caller that only knows the ' +
@@ -112,10 +112,11 @@ export function registerApplicationTools(
         'never applied to is "not found". Exactly one of the two must be given. A ' +
         '(company, title) match with more than one candidate is an error listing the ids to disambiguate ' +
         'with `id`; an unknown id or an unmatched (company, title) reports "not found" — ' +
-        'this tool never creates anything. Every call is an event: it is journaled and ' +
-        'moves the status date even when the status is the same (the next interview ' +
+        'this tool never creates anything. Every pipeline move is an event: it is journaled ' +
+        'and moves the status date even when the status is the same (the next interview ' +
         'round is INTERVIEW again) — so call it once per real event, not for a reminder ' +
-        'of one already recorded. `comment` is optional: when given it is added to the vacancy ' +
+        'of one already recorded. A triage status the vacancy already has is an error: ' +
+        'a repeat carries no event, and nothing is written. `comment` is optional: when given it is added to the vacancy ' +
         'as a new dated AGENT comment — earlier comments are never changed. Returns ' +
         '{ success: true, vacancy: { id, company, title } }.',
       inputSchema: {

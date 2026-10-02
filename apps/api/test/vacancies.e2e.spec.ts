@@ -261,6 +261,32 @@ describe('Vacancies (e2e)', () => {
       expect(res.body.estimationComment).toBe(validPayload.estimationComment);
     });
 
+    it('sets UNAVAILABLE, and filters by it', async () => {
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/vacancies')
+        .send(validPayload);
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/vacancies/${created.body.id}/status`)
+        .send({ status: 'UNAVAILABLE' })
+        .expect(200);
+      expect(res.body.status).toBe('UNAVAILABLE');
+      const listed = await request(app.getHttpServer())
+        .get('/api/v1/vacancies?status=UNAVAILABLE')
+        .expect(200);
+      expect(listed.body.total).toBe(1);
+    });
+
+    it('refuses a repeated triage status with 422', async () => {
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/vacancies')
+        .send(validPayload);
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/vacancies/${created.body.id}/status`)
+        .send({ status: 'NOT_REVIEWED' })
+        .expect(422);
+      expect(res.body.error).toBe('SameStatusError');
+    });
+
     it('rejects an invalid status with 400', async () => {
       const created = await request(app.getHttpServer())
         .post('/api/v1/vacancies')

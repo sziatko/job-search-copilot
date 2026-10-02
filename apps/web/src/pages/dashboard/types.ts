@@ -11,6 +11,8 @@ export const statsSchema = z.object({
   applied: z.number(),
   /** Currently DECLINED — the user said no. */
   declined: z.number(),
+  /** Currently UNAVAILABLE — the posting closed before the user applied. */
+  unavailable: z.number(),
   responded: z.number(),
   interview: z.number(),
   /** Currently in RECRUITER_SCREEN. */
