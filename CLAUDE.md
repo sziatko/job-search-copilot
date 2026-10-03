@@ -10,7 +10,7 @@ client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (Re
 - [`docs/architecture.md`](docs/architecture.md) — the system map. Start here.
 - [`docs/contracts.md`](docs/contracts.md) — surfaces other code depends on.
 - [`docs/domain-model.md`](docs/domain-model.md) — the two independent axes.
-- [`docs/decisions/`](docs/decisions/) — 28 ADRs, one per load-bearing decision.
+- [`docs/decisions/`](docs/decisions/) — 31 ADRs, one per load-bearing decision.
 - [`docs/design/`](docs/design/) — visual references (HTML mockups). Not prose; open
   in a browser rather than reading.
 - [`skills/`](skills/) — the user's Claude skills that drive the MCP server, kept here
@@ -37,6 +37,7 @@ Quote them from there if you change one; keep this list in step.
 7. **Tests run against a real `job_search_copilot_test` database**, sequentially
    (`fileParallelism: false`), and are integration tests, not Prisma mocks.
 8. **Env is loaded by the app entrypoint, validated at boot.**
+9. **Every REST route is closed by default** — anonymous or machine access is explicit.
 
 ## Commands
 

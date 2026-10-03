@@ -142,8 +142,11 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 
 1. **`packages/core` is the only database client.** `apps/api` and `apps/mcp`
    reach the DB *only* through `VacancyService` / `ApplicationService`. A
-   query written in a controller or a tool handler is a bug.
-   → [ADR-0002](decisions/0002-core-shared-domain-layer.md)
+   query written in a controller or a tool handler is a bug. Auth is the one other
+   door: the Better Auth instance built by `createAuth` in `core` on `core`'s client
+   (phase 6, once step 1 lands); the apps mount it, never build their own.
+   → [ADR-0002](decisions/0002-core-shared-domain-layer.md),
+   [ADR-0034](decisions/0034-auth-better-auth-in-core.md)
 2. **A vacancy is analysed once.** A vacancy can exist before its analysis (status
    `NEW`, `matchScore` and `recommendation` both `null`); the analysis is written once
    and never overwritten — `writeAnalysis` in `vacancy.service.ts` (`save()`,
@@ -183,6 +186,12 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 8. **Env is loaded by the app entrypoint, validated at boot.** `packages/core`
    does not load `.env`; a missing/invalid var fails startup with a readable
    message. → [ADR-0007](decisions/0007-env-config-and-loading.md)
+9. **Every REST route is closed by default** (phase 6, from step 2). A global guard
+   wants a session; anonymous access is explicit (`@AllowAnonymous()`, `/health` only),
+   machine access is explicit (`MachineTokenGuard`, the three n8n routes only).
+   `Vacancy` has no owner, so an anonymous route exposes all the data.
+   → [ADR-0034](decisions/0034-auth-better-auth-in-core.md),
+   [ADR-0036](decisions/0036-machine-token-for-n8n.md)
 
 ## Stack
 
