@@ -9,15 +9,16 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { useInfiniteList } from '@/lib/useInfiniteList';
 import { recordApplication } from '../applications/api';
-import { applicationStatusSchema, isPipelineStatus } from '../applications/types';
+import { isPipelineStatus } from '../applications/types';
 import { listVacanciesPage, updateVacancyStatus, type VacancyPage } from './api';
 import type { ApplyDetails } from './components/ApplyDialog';
 import { toastMoved } from './constants';
 import {
+  type RowAction,
+  STATUS_CONTEXT,
   STATUS_FILTER_ALL,
   type StatusFilterValue,
   VACANCY_ACTION,
-  type VacancyAction,
   type VacancyStatus,
 } from './types';
 
@@ -31,36 +32,24 @@ interface PendingVacancy {
 
 interface ActionChange {
   id: number;
-  status: VacancyAction;
+  status: RowAction;
 }
 
 type CachedPages = InfiniteData<VacancyPage, number | undefined>;
 
-/** The filter as the API's `status` — Applied stands for the whole pipeline, so a row
- * stays under it as it moves on; All sends none. */
-function statusesFor(filter: StatusFilterValue): readonly VacancyStatus[] | undefined {
-  if (filter === STATUS_FILTER_ALL) return undefined;
-  if (filter === VACANCY_ACTION.APPLIED) return applicationStatusSchema.options;
-  return [filter];
+/** The filter as the API's `status` — All is the page's own statuses, never the whole
+ * table: NEW / FILTERED_OUT are /inbox's, the pipeline /applications'. */
+function statusesFor(filter: StatusFilterValue): readonly VacancyStatus[] {
+  return filter === STATUS_FILTER_ALL ? STATUS_CONTEXT.vacancies.options : [filter];
 }
 
+/** /vacancies: the status filter, in the URL, over the shared vacancy rows. Search is
+ * the search modal's, never this table's. */
 export function useVacancies() {
-  const queryClient = useQueryClient();
   const search = useSearch({ from: '/vacancies' });
   const navigate = useNavigate({ from: '/vacancies' });
 
-  // `q` is what the box shows — the raw URL value, padding and all, because the
-  // input re-syncs from it and a trimmed value would eat a space as it is typed.
-  // `term` is what the server is asked for and what the cache is keyed on, so
-  // `" dev "` and `"dev"` are one entry and one request.
-  const q = search.q ?? '';
-  const term = q.trim();
-  const setSearchText = (value: string) => {
-    void navigate({
-      search: (prev) => ({ ...prev, q: value.trim() === '' ? undefined : value }),
-    });
-  };
-  // In the URL too, NOT_REVIEWED (the triage queue) being the absent value.
+  // NOT_REVIEWED (the triage queue) is the absent value.
   const statusFilter = search.status ?? VACANCY_ACTION.NOT_REVIEWED;
   const setStatusFilter = (value: StatusFilterValue) => {
     void navigate({
@@ -71,16 +60,34 @@ export function useVacancies() {
     });
   };
 
-  // The term and the filter are part of the key, not just the request: a different
-  // search is a different list, which starts again from its first page (ADR-0030). Every write below therefore goes through the *prefix*
-  // (`{ queryKey: VACANCIES_KEY }`), never one exact key — `findAll` is a partial
-  // match, and only a primitive in a key stops `['vacancies','foo']` from matching
-  // `['vacancies','foobar']` (terms cannot collide here, so the prefix is safe).
+  const rows = useVacancyRows([statusFilter], (cursor) =>
+    listVacanciesPage({ status: statusesFor(statusFilter), sort: 'recommended', cursor }),
+  );
+
+  return { ...rows, statusFilter, setStatusFilter };
+}
+
+/**
+ * A table of vacancy rows — /vacancies' and /inbox's: the server's list, paged, and the
+ * row writes (a status move, optimistic and toasted; Decline and Apply behind their
+ * dialogs). `filters` are the page's own, keyed under ['vacancies'].
+ */
+export function useVacancyRows(
+  filters: readonly unknown[],
+  fetchPage: (cursor: number | undefined) => Promise<VacancyPage>,
+) {
+  const queryClient = useQueryClient();
+
+  // The filters are part of the key, not just the request: a different
+  // filter is a different list, which starts again from its first page (ADR-0030).
+  // Every write below therefore goes through the *prefix* (`{ queryKey:
+  // VACANCIES_KEY }`), never one exact key — `findAll` is a partial match, so it
+  // reaches /vacancies' and /inbox's entries alike.
   // Each entry is an infinite query's `{ pages, pageParams }`, and the write patches
   // every page.
   //
   // The exact-key write this replaced was a silent no-op in both directions (phase
-  // 2.2, finding 3): while a new term is in flight its entry does not exist yet, so
+  // 2.2, finding 3): while a new filter is in flight its entry does not exist yet, so
   // `setQueryData` returned early and the rollback had no snapshot to restore.
   //
   // It is **not** visible, and the prefix write does not make it visible: while the
@@ -90,20 +97,13 @@ export function useVacancies() {
   // prevResult.data`), so an updated live entry is never re-read. What the prefix
   // write buys is that the optimistic value lands on the entry that exists and the
   // rollback has something to put back — measured, not assumed. Doing it "properly"
-  // would mean dropping keepPreviousData, which costs the blank-on-keystroke that
-  // phase 2.1, step 2 added it for.
-  const queryKey = [...VACANCIES_KEY, term, statusFilter] as const;
+  // would mean dropping keepPreviousData, which costs the blank table on every filter
+  // change that phase 2.1, step 2 added it for (then for the toolbar's search box).
+  const queryKey = [...VACANCIES_KEY, ...filters];
 
   // The server filters and sorts; `useInfiniteList` keeps the previous rows on screen
-  // while a new key loads, so the table does not blank on every debounced keystroke.
-  const { query, items, total, loadMore } = useInfiniteList(queryKey, (cursor) =>
-    listVacanciesPage({
-      search: term,
-      status: statusesFor(statusFilter),
-      sort: 'recommended',
-      cursor,
-    }),
-  );
+  // while a new key loads, so the table does not blank on a filter change.
+  const { query, items, total, loadMore } = useInfiniteList(queryKey, fetchPage);
   const loading = query.isPending;
   const loadError = query.error ? query.error.message : null;
 
@@ -175,7 +175,7 @@ export function useVacancies() {
     },
   });
 
-  function requestActionChange(id: number, status: VacancyAction) {
+  function requestActionChange(id: number, status: RowAction) {
     const item = items.find((i) => i.id === id);
     // Every status write is an event on the server, so picking the status a row
     // already has must not send one. An applied row's status moves on /applications
@@ -207,7 +207,7 @@ export function useVacancies() {
     mutationFn: ({ id, details }: { id: number; details: ApplyDetails }) =>
       recordApplication({
         vacancyId: id,
-        salaryInListing: details.salary || undefined,
+        salaryInApplication: details.salary || undefined,
         usedTailoredResume: details.usedTailoredResume,
         comment: details.comment || undefined,
       }),
@@ -263,10 +263,6 @@ export function useVacancies() {
     rowErrors,
     pendingDecline,
     pendingApply,
-    q,
-    setSearchText,
-    statusFilter,
-    setStatusFilter,
     requestActionChange,
     confirmDecline,
     confirmApply,

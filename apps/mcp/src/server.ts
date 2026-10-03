@@ -1,8 +1,8 @@
-import { ApplicationService, VacancyLogService, VacancyService } from '@job-search-copilot/core';
+import { ApplicationService, VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerApplicationTools } from './applications/applications.tools';
+import { registerIntakeTools } from './intake/intake.tools';
 import { registerVacancyTools } from './vacancies/vacancies.tools';
-import { registerVacancyLogTools } from './vacancy-log/vacancy-log.tools';
 
 /**
  * Sent to every client on connect: the rules that span tools. A rule about one tool
@@ -14,13 +14,22 @@ export const SERVER_INSTRUCTIONS = [
   'job-search-copilot tracks one job search in one table of vacancies. An application ' +
     'is not a separate record: it is a vacancy whose status is in the pipeline, and ' +
     "every id, from any tool, is the vacancy's id.",
-  'Order: check_vacancy_log before analysing a posting — only a new one is analysed — ' +
-    'then save_vacancy. save_vacancy does not write the log.',
-  'Status, one per vacancy: triage NOT_REVIEWED, SAVED_FOR_LATER, DECLINED (the ' +
-    'applicant chose not to apply), UNAVAILABLE (the posting no longer takes ' +
-    'applications); then the pipeline APPLIED, RECRUITER_SCREEN, ' +
+  'Order: intake_vacancy before analysing a posting — only a new one is analysed — ' +
+    'then save_vacancy, which attaches the analysis to the vacancy the intake created. ' +
+    'A link alone: list_vacancies({ applyUrl }) first, and fetch the page for its company ' +
+    'and title only when nothing is found.',
+  'The analysis queue: vacancies taken in without an analysis wait in status NEW. Work ' +
+    "it with list_vacancies({ status: ['NEW'], hasText: true }) → get_vacancies_batch → " +
+    'score each → submit_analyses_batch, at most 10 per call. An analysis is written ' +
+    'once: a vacancy that has one refuses another.',
+  'Status, one per vacancy: NEW (waiting for an analysis); triage NOT_REVIEWED, ' +
+    'SAVED_FOR_LATER, DECLINED (the applicant chose not to apply), UNAVAILABLE (the ' +
+    'posting no longer takes applications), FILTERED_OUT (screened out before triage, ' +
+    "by the analysis' SKIP or the applicant); then the pipeline APPLIED, RECRUITER_SCREEN, " +
     'REPLIED, INTERVIEW, OFFER, REJECTED (the company said no). `recommendation` is the ' +
-    "analyzer's verdict — never derive one from the other. Record applying with " +
+    "analyzer's verdict — never derive one from the other; the one link is the server's: " +
+    'writing an analysis moves a NEW vacancy to FILTERED_OUT on SKIP, else to ' +
+    'NOT_REVIEWED, and moves no other status. Record applying with ' +
     'record_application; make every other move with update_vacancy_status. Each pipeline ' +
     'status write is an event, dated by the server — the same status again too (the next ' +
     'interview round) — so write once per real event. A triage status the vacancy ' +
@@ -36,12 +45,12 @@ export const SERVER_INSTRUCTIONS = [
  * @param vacancies domain service to back the vacancy tools. Defaults to
  *   one on the shared lazy Prisma client; tests can pass their own.
  * @param applications same, for the application-tracking tools.
- * @param log same, for the vacancy-log tools.
+ * @param intake same, for the intake tools.
  */
 export function createServer(
   vacancies: VacancyService = new VacancyService(),
   applications: ApplicationService = new ApplicationService(),
-  log: VacancyLogService = new VacancyLogService(),
+  intake: VacancyIntakeService = new VacancyIntakeService(),
 ): McpServer {
   const server = new McpServer(
     { name: 'job-search-copilot', version: '0.1.0' },
@@ -50,7 +59,7 @@ export function createServer(
 
   registerVacancyTools(server, vacancies);
   registerApplicationTools(server, applications);
-  registerVacancyLogTools(server, log);
+  registerIntakeTools(server, intake);
 
   return server;
 }

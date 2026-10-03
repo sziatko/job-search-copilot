@@ -77,13 +77,21 @@ describe('DashboardPage', () => {
   });
 
   it('lists what dropped out under the funnel', async () => {
-    const stats = fakeStats({ logged: 1248, recommended: 524, declined: 40, unavailable: 12 });
+    // Not `logged − recommended`: that counted the 100 still awaiting analysis too.
+    const stats = fakeStats({
+      logged: 1248,
+      awaitingAnalysis: 100,
+      recommended: 524,
+      notRecommended: 624,
+      declined: 40,
+      unavailable: 12,
+    });
     stats.pipeline.byStatus.REJECTED = 90;
     stats.pipeline.timedOut = 70;
     renderDashboard(stats);
 
     expect(await droppedRows()).toEqual([
-      ['Not recommended by the analyzer', '724'],
+      ['Not recommended by the analyzer', '624'],
       ['Declined by you', '40'],
       ['No longer accepting applications', '12'],
       ['Rejected', '90'],
@@ -91,11 +99,12 @@ describe('DashboardPage', () => {
     ]);
   });
 
-  it('floors "not recommended" at 0 when more are recommended than logged', async () => {
-    // A vacancy saved without a log check (ADR-0026) is recommended but never logged.
-    renderDashboard(fakeStats({ logged: 3, recommended: 5 }));
+  it('shows how many vacancies await their analysis', async () => {
+    renderDashboard(fakeStats({ logged: 30, awaitingAnalysis: 12 }));
 
-    expect((await droppedRows())[0]).toEqual(['Not recommended by the analyzer', '0']);
+    const tile = (await screen.findByText('Awaiting analysis')).closest('.kpi-tile');
+    expect(tile).toHaveTextContent('12');
+    expect(tile).toHaveTextContent('in the inbox, not yet scored');
   });
 
   it('shows a dash, not NaN or Infinity, below an empty stage', async () => {

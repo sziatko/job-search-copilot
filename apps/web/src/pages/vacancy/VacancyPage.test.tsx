@@ -51,7 +51,7 @@ const applied = () =>
     title: 'Backend Engineer',
     fullText: 'We build things.',
     status: 'APPLIED',
-    salaryInListing: '130 PLN/h',
+    salaryInApplication: '130 PLN/h',
     timeline: [
       { status: 'NOT_REVIEWED', createdAt: '2026-09-01T00:00:00.000Z' },
       { status: 'APPLIED', createdAt: '2026-09-03T00:00:00.000Z' },
@@ -155,10 +155,37 @@ describe('VacancyPage', () => {
     await expectLoadedTable(table, 'Data Engineer');
   });
 
-  it('shows a placeholder for the text of a vacancy recorded without a posting', async () => {
-    renderAt('/vacancies/1', [fakeVacancy({ id: 1, fullText: 'N/A' })]);
+  it('says "No posting text" in place of the text of a vacancy that has none', async () => {
+    renderAt('/vacancies/1', [fakeVacancy({ id: 1, fullText: null })]);
 
-    expect(await screen.findByText('No description')).toBeInTheDocument();
+    const description = await card(/^description$/i);
+    expect(description.getByText('No posting text')).toBeInTheDocument();
+  });
+
+  it('says "Not analysed yet" in place of the score of a vacancy with no analysis', async () => {
+    renderAt('/vacancies/1', [
+      fakeVacancy({
+        id: 1,
+        status: 'NEW',
+        matchScore: null,
+        recommendation: null,
+        estimationComment: null,
+      }),
+    ]);
+
+    await screen.findByRole('heading', { level: 1, name: 'Backend Engineer' });
+    const meta = document.querySelector('.detail-meta-row') as HTMLElement;
+    expect(within(meta).getByText('Not analysed yet')).toBeInTheDocument();
+    expect(meta.querySelector('.pill')).toBeNull();
+  });
+
+  it('shows the score, not "Not analysed yet", once there is an analysis', async () => {
+    renderAt('/vacancies/1', [fakeVacancy({ id: 1, matchScore: 80 })]);
+
+    await screen.findByRole('heading', { level: 1, name: 'Backend Engineer' });
+    const meta = document.querySelector('.detail-meta-row') as HTMLElement;
+    expect(within(meta).getByText('80%')).toBeInTheDocument();
+    expect(within(meta).queryByText('Not analysed yet')).not.toBeInTheDocument();
   });
 
   it('says so for an unknown id', async () => {
@@ -182,6 +209,66 @@ describe('VacancyPage', () => {
     expect(success).toHaveBeenCalledWith('Moved to Saved for later', {
       description: expect.stringContaining(' — '),
     });
+  });
+
+  /** The status select's options, as labels, in order. */
+  function statusOptions() {
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    return [...select.options].map((option) => option.textContent);
+  }
+
+  const unanalysed = { matchScore: null, recommendation: null, estimationComment: null } as const;
+
+  it("offers a NEW vacancy only the row buttons' Filter out, under its own status", async () => {
+    const rows = [fakeVacancy({ id: 1, status: 'NEW', ...unanalysed })];
+    const writes = recordWrites();
+    renderAt('/vacancies/1', rows);
+
+    expect(await screen.findByRole('combobox')).toHaveValue('NEW');
+    expect(statusOptions()).toEqual(['New', 'Filtered out']);
+
+    await userEvent.selectOptions(screen.getByRole('combobox'), 'FILTERED_OUT');
+    await waitFor(() => expect(rows[0].status).toBe('FILTERED_OUT'));
+    expect(writes).toEqual(['PATCH /api/v1/vacancies/1/status']);
+    // Unanalysed, so it can go back to the queue.
+    await waitFor(() => expect(statusOptions()).toEqual(['Filtered out', 'New']));
+  });
+
+  it('puts an unanalysed FILTERED_OUT vacancy back in the queue', async () => {
+    const rows = [fakeVacancy({ id: 1, status: 'FILTERED_OUT', ...unanalysed })];
+    renderAt('/vacancies/1', rows);
+
+    expect(await screen.findByRole('combobox')).toHaveValue('FILTERED_OUT');
+    expect(statusOptions()).toEqual(['Filtered out', 'New']);
+    expect(screen.getByRole('combobox')).toBeEnabled();
+
+    await userEvent.selectOptions(screen.getByRole('combobox'), 'NEW');
+    await waitFor(() => expect(rows[0].status).toBe('NEW'));
+  });
+
+  it('offers an analysed FILTERED_OUT vacancy nowhere to go', async () => {
+    renderAt('/vacancies/1', [
+      fakeVacancy({ id: 1, status: 'FILTERED_OUT', recommendation: 'SKIP', matchScore: 20 }),
+    ]);
+
+    // The server refuses NEW on an analysed row, as on /inbox.
+    expect(await screen.findByRole('combobox')).toHaveValue('FILTERED_OUT');
+    expect(statusOptions()).toEqual(['Filtered out']);
+    expect(screen.getByRole('combobox')).toBeDisabled();
+  });
+
+  it('offers a triage vacancy the /vacancies actions, as before', async () => {
+    renderAt('/vacancies/1', [fakeVacancy({ id: 1, status: 'SAVED_FOR_LATER' })]);
+
+    expect(await screen.findByRole('combobox')).toHaveValue('SAVED_FOR_LATER');
+    expect(statusOptions()).toEqual([
+      'Not reviewed',
+      'Saved for later',
+      'Declined',
+      'Unavailable',
+      'Applied',
+    ]);
+    expect(screen.getByRole('combobox')).toBeEnabled();
   });
 
   it('applies through the apply dialog, which records the application', async () => {
@@ -233,10 +320,10 @@ describe('VacancyPage', () => {
     expect(success).toHaveBeenCalledWith('Comment added');
   });
 
-  it('is linked from each row of both tables', async () => {
+  it('is linked from each row of /vacancies', async () => {
     renderAt('/vacancies?status=ALL', [
       fakeVacancy({ id: 7, status: 'NOT_REVIEWED' }),
-      fakeVacancy({ id: 8, status: 'APPLIED', applyUrl: 'https://example.com/8' }),
+      fakeVacancy({ id: 8, status: 'SAVED_FOR_LATER', applyUrl: 'https://example.com/8' }),
     ]);
     await screen.findAllByRole('link', { name: /open vacancy details/i });
     expect(

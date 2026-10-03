@@ -1,4 +1,4 @@
-import { getPrisma } from '@job-search-copilot/core';
+import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
@@ -19,6 +19,12 @@ function textOf(result: { content?: Array<{ type: string; text?: string }> }): s
   return result.content?.find((c) => c.type === 'text')?.text ?? '';
 }
 
+/** A vacancy intake took in (NEW, unanalysed); returns its id. */
+async function queued(url: string, fullText?: string): Promise<number> {
+  await new VacancyIntakeService().intake({ url, company: 'Queued Co', title: url, fullText });
+  return (await getPrisma().vacancy.findUniqueOrThrow({ where: { applyUrl: url } })).id;
+}
+
 const validArgs = {
   company: 'Acme',
   title: 'Backend Engineer',
@@ -34,7 +40,6 @@ describe('job-search-copilot MCP server', () => {
 
   afterEach(async () => {
     await prisma.vacancy.deleteMany();
-    await prisma.vacancyLogEntry.deleteMany();
   });
 
   afterAll(async () => {
@@ -66,25 +71,121 @@ describe('job-search-copilot MCP server', () => {
   it('sends the cross-tool rules as its instructions', async () => {
     const client = await connectedClient();
     const instructions = client.getInstructions() ?? '';
-    expect(instructions).toContain('check_vacancy_log before analysing');
+    expect(instructions).toContain('intake_vacancy before analysing');
     expect(instructions).toContain('update_vacancy_status');
   });
 
-  it('registers exactly the ten tools', async () => {
+  it('registers exactly the thirteen tools', async () => {
     const client = await connectedClient();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'check_vacancy_log',
-      'check_vacancy_log_batch',
+      'get_vacancies_batch',
       'get_vacancy',
+      'intake_vacancies_batch',
+      'intake_vacancy',
       'list_applications',
       'list_vacancies',
       'record_application',
       'record_applications_batch',
       'save_vacancies_batch',
       'save_vacancy',
+      'submit_analyses_batch',
+      'submit_analysis',
       'update_vacancy_status',
     ]);
+  });
+
+  it('works the analysis queue: list NEW with text → get_vacancies_batch → submit_analyses_batch', async () => {
+    const client = await connectedClient();
+    await queued('https://example.com/q/1', 'Posting one.');
+    await queued('https://example.com/q/2', 'Posting two.');
+    await queued('https://example.com/q/3'); // no text: not in the queue
+
+    const listed = await client.callTool({
+      name: 'list_vacancies',
+      arguments: { status: ['NEW'], hasText: true },
+    });
+    const { items, total } = JSON.parse(textOf(listed));
+    expect(total).toBe(2);
+    const ids = items.map((item: { id: number }) => item.id);
+
+    const got = await client.callTool({ name: 'get_vacancies_batch', arguments: { ids } });
+    expect(
+      JSON.parse(textOf(got))
+        .map((v: { fullText: string }) => v.fullText)
+        .sort(),
+    ).toEqual(['Posting one.', 'Posting two.']);
+
+    const submitted = await client.callTool({
+      name: 'submit_analyses_batch',
+      arguments: {
+        analyses: [
+          { id: ids[0], matchScore: 80, recommendation: 'ПОДАВАТИСЯ', estimationComment: 'Fits.' },
+          { id: ids[1], matchScore: 20, recommendation: 'SKIP', estimationComment: 'Backend.' },
+        ],
+      },
+    });
+    expect(JSON.parse(textOf(submitted))).toMatchObject([
+      { success: true, vacancy: { id: ids[0] } },
+      { success: true, vacancy: { id: ids[1] } },
+    ]);
+    const statuses = await prisma.vacancy.findMany({ where: { id: { in: ids } } });
+    expect(Object.fromEntries(statuses.map((v) => [v.id, v.status]))).toEqual({
+      [ids[0]]: 'NOT_REVIEWED',
+      [ids[1]]: 'FILTERED_OUT',
+    });
+  });
+
+  it('submit_analysis isError for a vacancy already analysed', async () => {
+    const client = await connectedClient();
+    const id = await queued('https://example.com/q/1');
+    const args = { id, matchScore: 80, recommendation: 'APPLY', estimationComment: 'Fits.' };
+
+    const first = await client.callTool({ name: 'submit_analysis', arguments: args });
+    expect(JSON.parse(textOf(first))).toEqual({
+      success: true,
+      vacancy: { id, company: 'Queued Co', title: 'https://example.com/q/1' },
+    });
+    const again = await client.callTool({
+      name: 'submit_analysis',
+      arguments: { ...args, matchScore: 10 },
+    });
+    expect(again.isError).toBe(true);
+    expect(textOf(again)).toContain('already analysed');
+  });
+
+  it('get_vacancies_batch and submit_analyses_batch cap at 10; an unknown id isError', async () => {
+    const client = await connectedClient();
+    const ids = Array.from({ length: 11 }, (_, i) => i + 1);
+    const tooMany = await client.callTool({ name: 'get_vacancies_batch', arguments: { ids } });
+    expect(tooMany.isError).toBe(true);
+    const oversized = await client.callTool({
+      name: 'submit_analyses_batch',
+      arguments: {
+        analyses: ids.map((id) => ({
+          id,
+          matchScore: 1,
+          recommendation: 'SKIP',
+          estimationComment: '',
+        })),
+      },
+    });
+    expect(oversized.isError).toBe(true);
+
+    const unknown = await client.callTool({
+      name: 'get_vacancies_batch',
+      arguments: { ids: [999_999] },
+    });
+    expect(unknown.isError).toBe(true);
+    expect(textOf(unknown)).toContain('999999 not found');
+  });
+
+  it('save_vacancy attaches the analysis to a vacancy intake created: success true', async () => {
+    const client = await connectedClient();
+    const id = await queued(validArgs.applyUrl);
+    const saved = await client.callTool({ name: 'save_vacancy', arguments: validArgs });
+    expect(JSON.parse(textOf(saved))).toMatchObject({ success: true, vacancy: { id } });
+    expect((await prisma.vacancy.findUniqueOrThrow({ where: { id } })).status).toBe('NOT_REVIEWED');
   });
 
   it('save_vacancy reports success:false and drops the analysis on a re-save', async () => {
@@ -370,7 +471,7 @@ describe('job-search-copilot MCP server', () => {
 
     const recorded = await client.callTool({
       name: 'record_application',
-      arguments: { company: 'acme', title: 'backend engineer', salaryInListing: '130 PLN/h' },
+      arguments: { company: 'acme', title: 'backend engineer', salaryInApplication: '130 PLN/h' },
     });
     const { success, application } = JSON.parse(textOf(recorded));
     expect(success).toBe(true);
@@ -382,7 +483,7 @@ describe('job-search-copilot MCP server', () => {
     });
     expect(JSON.parse(textOf(got))).toMatchObject({
       status: 'APPLIED',
-      salaryInListing: '130 PLN/h',
+      salaryInApplication: '130 PLN/h',
     });
 
     const again = await client.callTool({
@@ -410,13 +511,13 @@ describe('job-search-copilot MCP server', () => {
 
     const recorded = await client.callTool({
       name: 'record_application',
-      arguments: { vacancyId: vacancy.id, salaryInListing: '130 PLN/h' },
+      arguments: { vacancyId: vacancy.id, salaryInApplication: '130 PLN/h' },
     });
     expect(JSON.parse(textOf(recorded)).application.id).toBe(vacancy.id);
     const got = await client.callTool({ name: 'get_vacancy', arguments: { id: vacancy.id } });
     expect(JSON.parse(textOf(got))).toMatchObject({
       status: 'APPLIED',
-      salaryInListing: '130 PLN/h',
+      salaryInApplication: '130 PLN/h',
     });
   });
 
@@ -655,43 +756,52 @@ describe('job-search-copilot MCP server', () => {
     });
     expect(result.isError).toBe(true);
   });
-  it('check_vacancy_log records a new posting, then reports it as a duplicate', async () => {
+  it('intake_vacancy creates a new posting as a NEW vacancy, then reports a duplicate', async () => {
     const client = await connectedClient();
     const url = 'https://pl.linkedin.com/jobs/view/engineer-at-acme-3900000001?trk=x';
-    const first = await client.callTool({ name: 'check_vacancy_log', arguments: { url } });
+    const first = await client.callTool({
+      name: 'intake_vacancy',
+      arguments: { url, company: 'Acme', title: 'Engineer', source: 'linkedin' },
+    });
     expect(JSON.parse(textOf(first))).toEqual({ new: true });
+    expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
+      status: 'NEW',
+      source: 'linkedin',
+      recommendation: null,
+    });
 
     const again = await client.callTool({
-      name: 'check_vacancy_log',
-      arguments: { url: 'https://www.linkedin.com/jobs/view/3900000001' },
+      name: 'intake_vacancy',
+      arguments: { url: 'https://www.linkedin.com/jobs/view/3900000001', company: 'X', title: 'Y' },
     });
     expect(JSON.parse(textOf(again))).toEqual({ new: false });
   });
 
-  it('check_vacancy_log isError without a url, or with a non-http one', async () => {
+  it('intake_vacancy isError without a url, company or title, or with a non-http url', async () => {
     const client = await connectedClient();
-    const missing = await client.callTool({
-      name: 'check_vacancy_log',
-      arguments: { company: 'Acme', title: 'Dev' },
-    });
-    expect(missing.isError).toBe(true);
-    const bad = await client.callTool({
-      name: 'check_vacancy_log',
-      arguments: { url: 'javascript:alert(1)' },
-    });
-    expect(bad.isError).toBe(true);
+    for (const args of [
+      { company: 'Acme', title: 'Dev' },
+      { url: 'https://acme.com/jobs/1' },
+      { url: 'https://acme.com/jobs/1', company: ' ', title: 'Dev' },
+      { url: 'javascript:alert(1)', company: 'Acme', title: 'Dev' },
+    ]) {
+      expect((await client.callTool({ name: 'intake_vacancy', arguments: args })).isError).toBe(
+        true,
+      );
+    }
+    expect(await prisma.vacancy.count()).toBe(0);
   });
 
-  it('check_vacancy_log_batch returns the raw urls of the new entries', async () => {
+  it('intake_vacancies_batch returns the raw urls of the new entries', async () => {
     const client = await connectedClient();
     const result = await client.callTool({
-      name: 'check_vacancy_log_batch',
+      name: 'intake_vacancies_batch',
       arguments: {
         entries: [
-          { url: 'https://acme.com/jobs/1?utm_source=x' },
-          { url: 'https://acme.com/jobs/1#apply' },
-          { company: 'Acme', title: 'No link' },
-          { url: 'https://acme.com/jobs/2', company: 'Acme', title: 'Dev' },
+          { url: 'https://acme.com/jobs/1?utm_source=x', company: 'Acme', title: 'QA' },
+          { url: 'https://acme.com/jobs/1#apply', company: 'Acme', title: 'QA' },
+          { url: 'https://acme.com/jobs/9', company: 'Acme Ltd', title: 'QA' },
+          { url: 'https://acme.com/jobs/2', company: 'Acme', title: 'Dev', source: 'justjoin' },
         ],
       },
     });
@@ -700,17 +810,38 @@ describe('job-search-copilot MCP server', () => {
     });
   });
 
-  it('check_vacancy_log_batch rejects an empty or oversized array', async () => {
+  it('intake_vacancies_batch rejects the whole call on an entry without a url, company or title', async () => {
+    const client = await connectedClient();
+    const ok = { url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' };
+    for (const bad of [
+      { company: 'Acme', title: 'No link' },
+      { url: 'https://acme.com/jobs/3' },
+      { url: 'ftp://acme.com/jobs/3', company: 'Acme', title: 'QA' },
+    ]) {
+      const result = await client.callTool({
+        name: 'intake_vacancies_batch',
+        arguments: { entries: [ok, bad] },
+      });
+      expect(result.isError).toBe(true);
+    }
+    expect(await prisma.vacancy.count()).toBe(0);
+  });
+
+  it('intake_vacancies_batch rejects an empty or oversized array', async () => {
     const client = await connectedClient();
     const empty = await client.callTool({
-      name: 'check_vacancy_log_batch',
+      name: 'intake_vacancies_batch',
       arguments: { entries: [] },
     });
     expect(empty.isError).toBe(true);
     const oversized = await client.callTool({
-      name: 'check_vacancy_log_batch',
+      name: 'intake_vacancies_batch',
       arguments: {
-        entries: Array.from({ length: 101 }, (_, i) => ({ url: `https://a.com/${i}` })),
+        entries: Array.from({ length: 101 }, (_, i) => ({
+          url: `https://a.com/${i}`,
+          company: 'A',
+          title: `Role ${i}`,
+        })),
       },
     });
     expect(oversized.isError).toBe(true);

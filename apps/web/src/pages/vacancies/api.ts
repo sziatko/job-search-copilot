@@ -20,6 +20,8 @@ export async function listVacanciesPage(
     recommendation?: Recommendation;
     /** Free text over company OR title, filtered server-side (ADR-0025). */
     search?: string;
+    /** With (`true`) or without (`false`) posting text; both when absent. */
+    hasText?: boolean;
     /** Every vacancy of this name's company, whatever its spelling (ADR-0032) — the
      * company modal and the vacancy page's other vacancies. */
     sameCompanyAs?: string;
@@ -34,6 +36,7 @@ export async function listVacanciesPage(
   if (params.recommendation) query.set('recommendation', params.recommendation);
   if (params.search) query.set('search', params.search);
   if (params.sameCompanyAs) query.set('sameCompanyAs', params.sameCompanyAs);
+  if (params.hasText !== undefined) query.set('hasText', String(params.hasText));
   if (params.sort) query.set('sort', params.sort);
   if (params.cursor !== undefined) query.set('cursor', String(params.cursor));
 

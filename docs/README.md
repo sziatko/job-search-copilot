@@ -10,7 +10,7 @@ and *what a change here breaks over there*.
 | --- | --- |
 | [`architecture.md`](architecture.md) | The system map: the four packages, their boundaries, the request lifecycle, the dev stack. Start here. |
 | [`domain-model.md`](domain-model.md) | `Vacancy`, the two independent axes (analyzer `recommendation` vs the user's `status`), the `StatusChange` journal, the status lifecycle, analyze-once, the DB-level rules. |
-| [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the ten MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
+| [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the thirteen MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
 | [`decisions/`](decisions/) | One Architecture Decision Record (ADR) per load-bearing choice — context, the decision, why not the alternatives, and what it constrains. |
 | [`backlog.md`](backlog.md) | What is not yet planned into a phase, in two lists: ideas (new capabilities) and improvements / fixes. Only open and planned rows; done and not-relevant ones move to [`backlog-archive.md`](backlog-archive.md). |
 | [`phases/phase-1.md`](phases/phase-1.md) | What Phase 1 delivered and its status. |
@@ -23,6 +23,7 @@ and *what a change here breaks over there*.
 | [`phases/phase-4.1.md`](phases/phase-4.1.md) | Fixes after phase 4: the dashboard funnel from Recommended with a "Dropped out" block and its styles, the table count in the toolbar with full-height tables, a two-state theme toggle, the CV tick. Its `## Status` is the live checklist. |
 | [`phases/phase-4.2.md`](phases/phase-4.2.md) | Fixes after phase 4.1: a header and KPI tiles that collapse on scroll, no sideways scroll on a phone, themed scrollbars, the company-history modal (a status column, row actions, on `/applications` too), no repeated triage status, and a new `UNAVAILABLE` status. Its `## Status` is the live checklist. |
 | [`phases/phase-4.3.md`](phases/phase-4.3.md) | Fixes after phase 4.2: skeletons in place of every "Loading…", the company-history modal (a CV column, Details in a new tab, the current row scrolled into view), the salary label, a toaster that follows the theme toggle, a toast after every write, a review card as tall as the funnel, and one company whatever its spelling (ADR-0032). Its `## Status` is the live checklist. |
+| [`phases/phase-5.md`](phases/phase-5.md) | Unscored vacancies in one table: the vacancy log merged into `Vacancy`, the `NEW` / `FILTERED_OUT` statuses, an intake endpoint for n8n, analysis pulled and submitted over MCP, an `/inbox` page, per-page status contexts, search in a modal, and the `salaryInApplication` rename. Its `## Status` is the live checklist. |
 | [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions

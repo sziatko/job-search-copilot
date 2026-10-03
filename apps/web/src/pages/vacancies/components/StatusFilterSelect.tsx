@@ -3,13 +3,12 @@ import { Select, type SelectOption } from '@/components/ui/Select';
 import { STATUS_LABELS } from '../constants';
 import { STATUS_FILTER_ALL, type StatusFilterValue, statusFilterValues } from '../types';
 
-// Applied stands for the whole pipeline, as in the filter itself.
+// The page's own statuses (its context); the pipeline is /applications'.
 const LABELS: Record<StatusFilterValue, string> = {
   NOT_REVIEWED: STATUS_LABELS.NOT_REVIEWED,
   SAVED_FOR_LATER: STATUS_LABELS.SAVED_FOR_LATER,
   DECLINED: STATUS_LABELS.DECLINED,
   UNAVAILABLE: STATUS_LABELS.UNAVAILABLE,
-  APPLIED: STATUS_LABELS.APPLIED,
   [STATUS_FILTER_ALL]: 'All',
 };
 

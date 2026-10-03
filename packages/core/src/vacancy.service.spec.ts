@@ -1,14 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApplicationService } from './application.service';
-import { InvalidRecommendationError, SameStatusError } from './errors';
+import {
+  AlreadyAnalysedError,
+  AnalysedNotNewError,
+  InvalidRecommendationError,
+  SameStatusError,
+  VacancyNotFoundError,
+} from './errors';
 import { getPrisma } from './prisma-client';
 import { companyKey, VacancyService } from './vacancy.service';
 import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
+import { VacancyIntakeService } from './vacancy-intake.service';
 
 // Integration tests: hit the real (test) Postgres database instead of mocking
 // Prisma. A mocked Prisma client would just re-assert our own query calls and
 // break on every harmless refactor — the DB round-trip is what actually matters.
 const service = new VacancyService();
+const intake = new VacancyIntakeService();
+
+/** A vacancy intake took in: NEW, unanalysed, no text. Returns its id. */
+async function queued(n: number): Promise<number> {
+  const url = `https://example.com/queue/${n}`;
+  await intake.intake({ url, company: 'Queued Co', title: `Dev ${n}` });
+  return (await getPrisma().vacancy.findUniqueOrThrow({ where: { applyUrl: url } })).id;
+}
+
+const analysis = { matchScore: 70, recommendation: 'ПОДАВАТИСЯ', estimationComment: 'Good.' };
 
 /** The vacancy's status journal, oldest first. */
 async function journal(vacancyId: number) {
@@ -80,12 +97,29 @@ describe('VacancyService', () => {
       expect(vacancy.status).toBe('NOT_REVIEWED');
     });
 
-    it('journals NOT_REVIEWED, dated with the cache', async () => {
+    it('journals NEW, then NOT_REVIEWED, both dated with the cache', async () => {
       const { vacancy } = await service.save(input());
-      const rows = await getPrisma().statusChange.findMany({ where: { vacancyId: vacancy.id } });
+      const rows = await getPrisma().statusChange.findMany({
+        where: { vacancyId: vacancy.id },
+        orderBy: { id: 'asc' },
+      });
       expect(rows.map((r) => [r.status, r.createdAt])).toEqual([
+        ['NEW', vacancy.statusChangedAt],
         ['NOT_REVIEWED', vacancy.statusChangedAt],
       ]);
+    });
+
+    it('moves a SKIP out of NEW to FILTERED_OUT (ADR-0033)', async () => {
+      const { vacancy } = await service.save(input({ recommendation: 'ПРОПУСТИТИ' }));
+      expect(vacancy).toMatchObject({ status: 'FILTERED_OUT', recommendation: 'SKIP' });
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'FILTERED_OUT']);
+    });
+
+    it('stores the match keys intake dedups on', async () => {
+      const { vacancy } = await service.save(
+        input({ company: 'Acme Sp. z o.o.', title: 'Senior  Front-End Dev' }),
+      );
+      expect(vacancy).toMatchObject({ companyKey: 'acme', titleKey: 'senior front end dev' });
     });
 
     it('leaves an already-saved vacancy untouched on a second save (same applyUrl)', async () => {
@@ -97,14 +131,14 @@ describe('VacancyService', () => {
       const all = await service.list();
       expect(all.total).toBe(1);
       expect(first.created).toBe(true);
-      expect(second.created).toBe(false);
+      expect([second.created, second.attached]).toEqual([false, false]);
       expect(second.vacancy.id).toBe(first.vacancy.id);
       expect(second.vacancy.matchScore).toBe(60);
       // Analyze-once covers the comment too: the repeat save wrote no second row.
       expect((await service.getById(first.vacancy.id))?.estimationComment).toBe('First pass.');
       expect(all.items[0].estimationComment).toBe('First pass.');
       expect(await getPrisma().comment.count()).toBe(1);
-      expect(await getPrisma().statusChange.count()).toBe(1);
+      expect(await getPrisma().statusChange.count()).toBe(2);
     });
 
     it('writes the estimationComment as one ANALYZER comment', async () => {
@@ -122,6 +156,37 @@ describe('VacancyService', () => {
       expect(resaved.created).toBe(false);
       expect(resaved.vacancy.id).toBe(first.vacancy.id);
       expect(resaved.vacancy.status).toBe('SAVED_FOR_LATER');
+    });
+
+    it('attaches the analysis to a row intake took in, and the text it lacked', async () => {
+      await intake.intake({ url: 'https://example.com/jobs/1', company: 'Acme', title: 'Dev' });
+
+      const { created, attached, vacancy } = await service.save(input({ recommendation: 'SKIP' }));
+
+      expect([created, attached]).toEqual([false, true]);
+      expect(vacancy).toMatchObject({
+        company: 'Acme',
+        title: 'Dev',
+        matchScore: 80,
+        recommendation: 'SKIP',
+        status: 'FILTERED_OUT',
+        fullText: 'Full vacancy text goes here.',
+      });
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'FILTERED_OUT']);
+      expect((await service.getById(vacancy.id))?.estimationComment).toBe('Strong match.');
+      expect(await getPrisma().vacancy.count()).toBe(1);
+    });
+
+    it('keeps the text a row intake took in already has', async () => {
+      await intake.intake({
+        url: 'https://example.com/jobs/1',
+        company: 'Acme',
+        title: 'Dev',
+        fullText: 'From the source.',
+      });
+      const { attached, vacancy } = await service.save(input());
+      expect(attached).toBe(true);
+      expect(vacancy.fullText).toBe('From the source.');
     });
 
     it('collapses two tracking variants of one posting into a single row', async () => {
@@ -272,6 +337,87 @@ describe('VacancyService', () => {
     });
   });
 
+  describe('submitAnalysis', () => {
+    it('moves a NEW vacancy to NOT_REVIEWED, journaled, with the ANALYZER comment', async () => {
+      const id = await queued(1);
+      const vacancy = await service.submitAnalysis({ id, ...analysis });
+
+      expect(vacancy).toMatchObject({ matchScore: 70, recommendation: 'APPLY' });
+      expect(vacancy.status).toBe('NOT_REVIEWED');
+      expect(await journal(id)).toEqual(['NEW', 'NOT_REVIEWED']);
+      expect((await service.getById(id))?.estimationComment).toBe('Good.');
+    });
+
+    it('moves a SKIP out of NEW to FILTERED_OUT', async () => {
+      const id = await queued(1);
+      const vacancy = await service.submitAnalysis({ id, ...analysis, recommendation: 'SKIP' });
+      expect(vacancy.status).toBe('FILTERED_OUT');
+      expect(await journal(id)).toEqual(['NEW', 'FILTERED_OUT']);
+    });
+
+    it('refuses a second analysis and writes nothing', async () => {
+      const id = await queued(1);
+      await service.submitAnalysis({ id, ...analysis });
+
+      await expect(
+        service.submitAnalysis({ id, ...analysis, matchScore: 10, recommendation: 'SKIP' }),
+      ).rejects.toThrow(AlreadyAnalysedError);
+
+      expect(await service.getById(id)).toMatchObject({
+        matchScore: 70,
+        recommendation: 'APPLY',
+        status: 'NOT_REVIEWED',
+      });
+      expect(await journal(id)).toEqual(['NEW', 'NOT_REVIEWED']);
+      expect(await getPrisma().comment.count()).toBe(1);
+    });
+
+    it('scores a pipeline placeholder and leaves its status alone', async () => {
+      const { application } = await new ApplicationService().record({
+        company: 'Placeholder Co',
+        title: 'Imported Role',
+      });
+      const vacancy = await service.submitAnalysis({ id: application.id, ...analysis });
+      expect(vacancy).toMatchObject({ status: 'APPLIED', recommendation: 'APPLY' });
+      expect(await journal(application.id)).toEqual(['NEW', 'APPLIED']);
+    });
+
+    it('refuses an unknown id', async () => {
+      await expect(service.submitAnalysis({ id: 999_999, ...analysis })).rejects.toThrow(
+        VacancyNotFoundError,
+      );
+    });
+  });
+
+  describe('submitAnalyses', () => {
+    it('writes each analysis, in order', async () => {
+      const [a, b] = [await queued(1), await queued(2)];
+      const rows = await service.submitAnalyses([
+        { id: a, ...analysis },
+        { id: b, ...analysis, recommendation: 'ПРОПУСТИТИ' },
+      ]);
+      expect(rows.map((row) => [row.id, row.status])).toEqual([
+        [a, 'NOT_REVIEWED'],
+        [b, 'FILTERED_OUT'],
+      ]);
+    });
+
+    it('writes none of them when one fails', async () => {
+      const [a, b] = [await queued(1), await queued(2)];
+      await service.submitAnalysis({ id: b, ...analysis });
+
+      await expect(
+        service.submitAnalyses([
+          { id: a, ...analysis },
+          { id: b, ...analysis },
+        ]),
+      ).rejects.toThrow(AlreadyAnalysedError);
+
+      expect(await service.getById(a)).toMatchObject({ status: 'NEW', recommendation: null });
+      expect(await journal(a)).toEqual(['NEW']);
+    });
+  });
+
   describe('getById', () => {
     it('returns null when the id does not exist', async () => {
       expect(await service.getById(999_999)).toBeNull();
@@ -304,6 +450,7 @@ describe('VacancyService', () => {
 
       const found = await service.getById(vacancy.id);
       expect(found?.timeline.map((step) => step.status)).toEqual([
+        'NEW',
         'NOT_REVIEWED',
         'INTERVIEW',
         'INTERVIEW',
@@ -390,6 +537,18 @@ describe('VacancyService', () => {
       expect(page.total).toBe(2);
     });
 
+    it('filters by hasText, and marks each item', async () => {
+      const id = await queued(1);
+
+      const withText = await service.list({ hasText: true });
+      expect(withText.total).toBe(2);
+      expect(withText.items.map((item) => item.hasText)).toEqual([true, true]);
+
+      const without = await service.list({ hasText: false });
+      expect(without.items.map((item) => [item.id, item.hasText])).toEqual([[id, false]]);
+      expect((await service.list()).total).toBe(3);
+    });
+
     describe('sort and cursor', () => {
       // Beside the two rows above (Acme APPLY 80, Beta Corp SKIP 80): three more, and
       // dates set by hand so the order has a createdAt tie (Beta Corp, Gamma, Delta)
@@ -454,6 +613,17 @@ describe('VacancyService', () => {
         expect(last).toMatchObject({ total: 5, nextCursor: null });
       });
 
+      it('sorts the unanalysed last, and pages across them', async () => {
+        const applications = new ApplicationService();
+        for (const company of ['Zeta', 'Eta']) {
+          await applications.record({ company, title: 'Imported Role' });
+        }
+        const { items } = await service.list({ sort: 'recommended' });
+        expect(companies(items).slice(0, 5)).toEqual(RECOMMENDED);
+        expect(items.slice(5).map((item) => item.recommendation)).toEqual([null, null]);
+        expect(await allPages({ sort: 'recommended', limit: 2 })).toEqual(companies(items));
+      });
+
       it('pages on from a cursor row that has left the filter', async () => {
         // The /vacancies case: the last loaded row is triaged out of NOT_REVIEWED
         // before the next page is asked for. Prisma's `skip: 1` assumes the cursor
@@ -470,7 +640,8 @@ describe('VacancyService', () => {
 
         const next = await service.list({ ...filters, cursor: first.nextCursor ?? undefined });
         expect(companies(next.items)).toEqual(['Acme', 'Delta']);
-        expect(next.total).toBe(4);
+        // Beta Corp, a SKIP, was never NOT_REVIEWED: it went to FILTERED_OUT.
+        expect(next.total).toBe(3);
       });
     });
 
@@ -564,6 +735,24 @@ describe('VacancyService', () => {
       it('lists nothing for a company with no vacancies', async () => {
         expect((await service.list({ sameCompanyAs: 'Nobody' })).total).toBe(0);
       });
+
+      it('leaves FILTERED_OUT out of both the list and the count', async () => {
+        // A SKIP moves the new row to FILTERED_OUT.
+        const skipped = await service.save(
+          input({ applyUrl: 'https://example.com/jobs/s4', recommendation: 'SKIP' }),
+        );
+        expect(skipped.vacancy.status).toBe('FILTERED_OUT');
+
+        const { items } = await service.list({ sameCompanyAs: 'Acme' });
+        expect(items.map((item) => item.id)).not.toContain(skipped.vacancy.id);
+        expect(items).toHaveLength(1);
+        // The button's count is the modal's row count.
+        expect(items[0].companyMatchCount).toBe(1);
+        // From the FILTERED_OUT row itself (/inbox): itself + the one row the modal
+        // lists, so its button still reads "1 other".
+        const own = await service.list({ status: ['FILTERED_OUT'] });
+        expect(own.items[0].companyMatchCount).toBe(2);
+      });
     });
 
     describe('hasAnalysis', () => {
@@ -574,8 +763,8 @@ describe('VacancyService', () => {
 
       it('is false for a placeholder, whatever its other fields say', async () => {
         // What the importer path creates (ADR-0019) — via the service that writes it,
-        // so the sentinel and the derivation are tested against each other rather
-        // than against a literal this file happens to share.
+        // so the write and the derivation are tested against each other rather than
+        // against a literal this file happens to share.
         const applications = new ApplicationService();
         const { application, resolution } = await applications.record({
           company: 'Placeholder Co',
@@ -591,15 +780,21 @@ describe('VacancyService', () => {
         expect(items[0].estimationComment).toBeNull();
       });
 
-      it('is true for a placeholder given an analyzer comment — the named ceiling', async () => {
-        await new ApplicationService().record({
+      it('reads the recommendation, not the analyzer comment', async () => {
+        const applications = new ApplicationService();
+        await applications.record({
           company: 'Noted Co',
           title: 'Imported Role',
           estimationComment: 'From tracker notes.',
         });
-        const { items } = await service.list({ company: 'Noted Co' });
-        expect(items[0].hasAnalysis).toBe(true);
-        expect(items[0].estimationComment).toBe('From tracker notes.');
+        await applications.record({ company: 'Scored Co', title: 'Imported Role', matchScore: 60 });
+        const noted = (await service.list({ company: 'Noted Co' })).items[0];
+        expect(noted).toMatchObject({
+          hasAnalysis: false,
+          estimationComment: 'From tracker notes.',
+        });
+        const scored = (await service.list({ company: 'Scored Co' })).items[0];
+        expect(scored).toMatchObject({ hasAnalysis: true, estimationComment: null });
       });
     });
 
@@ -694,6 +889,28 @@ describe('VacancyService', () => {
     });
   });
 
+  describe('the DB rules (ADR-0033)', () => {
+    const row = { company: 'Acme', title: 'Dev', applyUrl: 'https://example.com/jobs/check' };
+
+    it('refuses half an analysis', async () => {
+      await expect(
+        getPrisma().vacancy.create({ data: { ...row, status: 'NOT_REVIEWED', matchScore: 50 } }),
+      ).rejects.toThrow(/Vacancy_analysis_both_or_neither/);
+      await expect(
+        getPrisma().vacancy.create({
+          data: { ...row, status: 'NOT_REVIEWED', recommendation: 'APPLY' },
+        }),
+      ).rejects.toThrow(/Vacancy_analysis_both_or_neither/);
+    });
+
+    it('refuses an analysis on a NEW row', async () => {
+      await expect(
+        getPrisma().vacancy.create({ data: { ...row, matchScore: 50, recommendation: 'APPLY' } }),
+      ).rejects.toThrow(/Vacancy_new_is_unanalysed/);
+      expect(await getPrisma().vacancy.count()).toBe(0);
+    });
+  });
+
   describe('updateStatus', () => {
     it('returns null when the id does not exist', async () => {
       expect(await service.updateStatus(999_999, 'DECLINED')).toBeNull();
@@ -713,7 +930,7 @@ describe('VacancyService', () => {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
       expect([latest.status, latest.createdAt]).toEqual(['DECLINED', updated?.statusChangedAt]);
-      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'DECLINED']);
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'NOT_REVIEWED', 'DECLINED']);
     });
 
     it('journals a pipeline status the vacancy already has as a new event', async () => {
@@ -726,7 +943,7 @@ describe('VacancyService', () => {
       expect(same?.statusChangedAt.getTime()).toBeGreaterThanOrEqual(
         before?.statusChangedAt.getTime() ?? 0,
       );
-      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'INTERVIEW', 'INTERVIEW']);
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'NOT_REVIEWED', 'INTERVIEW', 'INTERVIEW']);
     });
 
     it('refuses a triage status the vacancy already has, and journals nothing', async () => {
@@ -736,7 +953,7 @@ describe('VacancyService', () => {
 
       await expect(service.updateStatus(vacancy.id, 'DECLINED')).rejects.toThrow(SameStatusError);
       expect((await service.getById(vacancy.id))?.statusChangedAt).toEqual(before?.statusChangedAt);
-      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'DECLINED']);
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'NOT_REVIEWED', 'DECLINED']);
     });
 
     it('moves to UNAVAILABLE, a triage status: a repeat is refused', async () => {
@@ -747,7 +964,7 @@ describe('VacancyService', () => {
       await expect(service.updateStatus(vacancy.id, 'UNAVAILABLE')).rejects.toThrow(
         SameStatusError,
       );
-      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'UNAVAILABLE']);
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'NOT_REVIEWED', 'UNAVAILABLE']);
     });
 
     it('refuses NOT_REVIEWED on a vacancy that was never moved', async () => {
@@ -757,7 +974,22 @@ describe('VacancyService', () => {
       );
       const found = await service.getById(vacancy.id);
       expect(found?.statusChangedAt).toEqual(vacancy.statusChangedAt);
-      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED']);
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'NOT_REVIEWED']);
+    });
+
+    it('sets an unanalysed vacancy back to NEW, and refuses an analysed one', async () => {
+      // Back to the queue (ADR-0033): fine while there is no analysis.
+      const id = await queued(1);
+      await service.updateStatus(id, 'FILTERED_OUT');
+      expect((await service.updateStatus(id, 'NEW'))?.status).toBe('NEW');
+      expect(await journal(id)).toEqual(['NEW', 'FILTERED_OUT', 'NEW']);
+
+      // An analysed one would break the CHECK — refused as a DomainError, nothing written.
+      const { vacancy } = await service.save(input({ recommendation: 'SKIP' }));
+      await expect(service.updateStatus(vacancy.id, 'NEW')).rejects.toThrow(AnalysedNotNewError);
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'FILTERED_OUT']);
+      // A NEW row asked for NEW again is still a plain repeat.
+      await expect(service.updateStatus(await queued(2), 'NEW')).rejects.toThrow(SameStatusError);
     });
 
     it('can set a vacancy back to NOT_REVIEWED', async () => {
@@ -765,7 +997,12 @@ describe('VacancyService', () => {
       await service.updateStatus(vacancy.id, 'DECLINED');
       const back = await service.updateStatus(vacancy.id, 'NOT_REVIEWED');
       expect(back?.status).toBe('NOT_REVIEWED');
-      expect(await journal(vacancy.id)).toEqual(['NOT_REVIEWED', 'DECLINED', 'NOT_REVIEWED']);
+      expect(await journal(vacancy.id)).toEqual([
+        'NEW',
+        'NOT_REVIEWED',
+        'DECLINED',
+        'NOT_REVIEWED',
+      ]);
     });
   });
 });

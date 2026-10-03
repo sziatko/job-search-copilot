@@ -17,9 +17,15 @@ const INTERVIEWED: VacancyStatus[] = ['INTERVIEW', 'OFFER'];
 /** `GET /stats` (ADR-0031). The funnel stages count the journal ("ever reached"),
  * `pipeline` the current status. */
 export interface Stats {
+  /** Every vacancy, analysed or not (ADR-0033). */
   logged: number;
+  /** Current `status = NEW` — the analysis queue, with or without posting text. */
+  awaitingAnalysis: number;
   awaitingTriage: number;
   recommended: number;
+  /** The analyzer's no, each vacancy once: currently `FILTERED_OUT` (by a `SKIP`, the
+   * user, or the migrated log) **or** analysed `SKIP`, whatever its status now. */
+  notRecommended: number;
   applied: number;
   /** Current `status = DECLINED` — the user said no. */
   declined: number;
@@ -57,8 +63,10 @@ export class StatsService {
 
     const [
       logged,
+      awaitingAnalysis,
       awaitingTriage,
       recommended,
+      notRecommended,
       applied,
       declined,
       unavailable,
@@ -68,9 +76,13 @@ export class StatsService {
       timedOut,
       recent,
     ] = await Promise.all([
-      this.db.vacancyLogEntry.count(),
+      this.db.vacancy.count(),
+      this.db.vacancy.count({ where: { status: 'NEW' } }),
       this.db.vacancy.count({ where: { status: 'NOT_REVIEWED' } }),
       this.db.vacancy.count({ where: { recommendation: { in: ['APPLY', 'APPLY_WITH_CAVEATS'] } } }),
+      this.db.vacancy.count({
+        where: { OR: [{ status: 'FILTERED_OUT' }, { recommendation: 'SKIP' }] },
+      }),
       everReached(['APPLIED']),
       this.db.vacancy.count({ where: { status: 'DECLINED' } }),
       this.db.vacancy.count({ where: { status: 'UNAVAILABLE' } }),
@@ -105,8 +117,10 @@ export class StatsService {
 
     return {
       logged,
+      awaitingAnalysis,
       awaitingTriage,
       recommended,
+      notRecommended,
       applied,
       declined,
       unavailable,

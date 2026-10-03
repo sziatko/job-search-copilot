@@ -17,18 +17,28 @@ model Vacancy {
   company             String
   title               String
   applyUrl            String          @unique
-  // Can be large. Kept on the row rather than a 1:1 side table on purpose: Postgres
-  // TOASTs large TEXT out-of-line, and every read path except getById projects it
-  // out (see LIST_SELECT), so queries that don't need it already don't pay for it.
-  fullText            String          @db.Text
-  matchScore          Int
-  recommendation      Recommendation
+  // Intake's second match (ADR-0033): normalizeCompanyKey / normalizeTitleKey
+  // (vacancy-intake.ts) — not vacancy.service's `companyKey()`, ADR-0032's company
+  // identity. Null only when the name normalizes to nothing (`—`).
+  companyKey          String?
+  titleKey            String?
+  // Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source
+  // needs no migration; null on rows from save_vacancy, record_application, the log.
+  source              String?
+  // Null = no posting text yet. Can be large. Kept on the row rather than a 1:1 side
+  // table on purpose: Postgres TOASTs large TEXT out-of-line, and every read path
+  // except getById projects it out (see LIST_SELECT).
+  fullText            String?         @db.Text
+  // The analysis: both null = not analysed yet, both set = analysed, written once.
+  // Hand-written CHECKs (20261003130100): both or neither, and never on a NEW row.
+  matchScore          Int?
+  recommendation      Recommendation?
   // The user's side: a cache of the latest StatusChange and its date. Written only
   // through writeStatus (status.ts), which keeps the two in step.
-  status              VacancyStatus   @default(NOT_REVIEWED)
+  status              VacancyStatus   @default(NEW)
   statusChangedAt     DateTime        @default(now())
   // What was entered when applying (the apply modal).
-  salaryInListing     String?
+  salaryInApplication String?
   usedTailoredResume  Boolean         @default(false)
 
   // Every note on the vacancy — the analyzer's reasoning, the user's, an agent's.
@@ -38,6 +48,7 @@ model Vacancy {
 
   @@index([recommendation])
   @@index([status, statusChangedAt])
+  @@index([companyKey, titleKey])
   @@index([company(ops: raw("gin_trgm_ops"))], type: Gin)
   // /applications searches company OR title as ILIKE '%term%' — same reason company has
   // a trigram GIN index, title needs one too.
@@ -70,22 +81,6 @@ model Comment {
   @@index([vacancyId, createdAt])
 }
 
-// Every posting seen before analysis — the dedup log (ADR-0026). Written only through
-// VacancyLogService, which normalizes url and derives both keys; a row written any
-// other way never matches. `createdAt` is the date the posting was first seen. The url
-// is required; company/title can be missing and are filled on a later duplicate.
-model VacancyLogEntry {
-  id         Int      @id @default(autoincrement())
-  createdAt  DateTime @default(now())
-  url        String   @unique
-  company    String?
-  title      String?
-  companyKey String?
-  titleKey   String?
-
-  @@index([companyKey, titleKey])
-}
-
 enum Recommendation {
   APPLY
   APPLY_WITH_CAVEATS
@@ -98,14 +93,18 @@ enum CommentSource {
   AGENT
 }
 
-// Triage (NOT_REVIEWED, SAVED_FOR_LATER, DECLINED, UNAVAILABLE), then the pipeline
-// (APPLIED … REJECTED — PIPELINE_STATUSES). REJECTED = the company said no; DECLINED = "I
-// chose not to apply"; UNAVAILABLE = the posting no longer takes applications.
+// Triage (NEW, NOT_REVIEWED, SAVED_FOR_LATER, DECLINED, UNAVAILABLE, FILTERED_OUT), then
+// the pipeline (APPLIED … REJECTED — PIPELINE_STATUSES). NEW = waiting for analysis;
+// FILTERED_OUT = screened out before triage, by the analyzer's SKIP or the user (ADR-0033).
+// REJECTED = the company said no; DECLINED = "I chose not to apply"; UNAVAILABLE = the
+// posting no longer takes applications.
 enum VacancyStatus {
+  NEW
   NOT_REVIEWED
   SAVED_FOR_LATER
   DECLINED
   UNAVAILABLE
+  FILTERED_OUT
   APPLIED
   RECRUITER_SCREEN
   REPLIED

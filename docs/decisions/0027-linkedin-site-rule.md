@@ -63,5 +63,5 @@ were backfilled once.
 
 ## Related
 
-[ADR-0023](0023-canonical-applyurl.md), [ADR-0026](0026-vacancy-log-table.md),
+[ADR-0023](0023-canonical-applyurl.md), [ADR-0033](0033-unscored-vacancies-in-one-table.md),
 [`../phases/phase-3.md`](../phases/phase-3.md).

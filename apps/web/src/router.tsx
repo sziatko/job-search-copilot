@@ -5,7 +5,7 @@ import type { RouteMeta } from './lib/routeMeta';
 import { ApplicationsPage } from './pages/applications/ApplicationsPage';
 import { applicationStatusFilterSchema } from './pages/applications/types';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
-import { LogPage } from './pages/log/LogPage';
+import { InboxPage, inboxTabSchema } from './pages/inbox/InboxPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { statusFilterSchema as vacancyStatusFilterSchema } from './pages/vacancies/types';
 import { VacanciesPage } from './pages/vacancies/VacanciesPage';
@@ -33,8 +33,8 @@ const APPLICATIONS_META: RouteMeta = {
   title: 'Application tracker',
   rail: true,
 };
-const LOG_META: RouteMeta = {
-  title: 'Vacancy log',
+const INBOX_META: RouteMeta = {
+  title: 'Inbox',
   rail: true,
 };
 const VACANCY_META: RouteMeta = {
@@ -53,26 +53,19 @@ const indexRoute = createRoute({
   staticData: DASHBOARD_META,
 });
 
-// Search terms and filters in the URL, so a view is shareable and the back button
-// works. Values arrive **JSON-parsed** by the router — `?q=2024` is the number 2024 —
-// so a strict `z.string()` threw inside `validateSearch`, and with no `errorComponent`
-// anywhere in the tree that replaces the whole page with "Something went wrong!" for a
-// URL a user can trivially type. `q` coerces (the term is a string by the time it is
-// typed into a box anyway); `status` is an enum, where no coercion could be right, so
-// junk falls back to "no filter" — the same state an absent value means.
-const termSchema = z.coerce.string().optional();
+// Filters in the URL, so a view is shareable and the back button works. Values arrive
+// **JSON-parsed** by the router, and a value `validateSearch` throws on replaces the
+// whole page with "Something went wrong!" (there is no `errorComponent` anywhere in the
+// tree) — for a URL a user can trivially type. So junk falls back to "no filter", the
+// same state an absent value means. An unknown key is dropped by `z.object`: an old
+// `?q=` bookmark, from when the toolbar had a search box, is ignored (search is a modal
+// now, with no URL state).
 const statusFilterSchema = applicationStatusFilterSchema.optional().catch(undefined);
 
-// The search box of /log. Unlike the tracker's, the term is not used to filter in the
-// browser: it is sent to the API (ADR-0030).
-const termSearchSchema = z.object({
-  q: termSchema,
-});
-
-// /vacancies: the term and the status filter both go to the API (ADR-0025, ADR-0030).
-// An absent `status` is the NOT_REVIEWED default.
+// /vacancies: the status filter goes to the API (ADR-0030). An absent `status` is the
+// NOT_REVIEWED default — and so is a bookmarked `?status=APPLIED`, from when the filter
+// still listed the pipeline.
 const vacanciesSearchSchema = z.object({
-  q: termSchema,
   status: vacancyStatusFilterSchema.optional().catch(undefined),
 });
 
@@ -93,12 +86,17 @@ const vacancyRoute = createRoute({
   staticData: VACANCY_META,
 });
 
-const logRoute = createRoute({
+// /inbox's tab; junk falls back to the Queue, as an absent value does.
+const inboxSearchSchema = z.object({
+  tab: inboxTabSchema.optional().catch(undefined),
+});
+
+const inboxRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/log',
-  component: LogPage,
-  staticData: LOG_META,
-  validateSearch: (search): z.infer<typeof termSearchSchema> => termSearchSchema.parse(search),
+  path: '/inbox',
+  component: InboxPage,
+  staticData: INBOX_META,
+  validateSearch: (search): z.infer<typeof inboxSearchSchema> => inboxSearchSchema.parse(search),
 });
 
 // No backend behind this one yet — see the page for what is missing.
@@ -109,10 +107,9 @@ const profileRoute = createRoute({
   staticData: PROFILE_META,
 });
 
-// The /applications search box + status filter. Parsed / validated by zod on every
-// navigation — see the note above on why both are lenient.
+// The /applications status filter. Parsed / validated by zod on every navigation —
+// see the note above on why it is lenient.
 const applicationsSearchSchema = z.object({
-  q: termSchema,
   status: statusFilterSchema,
 });
 
@@ -130,7 +127,7 @@ export const routeTree = rootRoute.addChildren([
   vacanciesRoute,
   vacancyRoute,
   applicationsRoute,
-  logRoute,
+  inboxRoute,
   profileRoute,
 ]);
 

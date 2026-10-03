@@ -6,21 +6,14 @@
 import { z } from 'zod';
 import { cursorPageSchema } from '@/lib/api';
 import {
+  STATUS_CONTEXT,
   type VacancyComment,
   type VacancyStatus,
   vacancyCommentSchema,
-  vacancyStatusSchema,
 } from '../vacancies/types';
 
-/** The pipeline: the statuses /applications shows. */
-export const applicationStatusSchema = vacancyStatusSchema.extract([
-  'APPLIED',
-  'RECRUITER_SCREEN',
-  'REPLIED',
-  'INTERVIEW',
-  'OFFER',
-  'REJECTED',
-]);
+/** The pipeline: the statuses /applications shows — its context. */
+export const applicationStatusSchema = STATUS_CONTEXT.applications;
 export type ApplicationStatus = z.infer<typeof applicationStatusSchema>;
 
 export function isPipelineStatus(status: VacancyStatus): status is ApplicationStatus {
@@ -70,12 +63,13 @@ export const applicationListItemSchema = z.object({
   appliedAt: z.string().nullable(),
   /** Every comment on the vacancy, oldest first, the analyzer's included. */
   comments: z.array(applicationCommentSchema),
-  salaryInListing: z.string().nullable(),
+  salaryInApplication: z.string().nullable(),
   usedTailoredResume: z.boolean(),
   company: z.string(),
   title: z.string(),
   applyUrl: z.string(),
-  matchScore: z.number(),
+  /** Null when the vacancy has no analysis (a row record_application created). */
+  matchScore: z.number().nullable(),
   /** How many vacancies (any status) share this row's company — derived by the list
    * endpoint only, so optional: the PATCH / POST responses parse through this schema
    * too and carry none (the /vacancies schema's trap, ADR-0025). */
@@ -93,14 +87,14 @@ export type RecordApplicationResponse = z.infer<typeof recordApplicationResponse
 /** PATCH /applications/:id. Absent = untouched; null or blank clears. A non-blank
  * `comment` is added as a new USER comment. */
 export interface UpdateApplicationInput {
-  salaryInListing?: string | null;
+  salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
   comment?: string;
 }
 
 export interface RecordApplicationInput {
   vacancyId: number;
-  salaryInListing?: string;
+  salaryInApplication?: string;
   usedTailoredResume?: boolean;
   comment?: string;
 }

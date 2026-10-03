@@ -1,7 +1,7 @@
 import 'reflect-metadata';
-import { getPrisma } from '@job-search-copilot/core';
-import type { INestApplication } from '@nestjs/common';
+import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
 import { ConfigService } from '@nestjs/config';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -13,7 +13,7 @@ import { configureApp } from '../src/setup-app';
 // actually exercises DTO validation + the class-validator/class-transformer
 // pipeline, which a controller-only unit test with a mocked service would miss.
 describe('Vacancies (e2e)', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   const prisma = getPrisma();
 
   const validPayload = {
@@ -26,9 +26,15 @@ describe('Vacancies (e2e)', () => {
     estimationComment: 'Strong match.',
   };
 
+  /** A vacancy intake took in (NEW, unanalysed, no text); returns its id. */
+  async function queued(url: string): Promise<number> {
+    await new VacancyIntakeService(prisma).intake({ url, company: 'Queued Co', title: url });
+    return (await prisma.vacancy.findUniqueOrThrow({ where: { applyUrl: url } })).id;
+  }
+
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<NestExpressApplication>();
     configureApp(app, app.get(ConfigService));
     await app.init();
   });
@@ -79,6 +85,173 @@ describe('Vacancies (e2e)', () => {
     it('rejects a payload missing required fields with 400', async () => {
       await request(app.getHttpServer()).post('/api/v1/vacancies').send({}).expect(400);
     });
+
+    it('rejects an applyUrl that is not an http(s) link with 400', async () => {
+      for (const applyUrl of ['not a url', 'example.com/jobs/1', 'javascript:alert(1)']) {
+        await request(app.getHttpServer())
+          .post('/api/v1/vacancies')
+          .send({ ...validPayload, applyUrl })
+          .expect(400);
+      }
+      expect(await prisma.vacancy.count()).toBe(0);
+    });
+
+    it('attaches the analysis to a row intake took in: 200, no Location', async () => {
+      const id = await queued(validPayload.applyUrl);
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/vacancies')
+        .send(validPayload)
+        .expect(200);
+      expect(res.body).toMatchObject({ id, recommendation: 'APPLY', status: 'NOT_REVIEWED' });
+      expect(res.headers.location).toBeUndefined();
+    });
+  });
+
+  describe('POST /api/v1/vacancies/intake', () => {
+    const intake = (entries: unknown[]) =>
+      request(app.getHttpServer()).post('/api/v1/vacancies/intake').send({ entries });
+    const entry = { url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' };
+
+    it('takes a new posting in as NEW (200, the url as sent); a repeat by url or by name is not new', async () => {
+      const raw = 'https://pl.linkedin.com/jobs/view/dev-at-acme-3900000001?trk=x';
+      const first = await intake([
+        { url: raw, company: 'Acme Sp. z o.o.', title: 'Senior Dev', source: 'linkedin' },
+      ]).expect(200);
+      expect(first.body).toEqual({ new: [raw] });
+      expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
+        applyUrl: 'https://www.linkedin.com/jobs/view/3900000001',
+        status: 'NEW',
+        recommendation: null,
+        source: 'linkedin',
+        fullText: null,
+      });
+
+      const again = await intake([
+        { url: 'https://www.linkedin.com/jobs/view/3900000001/', company: 'X', title: 'Y' },
+        { url: 'https://acme.com/careers/42', company: 'Acme', title: 'Senior Dev!' },
+      ]).expect(200);
+      expect(again.body).toEqual({ new: [] });
+      expect(await prisma.vacancy.count()).toBe(1);
+    });
+
+    it('fills the posting text on a second call, and nothing else', async () => {
+      await intake([entry]).expect(200);
+      const res = await intake([{ ...entry, source: 'justjoin', fullText: 'The posting.' }]).expect(
+        200,
+      );
+      expect(res.body).toEqual({ new: [] });
+      expect(
+        await prisma.vacancy.findUniqueOrThrow({ where: { applyUrl: entry.url } }),
+      ).toMatchObject({ fullText: 'The posting.', source: null, status: 'NEW' });
+    });
+
+    it('400s on a missing or blank company or title, a non-URL, an empty or oversized batch', async () => {
+      for (const bad of [
+        { ...entry, company: undefined },
+        { ...entry, title: undefined },
+        { ...entry, title: '  ' },
+        { ...entry, url: undefined },
+        { ...entry, url: 'acme.com/jobs/1' },
+        { ...entry, url: 'javascript:alert(1)' },
+        { ...entry, url: 'ftp://acme.com/jobs/1' },
+      ]) {
+        await intake([bad]).expect(400);
+      }
+      await intake([]).expect(400);
+      await intake(
+        Array.from({ length: 101 }, (_, i) => ({ ...entry, url: `https://a.com/${i}` })),
+      ).expect(400);
+      expect(await prisma.vacancy.count()).toBe(0);
+    });
+
+    it('accepts a ~1 MB body', async () => {
+      const fullText = 'x'.repeat(100_000);
+      const entries = Array.from({ length: 10 }, (_, i) => ({
+        ...entry,
+        url: `https://acme.com/jobs/${i}`,
+        title: `Role ${i}`,
+        fullText,
+      }));
+      const res = await intake(entries).expect(200);
+      expect(res.body.new).toHaveLength(10);
+    });
+  });
+
+  describe('POST /api/v1/vacancies/:id/analysis', () => {
+    const analysis = { matchScore: 30, recommendation: 'SKIP', estimationComment: 'Backend.' };
+
+    it('writes the analysis and moves NEW by the rule; a second one is a 409', async () => {
+      const id = await queued('https://example.com/q/1');
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/vacancies/${id}/analysis`)
+        .send(analysis)
+        .expect(200);
+      expect(res.body).toMatchObject({ id, recommendation: 'SKIP', status: 'FILTERED_OUT' });
+
+      const again = await request(app.getHttpServer())
+        .post(`/api/v1/vacancies/${id}/analysis`)
+        .send({ ...analysis, matchScore: 90, recommendation: 'APPLY' })
+        .expect(409);
+      expect(again.body).toMatchObject({ statusCode: 409, error: 'AlreadyAnalysedError' });
+      expect((await prisma.vacancy.findUniqueOrThrow({ where: { id } })).matchScore).toBe(30);
+    });
+
+    it('404s for an unknown id; 400s on a bad body', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/vacancies/999999/analysis')
+        .send(analysis)
+        .expect(404);
+      const id = await queued('https://example.com/q/1');
+      await request(app.getHttpServer())
+        .post(`/api/v1/vacancies/${id}/analysis`)
+        .send({ ...analysis, recommendation: 'MAYBE' })
+        .expect(400);
+    });
+  });
+
+  describe('POST /api/v1/vacancies/analysis', () => {
+    const analysis = { matchScore: 80, recommendation: 'APPLY', estimationComment: 'Fits.' };
+
+    it('writes a batch, in order', async () => {
+      const a = await queued('https://example.com/q/1');
+      const b = await queued('https://example.com/q/2');
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/vacancies/analysis')
+        .send({
+          analyses: [
+            { id: b, ...analysis },
+            { id: a, ...analysis },
+          ],
+        })
+        .expect(200);
+      expect(res.body.map((row: { id: number }) => row.id)).toEqual([b, a]);
+    });
+
+    it('writes none of a batch with an analysed row in it: 409', async () => {
+      const a = await queued('https://example.com/q/1');
+      const b = await queued('https://example.com/q/2');
+      await request(app.getHttpServer())
+        .post(`/api/v1/vacancies/${b}/analysis`)
+        .send(analysis)
+        .expect(200);
+      await request(app.getHttpServer())
+        .post('/api/v1/vacancies/analysis')
+        .send({
+          analyses: [
+            { id: a, ...analysis },
+            { id: b, ...analysis },
+          ],
+        })
+        .expect(409);
+      expect((await prisma.vacancy.findUniqueOrThrow({ where: { id: a } })).status).toBe('NEW');
+    });
+
+    it('400s on an empty batch or more than 10', async () => {
+      const post = (analyses: unknown[]) =>
+        request(app.getHttpServer()).post('/api/v1/vacancies/analysis').send({ analyses });
+      await post([]).expect(400);
+      await post(Array.from({ length: 11 }, (_, i) => ({ id: i + 1, ...analysis }))).expect(400);
+    });
   });
 
   describe('GET /api/v1/vacancies', () => {
@@ -88,6 +261,21 @@ describe('Vacancies (e2e)', () => {
       const res = await request(app.getHttpServer()).get('/api/v1/vacancies').expect(200);
       expect(res.body.total).toBe(1);
       expect(res.body.items[0]).not.toHaveProperty('fullText');
+    });
+
+    it('filters by ?hasText=; each item carries hasText', async () => {
+      await request(app.getHttpServer()).post('/api/v1/vacancies').send(validPayload).expect(201);
+      const id = await queued('https://example.com/q/1');
+
+      const without = await request(app.getHttpServer())
+        .get('/api/v1/vacancies?hasText=false')
+        .expect(200);
+      expect(without.body.items).toMatchObject([{ id, hasText: false }]);
+      const withText = await request(app.getHttpServer())
+        .get('/api/v1/vacancies?hasText=true')
+        .expect(200);
+      expect(withText.body.items).toMatchObject([{ hasText: true }]);
+      await request(app.getHttpServer()).get('/api/v1/vacancies?hasText=yes').expect(400);
     });
 
     it('filters by ?status=, any of a comma-separated list', async () => {
@@ -251,6 +439,7 @@ describe('Vacancies (e2e)', () => {
       expect(res.body.fullText).toBe(validPayload.fullText);
       expect(res.body.estimationComment).toBe(validPayload.estimationComment);
       expect(res.body.timeline).toEqual([
+        { status: 'NEW', createdAt: res.body.statusChangedAt },
         { status: 'NOT_REVIEWED', createdAt: res.body.statusChangedAt },
       ]);
     });
@@ -303,6 +492,28 @@ describe('Vacancies (e2e)', () => {
       expect(res.body.error).toBe('SameStatusError');
     });
 
+    it('sets an unanalysed vacancy back to NEW; an analysed one is a 422', async () => {
+      const server = app.getHttpServer();
+      const id = await queued('https://example.com/jobs/queued');
+      await request(server)
+        .patch(`/api/v1/vacancies/${id}/status`)
+        .send({ status: 'FILTERED_OUT' })
+        .expect(200);
+      const back = await request(server)
+        .patch(`/api/v1/vacancies/${id}/status`)
+        .send({ status: 'NEW' })
+        .expect(200);
+      expect(back.body.status).toBe('NEW');
+
+      // Saved with an analysis: the CHECK would make it a 500, core refuses it first.
+      const created = await request(server).post('/api/v1/vacancies').send(validPayload);
+      const res = await request(server)
+        .patch(`/api/v1/vacancies/${created.body.id}/status`)
+        .send({ status: 'NEW' })
+        .expect(422);
+      expect(res.body.error).toBe('AnalysedNotNewError');
+    });
+
     it('rejects an invalid status with 400', async () => {
       const created = await request(app.getHttpServer())
         .post('/api/v1/vacancies')
@@ -312,5 +523,14 @@ describe('Vacancies (e2e)', () => {
         .send({ status: 'MAYBE' })
         .expect(400);
     });
+  });
+
+  it('has no /log any more: GET /log and POST /log/check are 404s', async () => {
+    const server = app.getHttpServer();
+    await request(server).get('/api/v1/log').expect(404);
+    await request(server)
+      .post('/api/v1/log/check')
+      .send({ entries: [{ url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' }] })
+      .expect(404);
   });
 });

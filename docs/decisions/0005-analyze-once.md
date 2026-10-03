@@ -1,6 +1,6 @@
 # 0005 — Analyze-once: `save()` skip-if-exists, `{ created, vacancy }`, POST 201/200
 
-- Status: Accepted
+- Status: Accepted (amended by [0033](0033-unscored-vacancies-in-one-table.md))
 - Phase: 1 · Date: 2026-09
 
 ## Context
@@ -19,6 +19,12 @@ it's already analysed, skip it. `updatedAt` reacts to `userAction` changes."*
 2. Otherwise `normalizeRecommendation` → `create`.
 3. If the `create` loses a race (unique-constraint `P2002`), re-`findUnique` and
    return the winner.
+
+*Amended in phase 5 (ADR-0033):* a vacancy can exist before its analysis (intake,
+status `NEW`, both analysis fields `null`), so analyze-once is "the analysis is written
+once": `save()` still returns an existing row untouched, and attaching an analysis to an
+unscored row is a conditional write (`WHERE recommendation IS NULL`). `save()` creates
+the row with the journal `NEW`, then the rule's status.
 
 Return type is `{ created: boolean; vacancy: Vacancy }`
 (`SaveVacancyResult`) so callers can tell which path ran.

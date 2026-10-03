@@ -238,7 +238,7 @@
   .view {
     @apply px-[28px] pb-[56px] pt-[24px];
   }
-  /* The table pages (/vacancies, /applications, /log): the table's scroll box runs
+  /* The table pages (/vacancies, /applications, /inbox): the table's scroll box runs
      to the window's bottom, so the page itself does not scroll. A flex column from
      .main down — .main takes the window's height, the view and the card fill it,
      the scroll box takes what is left. `min-height: 320px` is the floor for short
@@ -358,6 +358,19 @@
   }
   .filter-group {
     @apply flex items-center gap-[7px] text-[12px] font-semibold text-ink-muted;
+  }
+  /* /inbox's tabs: a segmented control, the pressed one tinted like the active nav item. */
+  .tabs {
+    @apply flex flex-wrap gap-[3px] rounded-[10px] border border-border bg-surface-sunken p-[3px];
+  }
+  .tab {
+    @apply cursor-pointer rounded-[7px] border border-transparent bg-transparent px-[12px] py-[5px] text-[12.5px] font-semibold text-ink-muted;
+  }
+  .tab:hover {
+    @apply text-ink;
+  }
+  .tab[aria-pressed="true"] {
+    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
   }
 
   table {

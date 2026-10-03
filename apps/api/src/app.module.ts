@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { ApplicationsModule } from './applications/applications.module';
 import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
-import { LogModule } from './log/log.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StatsModule } from './stats/stats.module';
 import { VacanciesModule } from './vacancies/vacancies.module';
@@ -17,7 +16,6 @@ import { VacanciesModule } from './vacancies/vacancies.module';
     HealthModule,
     VacanciesModule,
     ApplicationsModule,
-    LogModule,
     StatsModule,
   ],
 })

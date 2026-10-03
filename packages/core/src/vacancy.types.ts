@@ -8,10 +8,29 @@ export interface VacancyComment {
 }
 
 export interface SaveVacancyResult {
-  /** false when a vacancy with this applyUrl already existed and was returned untouched. */
+  /** true when this call created the row. */
   created: boolean;
+  /** true when the row existed unanalysed (taken in by intake) and this call's analysis
+   * was attached to it. Both false = the row already had an analysis and was returned
+   * untouched, this one dropped. */
+  attached: boolean;
   vacancy: Vacancy;
 }
+
+/** An analysis for a vacancy that exists, written once (ADR-0033). */
+export interface SubmitAnalysisInput {
+  id: number;
+  matchScore: number;
+  /** Accepts the canonical English value or its Ukrainian equivalent — see recommendation.ts. */
+  recommendation: string;
+  /** Written as the vacancy's `ANALYZER` comment; a blank one writes none. */
+  estimationComment: string;
+}
+
+/** Max analyses per submitAnalyses / get_vacancies_batch call: each posting is read and
+ * scored by an agent, and ten keeps one step's context small (phase 5). Enforced by the
+ * transports. */
+export const ANALYSIS_BATCH_MAX = 10;
 
 /** getById / updateStatus: the whole row and every comment, oldest first, plus the
  * analyzer's (the first `ANALYZER` one), or null when there is none; `timeline` is
@@ -55,6 +74,8 @@ export interface ListVacanciesFilters {
   applyUrl?: string;
   /** ILIKE '%term%', case-insensitive — mirrors `company`; both have a trigram GIN index. */
   title?: string;
+  /** true: only rows with posting text; false: only rows without. */
+  hasText?: boolean;
   limit?: number;
   /** MCP's paging. Not with `cursor` — REST answers both with a 400. */
   offset?: number;
@@ -66,7 +87,8 @@ export interface ListVacanciesFilters {
 
 /** `newest`: `createdAt desc, id desc` — what `list_vacancies` promises.
  * `recommended`: `recommendation asc` (the enum's declaration order — APPLY,
- * APPLY_WITH_CAVEATS, SKIP), `matchScore desc, id desc` — the web's triage order. */
+ * APPLY_WITH_CAVEATS, SKIP — then the unanalysed), `matchScore desc, id desc` — the
+ * web's triage order. */
 export const VACANCY_SORTS = ['newest', 'recommended'] as const;
 export type VacancySort = (typeof VACANCY_SORTS)[number];
 
@@ -86,8 +108,9 @@ export type VacancyListItem = {
   company: string;
   title: string;
   applyUrl: string;
-  matchScore: number;
-  recommendation: Recommendation;
+  /** Both null when the vacancy has no analysis yet. */
+  matchScore: number | null;
+  recommendation: Recommendation | null;
   /** The first `ANALYZER` comment's body; null when there is none. */
   estimationComment: string | null;
   status: VacancyStatus;
@@ -100,14 +123,11 @@ export type VacancyListItem = {
    */
   companyMatchCount: number;
   /**
-   * Whether the analyzer ever looked at this posting. Derived the same way, and
-   * absent from the single-record endpoints for the same reason.
-   *
-   * The test is "an `ANALYZER` comment exists" (`estimationComment !== null`) —
-   * there is no column for this. `save()` always writes one; a placeholder row
-   * (ADR-0019) gets one only when `record_application` was given an
-   * `estimationComment`. Ceiling, named where it is derived: such a placeholder
-   * reads as analysed, and shows the score the caller passed, or 0.
+   * Whether the vacancy has an analysis: `recommendation !== null` (ADR-0033). Derived
+   * the same way, and absent from the single-record endpoints for the same reason.
    */
   hasAnalysis: boolean;
+  /** Whether the vacancy has posting text (`fullText !== null`) — derived the same way;
+   * the single-record endpoints carry `fullText` itself. */
+  hasText: boolean;
 };

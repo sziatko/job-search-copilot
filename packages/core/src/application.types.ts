@@ -8,7 +8,7 @@ import type { VacancyComment } from './vacancy.types';
  */
 export interface RecordApplicationByIdInput {
   vacancyId: number;
-  salaryInListing?: string | null;
+  salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
   /** Added as a USER comment; a blank one adds none. */
   comment?: string | null;
@@ -18,23 +18,24 @@ export interface RecordApplicationByIdInput {
 
 /**
  * MCP path: the vacancy is identified by (company, title). A unique match links to it;
- * no match creates a minimal Vacancy with placeholder analyzer fields (see
- * ApplicationService.record / ADR-0019); more than one match is an error.
+ * no match creates a minimal Vacancy, without an analysis unless a `matchScore` is
+ * passed (see ApplicationService.record / ADR-0019); more than one match is an error.
  */
 export interface RecordApplicationByVacancyInput {
   company: string;
   title: string;
   /** Synthesized as `tracker://…` when absent. */
   applyUrl?: string | null;
-  /** For a created vacancy: else 0. */
+  /** For a created vacancy: its score. Absent = the vacancy has no analysis. */
   matchScore?: number | null;
-  /** For a created vacancy: explicit, else derived from matchScore, else 'APPLY'. */
+  /** For a created vacancy with a `matchScore`: explicit, else derived from it. Ignored
+   * without one — the analysis is both fields or neither. */
   recommendation?: Recommendation | null;
-  /** For a created vacancy: else PLACEHOLDER_COMMENT ('N/A'). */
+  /** For a created vacancy: its posting text, else none (null). */
   fullText?: string | null;
   /** For a created vacancy: its ANALYZER comment, else none. */
   estimationComment?: string | null;
-  salaryInListing?: string | null;
+  salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
   /** Added as a USER comment; a blank one adds none. */
   comment?: string | null;
@@ -63,7 +64,7 @@ export interface RecordManyApplicationsResult {
  * null or blank = cleared. `comment` is not a field: a non-blank one adds a USER
  * comment, a blank one adds nothing. */
 export interface UpdateApplicationInput {
-  salaryInListing?: string | null;
+  salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
   comment?: string | null;
 }
@@ -116,8 +117,7 @@ export interface ListApplicationsResult {
 
 /**
  * A vacancy seen from /applications: the fields that page renders. `id` is the
- * vacancy's. The analyzer fields are never NULL — a never-analyzed application still
- * has a real (placeholder-filled) vacancy row.
+ * vacancy's.
  */
 export interface ApplicationListItem {
   id: number;
@@ -133,11 +133,12 @@ export interface ApplicationListItem {
   appliedAt: Date | null;
   /** Every comment on the vacancy, oldest first, the analyzer's included. */
   comments: VacancyComment[];
-  salaryInListing: string | null;
+  salaryInApplication: string | null;
   usedTailoredResume: boolean;
   company: string;
   title: string;
   applyUrl: string;
-  matchScore: number;
-  recommendation: Recommendation;
+  /** Both null when the vacancy has no analysis (a vacancy record_application created). */
+  matchScore: number | null;
+  recommendation: Recommendation | null;
 }

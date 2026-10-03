@@ -1,14 +1,22 @@
-import type { Prisma, VacancyStatus } from '@prisma/client';
-import { SameStatusError } from './errors';
+import type { Prisma, Recommendation, VacancyStatus } from '@prisma/client';
+import { AnalysedNotNewError, SameStatusError } from './errors';
 
-/** The statuses before the pipeline: the user's triage. A repeat of one carries no
- * event, so writeStatus refuses it (ADR-0029). */
+/** The statuses before the pipeline: the analysis queue (NEW), the user's triage, and
+ * FILTERED_OUT. A repeat of one carries no event, so writeStatus refuses it (ADR-0029). */
 export const TRIAGE_STATUSES = [
+  'NEW',
   'NOT_REVIEWED',
   'SAVED_FOR_LATER',
   'DECLINED',
   'UNAVAILABLE',
+  'FILTERED_OUT',
 ] as const satisfies readonly VacancyStatus[];
+
+/** Where an analysis moves a vacancy out of NEW (ADR-0033) — the one status move the
+ * analyzer makes, and only from NEW. */
+export function statusAfterAnalysis(recommendation: Recommendation): VacancyStatus {
+  return recommendation === 'SKIP' ? 'FILTERED_OUT' : 'NOT_REVIEWED';
+}
 
 /** The statuses /applications shows: the vacancy has been applied to. Everything before
  * is triage. */
@@ -58,13 +66,14 @@ export function isTimedOut(status: VacancyStatus, statusChangedAt: Date, now: Da
   );
 }
 
-/** A new vacancy's journal: NOT_REVIEWED (the column's default), dated `at` along with
- * `statusChangedAt`. Explicit, not `now()`: `record` takes `at` before it creates a
+/** A new vacancy's journal: NEW (the column's default), dated `at` along with
+ * `statusChangedAt` — every path, so every journal starts with the date the vacancy came
+ * in (ADR-0033). Explicit, not `now()`: `record` takes `at` before it creates a
  * placeholder, and its APPLIED dated `at` must not sort before this row. */
 export function firstStatus(at: Date) {
   return {
     statusChangedAt: at,
-    statusChanges: { create: { status: 'NOT_REVIEWED', createdAt: at } },
+    statusChanges: { create: { status: 'NEW', createdAt: at } },
   } as const;
 }
 
@@ -74,7 +83,8 @@ export function firstStatus(at: Date) {
  * vacancy already has is journaled too and moves `statusChangedAt` (the next interview
  * round is INTERVIEW again), so a caller writes once per real event. A triage status the
  * vacancy already has carries no event: it throws SameStatusError and writes nothing.
- * An unknown id writes nothing. Two writes, so `tx` must be a transaction — the
+ * NEW on an analysed vacancy throws AnalysedNotNewError — the CHECK would refuse it as
+ * a 500. An unknown id writes nothing. Two writes, so `tx` must be a transaction — the
  * caller's, which its other writes share.
  */
 export async function writeStatus(
@@ -85,12 +95,23 @@ export async function writeStatus(
 ): Promise<void> {
   const triage = (TRIAGE_STATUSES as readonly VacancyStatus[]).includes(status);
   const { count } = await tx.vacancy.updateMany({
-    where: triage ? { id: vacancyId, status: { not: status } } : { id: vacancyId },
+    where: {
+      id: vacancyId,
+      ...(triage && { status: { not: status } }),
+      ...(status === 'NEW' && { recommendation: null }),
+    },
     data: { status, statusChangedAt: at },
   });
   if (count > 0) {
     await tx.statusChange.create({ data: { vacancyId, status, createdAt: at } });
-  } else if (triage && (await tx.vacancy.count({ where: { id: vacancyId } })) > 0) {
-    throw new SameStatusError(`Vacancy ${vacancyId} is already ${status}`);
+    return;
   }
+  if (!triage) return;
+  const row = await tx.vacancy.findUnique({ where: { id: vacancyId }, select: { status: true } });
+  if (!row) return;
+  if (row.status === status) throw new SameStatusError(`Vacancy ${vacancyId} is already ${status}`);
+  // The one other triage miss: NEW on a row that has an analysis.
+  throw new AnalysedNotNewError(
+    `Vacancy ${vacancyId} has an analysis, so it cannot go back to NEW`,
+  );
 }

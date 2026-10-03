@@ -24,13 +24,16 @@ Across the dev DB's 448 company names (2026-10-02), the same rule also:
 
 1. **`companyKey(name)`** in `packages/core/src/vacancy.service.ts`: the vacancy
    log's `normalizeCompanyKey` (case, punctuation, legal forms such as `Sp. z o.o.`,
-   `Inc`, `B.V.`; [ADR-0026](0026-vacancy-log-table.md)) applied after dropping `( … )`
+   `Inc`, `B.V.`; intake's key since [ADR-0033](0033-unscored-vacancies-in-one-table.md)) applied after dropping `( … )`
    notes, then a trailing country or region word (`Polska`, `Poland`, `Spain`,
    `Latam`, …) is dropped as well. A name that is nothing but those words keeps
    itself.
 2. **Same company ⇔ equal keys.** This is an equivalence, so every spelling of a
    company sees the same rows and the same count.
 3. **`companyMatchCount`** counts by key. One `groupBy` on `company`, summed per key.
+   Amended in phase 5 (2026-10-03): both the count and `sameCompanyAs` leave
+   `FILTERED_OUT` rows out — the old log's screened-out postings are noise in "have I
+   dealt with these people before?" — so the count is still exactly the modal's rows.
 4. **A new list filter, `sameCompanyAs`**, on `GET /vacancies` and
    `GET /applications`: every stored spelling of the name's company. The company modal
    (both of its queries) and the vacancy page's other vacancies use it.
@@ -78,6 +81,7 @@ Across the dev DB's 448 company names (2026-10-02), the same rule also:
 
 - [ADR-0025](0025-vacancies-list-search-server-side.md): the substring count this
   replaces for the company button and the modal.
-- [ADR-0026](0026-vacancy-log-table.md): the log's company key this builds on.
+- [ADR-0033](0033-unscored-vacancies-in-one-table.md): intake's company key this builds on
+  (the log's, ADR-0026, deleted in phase 5).
 - [`../phases/phase-4.3.md`](../phases/phase-4.3.md): step 7.
 - [`../contracts.md`](../contracts.md): `sameCompanyAs` and `companyMatchCount`.

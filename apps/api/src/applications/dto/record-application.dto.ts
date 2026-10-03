@@ -13,7 +13,7 @@ export class RecordApplicationDto {
 
   @IsOptional()
   @IsString()
-  salaryInListing?: string;
+  salaryInApplication?: string;
 
   @IsOptional()
   @IsBoolean()

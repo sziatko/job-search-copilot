@@ -24,7 +24,7 @@ const DAY = 86_400_000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
 
 /**
- * Page-level, not `renderHook`: the search term lives in the route's search
+ * Page-level, not `renderHook`: the status filter lives in the route's search
  * params, so `useVacancies` calls `useSearch` and throws without a router above
  * it. Same shape as `renderApplications` in the tracker's test.
  */
@@ -76,7 +76,8 @@ function offered(company: string) {
   return STATUS_VERBS.filter((name) => rowOf(company).queryByRole('button', { name }));
 }
 
-const SEARCH_BOX = /search company or role/i;
+/** What `ALL` sends on /vacancies — the page's context. */
+const CONTEXT_STATUSES = 'NOT_REVIEWED,SAVED_FOR_LATER,DECLINED,UNAVAILABLE';
 
 /** A promise a test releases by hand — one held request, no timer to race. */
 function gate() {
@@ -115,33 +116,34 @@ describe('VacanciesPage / useVacancies', () => {
     expect(screen.queryByText('Applied Co')).not.toBeInTheDocument();
   });
 
-  it('files every pipeline status under Applied, each tagged with its own stage', async () => {
+  it("offers only the page's own statuses, and All lists only those", async () => {
     mswServer.use(
       ...buildHandlers([
-        vacancy({ id: 1, company: 'New Co' }),
+        vacancy({ id: 1, company: 'Fresh Co' }),
         vacancy({ id: 2, company: 'Saved Co', status: 'SAVED_FOR_LATER' }),
         vacancy({ id: 3, company: 'Declined Co', status: 'DECLINED' }),
-        vacancy({ id: 4, company: 'Applied Co', status: 'APPLIED' }),
-        vacancy({ id: 5, company: 'Interview Co', status: 'INTERVIEW' }),
-        vacancy({ id: 6, company: 'Rejected Co', status: 'REJECTED' }),
+        vacancy({ id: 4, company: 'Closed Co', status: 'UNAVAILABLE' }),
+        // /inbox's and /applications' rows, never this page's.
+        vacancy({ id: 5, company: 'Queued Co', status: 'NEW', recommendation: null }),
+        vacancy({ id: 6, company: 'Screened Co', status: 'FILTERED_OUT', recommendation: null }),
+        vacancy({ id: 7, company: 'Applied Co', status: 'APPLIED' }),
+        vacancy({ id: 8, company: 'Interview Co', status: 'INTERVIEW' }),
       ]),
     );
     renderVacancies();
-    await screen.findByText('New Co');
+    await screen.findByText('Fresh Co');
 
     const user = userEvent.setup();
     const filter = screen.getByLabelText('Status');
+    // No Applied: the pipeline is /applications'.
     expect([...(filter as HTMLSelectElement).options].map((o) => o.textContent)).toEqual([
       'Not reviewed',
       'Saved for later',
       'Declined',
       'Unavailable',
-      'Applied',
       'All',
     ]);
 
-    await user.selectOptions(filter, 'APPLIED');
-    await screen.findByText('Interview Co');
     const companies = () =>
       screen
         .getAllByRole('row')
@@ -149,9 +151,9 @@ describe('VacanciesPage / useVacancies', () => {
         .filter(Boolean)
         .map((cell) => cell.replace(/\s*#\d+$/, ''))
         .sort();
-    expect(companies()).toEqual(['Applied Co', 'Interview Co', 'Rejected Co']);
-    expect(rowOf('Interview Co').getByText('Interview', { selector: '.tag' })).toBeInTheDocument();
-    expect(rowOf('Rejected Co').getByText('Rejected', { selector: '.tag' })).toBeInTheDocument();
+    await user.selectOptions(filter, 'ALL');
+    await screen.findByText('Closed Co');
+    expect(companies()).toEqual(['Closed Co', 'Declined Co', 'Fresh Co', 'Saved Co']);
 
     await user.selectOptions(filter, 'SAVED_FOR_LATER');
     await waitFor(() => expect(companies()).toEqual(['Saved Co']));
@@ -179,7 +181,7 @@ describe('VacanciesPage / useVacancies', () => {
     );
   });
 
-  it('sends the status filter to the server, Applied as the whole pipeline', async () => {
+  it("sends the status filter to the server, All as the page's statuses", async () => {
     const lists: URLSearchParams[] = [];
     const onRequest = ({ request }: { request: Request }) => {
       const url = new URL(request.url);
@@ -196,14 +198,10 @@ describe('VacanciesPage / useVacancies', () => {
       expect(lists.at(-1)?.get('sort')).toBe('recommended');
 
       const user = userEvent.setup();
-      await user.selectOptions(screen.getByLabelText('Status'), 'APPLIED');
-      await waitFor(() =>
-        expect(lists.at(-1)?.get('status')).toBe(
-          'APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,OFFER,REJECTED',
-        ),
-      );
+      await user.selectOptions(screen.getByLabelText('Status'), 'DECLINED');
+      await waitFor(() => expect(lists.at(-1)?.get('status')).toBe('DECLINED'));
       await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-      await waitFor(() => expect(lists.at(-1)?.has('status')).toBe(false));
+      await waitFor(() => expect(lists.at(-1)?.get('status')).toBe(CONTEXT_STATUSES));
     } finally {
       mswServer.events.removeListener('request:start', onRequest);
     }
@@ -221,6 +219,21 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Declined Co');
     expect(screen.queryByText('Acme')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Status')).toHaveValue('DECLINED');
+  });
+
+  it('falls back to Not reviewed on a bookmarked ?status=APPLIED', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'Acme' }),
+        vacancy({ id: 2, company: 'Applied Co', status: 'APPLIED' }),
+      ]),
+    );
+    renderVacancies('/vacancies?status=APPLIED');
+
+    // The filter's old pipeline entry: the default, not an error page.
+    await screen.findByText('Acme');
+    expect(screen.queryByText('Applied Co')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Status')).toHaveValue('NOT_REVIEWED');
   });
 
   it('loads the next page on scroll, and an optimistic write reaches it', async () => {
@@ -252,72 +265,12 @@ describe('VacanciesPage / useVacancies', () => {
     await user.click(rowOf('Co 1').getByRole('button', { name: 'Save for later' }));
 
     const secondPage = () =>
-      client.getQueryData<InfiniteData<{ items: VacancyListItem[] }>>([
-        'vacancies',
-        '',
-        'NOT_REVIEWED',
-      ])?.pages[1].items;
+      client.getQueryData<InfiniteData<{ items: VacancyListItem[] }>>(['vacancies', 'NOT_REVIEWED'])
+        ?.pages[1].items;
     await waitFor(() =>
       expect(secondPage()?.find((item) => item.id === 1)?.status).toBe('SAVED_FOR_LATER'),
     );
     patch.release();
-  });
-
-  it('sends the typed term to the server as `search` and renders the matches', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
-        vacancy({ id: 2, company: 'Beta Corp', title: 'Frontend Lead' }),
-      ]),
-    );
-    renderVacancies();
-    await screen.findByText('Backend Engineer');
-
-    const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(SEARCH_BOX), 'beta');
-
-    // The MSW handler filters on `search` the way the real endpoint does, so this
-    // can only pass if the term left the browser — a client-side-only filter
-    // would leave `search` unset and both rows would still be there.
-    await waitFor(() => expect(screen.queryByText('Backend Engineer')).not.toBeInTheDocument());
-    await screen.findByText('Frontend Lead');
-  });
-
-  it('takes the initial term from the URL', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
-        vacancy({ id: 2, company: 'Beta Corp', title: 'Frontend Lead' }),
-      ]),
-    );
-    renderVacancies('/vacancies?q=beta');
-
-    // The router paints nothing until it has resolved, so this has to wait too.
-    expect(await screen.findByPlaceholderText(SEARCH_BOX)).toHaveValue('beta');
-    await screen.findByText('Frontend Lead');
-    expect(screen.queryByText('Backend Engineer')).not.toBeInTheDocument();
-  });
-
-  it('sends a padded term to the server trimmed, leaving the box as typed', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
-        vacancy({ id: 2, company: 'Beta Corp', title: 'Frontend Lead' }),
-      ]),
-    );
-    renderVacancies();
-    await screen.findByText('Backend Engineer');
-
-    const box = screen.getByPlaceholderText(SEARCH_BOX);
-    await userEvent.setup().type(box, '  beta  ');
-
-    // The handler matches on the term exactly as it arrives, so an untrimmed
-    // '  beta  ' matches nothing and both rows stay on screen.
-    await waitFor(() => expect(screen.queryByText('Backend Engineer')).not.toBeInTheDocument());
-    await screen.findByText('Frontend Lead');
-    // ...and the box keeps what was typed: trimming before the URL is written
-    // would make a space untypeable mid-word.
-    expect(box).toHaveValue('  beta  ');
   });
 
   it('shows one title and puts the count in the footer', async () => {
@@ -361,7 +314,8 @@ describe('VacanciesPage / useVacancies', () => {
           company: 'Acme',
           title: 'Imported Role',
           applyUrl: 'tracker://import/2',
-          matchScore: 0,
+          matchScore: null,
+          recommendation: null,
           estimationComment: null,
         }),
       ]),
@@ -373,9 +327,9 @@ describe('VacanciesPage / useVacancies', () => {
     // in the row. Before this step the placeholder rendered a real-looking `0%`.
     const imported = rowOf('Imported Role');
     expect(imported.queryByText('0%')).not.toBeInTheDocument();
-    // Two dashes: the score, and the Comment column, which has no analyzer comment
-    // to show (`estimationComment: null`).
-    expect(imported.getAllByText('—')).toHaveLength(2);
+    // Three dashes: the score, the verdict, and the Comment column, which has no
+    // analyzer comment to show (`estimationComment: null`).
+    expect(imported.getAllByText('—')).toHaveLength(3);
     // …and the analysed row keeps its pill: the dash is about the analysis, not
     // about the row being an import or its link being unusable.
     expect(rowOf('Backend Engineer').getByText('80%')).toBeInTheDocument();
@@ -389,7 +343,7 @@ describe('VacanciesPage / useVacancies', () => {
       ]),
     );
     renderVacancies();
-    // Neither row is NOT_REVIEWED, so the default filter starts on the empty state.
+    // No row is NOT_REVIEWED, so the default filter starts on the empty state.
     await screen.findByText(/no vacancies match this filter/i);
 
     const user = userEvent.setup();
@@ -463,7 +417,6 @@ describe('VacanciesPage / useVacancies', () => {
         vacancy({ id: 2, company: 'Saved Co', status: 'SAVED_FOR_LATER' }),
         vacancy({ id: 3, company: 'Declined Co', status: 'DECLINED' }),
         vacancy({ id: 4, company: 'Closed Co', status: 'UNAVAILABLE' }),
-        vacancy({ id: 5, company: 'Interview Co', status: 'INTERVIEW' }),
       ]),
     );
     renderVacancies();
@@ -471,7 +424,7 @@ describe('VacanciesPage / useVacancies', () => {
 
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-    await screen.findByText('Interview Co');
+    await screen.findByText('Closed Co');
 
     // Four quick actions on every row: the server refuses a triage repeat.
     expect(offered('Fresh Co')).toEqual(['Apply', 'Decline', 'Save for later', 'Mark unavailable']);
@@ -493,38 +446,53 @@ describe('VacanciesPage / useVacancies', () => {
       'Save for later',
       'Mark not reviewed',
     ]);
-    // A pipeline row counts as Applied, as in the status filter.
-    expect(offered('Interview Co')).toEqual([
+  });
+
+  it('locks the status controls of a row just applied to until the refetch drops it', async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({ id: 1, company: 'Acme' }),
+        vacancy({ id: 2, company: 'Saved Co', status: 'SAVED_FOR_LATER' }),
+      ]),
+    );
+    // The refetch after the apply is held: until it lands, the row is still on the page,
+    // APPLIED, and no longer saving — the only way a pipeline row reaches this table.
+    let holding = false;
+    const hold = holdGet('/vacancies', () => holding);
+    mswServer.use(hold.handler);
+    renderVacancies('/vacancies?status=ALL');
+    await screen.findByText('Acme');
+
+    const user = userEvent.setup();
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Apply' }));
+    holding = true;
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    // Applied and no longer saving, in one render: before the POST lands the tag is
+    // there too, with every control disabled by the save. Its status moves on
+    // /applications; copying it is still useful here.
+    await waitFor(() => {
+      expect(rowOf('Acme').getByText('Applied', { selector: '.tag' })).toBeInTheDocument();
+      expect(rowOf('Acme').getByRole('button', { name: /^Copy / })).toBeEnabled();
+    });
+    // A pipeline row counts as Applied.
+    expect(offered('Acme')).toEqual([
       'Decline',
       'Save for later',
       'Mark unavailable',
       'Mark not reviewed',
     ]);
-  });
-
-  it('locks the status controls of a row already applied to, and only those', async () => {
-    mswServer.use(
-      ...buildHandlers([
-        vacancy({ id: 1, company: 'Interview Co', status: 'INTERVIEW' }),
-        vacancy({ id: 2, company: 'Saved Co', status: 'SAVED_FOR_LATER' }),
-      ]),
-    );
-    renderVacancies('/vacancies');
-    const user = userEvent.setup();
-    await screen.findByText(/no vacancies match this filter/i);
-    await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-    await screen.findByText('Interview Co');
-
-    // Its status moves on /applications; copying it is still useful here.
-    for (const name of offered('Interview Co')) {
-      expect(rowOf('Interview Co').getByRole('button', { name })).toBeDisabled();
+    for (const name of offered('Acme')) {
+      expect(rowOf('Acme').getByRole('button', { name })).toBeDisabled();
     }
-    expect(rowOf('Interview Co').getByRole('button', { name: /^Copy / })).toBeEnabled();
     // A triage row keeps all of them.
     expect(offered('Saved Co')).toHaveLength(4);
     for (const name of offered('Saved Co')) {
       expect(rowOf('Saved Co').getByRole('button', { name })).toBeEnabled();
     }
+
+    hold.release();
+    await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
   });
 
   it('disables every control in a row while its save is in flight', async () => {
@@ -632,7 +600,7 @@ describe('VacanciesPage / useVacancies', () => {
     await waitFor(() =>
       expect(recorded).toMatchObject({
         vacancyId: 1,
-        salaryInListing: '130 PLN/h',
+        salaryInApplication: '130 PLN/h',
         usedTailoredResume: true,
         comment: 'Adapted CV.',
       }),
@@ -681,23 +649,25 @@ describe('VacanciesPage / useVacancies', () => {
   });
 
   /**
-   * Holds the list request for one term open until the test releases it, so a test
-   * can act inside the window finding 3 lives in: `keepPreviousData` is showing the
-   * *older* term's page, and the term being typed has no cache entry yet.
+   * Holds the list request for one `status` open until the test releases it, so a
+   * test can act inside the window finding 3 lives in: `keepPreviousData` is showing
+   * the *older* filter's page, and the filter just picked has no cache entry yet.
+   * (Phase 2.2 found it with the toolbar's search box; the status filter is the key
+   * that changes since phase 5 step 7 moved search into a modal.)
    *
    * The handler answers the held request itself rather than delegating — MSW's
    * `passthrough()` is not "try the next handler", it is "make the **real** request",
    * which here would hit the dev API on :3000 and fill the test with real vacancies.
    */
-  function holdTermRequest(term: string, items: FakeVacancy[]) {
+  function holdStatusRequest(status: string, items: FakeVacancy[]) {
     const held = gate();
     const state = { started: 0, release: held.release };
-    // Everything but the held term goes straight to the shared fake. The wrapper
+    // Everything but the held filter goes straight to the shared fake. The wrapper
     // must answer *every* list request, so delegating is what keeps it honest —
     // and it makes handler order irrelevant.
     const serve = vacanciesResolver(items);
     const handler = http.get('http://localhost:3000/api/v1/vacancies', async (info) => {
-      if (new URL(info.request.url).searchParams.get('search') !== term) {
+      if (new URL(info.request.url).searchParams.get('status') !== status) {
         return serve(info);
       }
       state.started += 1;
@@ -707,23 +677,21 @@ describe('VacanciesPage / useVacancies', () => {
     return { handler, state };
   }
 
-  it('writes an action into the cached page that exists while a term loads', async () => {
+  it('writes an action into the cached page that exists while a filter loads', async () => {
     const items = [vacancy({ id: 1, company: 'Acme' }), vacancy({ id: 2, company: 'Beta Corp' })];
-    const gate = holdTermRequest('beta', items);
+    const gate = holdStatusRequest(CONTEXT_STATUSES, items);
     mswServer.use(gate.handler, ...buildHandlers(items));
     const { client } = renderVacancies();
     await screen.findByText('Acme');
 
-    // This row's status changes below: under NOT_REVIEWED the refetch would take it
-    // out of the view before anything could be read.
+    // The page's own entry, NOT_REVIEWED, stays in the cache untouched by a refetch:
+    // once the filter moves on, nothing observes it.
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-
-    await user.type(screen.getByPlaceholderText(SEARCH_BOX), 'beta');
     await waitFor(() => expect(gate.state.started).toBe(1));
-    // The window finding 3 lives in: the term being typed has no cache entry, and
-    // the rows on screen are the *older* term's page, held by `keepPreviousData`.
-    expect(client.getQueryData(['vacancies', 'beta', 'ALL'])).toBeUndefined();
+    // The window finding 3 lives in: the filter just picked has no cache entry, and
+    // the rows on screen are the *older* filter's page, held by `keepPreviousData`.
+    expect(client.getQueryData(['vacancies', 'ALL'])).toBeUndefined();
 
     await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
 
@@ -733,18 +701,18 @@ describe('VacanciesPage / useVacancies', () => {
     // freezes the placeholder to the result it first produced and never re-reads the
     // entry underneath (see the comment in useVacancies.ts).
     await waitFor(() =>
-      expect(cachedStatus(client, ['vacancies', '', 'ALL'])).toBe('SAVED_FOR_LATER'),
+      expect(cachedStatus(client, ['vacancies', 'NOT_REVIEWED'])).toBe('SAVED_FOR_LATER'),
     );
-    expect(client.getQueryData(['vacancies', 'beta', 'ALL'])).toBeUndefined();
+    expect(client.getQueryData(['vacancies', 'ALL'])).toBeUndefined();
     // …and the frozen page is still what is on screen, unchanged.
     expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
 
     gate.state.release();
   });
 
-  it('restores the cached page it wrote when the save fails mid-search', async () => {
+  it('restores the cached page it wrote when the save fails mid-filter-change', async () => {
     const items = [vacancy({ id: 1, company: 'Acme' }), vacancy({ id: 2, company: 'Beta Corp' })];
-    const list = holdTermRequest('beta', items);
+    const list = holdStatusRequest(CONTEXT_STATUSES, items);
     // The PATCH is held too: the point of this test is the state *between* the
     // optimistic write and the failure, and without a hold the 500 lands before the
     // patched value can be read — leaving an assertion that a rollback that never
@@ -767,7 +735,6 @@ describe('VacanciesPage / useVacancies', () => {
 
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-    await user.type(screen.getByPlaceholderText(SEARCH_BOX), 'beta');
     await waitFor(() => expect(list.state.started).toBe(1));
 
     await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
@@ -775,14 +742,14 @@ describe('VacanciesPage / useVacancies', () => {
     // Mid-flight: the optimistic write is *in* the cached page, which is what makes
     // the rollback below a real rollback rather than a no-op on an untouched entry.
     await waitFor(() => expect(patchState.started).toBe(1));
-    const cached = () => cachedStatus(client, ['vacancies', '', 'ALL']);
+    const cached = () => cachedStatus(client, ['vacancies', 'NOT_REVIEWED']);
     expect(cached()).toBe('SAVED_FOR_LATER');
 
     // Now let it fail: the row says so, and the page it wrote is back to what it held.
     patch.release();
     await screen.findByText(/Failed to update vacancy 1/);
     expect(cached()).toBe('NOT_REVIEWED');
-    expect(client.getQueryData(['vacancies', 'beta', 'ALL'])).toBeUndefined();
+    expect(client.getQueryData(['vacancies', 'ALL'])).toBeUndefined();
 
     list.state.release();
   });
@@ -1015,10 +982,12 @@ describe('VacanciesPage / useVacancies', () => {
             company: 'Acme',
             title: 'Imported Role',
             applyUrl: 'tracker://import/2',
-            // A row `ApplicationService` had to create has no analyzer comment.
-            // Without that this fixture claimed a real analysis while carrying a
-            // `tracker://` URL — the dash below passed for the wrong reason (the
-            // URL scheme), which is what step 7 separates.
+            // A row `ApplicationService` had to create has no analysis. Without that
+            // this fixture claimed a real analysis while carrying a `tracker://` URL
+            // — the dash below passed for the wrong reason (the URL scheme), which is
+            // what step 7 separates.
+            matchScore: null,
+            recommendation: null,
             estimationComment: null,
           }),
         ]),

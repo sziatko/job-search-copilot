@@ -6,7 +6,7 @@ import { IsBoolean, IsOptional, IsString } from 'class-validator';
 export class UpdateApplicationDto {
   @IsOptional()
   @IsString()
-  salaryInListing?: string | null;
+  salaryInApplication?: string | null;
 
   @IsOptional()
   @IsBoolean()

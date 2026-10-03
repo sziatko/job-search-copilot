@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { routeTree } from './router';
-import { buildHandlers, statsHandler } from './test/msw/handlers';
+import { buildHandlers, fakeVacancy, statsHandler } from './test/msw/handlers';
 import { mswServer } from './test/msw/server';
 
 function renderAt(path: string) {
@@ -37,6 +37,15 @@ describe('router', () => {
     expect(await screen.findByRole('link', { name: /analyzed vacancies/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /application tracker/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^dashboard$/i })).toBeInTheDocument();
+    // The log's place, now the inbox's (phase 5).
+    expect(screen.getByRole('link', { name: /^inbox$/i })).toHaveAttribute('href', '/inbox');
+    expect(screen.queryByRole('link', { name: /vacancy log/i })).not.toBeInTheDocument();
+  });
+
+  it('has no /log page any more', async () => {
+    renderAt('/log');
+    expect(await screen.findByText(/not found/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /vacancy log/i })).not.toBeInTheDocument();
   });
 
   it('renders the dashboard at the index route', async () => {
@@ -45,16 +54,37 @@ describe('router', () => {
     expect(screen.queryByText(/failed to load/i)).not.toBeInTheDocument();
   });
 
-  it('reads a JSON-parsed number in ?q= as a term, not as an error', async () => {
-    // The router parses query values before zod sees them, so `?q=2024` is the
-    // number 2024. A strict `z.string()` threw out of validateSearch, and with no
-    // `errorComponent` anywhere the whole page became "Something went wrong!" — for
-    // a URL anyone can type.
-    mswServer.use(...buildHandlers([]));
-    renderAt('/vacancies?q=2024');
+  it.each([
+    ['/vacancies?q=beta', 'vacancies', 'Acme'],
+    // JSON-parsed by the router, so the number 2024: the old `q` schema had to coerce it.
+    ['/applications?q=2024', 'applications', 'Beta Corp'],
+  ])('ignores an old toolbar-search bookmark, %s', async (path, endpoint, company) => {
+    // Search is a modal now, with no URL state: the page lists what it would without it.
+    const asked: URLSearchParams[] = [];
+    const onRequest = ({ request }: { request: Request }) => {
+      const url = new URL(request.url);
+      if (url.pathname.endsWith(`/${endpoint}`)) asked.push(url.searchParams);
+    };
+    mswServer.events.on('request:start', onRequest);
+    try {
+      mswServer.use(
+        ...buildHandlers([
+          fakeVacancy({ id: 1, company: 'Acme', status: 'NOT_REVIEWED' }),
+          fakeVacancy({ id: 2, company: 'Beta Corp', status: 'APPLIED' }),
+        ]),
+        statsHandler(),
+      );
+      renderAt(path);
 
-    expect(await screen.findByPlaceholderText(/search company or role/i)).toHaveValue('2024');
-    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+      // Neither row matches the old term, so a page still filtering on it lists nothing.
+      expect(await screen.findByText(company)).toBeInTheDocument();
+      expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/search company or role/i)).not.toBeInTheDocument();
+      expect(asked.length).toBeGreaterThan(0);
+      expect(asked.every((query) => !query.has('search'))).toBe(true);
+    } finally {
+      mswServer.events.removeListener('request:start', onRequest);
+    }
   });
 
   it('ignores a junk ?status= on /applications instead of dropping the page', async () => {

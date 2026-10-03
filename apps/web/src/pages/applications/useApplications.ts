@@ -41,28 +41,20 @@ export function useApplications() {
   const search = useSearch({ from: '/applications' });
   const navigate = useNavigate({ from: '/applications' });
 
-  // `q` is the box (the raw URL value); `term` is what the server is asked for and
-  // what the cache is keyed on — as on /vacancies.
-  const q = search.q ?? '';
-  const term = q.trim();
   const statusFilter: ApplicationStatusFilter = search.status ?? STATUS_FILTER_ALL;
 
-  const setSearchText = (value: string) => {
-    void navigate({
-      search: (prev) => ({ ...prev, q: value.trim() === '' ? undefined : value }),
-    });
-  };
   const setStatusFilter = (value: ApplicationStatusFilter) => {
     void navigate({
       search: (prev) => ({ ...prev, status: value === STATUS_FILTER_ALL ? undefined : value }),
     });
   };
 
-  // The server filters, counts and pages (ADR-0030); a new term or filter is a new
-  // key, so a new list from its first page. Writes below go through the prefix.
+  // The server filters, counts and pages (ADR-0030); a new filter is a new key, so a
+  // new list from its first page. Writes below go through the prefix. Search is the
+  // search modal's, never this table's.
   const { query, items, total, loadMore } = useInfiniteList(
-    [...APPLICATIONS_KEY, term, statusFilter],
-    (cursor) => listApplicationsPage({ search: term, filter: statusFilter, cursor }),
+    [...APPLICATIONS_KEY, statusFilter],
+    (cursor) => listApplicationsPage({ filter: statusFilter, cursor }),
   );
   const loading = query.isPending;
   const loadError = query.error ? query.error.message : null;
@@ -176,7 +168,7 @@ export function useApplications() {
         const comment = input.comment?.trim();
         return {
           ...item,
-          salaryInListing: text(input.salaryInListing, item.salaryInListing),
+          salaryInApplication: text(input.salaryInApplication, item.salaryInApplication),
           usedTailoredResume: input.usedTailoredResume ?? item.usedTailoredResume,
           comments: comment
             ? [
@@ -205,8 +197,6 @@ export function useApplications() {
     stats,
     savingIds,
     rowErrors,
-    q,
-    setSearchText,
     statusFilter,
     setStatusFilter,
     changeStatus: (id: number, status: ApplicationStatus) =>

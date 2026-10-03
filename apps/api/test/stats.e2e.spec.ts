@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { getPrisma } from '@job-search-copilot/core';
-import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -9,19 +9,18 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/setup-app';
 
 describe('Stats (e2e)', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   const prisma = getPrisma();
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<NestExpressApplication>();
     configureApp(app, app.get(ConfigService));
     await app.init();
   });
 
   afterEach(async () => {
     await prisma.vacancy.deleteMany();
-    await prisma.vacancyLogEntry.deleteMany();
   });
 
   afterAll(async () => {
@@ -32,8 +31,8 @@ describe('Stats (e2e)', () => {
   it('GET counts the funnel from the journal and the pipeline from the status', async () => {
     const server = app.getHttpServer();
     await request(server)
-      .post('/api/v1/log/check')
-      .send({ entries: [{ url: 'https://acme.com/jobs/1' }] })
+      .post('/api/v1/vacancies/intake')
+      .send({ entries: [{ url: 'https://beta.com/jobs/1', company: 'Beta', title: 'QA' }] })
       .expect(200);
     const created = await request(server)
       .post('/api/v1/vacancies')
@@ -57,9 +56,12 @@ describe('Stats (e2e)', () => {
 
     expect(res.body).not.toHaveProperty('analysed');
     expect(res.body).toMatchObject({
-      logged: 1,
+      // Every vacancy: the one intake took in, unanalysed, and the one saved.
+      logged: 2,
+      awaitingAnalysis: 1,
       awaitingTriage: 0,
       recommended: 1,
+      notRecommended: 0,
       applied: 1,
       declined: 0,
       unavailable: 0,

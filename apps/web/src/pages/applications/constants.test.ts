@@ -21,7 +21,7 @@ function application(overrides: Partial<ApplicationListItem> = {}): ApplicationL
     statusChangedAt: NOW.toISOString(),
     timedOut: false,
     comments: [],
-    salaryInListing: null,
+    salaryInApplication: null,
     usedTailoredResume: false,
     company: 'Acme',
     title: 'Backend Engineer',

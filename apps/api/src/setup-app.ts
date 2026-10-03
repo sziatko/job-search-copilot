@@ -1,5 +1,6 @@
-import { type INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DomainExceptionFilter } from './common/domain-exception.filter';
 import type { Env } from './config/env.validation';
 
@@ -7,7 +8,11 @@ import type { Env } from './config/env.validation';
  * App-wide wiring shared by main.ts (real boot) and the e2e suite, so the tests
  * exercise the same pipes/filters/routing the deployed app runs and the two can't drift.
  */
-export function configureApp(app: INestApplication, config: ConfigService<Env, true>): void {
+export function configureApp(app: NestExpressApplication, config: ConfigService<Env, true>): void {
+  // Express' default is 100 KB; POST /vacancies/intake takes up to 100 postings with
+  // their text (~0.5–1 MB). Registered before init, so Nest skips its own JSON parser.
+  app.useBodyParser('json', { limit: '5mb' });
+
   const allowlist = config
     .get('CORS_ORIGINS', { infer: true })
     .split(',')

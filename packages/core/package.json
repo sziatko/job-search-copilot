@@ -9,6 +9,7 @@
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "studio": "dotenv -e ../../.env -- prisma studio",
+    "backfill:match-keys": "dotenv -e ../../.env -- tsx scripts/backfill-match-keys.ts",
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch"
   },
@@ -21,6 +22,7 @@
     "@types/pg": "^8.23.1",
     "dotenv-cli": "^11.0.0",
     "prisma": "^7.10.0",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3"
   }
 }

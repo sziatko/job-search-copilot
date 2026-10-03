@@ -23,7 +23,7 @@ export const RecordApplicationItemSchema = z.object({
   applyUrl: z.url().optional(),
   matchScore: matchScore.optional(),
   estimationComment: z.string().optional(),
-  salaryInListing: z
+  salaryInApplication: z
     .string()
     .optional()
     .describe(
@@ -54,8 +54,8 @@ export function toRecordInput({
   ...rest
 }: RecordApplicationItem): RecordApplicationInput {
   if (vacancyId != null && !company && !title) {
-    const { salaryInListing, usedTailoredResume, comment, status } = rest;
-    return { vacancyId, salaryInListing, usedTailoredResume, comment, status };
+    const { salaryInApplication, usedTailoredResume, comment, status } = rest;
+    return { vacancyId, salaryInApplication, usedTailoredResume, comment, status };
   }
   if (vacancyId == null && company && title) {
     return { company, title, ...rest };

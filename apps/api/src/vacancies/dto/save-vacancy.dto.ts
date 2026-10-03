@@ -1,5 +1,6 @@
 import { RECOMMENDATION_INPUT_VALUES } from '@job-search-copilot/core';
-import { IsIn, IsInt, IsNotEmpty, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsString, IsUrl, Max, Min } from 'class-validator';
+import { HTTP_URL } from './intake-vacancies.dto';
 
 export class SaveVacancyDto {
   @IsString()
@@ -10,8 +11,8 @@ export class SaveVacancyDto {
   @IsNotEmpty()
   title!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  /** As MCP's `.url()`: a non-link is a 400 here, not a synthetic `tracker://` row. */
+  @IsUrl(HTTP_URL)
   applyUrl!: string;
 
   @IsString()

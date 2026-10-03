@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { SearchInput } from '@/components/ui/SearchInput';
 import { ApplyDialog } from './components/ApplyDialog';
 import { CompanyHistoryModal } from './components/CompanyHistoryModal';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { SearchModal } from './components/SearchModal';
 import { StatusFilterSelect } from './components/StatusFilterSelect';
 import { VacancyTable } from './components/VacancyTable';
+import { STATUS_CONTEXT } from './types';
 import { useVacancies } from './useVacancies';
 
 export function VacanciesPage() {
@@ -18,8 +19,6 @@ export function VacanciesPage() {
     rowErrors,
     pendingDecline,
     pendingApply,
-    q,
-    setSearchText,
     statusFilter,
     setStatusFilter,
     requestActionChange,
@@ -36,23 +35,27 @@ export function VacanciesPage() {
     company: string;
     vacancyId: number;
   } | null>(null);
+  const [searching, setSearching] = useState(false);
 
   return (
     <section className="view view-fill">
       <div className="card">
         {/* Same shape as the tracker's card: the page title is the shell's, so there
-            is no head here and the toolbar carries the top padding. The search and
-            the status filter go to the server, so the count is the server's match
-            count — the loaded rows catch up with it as the table scrolls. Gated like
-            the tracker's: "Showing 0 of 0" during the first load is a claim about
-            the data, and there is no data yet. */}
+            is no head here and the toolbar carries the top padding. The status
+            filter goes to the server, so the count is the server's match count —
+            the loaded rows catch up with it as the table scrolls. Gated like the
+            tracker's: "Showing 0 of 0" during the first load is a claim about the
+            data, and there is no data yet. Search is a modal with its own results
+            (SearchModal); it never filters this table. */}
         <div className="toolbar pt-[16px]">
           {!loadError && !loading && (
             <span className="toolbar-count">
               Showing {items.length} of {total}
             </span>
           )}
-          <SearchInput value={q} onChange={setSearchText} />
+          <button type="button" className="btn ml-auto" onClick={() => setSearching(true)}>
+            Search
+          </button>
           <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         </div>
 
@@ -88,6 +91,13 @@ export function VacanciesPage() {
           company={companyHistory.company}
           currentId={companyHistory.vacancyId}
           onClose={() => setCompanyHistory(null)}
+        />
+      )}
+
+      {searching && (
+        <SearchModal
+          context={STATUS_CONTEXT.vacancies.options}
+          onClose={() => setSearching(false)}
         />
       )}
 

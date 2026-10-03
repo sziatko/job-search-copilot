@@ -1,10 +1,11 @@
-import type { PrismaClient, VacancyStatus } from '@prisma/client';
+import type { PrismaClient, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import { AlreadyAnalysedError, VacancyNotFoundError } from './errors';
 import { escapeLikePattern } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
-import { firstStatus, writeStatus } from './status';
+import { firstStatus, statusAfterAnalysis, writeStatus } from './status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
 import type {
   ListVacanciesFilters,
@@ -12,11 +13,12 @@ import type {
   SaveManyVacanciesResult,
   SaveVacancyInput,
   SaveVacancyResult,
+  SubmitAnalysisInput,
   VacancyDetail,
   VacancyListItem,
   VacancySort,
 } from './vacancy.types';
-import { normalizeCompanyKey } from './vacancy-log';
+import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 
 /** The analyzer's comment: the first `ANALYZER` row. A relation read, so every
  * reader selects it through here and flattens it with `withEstimation`. */
@@ -62,7 +64,9 @@ function toDetail({
   };
 }
 
-/** Each sort ends on `id`, so the order is total — Prisma's cursor needs that (ADR-0030). */
+/** Each sort ends on `id`, so the order is total — Prisma's cursor needs that (ADR-0030).
+ * An unanalysed row (both fields null) sorts after every analysed one: Postgres puts
+ * NULL last on `asc`, and `matchScore` is only null where `recommendation` is. */
 const ORDER_BY = {
   newest: [{ createdAt: 'desc' }, { id: 'desc' }],
   recommended: [{ recommendation: 'asc' }, { matchScore: 'desc' }, { id: 'desc' }],
@@ -103,6 +107,15 @@ export function companyKey(company: string): string {
   return key || company.trim().toLowerCase();
 }
 
+/**
+ * "The same company" leaves `FILTERED_OUT` out — screened-out postings (most of them
+ * the old log's, never analysed) are noise in "have I dealt with these people before?".
+ * Both the `sameCompanyAs` list and `companyMatchCounts` apply it; a FILTERED_OUT row
+ * adds itself back to its own count (`withDerivedFields`), so the button's "others" is
+ * exactly the rows the modal lists, from any row.
+ */
+const SAME_COMPANY_STATUSES: Prisma.VacancyWhereInput = { status: { not: 'FILTERED_OUT' } };
+
 // ponytail: both helpers below read every distinct company on each call — fine at a
 // few hundred names; past that, store `companyKey` in an indexed column.
 
@@ -116,8 +129,7 @@ export async function sameCompanyNames(db: PrismaClient, company: string): Promi
 /**
  * For each name, how many vacancies are the same company (`companyKey`) — the
  * duplicates button's count, on /vacancies and /applications alike, and exactly the
- * rows `sameCompanyAs` lists. Every vacancy counts, whatever its status: the modal
- * lists them all.
+ * rows `sameCompanyAs` lists: every status but `FILTERED_OUT` (`SAME_COMPANY_STATUSES`).
  */
 export async function companyMatchCounts(
   db: PrismaClient,
@@ -126,13 +138,77 @@ export async function companyMatchCounts(
   if (companies.length === 0) {
     return new Map();
   }
-  const groups = await db.vacancy.groupBy({ by: ['company'], _count: { _all: true } });
+  const groups = await db.vacancy.groupBy({
+    by: ['company'],
+    where: SAME_COMPANY_STATUSES,
+    _count: { _all: true },
+  });
   const perKey = new Map<string, number>();
   for (const group of groups) {
     const key = companyKey(group.company);
     perKey.set(key, (perKey.get(key) ?? 0) + group._count._all);
   }
   return new Map(companies.map((name) => [name, perKey.get(companyKey(name)) ?? 0]));
+}
+
+interface Analysis {
+  matchScore: number;
+  recommendation: Recommendation;
+  estimationComment: string;
+  /** Filled in when the row has no text yet; never replaces one. */
+  fullText?: string;
+}
+
+function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
+  return {
+    matchScore: input.matchScore,
+    recommendation: normalizeRecommendation(input.recommendation),
+    estimationComment: input.estimationComment,
+  };
+}
+
+/**
+ * Writes an analysis onto an unanalysed row, in the caller's transaction — the one
+ * writer of an analysis on `Vacancy` (save()'s created and attached rows,
+ * submitAnalysis); the analysis is written once (ADR-0033).
+ *
+ * The conditional write comes first (`recommendation IS NULL`, a no-op `updatedAt`): it
+ * takes the row lock, so a concurrent analysis of the same row waits for this one and
+ * then finds it analysed. From NEW the rule's status follows, before the analysis — the
+ * DB refuses an analysis on a NEW row and neither CHECK is deferrable. Any other status
+ * (a pipeline placeholder) is left as it is.
+ */
+async function writeAnalysis(
+  tx: Prisma.TransactionClient,
+  id: number,
+  analysis: Analysis,
+  at: Date,
+): Promise<Vacancy> {
+  const [row] = await tx.vacancy.updateManyAndReturn({
+    where: { id, recommendation: null },
+    data: { updatedAt: at },
+    select: { status: true, fullText: true },
+  });
+  if (!row) {
+    throw (await tx.vacancy.count({ where: { id } })) > 0
+      ? new AlreadyAnalysedError(`Vacancy ${id} is already analysed`)
+      : new VacancyNotFoundError(`Vacancy ${id} not found`);
+  }
+  if (row.status === 'NEW') {
+    await writeStatus(tx, id, statusAfterAnalysis(analysis.recommendation), at);
+  }
+  const estimationComment = analysis.estimationComment.trim();
+  return tx.vacancy.update({
+    where: { id },
+    data: {
+      matchScore: analysis.matchScore,
+      recommendation: analysis.recommendation,
+      ...(row.fullText === null && analysis.fullText?.trim() && { fullText: analysis.fullText }),
+      ...(estimationComment && {
+        comments: { create: { body: estimationComment, source: 'ANALYZER' } },
+      }),
+    },
+  });
 }
 
 export class VacancyService {
@@ -144,12 +220,17 @@ export class VacancyService {
   constructor(private readonly db: PrismaClient = getPrisma()) {}
 
   /**
-   * Persist a freshly analyzed vacancy, keyed by applyUrl. A vacancy is analyzed
-   * once: if a row with this applyUrl already exists it is returned untouched and
-   * the incoming analysis is discarded (re-analysis is not a supported flow — see
-   * the T6 decision). `created` tells the caller which happened. The unique
-   * constraint on applyUrl is the real guard; the pre-check just avoids a
+   * Persist a freshly analyzed vacancy, keyed by applyUrl. The analysis is written once
+   * (ADR-0005, ADR-0033):
+   * - no row with this applyUrl → created (`created: true`);
+   * - a row without an analysis (taken in by intake) → the analysis is attached to it,
+   *   and the posting text when the row has none (`attached: true`);
+   * - a row with one → returned untouched, the incoming analysis discarded (both false).
+   * The unique constraint on applyUrl is the real guard; the pre-check just avoids a
    * guaranteed-failing insert on the common path.
+   *
+   * Either way the analysis goes through writeAnalysis: a new row's journal is NEW, then
+   * the rule's status (`statusAfterAnalysis`), in one transaction and both dated now.
    */
   async save(input: SaveVacancyInput): Promise<SaveVacancyResult> {
     // Neutralized *before* the dedup lookup, not at the insert: applyUrl is the key,
@@ -161,28 +242,35 @@ export class VacancyService {
       buildSyntheticApplyUrl(input.company, input.title, new Date());
 
     const existing = await this.db.vacancy.findUnique({ where: { applyUrl } });
-    if (existing) {
-      return { created: false, vacancy: existing };
+    if (existing && existing.recommendation !== null) {
+      return { created: false, attached: false, vacancy: existing };
     }
 
-    const recommendation = normalizeRecommendation(input.recommendation);
-    const estimationComment = input.estimationComment.trim();
+    const analysis = { ...toAnalysis(input), fullText: input.fullText };
+    const at = new Date();
+    if (existing) {
+      const vacancy = await this.db.$transaction((tx) =>
+        writeAnalysis(tx, existing.id, analysis, at),
+      );
+      return { created: false, attached: true, vacancy };
+    }
     try {
-      const vacancy = await this.db.vacancy.create({
-        data: {
-          company: input.company,
-          title: input.title,
-          applyUrl,
-          fullText: input.fullText,
-          matchScore: input.matchScore,
-          recommendation,
-          ...(estimationComment && {
-            comments: { create: { body: estimationComment, source: 'ANALYZER' } },
-          }),
-          ...firstStatus(new Date()),
-        },
+      const vacancy = await this.db.$transaction(async (tx) => {
+        const { id } = await tx.vacancy.create({
+          data: {
+            company: input.company,
+            title: input.title,
+            applyUrl,
+            companyKey: normalizeCompanyKey(input.company),
+            titleKey: normalizeTitleKey(input.title),
+            fullText: input.fullText,
+            ...firstStatus(at),
+          },
+          select: { id: true },
+        });
+        return writeAnalysis(tx, id, analysis, at);
       });
-      return { created: true, vacancy };
+      return { created: true, attached: false, vacancy };
     } catch (err) {
       // Lost a race with a concurrent save of the same applyUrl — the other write won.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -190,11 +278,36 @@ export class VacancyService {
           where: { applyUrl },
         });
         if (raced) {
-          return { created: false, vacancy: raced };
+          return { created: false, attached: false, vacancy: raced };
         }
       }
       throw err;
     }
+  }
+
+  /**
+   * Writes the analysis of a vacancy that exists and has none (ADR-0033) — the queue's
+   * way back in. From NEW it moves the vacancy by the rule (`SKIP` → FILTERED_OUT, else
+   * NOT_REVIEWED, both journaled); any other status is untouched. Throws
+   * AlreadyAnalysedError when it has one (nothing written), VacancyNotFoundError for an
+   * unknown id.
+   */
+  submitAnalysis({ id, ...input }: SubmitAnalysisInput): Promise<Vacancy> {
+    return this.db.$transaction((tx) => writeAnalysis(tx, id, toAnalysis(input), new Date()));
+  }
+
+  /** submitAnalysis for several, in order and in one transaction: one failure (already
+   * analysed, unknown id, a bad recommendation) writes none of them. The transports cap
+   * a batch at ANALYSIS_BATCH_MAX. */
+  submitAnalyses(inputs: SubmitAnalysisInput[]): Promise<Vacancy[]> {
+    return this.db.$transaction(async (tx) => {
+      const at = new Date();
+      const rows: Vacancy[] = [];
+      for (const { id, ...input } of inputs) {
+        rows.push(await writeAnalysis(tx, id, toAnalysis(input), at));
+      }
+      return rows;
+    });
   }
 
   /**
@@ -241,9 +354,15 @@ export class VacancyService {
       ...(filters.title && {
         title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
       }),
+      ...(filters.hasText !== undefined && {
+        fullText: filters.hasText ? { not: null } : null,
+      }),
       // Under AND, so it narrows `company` rather than replacing it.
       ...(filters.sameCompanyAs && {
-        AND: [{ company: { in: await sameCompanyNames(this.db, filters.sameCompanyAs) } }],
+        AND: [
+          { company: { in: await sameCompanyNames(this.db, filters.sameCompanyAs) } },
+          SAME_COMPANY_STATUSES,
+        ],
       }),
     };
 
@@ -252,7 +371,16 @@ export class VacancyService {
 
     const [rows, total] = await Promise.all([
       this.db.vacancy.findMany({
-        where,
+        // Prisma pages a nullable sort (`recommended`) in memory from the cursor row, and
+        // finds nothing when that row has left the filter (triaged out of NOT_REVIEWED).
+        // The cursor row is kept in the result so it is always found; toCursorPage drops
+        // it (an empty `where` matches every row already — Prisma reads `{}` in an OR as
+        // false). ponytail: that in-memory path reads every row after the cursor, not
+        // one page — fine at a few thousand rows; past that, a hand-written keyset.
+        where:
+          cursor === undefined || Object.keys(where).length === 0
+            ? where
+            : { OR: [where, { id: cursor }] },
         orderBy: ORDER_BY[filters.sort ?? 'newest'],
         ...(filters.offset && { skip: filters.offset }),
         ...cursorArgs(cursor, limit),
@@ -266,28 +394,39 @@ export class VacancyService {
   }
 
   /**
-   * Adds the two derived fields a list item carries — neither is a column, and
-   * both are computed on every list call because they are read from the page that
+   * Adds the three derived fields a list item carries — none is a column, and
+   * all are computed on every list call because they are read from the page that
    * came back rather than from the database:
    *
    * - `companyMatchCount`: see `companyMatchCounts`.
-   * - `hasAnalysis`: whether the analyzer ever saw the posting — whether it has an
-   *   `ANALYZER` comment (see the type's own comment for the ceiling). One place
-   *   decides this, which is the point: before it, the modal inferred it from the
-   *   applyUrl's scheme, /vacancies rendered a `0%` for the same row, and the
-   *   dashboard counted it as analysed.
+   * - `hasAnalysis`: whether the vacancy has an analysis — `recommendation` is set
+   *   (ADR-0033; the CHECK keeps `matchScore` in step). One place decides this: before
+   *   it, the modal inferred it from the applyUrl's scheme, /vacancies rendered a `0%`
+   *   for the same row, and the dashboard counted it as analysed.
+   * - `hasText`: `fullText IS NOT NULL`, asked of the page's ids — the list never
+   *   selects the text itself, which can be large (TOAST).
    */
   private async withDerivedFields(
-    items: Omit<VacancyListItem, 'companyMatchCount' | 'hasAnalysis'>[],
+    items: Omit<VacancyListItem, 'companyMatchCount' | 'hasAnalysis' | 'hasText'>[],
   ): Promise<VacancyListItem[]> {
-    const counts = await companyMatchCounts(
-      this.db,
-      items.map((item) => item.company),
-    );
+    const [counts, withText] = await Promise.all([
+      companyMatchCounts(
+        this.db,
+        items.map((item) => item.company),
+      ),
+      this.db.vacancy.findMany({
+        where: { id: { in: items.map((item) => item.id) }, fullText: { not: null } },
+        select: { id: true },
+      }),
+    ]);
+    const textIds = new Set(withText.map((row) => row.id));
     return items.map((item) => ({
       ...item,
-      companyMatchCount: counts.get(item.company) ?? 0,
-      hasAnalysis: item.estimationComment !== null,
+      // A FILTERED_OUT row is not among the counted rows, but the count includes the
+      // row itself (`others = count − 1`), so it adds itself back.
+      companyMatchCount: (counts.get(item.company) ?? 0) + (item.status === 'FILTERED_OUT' ? 1 : 0),
+      hasAnalysis: item.recommendation !== null,
+      hasText: textIds.has(item.id),
     }));
   }
 

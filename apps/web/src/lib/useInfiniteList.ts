@@ -16,7 +16,7 @@ export function useInfiniteList<T>(
     queryFn: ({ pageParam }) => fetchPage(pageParam),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) => last.nextCursor,
-    // The old rows stay on screen while a new search loads, instead of a blank table.
+    // The old rows stay on screen while a new filter loads, instead of a blank table.
     placeholderData: keepPreviousData,
   });
 

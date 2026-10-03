@@ -17,12 +17,15 @@ export type Recommendation = z.infer<typeof recommendationSchema>;
 /** Named access to the values, e.g. `RECOMMENDATION.APPLY`. */
 export const RECOMMENDATION = recommendationSchema.enum;
 
-/** One status per vacancy: triage, then the pipeline (APPLIED … REJECTED). */
+/** One status per vacancy: the analysis queue (NEW), triage, FILTERED_OUT (screened out
+ * before triage), then the pipeline (APPLIED … REJECTED). */
 export const vacancyStatusSchema = z.enum([
+  'NEW',
   'NOT_REVIEWED',
   'SAVED_FOR_LATER',
   'DECLINED',
   'UNAVAILABLE',
+  'FILTERED_OUT',
   'APPLIED',
   'RECRUITER_SCREEN',
   'REPLIED',
@@ -32,25 +35,55 @@ export const vacancyStatusSchema = z.enum([
 ]);
 export type VacancyStatus = z.infer<typeof vacancyStatusSchema>;
 
-/** What a /vacancies row can be moved to, and what its filter offers — APPLIED
- * standing for the whole pipeline. The later pipeline stages are /applications'. */
+/** Each page's statuses, its **context**: `ALL` in a page's status filter means these,
+ * never the whole table. /inbox's tabs split its two; /applications' endpoint is the
+ * pipeline itself, so its `ALL` sends no `status`. */
+export const STATUS_CONTEXT = {
+  inbox: vacancyStatusSchema.extract(['NEW', 'FILTERED_OUT']),
+  vacancies: vacancyStatusSchema.extract([
+    'NOT_REVIEWED',
+    'SAVED_FOR_LATER',
+    'DECLINED',
+    'UNAVAILABLE',
+  ]),
+  applications: vacancyStatusSchema.extract([
+    'APPLIED',
+    'RECRUITER_SCREEN',
+    'REPLIED',
+    'INTERVIEW',
+    'OFFER',
+    'REJECTED',
+  ]),
+};
+
+/** What a /vacancies row can be moved to: its page's statuses, and APPLIED — which
+ * takes it to /applications. The later pipeline stages are /applications'. */
 const vacancyActionSchema = vacancyStatusSchema.extract([
-  'NOT_REVIEWED',
-  'SAVED_FOR_LATER',
-  'DECLINED',
-  'UNAVAILABLE',
+  ...STATUS_CONTEXT.vacancies.options,
   'APPLIED',
 ]);
 export type VacancyAction = z.infer<typeof vacancyActionSchema>;
 /** Named access to the values, e.g. `VACANCY_ACTION.DECLINED`. */
 export const VACANCY_ACTION = vacancyActionSchema.enum;
 
-/** Extra option in the status dropdown — UI only, never sent to the API (it sends no
- * `status`), though it does appear in the page's URL. */
+/** What a row's buttons can move it to: the /vacancies actions, and the inbox's two —
+ * Filter out (NEW → FILTERED_OUT) and Back to queue (FILTERED_OUT → NEW, only without
+ * an analysis; ADR-0033). */
+const rowActionSchema = vacancyStatusSchema.extract([
+  ...vacancyActionSchema.options,
+  'FILTERED_OUT',
+  'NEW',
+]);
+export type RowAction = z.infer<typeof rowActionSchema>;
+/** Named access to the values, e.g. `ROW_ACTION.FILTERED_OUT`. */
+export const ROW_ACTION = rowActionSchema.enum;
+
+/** Extra option in the status dropdown — UI only, never sent to the API as itself (it
+ * sends the page's context), though it does appear in the page's URL. */
 export const STATUS_FILTER_ALL = 'ALL' as const;
-/** Every action plus the "all" sentinel, in dropdown order — also the router's
+/** /vacancies' statuses plus the "all" sentinel, in dropdown order — also the router's
  * `?status=` schema. */
-export const statusFilterSchema = z.enum([...vacancyActionSchema.options, STATUS_FILTER_ALL]);
+export const statusFilterSchema = z.enum([...STATUS_CONTEXT.vacancies.options, STATUS_FILTER_ALL]);
 export type StatusFilterValue = z.infer<typeof statusFilterSchema>;
 export const statusFilterValues = statusFilterSchema.options;
 
@@ -60,8 +93,9 @@ export const vacancyListItemSchema = z.object({
   company: z.string(),
   title: z.string(),
   applyUrl: z.string(),
-  matchScore: z.number(),
-  recommendation: recommendationSchema,
+  /** Both null when the vacancy has no analysis yet. */
+  matchScore: z.number().nullable(),
+  recommendation: recommendationSchema.nullable(),
   /** The analyzer's comment; null when it wrote none (a placeholder row). */
   estimationComment: z.string().nullable(),
   status: vacancyStatusSchema,
@@ -70,10 +104,13 @@ export const vacancyListItemSchema = z.object({
    * .../status response, which returns a plain record with no derived field —
    * requiring it here would fail every action change with "unexpected format". */
   companyMatchCount: z.number().optional(),
-  /** Whether the analyzer ever saw this posting — also derived (same trap, same
-   * reason: phase 2.2, step 7). Read it as "can a score be shown": `false` and
-   * `undefined` both mean no, so consumers must not treat `undefined` as analysed. */
+  /** Whether the vacancy has an analysis (`recommendation` set) — also derived (same
+   * trap, same reason: phase 2.2, step 7). Read it as "can a score be shown": `false`
+   * and `undefined` both mean no, so consumers must not treat `undefined` as analysed. */
   hasAnalysis: z.boolean().optional(),
+  /** Whether the vacancy has posting text — derived too, so optional for the same reason;
+   * the PATCH response carries `fullText` itself. */
+  hasText: z.boolean().optional(),
 });
 export type VacancyListItem = z.infer<typeof vacancyListItemSchema>;
 
@@ -99,12 +136,14 @@ export const vacancyDetailSchema = z.object({
   company: z.string(),
   title: z.string(),
   applyUrl: z.string(),
-  fullText: z.string(),
-  matchScore: z.number(),
-  recommendation: recommendationSchema,
+  /** Null when there is no posting text yet. */
+  fullText: z.string().nullable(),
+  /** Both null when the vacancy has no analysis yet. */
+  matchScore: z.number().nullable(),
+  recommendation: recommendationSchema.nullable(),
   status: vacancyStatusSchema,
   statusChangedAt: z.string(),
-  salaryInListing: z.string().nullable(),
+  salaryInApplication: z.string().nullable(),
   usedTailoredResume: z.boolean(),
   comments: z.array(vacancyCommentSchema),
   /** The analyzer's comment; null on a placeholder that never had one — no score to show. */

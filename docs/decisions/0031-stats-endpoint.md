@@ -30,9 +30,11 @@ dashboard and the `/applications` KPI strip read it; neither loads a list to cou
 
 | Field | Meaning |
 | --- | --- |
-| `logged` | `VacancyLogEntry` count |
+| `logged` | every vacancy, analysed or not (was the `VacancyLogEntry` count — [ADR-0033](0033-unscored-vacancies-in-one-table.md)) |
+| `awaitingAnalysis` | `status = NEW` — the analysis queue, text or not (phase 5) |
 | `awaitingTriage` | `status = NOT_REVIEWED` |
 | `recommended` | `recommendation in (APPLY, APPLY_WITH_CAVEATS)` |
+| `notRecommended` | `status = FILTERED_OUT` **or** `recommendation = SKIP`, each vacancy once (phase 5) |
 | `applied` | vacancies with an `APPLIED` journal row, ever |
 | `declined` | … currently `DECLINED` (the user's no) |
 | `unavailable` | … currently `UNAVAILABLE` (the posting stopped taking applications) |
@@ -44,8 +46,8 @@ dashboard and the `/applications` KPI strip read it; neither loads a list to cou
 
 The funnel is Logged → Recommended → Applied → Got a response → Interview. Its
 stages past Recommended count the journal ("ever reached"); `pipeline` counts the
-current status. Under it, "Dropped out": not recommended (`logged − recommended`,
-floored at 0), declined (`declined`), no longer accepting applications
+current status. Under it, "Dropped out": not recommended (`notRecommended` since
+phase 5; `logged − recommended`, floored at 0, before), declined (`declined`), no longer accepting applications
 (`unavailable`, added in phase 4.2 step 8), rejected (`pipeline.byStatus.REJECTED`), timed
 out (`pipeline.timedOut`).
 
@@ -53,6 +55,13 @@ out (`pipeline.timedOut`).
 vacancies with an `ANALYZER` comment). The importer's placeholders
 ([ADR-0019](0019-record-or-create-vacancy.md)) have none, so it came out smaller than
 Recommended; `analysed` was dropped and `declined` added.
+
+*Amended in phase 5 step 5:* with the log merged into `Vacancy`
+([ADR-0033](0033-unscored-vacancies-in-one-table.md)), `logged − recommended` also
+counted every vacancy still waiting for its analysis. "Not recommended" is
+`notRecommended` now, counted on the one table: what is `FILTERED_OUT` (the analyzer's
+`SKIP`, the user's, the migrated log) or was analysed `SKIP` (whatever its status since).
+`awaitingAnalysis` (`status = NEW`) is a dashboard tile of its own.
 
 **The timeout rule moves to `core`.** Still derived, still 30 days, still
 `statusChangedAt` and "not `REJECTED` / `OFFER`" — but `TIMEOUT_DAYS` lives in core.

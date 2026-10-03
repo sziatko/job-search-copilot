@@ -13,7 +13,7 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0002](0002-core-shared-domain-layer.md) | `packages/core` as a framework-agnostic shared domain layer | Accepted |
 | [0003](0003-core-consumed-as-dist.md) | Apps consume `core` as compiled `dist/` | Accepted (known friction) |
 | [0004](0004-one-service-two-transports.md) | One domain service, two transports (REST + MCP) | Accepted |
-| [0005](0005-analyze-once.md) | Analyze-once: `save()` skip-if-exists, `{ created, vacancy }`, POST 201/200 | Accepted |
+| [0005](0005-analyze-once.md) | Analyze-once: `save()` skip-if-exists, `{ created, vacancy }`, POST 201/200 | Accepted (amended by 0033) |
 | [0006](0006-nest-di-prisma-lifecycle.md) | Nest DI end-to-end + `PrismaService` connection lifecycle | Accepted |
 | [0007](0007-env-config-and-loading.md) | Validated fail-fast env config + `load-env.ts` loading | Accepted |
 | [0008](0008-api-prefix-and-versioning.md) | `/api/v1` prefix, URI versioning, version-neutral `/health` | Accepted |
@@ -34,13 +34,14 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0023](0023-canonical-applyurl.md) | `applyUrl` is stored canonicalized, with the query string dropped except where a site rule defines it | Accepted |
 | [0024](0024-web-shell-and-theme.md) | The web app shell: a three-state theme, a dashboard at `/`, two placeholder routes | Accepted |
 | [0025](0025-vacancies-list-search-server-side.md) | The vacancies list: server-side search, a derived company count, and what stays out of the list item | Accepted |
-| [0026](0026-vacancy-log-table.md) | The vacancy log is its own table, and answers only "new or duplicate" | Accepted |
+| 0026 | *Deleted in phase 5:* the vacancy log as its own table — replaced by 0033 | — |
 | [0027](0027-linkedin-site-rule.md) | LinkedIn site rule: one key per job id, locale host merged | Accepted |
 | 0028 | *Deleted in phase 3.1:* application comments as a `Comment` table on `Application` — replaced by 0029 | — |
 | [0029](0029-one-vacancy-table.md) | One `Vacancy` table: one status, a `StatusChange` journal, comments with a `source` | Accepted (replaces 0017, 0018, 0028) |
 | [0030](0030-cursor-paging.md) | The web's tables page by a Prisma cursor; MCP keeps offset | Accepted |
 | [0031](0031-stats-endpoint.md) | One stats endpoint; the funnel counts the journal, and timeout moves to core | Accepted |
 | [0032](0032-same-company-normalised-name.md) | Same company = an equal normalised name | Accepted (amends 0025) |
+| [0033](0033-unscored-vacancies-in-one-table.md) | Unscored vacancies live in `Vacancy`: the log merges in, `NEW` and `FILTERED_OUT` | Accepted (replaces 0026, amends 0005) |
 
 A gap in the numbers is a deleted ADR. The ADR that replaced it names it on its
 `Replaces:` line (an ADR whose code is simply gone has none), and

@@ -5,8 +5,12 @@ import { applicationStatusSchema } from '../applications/types';
 
 export const statsSchema = z.object({
   logged: z.number(),
+  /** Currently NEW — the analysis queue, with or without posting text. */
+  awaitingAnalysis: z.number(),
   awaitingTriage: z.number(),
   recommended: z.number(),
+  /** The analyzer's no, each vacancy once: currently FILTERED_OUT, or analysed SKIP. */
+  notRecommended: z.number(),
   /** The funnel: vacancies that ever reached the stage (the journal). */
   applied: z.number(),
   /** Currently DECLINED — the user said no. */

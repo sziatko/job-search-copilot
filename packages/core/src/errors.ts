@@ -23,8 +23,18 @@ export class AmbiguousVacancyMatchError extends DomainError {}
 /** That Vacancy is already in the pipeline — it has been applied to. */
 export class AlreadyAppliedError extends DomainError {}
 
-/** A vacancy-log check without an http(s) url — the log's key. */
-export class InvalidVacancyLogEntryError extends DomainError {}
+/** An intake entry without an http(s) url, a company or a title — what a vacancy needs. */
+export class InvalidIntakeEntryError extends DomainError {}
 
 /** A triage status the vacancy already has — a repeat carries no event (ADR-0029). */
 export class SameStatusError extends DomainError {}
+
+/** NEW asked for a vacancy that has an analysis: the queue holds only the unanalysed
+ * (the `Vacancy_new_is_unanalysed` CHECK, ADR-0033). */
+export class AnalysedNotNewError extends DomainError {}
+
+/** The vacancy already has an analysis — it is written once (ADR-0033). */
+export class AlreadyAnalysedError extends DomainError {}
+
+/** No vacancy has this id. */
+export class VacancyNotFoundError extends DomainError {}

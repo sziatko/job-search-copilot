@@ -5,7 +5,7 @@ import type { ApplicationStatus } from '../applications/types';
 import { addComment, getVacancy, listVacanciesPage, updateVacancyStatus } from '../vacancies/api';
 import type { ApplyDetails } from '../vacancies/components/ApplyDialog';
 import { toastMoved } from '../vacancies/constants';
-import type { VacancyAction } from '../vacancies/types';
+import type { RowAction } from '../vacancies/types';
 
 /** Every cache a write on this page can make stale — this record, the tables that list
  * it, the company views, the dashboard's counts. */
@@ -59,7 +59,7 @@ export function useVacancyPage(id: number) {
   });
 
   // The controls are drawn from the loaded vacancy, so its data is there by now.
-  const moved = (status: VacancyAction | ApplicationStatus) => () => {
+  const moved = (status: RowAction | ApplicationStatus) => () => {
     if (vacancy.data) toastMoved(status, vacancy.data);
   };
 
@@ -69,7 +69,7 @@ export function useVacancyPage(id: number) {
     othersPending: others.isPending,
     statusSaving: statusWrite.isPending,
     statusError: statusWrite.error?.message ?? null,
-    moveTriage: (status: VacancyAction) =>
+    moveTriage: (status: RowAction) =>
       statusWrite.mutate(() => updateVacancyStatus(id, status), { onSuccess: moved(status) }),
     movePipeline: (status: ApplicationStatus) =>
       statusWrite.mutate(() => updateApplicationStatus(id, status), {
@@ -80,7 +80,7 @@ export function useVacancyPage(id: number) {
         () =>
           recordApplication({
             vacancyId: id,
-            salaryInListing: details.salary || undefined,
+            salaryInApplication: details.salary || undefined,
             usedTailoredResume: details.usedTailoredResume,
             comment: details.comment || undefined,
           }),

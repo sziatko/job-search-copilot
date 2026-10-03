@@ -154,7 +154,7 @@ export function ApplicationsTable({
                 <td>
                   <ScorePill score={item.matchScore} />
                 </td>
-                <td className="mono text-[12px]">{item.salaryInListing ?? '—'}</td>
+                <td className="mono text-[12px]">{item.salaryInApplication ?? '—'}</td>
                 <td className="text-[12px] text-ink-muted">
                   {item.usedTailoredResume ? '✓' : '—'}
                 </td>

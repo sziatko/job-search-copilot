@@ -10,7 +10,7 @@ import {
 import { IconCheck, IconChevronLeft, IconCross, IconExternal } from '@/components/icons';
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ScorePill } from '@/components/ui/ScorePill';
-import { Select } from '@/components/ui/Select';
+import { Select, type SelectOption } from '@/components/ui/Select';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { SkeletonRows } from '@/components/ui/SkeletonRows';
 import { isSafeExternalUrl } from '@/lib/url';
@@ -20,11 +20,13 @@ import { ApplyDialog } from '../vacancies/components/ApplyDialog';
 import { ConfirmDialog } from '../vacancies/components/ConfirmDialog';
 import { CopyVacancyButton } from '../vacancies/components/CopyVacancyButton';
 import { RecommendationTag } from '../vacancies/components/RecommendationTag';
+import { actionsFor } from '../vacancies/components/VacancyTable';
 import { STATUS_LABELS, STATUS_TAGS } from '../vacancies/constants';
 import {
   type CommentSource,
+  ROW_ACTION,
+  type RowAction,
   VACANCY_ACTION,
-  type VacancyAction,
   type VacancyComment,
   type VacancyDetail,
   type VacancyListItem,
@@ -51,11 +53,13 @@ const TRIAGE_OPTIONS = Object.values(VACANCY_ACTION).map((value) => ({
 }));
 
 /** The statuses that end a vacancy: a bad one, and the good one. */
-const CLOSED_BAD: readonly VacancyStatus[] = ['DECLINED', 'UNAVAILABLE', 'REJECTED'];
+const CLOSED_BAD: readonly VacancyStatus[] = [
+  'DECLINED',
+  'UNAVAILABLE',
+  'FILTERED_OUT',
+  'REJECTED',
+];
 const CLOSED_GOOD: VacancyStatus = 'OFFER';
-
-/** Core's `PLACEHOLDER_COMMENT` — the text a vacancy recorded without a posting carries. */
-const PLACEHOLDER_TEXT = 'N/A';
 
 const SOURCE_META = {
   ANALYZER: { label: 'LLM analysis', className: 'src-analyzer' },
@@ -232,8 +236,8 @@ function Header({
   page: ReturnType<typeof useVacancyPage>;
 }) {
   const linkable = isSafeExternalUrl(vacancy.applyUrl);
-  // `hasAnalysis`' rule: a placeholder has no analysis behind its score.
-  const analysed = vacancy.estimationComment !== null;
+  // `hasAnalysis`' rule: the analysis is there when `recommendation` is.
+  const analysed = vacancy.recommendation !== null;
 
   return (
     <div className="detail-header">
@@ -244,6 +248,7 @@ function Header({
         <h1 className="detail-title">{vacancy.title}</h1>
         <div className="detail-meta-row">
           <span className="detail-id-tag">#{vacancy.id}</span>
+          {!analysed && <span className="tag neutral">Not analysed yet</span>}
           {analysed && <ScorePill score={vacancy.matchScore} />}
           {analysed &&
             (linkable ? (
@@ -290,6 +295,8 @@ function Header({
 /**
  * Before APPLIED, the /vacancies actions — Applied records the application through its
  * dialog, Declined confirms first; from APPLIED on, the /applications pipeline select.
+ * NEW and FILTERED_OUT come before triage: their select offers what the row buttons do
+ * (`actionsFor`), under the status itself.
  */
 function StatusControl({
   vacancy,
@@ -311,19 +318,25 @@ function StatusControl({
     );
   }
 
-  function change(next: VacancyAction) {
+  function change(next: RowAction) {
     if (next === VACANCY_ACTION.APPLIED) setPending('apply');
     else if (next === VACANCY_ACTION.DECLINED) setPending('decline');
     else page.moveTriage(next);
   }
 
+  const options: readonly SelectOption<RowAction>[] =
+    status === ROW_ACTION.NEW || status === ROW_ACTION.FILTERED_OUT
+      ? [status, ...actionsFor(vacancy)].map((value) => ({ value, label: STATUS_LABELS[value] }))
+      : TRIAGE_OPTIONS;
+
   return (
     <>
       <Select
         className="status-select"
-        value={status as VacancyAction}
-        options={TRIAGE_OPTIONS}
-        disabled={page.statusSaving}
+        value={status}
+        options={options}
+        // An analysed FILTERED_OUT vacancy has nowhere to go.
+        disabled={page.statusSaving || options.length === 1}
         onChange={change}
       />
       {pending === 'apply' && (
@@ -393,7 +406,7 @@ function Timeline({ steps }: { steps: VacancyDetail['timeline'] }) {
 }
 
 /** The posting, clamped with a fade; the toggle shows only when the text overflows. */
-function Description({ text }: { text: string }) {
+function Description({ text }: { text: string | null }) {
   const [clampable, setClampable] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -404,12 +417,11 @@ function Description({ text }: { text: string }) {
     setClampable(!!el && el.scrollHeight > el.clientHeight + 2);
   }, [text]);
 
-  const trimmed = text.trim();
-  if (trimmed === '' || trimmed.toUpperCase() === PLACEHOLDER_TEXT) {
+  if (!text?.trim()) {
     return (
       <div className="empty-block">
-        <p>No description</p>
-        <span>This source gave no posting text.</span>
+        <p>No posting text</p>
+        <span>None has come in for this vacancy yet.</span>
       </div>
     );
   }
@@ -522,14 +534,15 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Facts({ vacancy }: { vacancy: VacancyDetail }) {
-  const analysed = vacancy.estimationComment !== null;
   return (
     <div className="fact-list">
-      <Fact label="Match score">{analysed ? <ScorePill score={vacancy.matchScore} /> : '—'}</Fact>
-      <Fact label="Recommendation">
-        {analysed ? <RecommendationTag recommendation={vacancy.recommendation} /> : '—'}
+      <Fact label="Match score">
+        <ScorePill score={vacancy.matchScore} />
       </Fact>
-      <Fact label="Salary">{vacancy.salaryInListing ?? 'not listed'}</Fact>
+      <Fact label="Recommendation">
+        <RecommendationTag recommendation={vacancy.recommendation} />
+      </Fact>
+      <Fact label="Salary">{vacancy.salaryInApplication ?? 'not listed'}</Fact>
       <Fact label="Tailored resume used">{vacancy.usedTailoredResume ? 'Yes' : 'No'}</Fact>
       <Fact label="Source">{hostname(vacancy.applyUrl)}</Fact>
       <Fact label="Status changed">

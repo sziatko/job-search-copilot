@@ -83,7 +83,7 @@ function ReviewQueue({ items }: { items: VacancyListItem[] }) {
     <div className="attn-list">
       {items.map((item) => (
         <div className="attn-item" key={item.id}>
-          <div className="attn-score">{item.matchScore}%</div>
+          <div className="attn-score">{item.matchScore === null ? '—' : `${item.matchScore}%`}</div>
           <div className="attn-body">
             <div className="attn-title">{item.title}</div>
             <div className="attn-sub">{item.company}</div>
@@ -129,13 +129,13 @@ function RecentActivity({ items }: { items: RecentMove[] }) {
   );
 }
 
-/** The page while it loads: its five KPI tiles and its three cards, as bars. */
+/** The page while it loads: its six KPI tiles and its three cards, as bars. */
 function DashboardSkeleton() {
   return (
     <section className="view" aria-busy="true">
       <span className="sr-only">Loading…</span>
       <div aria-hidden className="kpi-row">
-        {Array.from({ length: 5 }, (_, i) => (
+        {Array.from({ length: 6 }, (_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
           <div key={i} className="kpi-tile">
             <span className="skeleton h-[11px] w-[60%]" />
@@ -179,12 +179,10 @@ export function DashboardPage() {
     { label: 'Got a response', value: stats.responded },
     { label: 'Interview', value: stats.interview },
   ];
-  // Floored: a vacancy saved without a log check (ADR-0026) can make it negative.
+  // Counted on the one table (ADR-0033), not `logged − recommended`: that also
+  // counted every vacancy still waiting for its analysis.
   const dropped: { label: string; value: number }[] = [
-    {
-      label: 'Not recommended by the analyzer',
-      value: Math.max(stats.logged - stats.recommended, 0),
-    },
+    { label: 'Not recommended by the analyzer', value: stats.notRecommended },
     { label: 'Declined by you', value: stats.declined },
     { label: 'No longer accepting applications', value: stats.unavailable },
     { label: 'Rejected', value: stats.pipeline.byStatus.REJECTED },
@@ -195,6 +193,11 @@ export function DashboardPage() {
     <section className="view">
       <div className="kpi-row">
         <KpiTile label="Logged" value={stats.logged} note="postings seen, deduped by URL" />
+        <KpiTile
+          label="Awaiting analysis"
+          value={stats.awaitingAnalysis}
+          note="in the inbox, not yet scored"
+        />
         <KpiTile
           label="Awaiting triage"
           value={stats.awaitingTriage}

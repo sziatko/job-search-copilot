@@ -27,10 +27,10 @@ apps/web (React SPA)        vacancy-match-analyzer
 
 | Package | Responsibility | Depends on |
 | --- | --- | --- |
-| [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the schema (`Vacancy` with its `StatusChange` journal and `Comment`s, `VacancyLogEntry`) + migrations, the `VacancyService`, `ApplicationService`, `VacancyLogService` and `StatsService` (all queries), `writeStatus` (the only writer of status), the timeout rule (`TIMEOUT_DAYS`, `timedOutWhere` in `status.ts`), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
+| [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the schema (`Vacancy` with its `StatusChange` journal and `Comment`s) + migrations, the `VacancyService`, `ApplicationService`, `VacancyIntakeService` and `StatsService` (all queries), `writeStatus` (the only writer of status), the timeout rule (`TIMEOUT_DAYS`, `timedOutWhere` in `status.ts`), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
 | `apps/api` | Thin HTTP transport over the core services for the web app. NestJS: DI, DTO validation, versioned routes (`vacancies`, `applications`), a health check. | `core`, `@nestjs/*`, `class-validator`, `zod` |
-| `apps/mcp` | Thin stdio transport over the *same* services, exposing ten tools (4 for vacancies, 4 for applications incl. `update_vacancy_status`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. | `core`, `@modelcontextprotocol/sdk`, `zod` |
-| `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/applications`, `/log`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
+| `apps/mcp` | Thin stdio transport over the *same* services, exposing thirteen tools (7 for vacancies, 4 for applications incl. `update_vacancy_status`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. | `core`, `@modelcontextprotocol/sdk`, `zod` |
+| `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/applications`, `/inbox`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 (monorepo), [ADR-0002](decisions/0002-core-shared-domain-layer.md) (core as the
@@ -46,9 +46,14 @@ Claude runs vacancy-match-analyzer
   → calls MCP tool save_vacancy (apps/mcp/src/vacancies/vacancies.tools.ts)
   → VacancyService.save()  (packages/core)
       → findUnique by applyUrl
-          → exists?  return { created: false, vacancy }   (analysis discarded)
-          → new?     normalizeRecommendation() → create → { created: true, vacancy }
-  → tool returns { created, vacancy } as JSON text
+          → analysed?    return { created: false, attached: false, vacancy }   (analysis discarded)
+          → unanalysed?  writeAnalysis() → { created: false, attached: true, vacancy }
+          → new?         create (NEW) → writeAnalysis() → { created: true, attached: false, vacancy }
+  → tool returns { success: created || attached, vacancy: { id, company, title } } as JSON text
+
+The analysis queue (phase 5): list_vacancies({ status: ['NEW'], hasText: true })
+  → get_vacancies_batch → submit_analyses_batch → VacancyService.submitAnalyses()
+      → writeAnalysis() per item, one transaction
 ```
 
 **User works through the list** (the read/update path):
@@ -139,17 +144,30 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    reach the DB *only* through `VacancyService` / `ApplicationService`. A
    query written in a controller or a tool handler is a bug.
    → [ADR-0002](decisions/0002-core-shared-domain-layer.md)
-2. **A vacancy is analysed once.** `save()` never overwrites an existing row for a
-   given `applyUrl`. Anything that expects re-analysis to update stored fields is
-   wrong. → [ADR-0005](decisions/0005-analyze-once.md),
+2. **A vacancy is analysed once.** A vacancy can exist before its analysis (status
+   `NEW`, `matchScore` and `recommendation` both `null`); the analysis is written once
+   and never overwritten — `writeAnalysis` in `vacancy.service.ts` (`save()`,
+   `submitAnalysis`) is a conditional write (`recommendation IS NULL`), and `record()`
+   writes one only on the vacancy it creates; `save()` returns an analysed row for a
+   given `applyUrl` untouched, `submitAnalysis` refuses one (`AlreadyAnalysedError`).
+   Both fields or neither, and never on a `NEW` row: two DB CHECKs.
+   Anything that expects re-analysis to update stored fields is wrong.
+   → [ADR-0005](decisions/0005-analyze-once.md),
+   [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md),
    [`domain-model.md`](domain-model.md)
 3. **`recommendation` is the analyzer's; `status` is the user's.** They are
    independent axes and neither is derived from the other, and they have disjoint
-   writers: `save()` and `record()`'s create-vacancy path write the analysis fields
-   (and a new vacancy's first `NOT_REVIEWED`); `writeStatus()` alone writes `status`
-   + `statusChangedAt` and the `StatusChange` journal, in one transaction.
+   writers: `save()` / `submitAnalysis()` (through `writeAnalysis`) and `record()`'s
+   create-vacancy path write the analysis fields
+   (and a new vacancy's first `NEW`); `writeStatus()` alone writes `status`
+   + `statusChangedAt` and the `StatusChange` journal, in one transaction. **One
+   exception:** the analysis moves a vacancy out of `NEW`, through `writeStatus()` in
+   the transaction that writes it — `SKIP` → `FILTERED_OUT`, else `NOT_REVIEWED`
+   (`statusAfterAnalysis`, in `core`, never in an agent). Only from `NEW`, so it never
+   clobbers the user's progress.
    → [`domain-model.md`](domain-model.md),
-   [ADR-0029](decisions/0029-one-vacancy-table.md)
+   [ADR-0029](decisions/0029-one-vacancy-table.md),
+   [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)
 4. **`recommendation` is stored canonical-English.** Ukrainian input is normalized
    on the way in (`normalizeRecommendation`). Every filter/enum downstream assumes
    English. → [`domain-model.md`](domain-model.md)

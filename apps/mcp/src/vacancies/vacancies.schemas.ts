@@ -16,6 +16,14 @@ export const RecommendationFilterEnum = z.enum(Recommendation);
 
 export const VacancyStatusEnum = z.enum(VacancyStatus);
 
+const estimationComment = z
+  .string()
+  .describe(
+    'The analysis behind the score, stored as the ANALYZER comment. ' +
+      "The posting's salary / rate, when it states one, goes here — there is no field " +
+      'for it.',
+  );
+
 export const SaveVacancyItemSchema = z.object({
   company: z.string(),
   title: z.string(),
@@ -23,11 +31,12 @@ export const SaveVacancyItemSchema = z.object({
   fullText: z.string().describe('The whole posting text that was analysed, not shortened.'),
   matchScore,
   recommendation: RecommendationInputEnum,
-  estimationComment: z
-    .string()
-    .describe(
-      'The analysis behind the score, stored as the ANALYZER comment. ' +
-        "The posting's salary / rate, when it states one, goes here — there is no field " +
-        'for it.',
-    ),
+  estimationComment,
+});
+
+export const SubmitAnalysisItemSchema = z.object({
+  id: z.number().int().describe("The vacancy's id, from list_vacancies."),
+  matchScore,
+  recommendation: RecommendationInputEnum,
+  estimationComment,
 });

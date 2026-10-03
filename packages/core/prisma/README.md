@@ -29,4 +29,5 @@ Run from the repo root (they proxy into `@job-search-copilot/core`):
 ## Things the schema DSL can't express (added by hand in `--create-only` migrations)
 
 - `CHECK ("matchScore" >= 0 AND "matchScore" <= 100)` — `20260909224918_add_match_score_check`.
+- `CHECK (("matchScore" IS NULL) = ("recommendation" IS NULL))` and `CHECK ("status" <> 'NEW' OR "recommendation" IS NULL)` — `20261003130100_vacancy_log_into_vacancy` (ADR-0033). The enum values it uses (`NEW`, `FILTERED_OUT`) were added in a migration of their own, `20261003130000`: Postgres cannot use a new enum value in the transaction that added it.
 - `pg_trgm` extension + GIN index for `company` ILIKE search — `20260909225003_company_trigram_index` (the extension itself is declared in `datasource.extensions`).

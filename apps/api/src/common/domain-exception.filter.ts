@@ -1,4 +1,4 @@
-import { DomainError } from '@job-search-copilot/core';
+import { AlreadyAnalysedError, DomainError, VacancyNotFoundError } from '@job-search-copilot/core';
 import {
   type ArgumentsHost,
   Catch,
@@ -8,9 +8,16 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 
+/** The DomainErrors that are not a 422. */
+const STATUS_OF = new Map<unknown, HttpStatus>([
+  [AlreadyAnalysedError, HttpStatus.CONFLICT],
+  [VacancyNotFoundError, HttpStatus.NOT_FOUND],
+]);
+
 /**
- * Maps a @job-search-copilot/core DomainError (a caller mistake) to 422 instead of
- * letting it fall through to Nest's default 500. Registered globally in setup-app.ts.
+ * Maps a @job-search-copilot/core DomainError (a caller mistake) to a client error —
+ * 422 unless STATUS_OF says otherwise — instead of letting it fall through to Nest's
+ * default 500. Registered globally in setup-app.ts.
  */
 @Catch(DomainError)
 export class DomainExceptionFilter implements ExceptionFilter {
@@ -18,9 +25,10 @@ export class DomainExceptionFilter implements ExceptionFilter {
 
   catch(exception: DomainError, host: ArgumentsHost): void {
     const res = host.switchToHttp().getResponse<Response>();
+    const status = STATUS_OF.get(exception.constructor) ?? HttpStatus.UNPROCESSABLE_ENTITY;
     this.logger.warn(`${exception.name}: ${exception.message}`);
-    res.status(HttpStatus.UNPROCESSABLE_ENTITY).json({
-      statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+    res.status(status).json({
+      statusCode: status,
       error: exception.name,
       message: exception.message,
     });

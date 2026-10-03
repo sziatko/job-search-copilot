@@ -26,8 +26,9 @@ export function registerApplicationTools(
         'Log that the user applied to a role. Identify the vacancy by `vacancyId`, or by ' +
         '`company` + `title`, looked up (case-insensitive) in the vacancies table: a ' +
         'unique match moves that vacancy to APPLIED; no match creates a minimal vacancy ' +
-        'row (fullText "N/A", score/verdict from what you pass or a placeholder), also ' +
-        'APPLIED; more than one match is an error listing the candidate ids — retry with ' +
+        'row (no posting text; a score and verdict only when you pass `matchScore`, ' +
+        'otherwise it has no analysis), also APPLIED; more than one match is an error ' +
+        'listing the candidate ids — retry with ' +
         'the right one as `vacancyId`. A vacancy already in the pipeline (APPLIED … ' +
         'REJECTED) is an error too. `applyUrl` / `matchScore` / `estimationComment` only ' +
         'shape a vacancy this call creates. `status` records it further along — APPLIED is ' +
@@ -103,8 +104,11 @@ export function registerApplicationTools(
       title: 'Update a vacancy status',
       description:
         "Move a vacancy to a new status — the user's triage (NOT_REVIEWED, SAVED_FOR_LATER, " +
-        'DECLINED, UNAVAILABLE — the posting no longer takes applications) or a pipeline stage (APPLIED … REJECTED); separate from the ' +
-        "analyzer's recommendation. To record applying, prefer record_application. " +
+        'DECLINED, UNAVAILABLE — the posting no longer takes applications, FILTERED_OUT — ' +
+        'screened out before triage, NEW — back to the analysis queue, only for a vacancy ' +
+        'without an analysis) or a pipeline stage (APPLIED … REJECTED); separate from the ' +
+        "analyzer's recommendation — writing an analysis moves NEW by itself " +
+        '(submit_analysis). To record applying, prefer record_application. ' +
         'Identify the vacancy either by `id` (from list_vacancies / list_applications), ' +
         'or by `company` + `title` — the latter is for a caller that only knows the ' +
         'company/role (e.g. an agent reading a rejection/offer email) and matches ' +

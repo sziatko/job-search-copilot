@@ -1,4 +1,4 @@
-export type { PrismaClient, Vacancy, VacancyLogEntry } from '@prisma/client';
+export type { PrismaClient, Vacancy } from '@prisma/client';
 export { CommentSource, Recommendation, VacancyStatus } from '@prisma/client';
 export { ApplicationService } from './application.service';
 export type {
@@ -16,16 +16,18 @@ export type {
 } from './application.types';
 export { APPLICATION_STATES } from './application.types';
 export {
+  AlreadyAnalysedError,
   AlreadyAppliedError,
   AmbiguousVacancyMatchError,
+  AnalysedNotNewError,
   DomainError,
   InvalidApplicationInputError,
+  InvalidIntakeEntryError,
   InvalidRecommendationError,
-  InvalidVacancyLogEntryError,
   SameStatusError,
+  VacancyNotFoundError,
 } from './errors';
 export { escapeLikePattern } from './like';
-export { PLACEHOLDER_COMMENT } from './placeholder';
 export { createPrismaClient, getPrisma } from './prisma-client';
 export {
   deriveRecommendationFromScore,
@@ -43,18 +45,13 @@ export type {
   SaveManyVacanciesResult,
   SaveVacancyInput,
   SaveVacancyResult,
+  SubmitAnalysisInput,
   VacancyComment,
   VacancyDetail,
   VacancyListItem,
   VacancySort,
 } from './vacancy.types';
-export { VACANCY_SORTS } from './vacancy.types';
-export type {
-  CheckVacancyLogOptions,
-  ListVacancyLogFilters,
-  ListVacancyLogResult,
-  VacancyLogInput,
-  VacancyLogListItem,
-} from './vacancy-log';
-export { normalizeCompanyKey, normalizeTitleKey } from './vacancy-log';
-export { VacancyLogService } from './vacancy-log.service';
+export { ANALYSIS_BATCH_MAX, VACANCY_SORTS } from './vacancy.types';
+export type { VacancyIntakeInput } from './vacancy-intake';
+export { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
+export { VacancyIntakeService } from './vacancy-intake.service';

@@ -1,4 +1,4 @@
-import { VacancyService } from '@job-search-copilot/core';
+import { VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { VacanciesController } from './vacancies.controller';
@@ -11,6 +11,11 @@ import { VacanciesController } from './vacancies.controller';
       // the MCP server can reuse it). Nest constructs it here with the DI-managed client.
       provide: VacancyService,
       useFactory: (prisma: PrismaService) => new VacancyService(prisma.client),
+      inject: [PrismaService],
+    },
+    {
+      provide: VacancyIntakeService,
+      useFactory: (prisma: PrismaService) => new VacancyIntakeService(prisma.client),
       inject: [PrismaService],
     },
   ],

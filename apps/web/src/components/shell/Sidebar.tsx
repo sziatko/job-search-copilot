@@ -5,7 +5,7 @@ import {
   IconChecklist,
   IconChevronLeft,
   IconDashboard,
-  IconLayers,
+  IconInbox,
   IconPerson,
   IconSend,
 } from '@/components/icons';
@@ -40,7 +40,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         title: 'Application tracker',
         icon: IconSend,
       },
-      { to: '/log', label: 'Vacancy log', title: 'Vacancy log', icon: IconLayers },
+      { to: '/inbox', label: 'Inbox', title: 'Inbox', icon: IconInbox },
     ],
   },
   {

@@ -5,13 +5,12 @@ import {
   type UpdateApplicationInput,
 } from '@/pages/applications/types';
 import type { Stats } from '@/pages/dashboard/types';
-import type { LogEntry } from '@/pages/log/types';
 import type { VacancyDetail, VacancyListItem, VacancyStatus } from '@/pages/vacancies/types';
 
 export const API_URL = 'http://localhost:3000/api/v1';
 
-/** The Postgres enum's order, which `sort=recommended` sorts by. */
-const RECOMMENDATION_RANK = { APPLY: 0, APPLY_WITH_CAVEATS: 1, SKIP: 2 } as const;
+/** The Postgres enum's order, which `sort=recommended` sorts by — unanalysed last. */
+const RECOMMENDATION_RANK = { APPLY: 0, APPLY_WITH_CAVEATS: 1, SKIP: 2, null: 3 } as const;
 
 /**
  * One row of the fake's single table, like the real `Vacancy`: what /vacancies lists
@@ -21,7 +20,7 @@ const RECOMMENDATION_RANK = { APPLY: 0, APPLY_WITH_CAVEATS: 1, SKIP: 2 } as cons
 export type FakeVacancy = VacancyListItem &
   Pick<
     ApplicationListItem,
-    'statusChangedAt' | 'appliedAt' | 'comments' | 'salaryInListing' | 'usedTailoredResume'
+    'statusChangedAt' | 'appliedAt' | 'comments' | 'salaryInApplication' | 'usedTailoredResume'
   > &
   // Only GET /vacancies/:id reads these; `asDetail` fills them when a test does not.
   Partial<Pick<VacancyDetail, 'fullText' | 'timeline'>>;
@@ -41,7 +40,7 @@ export function fakeVacancy(overrides: Partial<FakeVacancy> = {}): FakeVacancy {
     statusChangedAt: '2026-09-01T00:00:00.000Z',
     appliedAt: null,
     comments: [],
-    salaryInListing: null,
+    salaryInApplication: null,
     usedTailoredResume: false,
     ...overrides,
   };
@@ -69,19 +68,28 @@ function sameCompany(a: string, b: string) {
   return a.toLowerCase() === b.toLowerCase();
 }
 
-/** Core's `companyMatchCounts`: every row of the same company, this one included. */
+/** Core's `companyMatchCount`: this row, plus every other row of the same company but
+ * FILTERED_OUT — so `count − 1` is exactly the others `sameCompanyAs` lists. */
 function companyMatchCount(rows: FakeVacancy[], row: FakeVacancy) {
-  return rows.filter((candidate) => sameCompany(candidate.company, row.company)).length;
+  return rows.filter(
+    (candidate) =>
+      (candidate === row || candidate.status !== 'FILTERED_OUT') &&
+      sameCompany(candidate.company, row.company),
+  ).length;
 }
 
-/** A row as GET /vacancies/:id — the journal starts at NOT_REVIEWED on `createdAt`,
- * as `firstStatus` writes it. */
+/** A row as GET /vacancies/:id — the journal starts at NEW on `createdAt`, as
+ * `firstStatus` writes it, then NOT_REVIEWED as `save` does. */
 function asDetail(row: FakeVacancy): VacancyDetail {
   return {
     ...row,
     updatedAt: row.statusChangedAt,
-    fullText: row.fullText ?? 'Full vacancy text.',
-    timeline: row.timeline ?? [{ status: 'NOT_REVIEWED', createdAt: row.createdAt }],
+    // `undefined` = the test does not care; `null` = no posting text.
+    fullText: row.fullText === undefined ? 'Full vacancy text.' : row.fullText,
+    timeline: row.timeline ?? [
+      { status: 'NEW', createdAt: row.createdAt },
+      { status: 'NOT_REVIEWED', createdAt: row.createdAt },
+    ],
   };
 }
 
@@ -111,7 +119,7 @@ function addComment(row: FakeVacancy, body: string | null | undefined) {
 
 /**
  * The list endpoint's behaviour, as a resolver — exported so a test can *wrap* it
- * (holding one term's request open, phase 2.2 step 6) instead of re-implementing
+ * (holding one filter's request open, phase 2.2 step 6) instead of re-implementing
  * the filter, which is how a fake starts disagreeing with the thing it fakes.
  */
 export function vacanciesResolver(rows: FakeVacancy[]) {
@@ -123,21 +131,26 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
     const recommendation = query.get('recommendation');
     const search = query.get('search');
     const sameCompanyAs = query.get('sameCompanyAs');
+    const hasText = query.get('hasText');
     const cursor = query.get('cursor');
     // The server's two orders (ADR-0030), each ending on `id`.
     const byOrder =
       query.get('sort') === 'recommended'
         ? (a: FakeVacancy, b: FakeVacancy) =>
-            RECOMMENDATION_RANK[a.recommendation] - RECOMMENDATION_RANK[b.recommendation] ||
-            b.matchScore - a.matchScore ||
+            RECOMMENDATION_RANK[`${a.recommendation}`] -
+              RECOMMENDATION_RANK[`${b.recommendation}`] ||
+            (b.matchScore ?? -1) - (a.matchScore ?? -1) ||
             b.id - a.id
         : (a: FakeVacancy, b: FakeVacancy) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id;
     const matches = (row: FakeVacancy) =>
       (!statuses || statuses.includes(row.status)) &&
       (!recommendation || row.recommendation === recommendation) &&
-      (!sameCompanyAs || sameCompany(row.company, sameCompanyAs)) &&
-      // /vacancies sends its term here rather than filtering client-side, so
-      // without this the page's search tests would pass while doing nothing.
+      (!sameCompanyAs ||
+        (row.status !== 'FILTERED_OUT' && sameCompany(row.company, sameCompanyAs))) &&
+      // `fullText` undefined = the test does not care, and counts as text — as below.
+      (hasText === null || (row.fullText !== null) === (hasText === 'true')) &&
+      // The search modal sends its term here rather than filtering client-side, so
+      // without this the modal's tests would pass while doing nothing.
       (!search ||
         row.company.toLowerCase().includes(search.toLowerCase()) ||
         row.title.toLowerCase().includes(search.toLowerCase()));
@@ -158,9 +171,11 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
       ...row,
       companyMatchCount: companyMatchCount(rows, row),
       // Derived the same way the endpoint derives it (phase 2.2, step 7) rather than
-      // hand-set per fixture: a fixture is a placeholder by having no analyzer
-      // comment, which is what `ApplicationService` actually writes.
-      hasAnalysis: row.estimationComment !== null,
+      // hand-set per fixture: a fixture is unanalysed by having no recommendation,
+      // which is what `ApplicationService` writes for a placeholder.
+      hasAnalysis: row.recommendation !== null,
+      // `fullText` undefined = the test does not care, as in `asDetail`.
+      hasText: row.fullText !== null,
     }));
     return HttpResponse.json({
       items: page,
@@ -212,7 +227,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
     http.post(`${API_URL}/applications`, async ({ request }) => {
       const body = (await request.json()) as {
         vacancyId: number;
-        salaryInListing?: string;
+        salaryInApplication?: string;
         usedTailoredResume?: boolean;
         comment?: string;
       };
@@ -227,7 +242,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
         );
       }
       moveTo(row, 'APPLIED');
-      row.salaryInListing = body.salaryInListing?.trim() || null;
+      row.salaryInApplication = body.salaryInApplication?.trim() || null;
       row.usedTailoredResume = body.usedTailoredResume ?? false;
       addComment(row, body.comment);
       return HttpResponse.json({
@@ -296,7 +311,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
       const body = (await request.json()) as UpdateApplicationInput;
       const text = (value: string | null | undefined, current: string | null) =>
         value === undefined ? current : value?.trim() || null;
-      row.salaryInListing = text(body.salaryInListing, row.salaryInListing);
+      row.salaryInApplication = text(body.salaryInApplication, row.salaryInApplication);
       row.usedTailoredResume = body.usedTailoredResume ?? row.usedTailoredResume;
       addComment(row, body.comment);
       return HttpResponse.json(asApplication(row));
@@ -304,52 +319,15 @@ export function buildHandlers(rows: FakeVacancy[]) {
   ];
 }
 
-/** A `VacancyLogEntry` row with every field filled — tests override what they are about. */
-export function fakeLogEntry(overrides: Partial<LogEntry> = {}): LogEntry {
-  return {
-    id: 1,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    url: 'https://example.com/jobs/1',
-    company: 'Acme',
-    title: 'Backend Engineer',
-    ...overrides,
-  };
-}
-
-/** GET /log like the real endpoint: `q` over company / title / url, `createdAt desc,
- * id desc`, and a cursor page (ADR-0030) — so a loader that ignored `nextCursor`
- * would read page one forever rather than pass. */
-export function logHandler(entries: LogEntry[]) {
-  return http.get(`${API_URL}/log`, ({ request }) => {
-    const query = new URL(request.url).searchParams;
-    const q = query.get('q')?.toLowerCase();
-    const limit = Number(query.get('limit') ?? 50);
-    const cursor = query.get('cursor');
-    const matching = entries
-      .filter(
-        (entry) =>
-          !q ||
-          [entry.company, entry.title, entry.url].some((field) => field?.toLowerCase().includes(q)),
-      )
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id);
-    const start = cursor ? matching.findIndex((entry) => entry.id === Number(cursor)) + 1 : 0;
-    const items = matching.slice(start, start + limit);
-    const more = start + limit < matching.length;
-    return HttpResponse.json({
-      items,
-      total: matching.length,
-      nextCursor: more ? (items.at(-1)?.id ?? null) : null,
-    });
-  });
-}
-
 /** A `/stats` body, all zeros — tests set what they are about. Not derived from a
  * `buildHandlers` table: the funnel counts the journal, which the fake does not keep. */
 export function fakeStats(overrides: Partial<Stats> = {}): Stats {
   return {
     logged: 0,
+    awaitingAnalysis: 0,
     awaitingTriage: 0,
     recommended: 0,
+    notRecommended: 0,
     applied: 0,
     declined: 0,
     unavailable: 0,

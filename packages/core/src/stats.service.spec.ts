@@ -4,7 +4,7 @@ import { getPrisma } from './prisma-client';
 import { StatsService } from './stats.service';
 import { TIMEOUT_DAYS, writeStatus } from './status';
 import { VacancyService } from './vacancy.service';
-import { VacancyLogService } from './vacancy-log.service';
+import { VacancyIntakeService } from './vacancy-intake.service';
 
 // Integration tests against the real (test) Postgres — same rationale as
 // vacancy.service.spec.ts.
@@ -49,8 +49,10 @@ describe('StatsService.get', () => {
   it('is all zeros on an empty database', async () => {
     expect(await stats.get(NOW)).toEqual({
       logged: 0,
+      awaitingAnalysis: 0,
       awaitingTriage: 0,
       recommended: 0,
+      notRecommended: 0,
       applied: 0,
       declined: 0,
       unavailable: 0,
@@ -74,10 +76,10 @@ describe('StatsService.get', () => {
     });
   });
 
-  it('counts the log, triage and the recommended', async () => {
-    await new VacancyLogService().checkMany([
-      { url: 'https://a.com/1' },
-      { url: 'https://a.com/2' },
+  it('counts every vacancy as logged, analysed or not, then triage and the recommended', async () => {
+    await new VacancyIntakeService().intakeMany([
+      { url: 'https://a.com/1', company: 'A', title: 'Dev' },
+      { url: 'https://a.com/2', company: 'B', title: 'Dev' },
     ]);
     await seed([], { recommendation: 'APPLY' });
     await seed([], { recommendation: 'APPLY_WITH_CAVEATS' });
@@ -85,7 +87,31 @@ describe('StatsService.get', () => {
 
     const result = await stats.get(NOW);
 
-    expect(result).toMatchObject({ logged: 2, awaitingTriage: 2, recommended: 2 });
+    expect(result).toMatchObject({ logged: 5, awaitingTriage: 2, recommended: 2 });
+  });
+
+  it("counts the queue, and the analyzer's no once per vacancy: FILTERED_OUT or an analysed SKIP", async () => {
+    await new VacancyIntakeService().intakeMany([
+      { url: 'https://a.com/1', company: 'A', title: 'Dev' },
+      { url: 'https://a.com/2', company: 'B', title: 'Dev', fullText: 'Text.' },
+      { url: 'https://a.com/3', company: 'C', title: 'Dev' },
+    ]);
+    // Filtered out by the user, never analysed.
+    const { id } = await prisma.vacancy.findUniqueOrThrow({
+      where: { applyUrl: 'https://a.com/3' },
+    });
+    await prisma.$transaction((tx) => writeStatus(tx, id, 'FILTERED_OUT'));
+    await seed([], { recommendation: 'SKIP' }); // FILTERED_OUT by the rule: one, not two
+    await seed(['NOT_REVIEWED'], { recommendation: 'SKIP' }); // taken back: still the analyzer's no
+    await seed([], { recommendation: 'APPLY' });
+    await seed(['DECLINED'], { recommendation: 'APPLY_WITH_CAVEATS' });
+
+    expect(await stats.get(NOW)).toMatchObject({
+      logged: 7,
+      awaitingAnalysis: 2,
+      notRecommended: 3,
+      recommended: 2,
+    });
   });
 
   it('counts declined by the current status only', async () => {

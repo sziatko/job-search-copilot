@@ -68,11 +68,11 @@ export function IconSend(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function IconLayers(props: SVGProps<SVGSVGElement>) {
+export function IconInbox(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
-      <path d="M21 8 12 3 3 8l9 5 9-5Z" />
-      <path d="m3 12 9 5 9-5M3 16l9 5 9-5" />
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z" />
     </Icon>
   );
 }
@@ -133,6 +133,14 @@ export function IconBan(props: SVGProps<SVGSVGElement>) {
     <Icon {...props}>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M6 6l12 12" />
+    </Icon>
+  );
+}
+
+export function IconFilter(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 4h18l-7 8.5V19l-4 2v-8.5L3 4Z" />
     </Icon>
   );
 }

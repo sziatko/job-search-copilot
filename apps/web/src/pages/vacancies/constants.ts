@@ -6,10 +6,12 @@ import { APPLICATION_STATUS_LABELS } from '../applications/constants';
 import type { Recommendation, VacancyStatus } from './types';
 
 export const STATUS_LABELS = {
+  NEW: 'New',
   NOT_REVIEWED: 'Not reviewed',
   SAVED_FOR_LATER: 'Saved for later',
   DECLINED: 'Declined',
   UNAVAILABLE: 'Unavailable',
+  FILTERED_OUT: 'Filtered out',
   ...APPLICATION_STATUS_LABELS,
 } satisfies Record<VacancyStatus, string>;
 
@@ -26,10 +28,12 @@ export function toastMoved(
  * `.tag.*` classes in index.css; `text` reuses the labels so a tag can never disagree
  * with the filter entry that selects the same state. */
 export const STATUS_TAGS = {
+  NEW: { text: STATUS_LABELS.NEW, variant: 'neutral' },
   NOT_REVIEWED: { text: STATUS_LABELS.NOT_REVIEWED, variant: 'neutral' },
   SAVED_FOR_LATER: { text: STATUS_LABELS.SAVED_FOR_LATER, variant: 'accent' },
   DECLINED: { text: STATUS_LABELS.DECLINED, variant: 'bad' },
   UNAVAILABLE: { text: STATUS_LABELS.UNAVAILABLE, variant: 'bad' },
+  FILTERED_OUT: { text: STATUS_LABELS.FILTERED_OUT, variant: 'bad' },
   APPLIED: { text: STATUS_LABELS.APPLIED, variant: 'good' },
   RECRUITER_SCREEN: { text: STATUS_LABELS.RECRUITER_SCREEN, variant: 'good' },
   REPLIED: { text: STATUS_LABELS.REPLIED, variant: 'good' },

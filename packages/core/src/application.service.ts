@@ -1,4 +1,4 @@
-import type { CommentSource, PrismaClient, VacancyStatus } from '@prisma/client';
+import type { CommentSource, PrismaClient, Recommendation, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type {
   ApplicationListItem,
@@ -18,7 +18,6 @@ import {
 } from './errors';
 import { escapeLikePattern } from './like';
 import { cursorArgs, toCursorPage } from './paging';
-import { PLACEHOLDER_COMMENT } from './placeholder';
 import { getPrisma } from './prisma-client';
 import { deriveRecommendationFromScore } from './recommendation';
 import {
@@ -31,13 +30,14 @@ import {
 } from './status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
 import { ALL_COMMENTS, companyMatchCounts, sameCompanyNames } from './vacancy.service';
+import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 
 /** The Vacancy fields the /applications page reads. */
 const APPLICATION_SELECT = {
   id: true,
   status: true,
   statusChangedAt: true,
-  salaryInListing: true,
+  salaryInApplication: true,
   usedTailoredResume: true,
   company: true,
   title: true,
@@ -110,9 +110,10 @@ export class ApplicationService {
   /**
    * Record that the user applied to a role. In one transaction: resolve the vacancy
    * (link by id, link to a unique (company,title) match, or create a minimal
-   * placeholder-filled row), move it to APPLIED (then to `status`, if given), and set
-   * salary / CV / comment. Throws a DomainError on blank input, an unknown id, an
-   * ambiguous (company,title) match, or a vacancy already in the pipeline.
+   * placeholder row, unanalysed unless given a score), move it to APPLIED (then to
+   * `status`, if given), and set salary / CV / comment. Throws a DomainError on blank
+   * input, an unknown id, an ambiguous (company,title) match, or a vacancy already in
+   * the pipeline.
    */
   record(input: RecordApplicationInput): Promise<RecordApplicationResult> {
     return this.db.$transaction((tx) => recordWithin(tx, input));
@@ -245,7 +246,7 @@ export class ApplicationService {
     const text = (value: string | null | undefined) =>
       value === undefined ? undefined : value?.trim() || null;
     return updateRow(this.db, id, {
-      salaryInListing: text(input.salaryInListing),
+      salaryInApplication: text(input.salaryInApplication),
       usedTailoredResume: input.usedTailoredResume,
       ...commentOn(input.comment, 'USER'),
     });
@@ -310,6 +311,9 @@ interface ResolvedVacancy {
   vacancy: { id: number; status: VacancyStatus };
   resolution: VacancyResolution;
   vacancyCreated: boolean;
+  /** A created vacancy's analysis, written once the row has left NEW — the DB refuses
+   * an analysis on a NEW row (ADR-0033). Absent when there is none. */
+  analysis?: { matchScore: number; recommendation: Recommendation };
 }
 
 async function resolveVacancy(
@@ -346,10 +350,14 @@ async function resolveVacancy(
     );
   }
 
-  const matchScore = input.matchScore ?? 0;
-  const recommendation =
-    input.recommendation ??
-    (input.matchScore != null ? deriveRecommendationFromScore(input.matchScore) : 'APPLY');
+  // No analysis unless the caller passed a score: the CHECK wants both fields or neither.
+  const analysis =
+    input.matchScore == null
+      ? undefined
+      : {
+          matchScore: input.matchScore,
+          recommendation: input.recommendation ?? deriveRecommendationFromScore(input.matchScore),
+        };
   // Neutralized, not stored raw: a non-http(s) scheme here would be rendered as a
   // clickable link by the web app. The record is kept either way — losing a whole
   // application over a bad URL would be worse than an unlinked one.
@@ -361,9 +369,9 @@ async function resolveVacancy(
         company,
         title,
         applyUrl,
-        fullText: input.fullText ?? PLACEHOLDER_COMMENT,
-        matchScore,
-        recommendation,
+        companyKey: normalizeCompanyKey(company),
+        titleKey: normalizeTitleKey(title),
+        fullText: input.fullText?.trim() ? input.fullText : null,
         ...(estimationComment && {
           comments: { create: { body: estimationComment, source: 'ANALYZER' } },
         }),
@@ -371,7 +379,7 @@ async function resolveVacancy(
       },
       select: { id: true, status: true },
     });
-    return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true };
+    return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true, analysis };
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw new InvalidApplicationInputError(
@@ -389,7 +397,7 @@ async function recordWithin(
   input: RecordApplicationInput,
 ): Promise<RecordApplicationResult> {
   const at = new Date();
-  const { vacancy, resolution, vacancyCreated } = await resolveVacancy(tx, input, at);
+  const { vacancy, resolution, vacancyCreated, analysis } = await resolveVacancy(tx, input, at);
 
   if (PIPELINE.includes(vacancy.status)) {
     throw new AlreadyAppliedError(`Vacancy ${vacancy.id} is already ${vacancy.status}`);
@@ -404,8 +412,9 @@ async function recordWithin(
   const row = await tx.vacancy.update({
     where: { id: vacancy.id },
     data: {
-      salaryInListing: input.salaryInListing?.trim() || null,
+      salaryInApplication: input.salaryInApplication?.trim() || null,
       usedTailoredResume: input.usedTailoredResume ?? false,
+      ...analysis,
       ...commentOn(input.comment, 'USER'),
     },
     select: APPLICATION_SELECT,

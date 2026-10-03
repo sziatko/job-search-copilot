@@ -8,7 +8,6 @@ const prisma = getPrisma();
 afterEach(async () => {
   // Comments and status changes go with their vacancy (ON DELETE CASCADE).
   await prisma.vacancy.deleteMany();
-  await prisma.vacancyLogEntry.deleteMany();
 });
 
 afterAll(async () => {

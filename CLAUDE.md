@@ -28,8 +28,9 @@ violated. Reasoned through, with the ADR that owns each:
 Quote them from there if you change one; keep this list in step.
 
 1. **`packages/core` is the only database client.**
-2. **A vacancy is analysed once.**
-3. **`recommendation` is the analyzer's; `status` is the user's.**
+2. **A vacancy is analysed once** — it can exist before its analysis (`NEW`).
+3. **`recommendation` is the analyzer's; `status` is the user's** — except the one move
+   out of `NEW` that an analysis makes (`SKIP` → `FILTERED_OUT`, else `NOT_REVIEWED`).
 4. **`recommendation` is stored canonical-English.**
 5. **The web app's API contract is a hand-written zod schema**, not a `core` import.
 6. **`apps/api` disables Biome's `useImportType`.**

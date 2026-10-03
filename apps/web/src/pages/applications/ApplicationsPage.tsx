@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { SearchInput } from '@/components/ui/SearchInput';
 import { ApplyDialog } from '@/pages/vacancies/components/ApplyDialog';
 import { CompanyHistoryModal } from '@/pages/vacancies/components/CompanyHistoryModal';
+import { SearchModal } from '@/pages/vacancies/components/SearchModal';
+import { STATUS_CONTEXT } from '@/pages/vacancies/types';
 import { ApplicationStatusFilterSelect } from './components/ApplicationStatusFilterSelect';
 import { ApplicationsKpis } from './components/ApplicationsKpis';
 import { ApplicationsTable } from './components/ApplicationsTable';
@@ -18,8 +19,6 @@ export function ApplicationsPage() {
     stats,
     savingIds,
     rowErrors,
-    q,
-    setSearchText,
     statusFilter,
     setStatusFilter,
     changeStatus,
@@ -30,9 +29,10 @@ export function ApplicationsPage() {
     company: string;
     vacancyId: number;
   } | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const emptyMessage =
-    q.trim() === '' && statusFilter === STATUS_FILTER_ALL
+    statusFilter === STATUS_FILTER_ALL
       ? 'No applications recorded yet.'
       : 'No applications match this filter.';
 
@@ -49,7 +49,9 @@ export function ApplicationsPage() {
               Showing {visibleItems.length} of {total}
             </span>
           )}
-          <SearchInput value={q} onChange={setSearchText} />
+          <button type="button" className="btn ml-auto" onClick={() => setSearching(true)}>
+            Search
+          </button>
           <ApplicationStatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         </div>
 
@@ -78,19 +80,26 @@ export function ApplicationsPage() {
         />
       )}
 
+      {searching && (
+        <SearchModal
+          context={STATUS_CONTEXT.applications.options}
+          onClose={() => setSearching(false)}
+        />
+      )}
+
       {editing && (
         <ApplyDialog
           company={editing.company}
           title={editing.title}
           heading="Edit application"
           initial={{
-            salary: editing.salaryInListing ?? '',
+            salary: editing.salaryInApplication ?? '',
             usedTailoredResume: editing.usedTailoredResume,
           }}
           onCancel={() => setEditing(null)}
           onConfirm={({ salary, usedTailoredResume, comment }) => {
             editApplication(editing.id, {
-              salaryInListing: salary,
+              salaryInApplication: salary,
               usedTailoredResume,
               comment,
             });

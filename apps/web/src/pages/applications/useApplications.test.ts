@@ -81,19 +81,13 @@ function renderApplications(path = '/applications') {
 afterEach(() => vi.restoreAllMocks());
 
 describe('ApplicationsPage / useApplications', () => {
-  it('lists applications and filters the search by company OR role', async () => {
+  it('lists applications', async () => {
     serve([
       application({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
       application({ id: 2, company: 'Beta Corp', title: 'Frontend Lead' }),
     ]);
     renderApplications();
     await screen.findByText('Acme');
-    expect(screen.getByText('Beta Corp')).toBeInTheDocument();
-
-    const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/search company or role/i), 'lead');
-
-    await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
     expect(screen.getByText('Beta Corp')).toBeInTheDocument();
   });
 
@@ -191,6 +185,22 @@ describe('ApplicationsPage / useApplications', () => {
 
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
     expect(screen.getByText('Beta Corp')).toBeInTheDocument();
+  });
+
+  it('lists the pipeline only under All: its endpoint is the context, so no status goes', async () => {
+    const lists: URL[] = [];
+    mswServer.events.on('request:start', ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname.endsWith('/applications')) lists.push(url);
+    });
+    serve([application({ id: 1, company: 'Acme' }), fakeVacancy({ id: 2, company: 'Triage Co' })]);
+    renderApplications();
+
+    await screen.findByText('Acme');
+    expect(screen.getByLabelText('Status')).toHaveValue('ALL');
+    expect(screen.queryByText('Triage Co')).not.toBeInTheDocument();
+    expect(lists.at(-1)?.searchParams.has('status')).toBe(false);
+    mswServer.events.removeAllListeners();
   });
 
   /** `stats.pipeline` with these counts; the rest zero. */
@@ -485,7 +495,7 @@ describe('ApplicationsPage / useApplications', () => {
       serve([
         application({
           id: 1,
-          salaryInListing: '100 PLN/h',
+          salaryInApplication: '100 PLN/h',
           comments: [
             { id: 7, createdAt: '2026-09-01T10:00:00Z', body: 'First note', source: 'USER' },
           ],

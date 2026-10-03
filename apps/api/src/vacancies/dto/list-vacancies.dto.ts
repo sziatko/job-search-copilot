@@ -5,7 +5,7 @@ import {
   VacancyStatus,
 } from '@job-search-copilot/core';
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class ListVacanciesQueryDto {
   @IsOptional()
@@ -30,6 +30,12 @@ export class ListVacanciesQueryDto {
   @IsOptional()
   @IsString()
   sameCompanyAs?: string;
+
+  /** `true` / `false` — with or without posting text. Anything else is a 400. */
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  hasText?: boolean;
 
   @IsOptional()
   @Type(() => Number)
