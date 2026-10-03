@@ -11,7 +11,7 @@ same machinery later serving MCP clients as an OAuth 2.1 authorization server
 is a backlog row. Invariant 1 says only `core` talks to the database.
 
 ## Decision
-Better Auth 1.6, configured in `packages/core/src/auth/` (`createAuth(prisma, config)`)
+Better Auth 1.7, configured in `packages/core/src/auth/` (`createAuth(prisma, config)`)
 on `core`'s Prisma client, with its tables in `core`'s schema. `apps/api` mounts it at
 `/api/auth/*` through `@thallesp/nestjs-better-auth`, whose global guard closes every
 route by default. Sign-in: Google and LinkedIn over OIDC (Authorization Code + PKCE),

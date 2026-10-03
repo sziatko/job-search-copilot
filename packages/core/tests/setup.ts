@@ -8,6 +8,8 @@ const prisma = getPrisma();
 afterEach(async () => {
   // Comments and status changes go with their vacancy (ON DELETE CASCADE).
   await prisma.vacancy.deleteMany();
+  // Sessions, accounts and passkeys go with their user.
+  await prisma.user.deleteMany();
 });
 
 afterAll(async () => {

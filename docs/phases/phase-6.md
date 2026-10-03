@@ -17,7 +17,7 @@ phase adds:
 
 Decided with the user on 2026-10-03:
 
-- **Better Auth 1.6, inside JSC** ([ADR-0034](../decisions/0034-auth-better-auth-in-core.md)).
+- **Better Auth 1.7, inside JSC** ([ADR-0034](../decisions/0034-auth-better-auth-in-core.md)).
   No separate auth service, no hosted IdP, no Passport. Reuse across the user's other
   projects comes from the standard (each is an OIDC client of whatever issues the
   tokens), not from shared code. Passport would have shown the mechanics more plainly
@@ -62,8 +62,10 @@ brackets are the RFCs.
 5. **Find or create the user.** An `Account` row keys `(providerId, accountId = sub)`
    to a `User`. A new email passes the allowlist hook first. If the email already
    belongs to a user (signed in earlier with LinkedIn), the account is **linked** only
-   when `email_verified` is true and the provider is in `trustedProviders`; otherwise
-   anyone with an unverified address could take over that user.
+   when `email_verified` is true or the provider is in `trustedProviders` (a trusted
+   provider skips the `email_verified` check, so list only providers that verify
+   emails themselves); otherwise anyone with an unverified address could take over
+   that user.
 6. The API writes a `Session` row and sets a cookie: a random token, `HttpOnly`
    (invisible to JavaScript, so XSS cannot steal it), `SameSite=Lax` (not sent on a
    cross-site POST, so CSRF on writes is blocked), `Secure` outside localhost. Google's
@@ -140,12 +142,21 @@ register Claude as a client. Hence JSC's own authorization server.
   5.1). Invariants 1 and 9 in `architecture.md` describe the state after steps 1–2;
   until then they describe the plan.
 
-- [ ] **1 · Core: Better Auth.** `better-auth` and `@better-auth/passkey` in `core`;
+- [x] **1 · Core: Better Auth.** `better-auth` and `@better-auth/passkey` in `core`;
   `createAuth`; the schema from Better Auth's CLI (User, Session, Account,
   Verification, Passkey) and a migration; the allowlist hook; the config type `core`
   takes (no env read in `core`, invariant 8). Tests on the real test DB: the hook
   rejects an email outside the list and lets one inside through; a user and a session
-  are created through the adapter.
+  are created through the adapter. — *2026-10-03.* 1.7.7 (latest stable; the
+  NestJS package takes `>=1.5 <2`). Migration `20261003140000_better_auth`, applied
+  to the test DB only — **the dev DB still needs `npm run migrate:dev`** before the
+  API boots with auth (Better Auth logs "Prisma schema mismatch" otherwise).
+  `better-auth` is ESM-only; `core` (CJS) loads it through Node 24's `require(esm)`.
+  `npm install -w core <pkg>` crashes here (arborist `reading 'location'`): add the
+  dep to the workspace's `package.json`, then a root `npm install`. Run vitest from a
+  `C:\` cwd (PowerShell): from Git Bash's `/c/…` every suite fails with "failed to
+  find the current suite". `core`'s test setup now deletes users too; api/mcp setups
+  do not yet.
 
 - [ ] **2 · API: the guard and the machine token.** The module, CORS with credentials,
   `@AllowAnonymous()` on `/health`, `MachineTokenGuard` (`timingSafeEqual` on
@@ -153,7 +164,8 @@ register Claude as a client. Hence JSC's own authorization server.
   vars. **Check first:** the module wants `bodyParser: false`, while `setup-app.ts`
   raises the JSON limit to 5 MB for intake — that limit must survive. Every existing
   e2e test now gets a 401, so a helper signs a test user in (Better Auth's test
-  utilities if 1.6 has them, else a `Session` row written in the test DB). New tests:
+  utilities: 1.7 has a `testUtils` plugin in `better-auth/plugins`; else a `Session`
+  row written in the test DB). New tests:
   401 without a cookie, 200 with one; `/health` anonymous; the three n8n routes 401 /
   401 / 2xx for no token, a wrong token, the right one.
 
