@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -93,6 +95,29 @@ describe('job-search-copilot MCP server', () => {
       'submit_analysis',
       'update_vacancy_status',
     ]);
+  });
+
+  // The skills in skills/ call these tools by name and are uploaded to claude.ai by
+  // hand, so a rename here leaves them calling a tool that no longer exists — silently.
+  it('every JSC tool a skill names is registered', async () => {
+    const client = await connectedClient();
+    const { tools } = await client.listTools();
+    const registered = new Set(tools.map((t) => t.name));
+
+    const skillsDir = path.resolve(import.meta.dirname, '../../../skills');
+    // ponytail: a tool is recognised by its noun (`<verb>_vacanc…/application…/analys…`);
+    // one named after another noun goes unchecked — widen the pattern when one appears.
+    const referenced = readdirSync(skillsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((entry) => {
+        const text = readFileSync(path.join(skillsDir, entry.name, 'SKILL.md'), 'utf8');
+        return [...text.matchAll(/`([a-z]+_(?:vacanc|application|analys)[a-z_]*)`/g)].map(
+          (m) => `${entry.name}: ${m[1]}`,
+        );
+      });
+
+    expect(referenced.length).toBeGreaterThan(0);
+    expect(referenced.filter((ref) => !registered.has(ref.split(': ')[1]))).toEqual([]);
   });
 
   it('works the analysis queue: list NEW with text → get_vacancies_batch → submit_analyses_batch', async () => {
