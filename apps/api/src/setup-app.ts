@@ -1,6 +1,7 @@
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { DomainExceptionFilter } from './common/domain-exception.filter';
 import type { Env } from './config/env.validation';
 
@@ -27,6 +28,19 @@ export function configureApp(app: NestExpressApplication, config: ConfigService<
   // URI versioning: /api/v1/... . New breaking shapes get a v2 controller instead
   // of mutating v1 under clients' feet.
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+
+  // Swagger UI at /api/docs, the raw document at /api/docs-json. The DTO and comment
+  // metadata comes from the CLI plugin in nest-cli.json, so it is there under
+  // `nest build` / `nest start` only, not under vitest's SWC.
+  SwaggerModule.setup(
+    'docs',
+    app,
+    SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder().setTitle('Job Search Copilot API').setVersion('1').build(),
+    ),
+    { useGlobalPrefix: true },
+  );
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new DomainExceptionFilter());

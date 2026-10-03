@@ -46,7 +46,7 @@ npm run test:db:migrate         # test DB (job_search_copilot_test)
 | Service | URL |
 | --- | --- |
 | Web | http://localhost:5173 |
-| API | http://localhost:3000/api/v1 · health at http://localhost:3000/health |
+| API | http://localhost:3000/api/v1 · health at http://localhost:3000/health · docs (Swagger UI) at http://localhost:3000/api/docs |
 | Postgres | `localhost:5432` (`postgres` / `postgres`) |
 
 The `mcp` container idles (`sleep infinity`); a session connects by `docker exec`
@@ -62,6 +62,7 @@ into it and running `npm run dev:mcp`.
 | Command | |
 | --- | --- |
 | `npm run dev:api` / `npm run dev:mcp` | run a service on the host instead of in Docker |
+| `npm run mcp:inspect` | the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) web UI over the MCP server (stdio, needs `.env`) — browse the tools and call them |
 | `npm test` / `npm run test:watch` | Vitest across all workspaces (needs the test DB) |
 | `npm run lint` / `npm run lint:fix` / `npm run format` | Biome |
 | `npm run typecheck` | `tsc --noEmit` across every workspace |

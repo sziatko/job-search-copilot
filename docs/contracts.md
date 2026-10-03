@@ -22,6 +22,12 @@ Global `ValidationPipe({ whitelist: true, transform: true })` — unknown body/q
 fields are stripped; type coercion is on. JSON bodies up to 5 MB (`useBodyParser` in
 `setup-app.ts`; Express' default is 100 KB) — intake carries posting text.
 
+Browse and try it: Swagger UI at `/api/docs`, the OpenAPI document at `/api/docs-json`
+(`@nestjs/swagger`; requests only, responses are untyped). The request fields come
+from the DTOs' `class-validator` decorators and the descriptions from the controllers'
+JSDoc, through the CLI plugin in `nest-cli.json` — present in `nest build` / `nest
+start`, not under vitest's SWC. Not a contract: the web's schema stays hand-written.
+
 Text marked **(phase 4 step N)** is agreed but not built yet
 ([`phases/phase-4.md`](phases/phase-4.md)); the step that builds it removes the mark.
 
@@ -131,6 +137,9 @@ record/save/update tools return only a minimal confirmation (see Output column) 
 back the large text the caller just sent (`fullText`, `estimationComment`,
 `comment`); read the full record back with `get_vacancy`
 / `list_vacancies` / `list_applications`.
+
+To browse the tools and try them, run `npm run mcp:inspect` (the MCP Inspector over the
+server on stdio) — it shows what `tools/list` returns, so it is always the real set.
 
 | Tool | Input | Output | Not-found / error |
 | --- | --- | --- | --- |

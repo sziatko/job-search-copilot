@@ -33,6 +33,9 @@ comment saying exactly this and why.
   `vacancyListItemSchema` here. This is the one place the repo tolerates
   hand-kept duplication.
 - The web build never sees Prisma/pg.
+- Since phase 5.1 an OpenAPI document exists (`/api/docs-json`, from `@nestjs/swagger`),
+  built for browsing the API, not for codegen. The web still does not generate from it;
+  the "no OpenAPI spec" argument above is out of date, the rest stands.
 - Runtime validation: a contract drift fails loudly (`parseResponse` throws) with
   a user-readable message, and the mismatch is logged in full.
 
