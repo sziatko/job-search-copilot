@@ -19,8 +19,17 @@ Source of truth:
 Base: everything under `/api/v1` except `/health` (version-neutral, un-prefixed).
 Configured in `setup-app.ts` — see [ADR-0008](decisions/0008-api-prefix-and-versioning.md).
 Global `ValidationPipe({ whitelist: true, transform: true })` — unknown body/query
-fields are stripped; type coercion is on. JSON bodies up to 5 MB (`useBodyParser` in
-`setup-app.ts`; Express' default is 100 KB) — intake carries posting text.
+fields are stripped; type coercion is on. JSON bodies up to 5 MB (`AuthModule`'s
+`bodyParser` in `app.module.ts`, the app created with `bodyParser: false`; Express'
+default is 100 KB) — intake carries posting text.
+
+**Auth** ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)) — every route wants
+a session cookie, else `401`; Better Auth serves `/api/auth/*`. Two exceptions:
+`/health` is anonymous; `POST /vacancies/intake`, `POST /vacancies/analysis` and
+`POST /vacancies/:id/analysis` also take `Authorization: Bearer <INTAKE_TOKEN>`
+([ADR-0036](decisions/0036-machine-token-for-n8n.md)) — n8n's credentials hold that
+header, so renaming it or its scheme breaks them. Swagger (`/api/docs`) is outside
+Nest's router, so the guard does not see it: it stays open.
 
 Browse and try it: Swagger UI at `/api/docs`, the OpenAPI document at `/api/docs-json`
 (`@nestjs/swagger`; requests only, responses are untyped). The request fields come
@@ -80,8 +89,9 @@ message }` — `422` for a `DomainError` unless its `STATUS_OF` map says otherwi
 400/404: `{ statusCode, message, error }`. A bad recommendation is a 400 first (the
 DTO's `@IsIn`) — [ADR-0009](decisions/0009-domain-errors-and-configure-app.md).
 
-**CORS** — `app.enableCors({ origin: <CORS_ORIGINS split on ','> })`. Empty
-`CORS_ORIGINS` → reflect any origin (dev). Set it before deploying.
+**CORS** — `app.enableCors({ origin: WEB_ORIGIN, credentials: true })`: one exact
+origin, which is also Better Auth's `trustedOrigins`. `AuthModule`'s own CORS is off
+(`disableTrustedOriginsCors`; it would not allow `PATCH`).
 
 > **What this constrains — breaks if you change it**
 > - Changing `POST /vacancies/intake`'s body or result → any n8n workflow calling

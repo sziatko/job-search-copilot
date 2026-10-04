@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
+import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -14,6 +15,8 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 // Excluded from the /api prefix (setup-app.ts) and version-neutral: infra hits a
 // stable /health, not /api/v1/health.
+// Anonymous: docker-compose's healthcheck has no session.
+@AllowAnonymous()
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);

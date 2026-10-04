@@ -1,12 +1,8 @@
 import 'reflect-metadata';
 import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
-import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test } from '@nestjs/testing';
-import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { AppModule } from '../src/app.module';
-import { configureApp } from '../src/setup-app';
+import { type Api, createTestApp, signedInAgent } from './test-app';
 
 // End-to-end: boots the real Nest app (same ValidationPipe as setup-app.ts) against
 // the real test database, and hits it over HTTP via supertest. This is what
@@ -14,6 +10,7 @@ import { configureApp } from '../src/setup-app';
 // pipeline, which a controller-only unit test with a mocked service would miss.
 describe('Vacancies (e2e)', () => {
   let app: NestExpressApplication;
+  let api: Api;
   const prisma = getPrisma();
 
   const validPayload = {
@@ -33,10 +30,8 @@ describe('Vacancies (e2e)', () => {
   }
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication<NestExpressApplication>();
-    configureApp(app, app.get(ConfigService));
-    await app.init();
+    app = await createTestApp();
+    api = await signedInAgent(app);
   });
 
   afterEach(async () => {
@@ -44,28 +39,26 @@ describe('Vacancies (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.user.deleteMany();
     await app.close();
     await prisma.$disconnect();
   });
 
   describe('POST /api/v1/vacancies', () => {
     it('creates a vacancy (201 + Location) and normalizes the Ukrainian recommendation', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/v1/vacancies')
-        .send(validPayload)
-        .expect(201);
+      const res = await api.post('/api/v1/vacancies').send(validPayload).expect(201);
       expect(res.body.recommendation).toBe('APPLY');
       expect(res.body.status).toBe('NOT_REVIEWED');
       expect(res.headers.location).toBe(`/api/v1/vacancies/${res.body.id}`);
     });
 
     it('returns 200 (not 201) when the applyUrl already exists, leaving it untouched', async () => {
-      const first = await request(app.getHttpServer())
+      const first = await api
         .post('/api/v1/vacancies')
         .send({ ...validPayload, matchScore: 60 })
         .expect(201);
 
-      const second = await request(app.getHttpServer())
+      const second = await api
         .post('/api/v1/vacancies')
         .send({ ...validPayload, matchScore: 95 })
         .expect(200);
@@ -76,19 +69,19 @@ describe('Vacancies (e2e)', () => {
     });
 
     it('rejects an unknown recommendation with 400', async () => {
-      await request(app.getHttpServer())
+      await api
         .post('/api/v1/vacancies')
         .send({ ...validPayload, recommendation: 'MAYBE' })
         .expect(400);
     });
 
     it('rejects a payload missing required fields with 400', async () => {
-      await request(app.getHttpServer()).post('/api/v1/vacancies').send({}).expect(400);
+      await api.post('/api/v1/vacancies').send({}).expect(400);
     });
 
     it('rejects an applyUrl that is not an http(s) link with 400', async () => {
       for (const applyUrl of ['not a url', 'example.com/jobs/1', 'javascript:alert(1)']) {
-        await request(app.getHttpServer())
+        await api
           .post('/api/v1/vacancies')
           .send({ ...validPayload, applyUrl })
           .expect(400);
@@ -98,18 +91,14 @@ describe('Vacancies (e2e)', () => {
 
     it('attaches the analysis to a row intake took in: 200, no Location', async () => {
       const id = await queued(validPayload.applyUrl);
-      const res = await request(app.getHttpServer())
-        .post('/api/v1/vacancies')
-        .send(validPayload)
-        .expect(200);
+      const res = await api.post('/api/v1/vacancies').send(validPayload).expect(200);
       expect(res.body).toMatchObject({ id, recommendation: 'APPLY', status: 'NOT_REVIEWED' });
       expect(res.headers.location).toBeUndefined();
     });
   });
 
   describe('POST /api/v1/vacancies/intake', () => {
-    const intake = (entries: unknown[]) =>
-      request(app.getHttpServer()).post('/api/v1/vacancies/intake').send({ entries });
+    const intake = (entries: unknown[]) => api.post('/api/v1/vacancies/intake').send({ entries });
     const entry = { url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' };
 
     it('takes a new posting in as NEW (200, the url as sent); a repeat by url or by name is not new', async () => {
@@ -182,13 +171,10 @@ describe('Vacancies (e2e)', () => {
 
     it('writes the analysis and moves NEW by the rule; a second one is a 409', async () => {
       const id = await queued('https://example.com/q/1');
-      const res = await request(app.getHttpServer())
-        .post(`/api/v1/vacancies/${id}/analysis`)
-        .send(analysis)
-        .expect(200);
+      const res = await api.post(`/api/v1/vacancies/${id}/analysis`).send(analysis).expect(200);
       expect(res.body).toMatchObject({ id, recommendation: 'SKIP', status: 'FILTERED_OUT' });
 
-      const again = await request(app.getHttpServer())
+      const again = await api
         .post(`/api/v1/vacancies/${id}/analysis`)
         .send({ ...analysis, matchScore: 90, recommendation: 'APPLY' })
         .expect(409);
@@ -197,12 +183,9 @@ describe('Vacancies (e2e)', () => {
     });
 
     it('404s for an unknown id; 400s on a bad body', async () => {
-      await request(app.getHttpServer())
-        .post('/api/v1/vacancies/999999/analysis')
-        .send(analysis)
-        .expect(404);
+      await api.post('/api/v1/vacancies/999999/analysis').send(analysis).expect(404);
       const id = await queued('https://example.com/q/1');
-      await request(app.getHttpServer())
+      await api
         .post(`/api/v1/vacancies/${id}/analysis`)
         .send({ ...analysis, recommendation: 'MAYBE' })
         .expect(400);
@@ -215,7 +198,7 @@ describe('Vacancies (e2e)', () => {
     it('writes a batch, in order', async () => {
       const a = await queued('https://example.com/q/1');
       const b = await queued('https://example.com/q/2');
-      const res = await request(app.getHttpServer())
+      const res = await api
         .post('/api/v1/vacancies/analysis')
         .send({
           analyses: [
@@ -230,11 +213,8 @@ describe('Vacancies (e2e)', () => {
     it('writes none of a batch with an analysed row in it: 409', async () => {
       const a = await queued('https://example.com/q/1');
       const b = await queued('https://example.com/q/2');
-      await request(app.getHttpServer())
-        .post(`/api/v1/vacancies/${b}/analysis`)
-        .send(analysis)
-        .expect(200);
-      await request(app.getHttpServer())
+      await api.post(`/api/v1/vacancies/${b}/analysis`).send(analysis).expect(200);
+      await api
         .post('/api/v1/vacancies/analysis')
         .send({
           analyses: [
@@ -248,7 +228,7 @@ describe('Vacancies (e2e)', () => {
 
     it('400s on an empty batch or more than 10', async () => {
       const post = (analyses: unknown[]) =>
-        request(app.getHttpServer()).post('/api/v1/vacancies/analysis').send({ analyses });
+        api.post('/api/v1/vacancies/analysis').send({ analyses });
       await post([]).expect(400);
       await post(Array.from({ length: 11 }, (_, i) => ({ id: i + 1, ...analysis }))).expect(400);
     });
@@ -256,63 +236,54 @@ describe('Vacancies (e2e)', () => {
 
   describe('GET /api/v1/vacancies', () => {
     it('lists saved vacancies without fullText', async () => {
-      await request(app.getHttpServer()).post('/api/v1/vacancies').send(validPayload).expect(201);
+      await api.post('/api/v1/vacancies').send(validPayload).expect(201);
 
-      const res = await request(app.getHttpServer()).get('/api/v1/vacancies').expect(200);
+      const res = await api.get('/api/v1/vacancies').expect(200);
       expect(res.body.total).toBe(1);
       expect(res.body.items[0]).not.toHaveProperty('fullText');
     });
 
     it('filters by ?hasText=; each item carries hasText', async () => {
-      await request(app.getHttpServer()).post('/api/v1/vacancies').send(validPayload).expect(201);
+      await api.post('/api/v1/vacancies').send(validPayload).expect(201);
       const id = await queued('https://example.com/q/1');
 
-      const without = await request(app.getHttpServer())
-        .get('/api/v1/vacancies?hasText=false')
-        .expect(200);
+      const without = await api.get('/api/v1/vacancies?hasText=false').expect(200);
       expect(without.body.items).toMatchObject([{ id, hasText: false }]);
-      const withText = await request(app.getHttpServer())
-        .get('/api/v1/vacancies?hasText=true')
-        .expect(200);
+      const withText = await api.get('/api/v1/vacancies?hasText=true').expect(200);
       expect(withText.body.items).toMatchObject([{ hasText: true }]);
-      await request(app.getHttpServer()).get('/api/v1/vacancies?hasText=yes').expect(400);
+      await api.get('/api/v1/vacancies?hasText=yes').expect(400);
     });
 
     it('filters by ?status=, any of a comma-separated list', async () => {
-      const a = await request(app.getHttpServer())
+      const a = await api
         .post('/api/v1/vacancies')
         .send({ ...validPayload, applyUrl: 'https://example.com/a' });
-      await request(app.getHttpServer())
+      await api
         .post('/api/v1/vacancies')
         .send({ ...validPayload, applyUrl: 'https://example.com/b' });
-      await request(app.getHttpServer())
+      await api
         .patch(`/api/v1/vacancies/${a.body.id}/status`)
         .send({ status: 'DECLINED' })
         .expect(200);
 
-      const declined = await request(app.getHttpServer())
-        .get('/api/v1/vacancies?status=DECLINED')
-        .expect(200);
+      const declined = await api.get('/api/v1/vacancies?status=DECLINED').expect(200);
       expect(declined.body.total).toBe(1);
-      const either = await request(app.getHttpServer())
-        .get('/api/v1/vacancies?status=NOT_REVIEWED,DECLINED')
-        .expect(200);
+      const either = await api.get('/api/v1/vacancies?status=NOT_REVIEWED,DECLINED').expect(200);
       expect(either.body.total).toBe(2);
-      await request(app.getHttpServer()).get('/api/v1/vacancies?status=DECLINED,MAYBE').expect(400);
+      await api.get('/api/v1/vacancies?status=DECLINED,MAYBE').expect(400);
     });
 
     it('rejects limit above 100 with 400', async () => {
-      await request(app.getHttpServer()).get('/api/v1/vacancies?limit=200').expect(400);
+      await api.get('/api/v1/vacancies?limit=200').expect(400);
     });
 
     it('pages by ?cursor= in ?sort=recommended order', async () => {
-      const server = app.getHttpServer();
       for (const [n, recommendation, matchScore] of [
         [1, 'SKIP', 90],
         [2, 'APPLY', 60],
         [3, 'APPLY_WITH_CAVEATS', 70],
       ] as const) {
-        await request(server)
+        await api
           .post('/api/v1/vacancies')
           .send({
             ...validPayload,
@@ -324,32 +295,28 @@ describe('Vacancies (e2e)', () => {
           .expect(201);
       }
 
-      const first = await request(server)
-        .get('/api/v1/vacancies?sort=recommended&limit=2')
-        .expect(200);
+      const first = await api.get('/api/v1/vacancies?sort=recommended&limit=2').expect(200);
       expect(first.body.items.map((item: { company: string }) => item.company)).toEqual([
         'Co 2',
         'Co 3',
       ]);
       expect(first.body).toMatchObject({ total: 3, nextCursor: first.body.items[1].id });
 
-      const next = await request(server)
+      const next = await api
         .get(`/api/v1/vacancies?sort=recommended&limit=2&cursor=${first.body.nextCursor}`)
         .expect(200);
       expect(next.body).toMatchObject({ items: [{ company: 'Co 1' }], total: 3, nextCursor: null });
     });
 
     it('400s on cursor with offset, a bad cursor, or an unknown sort', async () => {
-      const server = app.getHttpServer();
-      await request(server).get('/api/v1/vacancies?cursor=5&offset=0').expect(400);
-      await request(server).get('/api/v1/vacancies?cursor=abc').expect(400);
-      await request(server).get('/api/v1/vacancies?sort=oldest').expect(400);
+      await api.get('/api/v1/vacancies?cursor=5&offset=0').expect(400);
+      await api.get('/api/v1/vacancies?cursor=abc').expect(400);
+      await api.get('/api/v1/vacancies?sort=oldest').expect(400);
     });
 
     it('filters by ?search= on either the company or the title', async () => {
-      const server = app.getHttpServer();
-      await request(server).post('/api/v1/vacancies').send(validPayload).expect(201);
-      await request(server)
+      await api.post('/api/v1/vacancies').send(validPayload).expect(201);
+      await api
         .post('/api/v1/vacancies')
         .send({
           ...validPayload,
@@ -360,21 +327,20 @@ describe('Vacancies (e2e)', () => {
         })
         .expect(201);
 
-      const byCompany = await request(server).get('/api/v1/vacancies?search=ACME').expect(200);
+      const byCompany = await api.get('/api/v1/vacancies?search=ACME').expect(200);
       expect(byCompany.body.total).toBe(1);
       expect(byCompany.body.items[0].company).toBe('Acme');
 
-      const byTitle = await request(server).get('/api/v1/vacancies?search=frontend').expect(200);
+      const byTitle = await api.get('/api/v1/vacancies?search=frontend').expect(200);
       expect(byTitle.body.total).toBe(1);
       expect(byTitle.body.items[0].title).toBe('Frontend Lead');
     });
 
     it('treats a LIKE metacharacter in ?search= as a literal', async () => {
-      const server = app.getHttpServer();
-      await request(server).post('/api/v1/vacancies').send(validPayload).expect(201);
+      await api.post('/api/v1/vacancies').send(validPayload).expect(201);
 
       // Unescaped, `%` is a wildcard and this matches every row in the table.
-      const res = await request(server)
+      const res = await api
         .get('/api/v1/vacancies?search=%25') // %25 is a URL-encoded '%'
         .expect(200);
 
@@ -382,41 +348,36 @@ describe('Vacancies (e2e)', () => {
     });
 
     it('ANDs ?search= with the other query filters', async () => {
-      const server = app.getHttpServer();
-      await request(server).post('/api/v1/vacancies').send(validPayload).expect(201);
+      await api.post('/api/v1/vacancies').send(validPayload).expect(201);
 
-      const res = await request(server)
-        .get('/api/v1/vacancies?search=acme&recommendation=SKIP')
-        .expect(200);
+      const res = await api.get('/api/v1/vacancies?search=acme&recommendation=SKIP').expect(200);
       expect(res.body.total).toBe(0);
     });
 
     it('carries the derived companyMatchCount, counted across the whole table', async () => {
-      const server = app.getHttpServer();
-      await request(server).post('/api/v1/vacancies').send(validPayload).expect(201);
-      await request(server)
+      await api.post('/api/v1/vacancies').send(validPayload).expect(201);
+      await api
         .post('/api/v1/vacancies')
         .send({ ...validPayload, title: 'Data Engineer', applyUrl: 'https://example.com/jobs/3' })
         .expect(201);
 
       // limit=1: the count still spans both Acme rows, so it is a property of the
       // row, not of the page it arrived on.
-      const res = await request(server).get('/api/v1/vacancies?company=Acme&limit=1').expect(200);
+      const res = await api.get('/api/v1/vacancies?company=Acme&limit=1').expect(200);
 
       expect(res.body.items).toHaveLength(1);
       expect(res.body.items[0].companyMatchCount).toBe(2);
     });
 
     it('lists every spelling of a company with ?sameCompanyAs=', async () => {
-      const server = app.getHttpServer();
-      await request(server).post('/api/v1/vacancies').send(validPayload).expect(201);
-      await request(server)
+      await api.post('/api/v1/vacancies').send(validPayload).expect(201);
+      await api
         .post('/api/v1/vacancies')
         .send({ ...validPayload, company: 'Acme Polska', applyUrl: 'https://example.com/jobs/4' })
         .expect(201);
 
       for (const name of ['Acme', 'Acme Polska']) {
-        const res = await request(server)
+        const res = await api
           .get(`/api/v1/vacancies?sameCompanyAs=${encodeURIComponent(name)}`)
           .expect(200);
         expect(res.body.total).toBe(2);
@@ -426,16 +387,12 @@ describe('Vacancies (e2e)', () => {
 
   describe('GET /api/v1/vacancies/:id', () => {
     it('404s for an unknown id', async () => {
-      await request(app.getHttpServer()).get('/api/v1/vacancies/999999').expect(404);
+      await api.get('/api/v1/vacancies/999999').expect(404);
     });
 
     it('returns the full record, including fullText, for a known id', async () => {
-      const created = await request(app.getHttpServer())
-        .post('/api/v1/vacancies')
-        .send(validPayload);
-      const res = await request(app.getHttpServer())
-        .get(`/api/v1/vacancies/${created.body.id}`)
-        .expect(200);
+      const created = await api.post('/api/v1/vacancies').send(validPayload);
+      const res = await api.get(`/api/v1/vacancies/${created.body.id}`).expect(200);
       expect(res.body.fullText).toBe(validPayload.fullText);
       expect(res.body.estimationComment).toBe(validPayload.estimationComment);
       expect(res.body.timeline).toEqual([
@@ -447,17 +404,12 @@ describe('Vacancies (e2e)', () => {
 
   describe('PATCH /api/v1/vacancies/:id/status', () => {
     it('404s for an unknown id', async () => {
-      await request(app.getHttpServer())
-        .patch('/api/v1/vacancies/999999/status')
-        .send({ status: 'DECLINED' })
-        .expect(404);
+      await api.patch('/api/v1/vacancies/999999/status').send({ status: 'DECLINED' }).expect(404);
     });
 
     it('updates the status for a known id', async () => {
-      const created = await request(app.getHttpServer())
-        .post('/api/v1/vacancies')
-        .send(validPayload);
-      const res = await request(app.getHttpServer())
+      const created = await api.post('/api/v1/vacancies').send(validPayload);
+      const res = await api
         .patch(`/api/v1/vacancies/${created.body.id}/status`)
         .send({ status: 'SAVED_FOR_LATER' })
         .expect(200);
@@ -467,25 +419,19 @@ describe('Vacancies (e2e)', () => {
     });
 
     it('sets UNAVAILABLE, and filters by it', async () => {
-      const created = await request(app.getHttpServer())
-        .post('/api/v1/vacancies')
-        .send(validPayload);
-      const res = await request(app.getHttpServer())
+      const created = await api.post('/api/v1/vacancies').send(validPayload);
+      const res = await api
         .patch(`/api/v1/vacancies/${created.body.id}/status`)
         .send({ status: 'UNAVAILABLE' })
         .expect(200);
       expect(res.body.status).toBe('UNAVAILABLE');
-      const listed = await request(app.getHttpServer())
-        .get('/api/v1/vacancies?status=UNAVAILABLE')
-        .expect(200);
+      const listed = await api.get('/api/v1/vacancies?status=UNAVAILABLE').expect(200);
       expect(listed.body.total).toBe(1);
     });
 
     it('refuses a repeated triage status with 422', async () => {
-      const created = await request(app.getHttpServer())
-        .post('/api/v1/vacancies')
-        .send(validPayload);
-      const res = await request(app.getHttpServer())
+      const created = await api.post('/api/v1/vacancies').send(validPayload);
+      const res = await api
         .patch(`/api/v1/vacancies/${created.body.id}/status`)
         .send({ status: 'NOT_REVIEWED' })
         .expect(422);
@@ -493,21 +439,20 @@ describe('Vacancies (e2e)', () => {
     });
 
     it('sets an unanalysed vacancy back to NEW; an analysed one is a 422', async () => {
-      const server = app.getHttpServer();
       const id = await queued('https://example.com/jobs/queued');
-      await request(server)
+      await api
         .patch(`/api/v1/vacancies/${id}/status`)
         .send({ status: 'FILTERED_OUT' })
         .expect(200);
-      const back = await request(server)
+      const back = await api
         .patch(`/api/v1/vacancies/${id}/status`)
         .send({ status: 'NEW' })
         .expect(200);
       expect(back.body.status).toBe('NEW');
 
       // Saved with an analysis: the CHECK would make it a 500, core refuses it first.
-      const created = await request(server).post('/api/v1/vacancies').send(validPayload);
-      const res = await request(server)
+      const created = await api.post('/api/v1/vacancies').send(validPayload);
+      const res = await api
         .patch(`/api/v1/vacancies/${created.body.id}/status`)
         .send({ status: 'NEW' })
         .expect(422);
@@ -515,10 +460,8 @@ describe('Vacancies (e2e)', () => {
     });
 
     it('rejects an invalid status with 400', async () => {
-      const created = await request(app.getHttpServer())
-        .post('/api/v1/vacancies')
-        .send(validPayload);
-      await request(app.getHttpServer())
+      const created = await api.post('/api/v1/vacancies').send(validPayload);
+      await api
         .patch(`/api/v1/vacancies/${created.body.id}/status`)
         .send({ status: 'MAYBE' })
         .expect(400);
@@ -526,9 +469,8 @@ describe('Vacancies (e2e)', () => {
   });
 
   it('has no /log any more: GET /log and POST /log/check are 404s', async () => {
-    const server = app.getHttpServer();
-    await request(server).get('/api/v1/log').expect(404);
-    await request(server)
+    await api.get('/api/v1/log').expect(404);
+    await api
       .post('/api/v1/log/check')
       .send({ entries: [{ url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' }] })
       .expect(404);

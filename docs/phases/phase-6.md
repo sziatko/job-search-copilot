@@ -158,7 +158,7 @@ register Claude as a client. Hence JSC's own authorization server.
   find the current suite". `core`'s test setup now deletes users too; api/mcp setups
   do not yet.
 
-- [ ] **2 · API: the guard and the machine token.** The module, CORS with credentials,
+- [x] **2 · API: the guard and the machine token.** The module, CORS with credentials,
   `@AllowAnonymous()` on `/health`, `MachineTokenGuard` (`timingSafeEqual` on
   `INTAKE_TOKEN`; a route it guards accepts a session too), env validation for the new
   vars. **Check first:** the module wants `bodyParser: false`, while `setup-app.ts`
@@ -167,7 +167,16 @@ register Claude as a client. Hence JSC's own authorization server.
   utilities: 1.7 has a `testUtils` plugin in `better-auth/plugins`; else a `Session`
   row written in the test DB). New tests:
   401 without a cookie, 200 with one; `/health` anonymous; the three n8n routes 401 /
-  401 / 2xx for no token, a wrong token, the right one.
+  401 / 2xx for no token, a wrong token, the right one. — *2026-10-04.*
+  `@thallesp/nestjs-better-auth` 2.8.0 (ESM-only, loaded through `require(esm)` like
+  `better-auth`). `CORS_ORIGINS` is gone, replaced by `WEB_ORIGIN`. **The dev API will
+  not boot until `.env` has the new vars** (copy them from `.env.example`, generate
+  `BETTER_AUTH_SECRET` and `INTAKE_TOKEN`; fake Google/LinkedIn ids are enough until
+  step 3) and `npm run migrate:dev` has run. The `api` container now reads `.env`
+  (`env_file`). Test sign-in writes the `User` + `Session` rows and signs the cookie
+  itself (`apps/api/test/test-app.ts`), so no `testUtils` plugin in `createAuth`; an
+  e2e app must be created with `bodyParser: false` (`createTestApp()`), or the 5 MB
+  limit is lost. Only the api project was run here (63/63); core, mcp, web unchanged.
 
 - [ ] **3 · Web: sign-in.** `/login` (Google, LinkedIn, Sign in with a passkey), the
   root guard redirecting to `/login`, sign-out, Passkeys on `/profile`, `credentials`.

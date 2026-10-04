@@ -9,8 +9,32 @@ import { z } from 'zod';
 const envSchema = z.object({
   DATABASE_URL: z.url(),
   API_PORT: z.coerce.number().int().positive().default(3000),
-  /** Comma-separated CORS allowlist. Empty → reflect any origin (dev convenience). */
-  CORS_ORIGINS: z.string().default(''),
+  /** Signs session cookies (ADR-0034). `openssl rand -base64 32`. */
+  BETTER_AUTH_SECRET: z.string().min(32),
+  /** The API's public origin; OAuth callbacks are built from it. */
+  BETTER_AUTH_URL: z.url(),
+  /** The web's origin, exactly: the CORS allowlist and Better Auth's trustedOrigins. */
+  WEB_ORIGIN: z.url().refine((url) => new URL(url).origin === url, {
+    message: 'must be a bare origin, e.g. http://localhost:5173 (no path, no trailing slash)',
+  }),
+  GOOGLE_CLIENT_ID: z.string().min(1),
+  GOOGLE_CLIENT_SECRET: z.string().min(1),
+  LINKEDIN_CLIENT_ID: z.string().min(1),
+  LINKEDIN_CLIENT_SECRET: z.string().min(1),
+  /** Comma-separated: the only emails that may sign up. */
+  AUTH_ALLOWED_EMAILS: z
+    .string()
+    .transform((list) =>
+      list
+        .split(',')
+        .map((email) => email.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.email()).min(1)),
+  /** The passkeys' relying party id (`localhost` in dev); changing it voids them all. */
+  PASSKEY_RP_ID: z.string().min(1),
+  /** n8n's bearer token for the intake and analysis routes (ADR-0036). */
+  INTAKE_TOKEN: z.string().min(32),
 });
 
 export type Env = z.infer<typeof envSchema>;

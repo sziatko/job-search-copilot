@@ -27,6 +27,17 @@ jobs:
     env:
       # vitest configs read process.env when no .env.test file is present (CI has none).
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/job_search_copilot_test
+      # Auth (phase 6) — fake values, as in .env.test.
+      BETTER_AUTH_SECRET: test-secret-at-least-32-characters-long
+      BETTER_AUTH_URL: http://localhost:3000
+      WEB_ORIGIN: http://localhost:5173
+      GOOGLE_CLIENT_ID: test-google-client-id
+      GOOGLE_CLIENT_SECRET: test-google-client-secret
+      LINKEDIN_CLIENT_ID: test-linkedin-client-id
+      LINKEDIN_CLIENT_SECRET: test-linkedin-client-secret
+      AUTH_ALLOWED_EMAILS: me@example.com
+      PASSKEY_RP_ID: localhost
+      INTAKE_TOKEN: test-intake-token-at-least-32-characters
 
     steps:
       - uses: actions/checkout@v4
