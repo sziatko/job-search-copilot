@@ -122,8 +122,11 @@ describe('job-search-copilot MCP server', () => {
 
   it('works the analysis queue: list NEW with text → get_vacancies_batch → submit_analyses_batch', async () => {
     const client = await connectedClient();
-    await queued('https://example.com/q/1', 'Posting one.');
-    await queued('https://example.com/q/2', 'Posting two.');
+    // Intake stores posting text from 200 characters (a shorter one is a login wall).
+    const one = 'Posting one. '.padEnd(200, 'x');
+    const two = 'Posting two. '.padEnd(200, 'x');
+    await queued('https://example.com/q/1', one);
+    await queued('https://example.com/q/2', two);
     await queued('https://example.com/q/3'); // no text: not in the queue
 
     const listed = await client.callTool({
@@ -139,7 +142,7 @@ describe('job-search-copilot MCP server', () => {
       JSON.parse(textOf(got))
         .map((v: { fullText: string }) => v.fullText)
         .sort(),
-    ).toEqual(['Posting one.', 'Posting two.']);
+    ).toEqual([one, two]);
 
     const submitted = await client.callTool({
       name: 'submit_analyses_batch',

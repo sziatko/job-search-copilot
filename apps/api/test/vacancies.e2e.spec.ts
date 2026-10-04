@@ -124,14 +124,13 @@ describe('Vacancies (e2e)', () => {
     });
 
     it('fills the posting text on a second call, and nothing else', async () => {
+      const fullText = 'The posting. '.padEnd(200, 'x');
       await intake([entry]).expect(200);
-      const res = await intake([{ ...entry, source: 'justjoin', fullText: 'The posting.' }]).expect(
-        200,
-      );
+      const res = await intake([{ ...entry, source: 'justjoin', fullText }]).expect(200);
       expect(res.body).toEqual({ new: [] });
       expect(
         await prisma.vacancy.findUniqueOrThrow({ where: { applyUrl: entry.url } }),
-      ).toMatchObject({ fullText: 'The posting.', source: null, status: 'NEW' });
+      ).toMatchObject({ fullText, source: null, status: 'NEW' });
     });
 
     it('400s on a missing or blank company or title, a non-URL, an empty or oversized batch', async () => {

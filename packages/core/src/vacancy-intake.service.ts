@@ -6,6 +6,10 @@ import { normalizeApplyUrl } from './url';
 import type { VacancyIntakeInput } from './vacancy-intake';
 import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 
+/** Shorter posting text, trimmed, is taken as none: a login wall or captcha page, not a
+ * posting. Text is never overwritten, so storing it would block the real one. */
+const MIN_TEXT_LENGTH = 200;
+
 interface PreparedEntry {
   applyUrl: string;
   company: string;
@@ -30,7 +34,8 @@ function prepare(entry: VacancyIntakeInput): PreparedEntry | null {
     companyKey: normalizeCompanyKey(company),
     titleKey: normalizeTitleKey(title),
     source: entry.source?.trim() || null,
-    fullText: entry.fullText?.trim() ? entry.fullText : null,
+    fullText:
+      entry.fullText && entry.fullText.trim().length >= MIN_TEXT_LENGTH ? entry.fullText : null,
   };
 }
 

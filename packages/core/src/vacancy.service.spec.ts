@@ -178,15 +178,16 @@ describe('VacancyService', () => {
     });
 
     it('keeps the text a row intake took in already has', async () => {
+      const fullText = 'From the source. '.padEnd(200, 'x');
       await intake.intake({
         url: 'https://example.com/jobs/1',
         company: 'Acme',
         title: 'Dev',
-        fullText: 'From the source.',
+        fullText,
       });
       const { attached, vacancy } = await service.save(input());
       expect(attached).toBe(true);
-      expect(vacancy.fullText).toBe('From the source.');
+      expect(vacancy.fullText).toBe(fullText);
     });
 
     it('collapses two tracking variants of one posting into a single row', async () => {
