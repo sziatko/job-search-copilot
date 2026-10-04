@@ -95,7 +95,7 @@ origin, which is also Better Auth's `trustedOrigins`. `AuthModule`'s own CORS is
 
 > **What this constrains — breaks if you change it**
 > - Changing `POST /vacancies/intake`'s body or result → any n8n workflow calling
->   it (not in this repo; this is n8n's only way in while MCP is stdio-only) and
+>   it (not in this repo; this is n8n's way in) and
 >   `apps/api/test/vacancies.e2e.spec.ts`.
 > - Renaming a path / changing the prefix or version → `apps/web/src/lib/api.ts`
 >   (`API_BASE`), both features' `api.ts`, the MSW handlers in
@@ -170,6 +170,28 @@ server on stdio) — it shows what `tools/list` returns, so it is always the rea
 `stdout` is reserved for the MCP protocol — all logging goes to `stderr`
 (`console.error` in `apps/mcp/src/index.ts`).
 
+**Over HTTP** ([ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md)) —
+`apps/mcp/src/http.ts` (`npm run dev:mcp:http`, port `MCP_HTTP_PORT`, 3001) serves the
+same tools as Streamable HTTP at `MCP_PUBLIC_URL`'s path (`/mcp`); stdio is unchanged
+and has no auth.
+
+- `GET /.well-known/oauth-protected-resource/mcp` (RFC 9728, path-inserted) →
+  `{ resource: MCP_PUBLIC_URL, authorization_servers: ["${BETTER_AUTH_URL}/api/auth"],
+  bearer_methods_supported: ["header"] }`. The authorization server's own metadata is
+  the API's (`/.well-known/oauth-authorization-server/api/auth`).
+- `POST /mcp` wants `Authorization: Bearer <access token>`: a JWT the API's
+  `oauthProvider` signed (`typ: at+jwt`), checked against the API's JWKS
+  (`${AUTH_URL}/api/auth/jwks`, cached) for `iss` = `${BETTER_AUTH_URL}/api/auth`,
+  `aud` ∋ `MCP_PUBLIC_URL`, `exp`. No token, or a bad one → `401` with
+  `WWW-Authenticate: Bearer error="invalid_token", …,
+  resource_metadata="<the document above>"`. The API unreachable → `500`. A client gets
+  a JWT only when it sends `resource=<MCP_PUBLIC_URL>` (RFC 8707); without it the token
+  is opaque and refused here.
+- Stateless: each `POST` gets its own server and transport, no `Mcp-Session-Id`;
+  `GET` / `DELETE /mcp` → `405`. JSON bodies up to 5 MB (as the API — the batch tools
+  carry posting text). The `Host` header must be `MCP_PUBLIC_URL`'s host, else `403`
+  (DNS-rebinding guard).
+
 > **What this constrains — breaks if you change it**
 > - Changing `save_vacancy`'s output shape → the external
 >   vacancy-match-analyzer prompt (not in this repo) reads `success` (renamed from
@@ -179,6 +201,10 @@ server on stdio) — it shows what `tools/list` returns, so it is always the rea
 >   (the in-memory `Client` calls each tool by name).
 > - Writing anything to `stdout` from the MCP process → corrupts the protocol
 >   stream; the client disconnects.
+>   (stdio only; the HTTP entrypoint logs to `stdout` freely.)
+> - Changing `MCP_PUBLIC_URL` (scheme, host, port or path) without the API seeing the
+>   same value → every token's `aud` misses and every call is a `401`; the host also
+>   gates the `Host` check. The API seeds an `OauthResource` row per value, insert-only.
 
 ## Web ↔ API contract
 

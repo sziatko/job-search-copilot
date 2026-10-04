@@ -113,6 +113,31 @@ services:
     # Prisma client regenerated on start — see `core`.
     command: sh -c "npm --prefix /repo run generate && exec sleep infinity"
 
+  # MCP over Streamable HTTP behind OAuth (ADR-0035): the same tools as `mcp`, for remote
+  # clients (the MCP Inspector, `claude mcp add --transport http`). A service of its own,
+  # so a crash here never takes stdio down. MCP_PUBLIC_URL and BETTER_AUTH_URL come from
+  # .env (src/env.ts loads it); AUTH_URL is where it fetches the API's JWKS — `localhost`
+  # inside a container is the container itself.
+  mcp-http:
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core:
+        condition: service_started
+    command: sh -c "npm --prefix /repo run generate && exec npm run dev:http"
+    environment:
+      DATABASE_URL: *database-url
+      AUTH_URL: http://api:3000
+      MCP_HTTP_PORT: 3001
+    ports:
+      - '3001:3001'
+    volumes: *repo-volumes
+
   web:
     build:
       context: .

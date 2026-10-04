@@ -130,7 +130,9 @@ register Claude as a client. Hence JSC's own authorization server.
   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`,
   `LINKEDIN_CLIENT_SECRET`, `AUTH_ALLOWED_EMAILS`, `PASSKEY_RP_ID`, `INTAKE_TOKEN`,
   `MCP_PUBLIC_URL` (the tokens' audience; one `.env` value for both apps); for mcp
-  `AUTH_URL`, `MCP_HTTP_PORT`, `MCP_PUBLIC_URL`. Fake values in `.env.example` and
+  `AUTH_URL` (where it fetches the JWKS), `MCP_HTTP_PORT`, `MCP_PUBLIC_URL`, and
+  `BETTER_AUTH_URL` (the issuer; in Docker `AUTH_URL` is `http://api:3000`, which is
+  not the public URL the tokens name). Fake values in `.env.example` and
   `.env.test`.
 - **A new invariant:** every REST route is closed by default; anonymous access is
   explicit (`@AllowAnonymous()`), machine access is explicit (`MachineTokenGuard`).
@@ -218,7 +220,7 @@ register Claude as a client. Hence JSC's own authorization server.
   The `OauthResource` row is seeded at boot, insert-only: changing `MCP_PUBLIC_URL`
   adds a row, it does not edit the old one. core/api/mcp/web 501/501, lint and typecheck clean.
 
-- [ ] **5 · MCP over HTTP.** `apps/mcp/src/http.ts`, its port in `docker-compose.yml`,
+- [x] **5 · MCP over HTTP.** `apps/mcp/src/http.ts`, its port in `docker-compose.yml`,
   an npm script. **Check first:** how to verify `oauthProvider`'s tokens from a separate
   resource server (Better Auth's helper, or `jose` against the JWKS); how a test gets a
   valid token. Tests: the protected-resource document; 401 with `WWW-Authenticate`;
@@ -226,6 +228,19 @@ register Claude as a client. Hence JSC's own authorization server.
   MCP Inspector (phase 5.1) or `claude mcp add --transport http` runs the OAuth flow
   end to end. Update `architecture.md`, `contracts.md`, the root `README.md`. No skill
   changes: no tool or field changes.
+  — *Code and tests done 2026-10-04; the by-hand check is pending*, together with the
+  phase's end-to-end verification below (no OAuth credentials, dev DB not migrated).
+  Tokens are checked with `jose` (`jwtVerify` against `createRemoteJWKSet`, `typ:
+  at+jwt`) inside the SDK's `requireBearerAuth`; Better Auth's resource client would
+  pull `better-auth` into mcp for the same check. `src/http-app.ts` is the testable
+  factory, `src/http.ts` the entrypoint. Own Express app, not the SDK's
+  `createMcpExpressApp`: its JSON limit is 100 KB, too small for the batch tools. A
+  service of its own in Compose, `mcp-http` (port 3001), so stdio's `mcp` is untouched;
+  **the containers need `docker compose up -d --build`** (new deps: `express`, `jose`;
+  SDK 1.30 → 1.32). Stayed on `@modelcontextprotocol/sdk` 1.x: the split v2 packages
+  (`@modelcontextprotocol/server` 2.x) are a migration of every tool file, not this
+  step. No CORS on the MCP server: Claude Code and the Inspector's proxy call it from
+  Node, not a browser. mcp project 41/41; core, api, web not run (unchanged).
 
 ## Verification, every step
 

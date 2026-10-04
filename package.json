@@ -13,6 +13,7 @@
     "build": "npm run build --workspaces --if-present",
     "dev:api": "npm run start:dev --workspace=@job-search-copilot/api",
     "dev:mcp": "npm run dev --workspace=@job-search-copilot/mcp",
+    "dev:mcp:http": "npm run dev:http --workspace=@job-search-copilot/mcp",
     "mcp:inspect": "mcp-inspector npm run dev:mcp",
     "test": "vitest run",
     "test:watch": "vitest",

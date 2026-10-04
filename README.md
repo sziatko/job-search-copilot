@@ -47,10 +47,13 @@ npm run test:db:migrate         # test DB (job_search_copilot_test)
 | --- | --- |
 | Web | http://localhost:5173 |
 | API | http://localhost:3000/api/v1 · health at http://localhost:3000/health · docs (Swagger UI) at http://localhost:3000/api/docs |
+| MCP over HTTP | http://localhost:3001/mcp — OAuth: sign in on the web, then consent ([ADR-0035](docs/decisions/0035-mcp-over-http-oauth-resource-server.md)) |
 | Postgres | `localhost:5432` (`postgres` / `postgres`) |
 
 The `mcp` container idles (`sleep infinity`); a session connects by `docker exec`
-into it and running `npm run dev:mcp`.
+into it and running `npm run dev:mcp`. `mcp-http` serves the same tools over HTTP for
+remote clients: `claude mcp add --transport http jsc http://localhost:3001/mcp`, or the
+MCP Inspector with transport *Streamable HTTP* and that URL.
 
 > After changing dependencies or `packages/core/prisma/schema.prisma`, the
 > containers' `node_modules` / generated client go stale — re-run
@@ -62,6 +65,7 @@ into it and running `npm run dev:mcp`.
 | Command | |
 | --- | --- |
 | `npm run dev:api` / `npm run dev:mcp` | run a service on the host instead of in Docker |
+| `npm run dev:mcp:http` | MCP over Streamable HTTP on the host (`MCP_HTTP_PORT`, behind OAuth; needs the API up) |
 | `npm run mcp:inspect` | the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) web UI over the MCP server (stdio, needs `.env`) — browse the tools and call them |
 | `npm test` / `npm run test:watch` | Vitest across all workspaces (needs the test DB) |
 | `npm run lint` / `npm run lint:fix` / `npm run format` | Biome |

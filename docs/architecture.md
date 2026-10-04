@@ -8,8 +8,8 @@ score, a recommendation, and reasoning. This repo is the plumbing around that
 output: somewhere to store each analysed vacancy, and a UI to work through them
 from *not reviewed* to *applied* or *declined*.
 
-Single user (the user). No auth, no multi-tenancy. Local-first: Docker Compose on a
-laptop, Postgres in a container.
+Single user (the user), signed in with Google / LinkedIn / a passkey (phase 6); no
+multi-tenancy. Local-first: Docker Compose on a laptop, Postgres in a container.
 
 ## The four packages
 
@@ -19,9 +19,10 @@ packages/core   ── domain layer: Prisma schema/client, VacancyService,
                    Framework-agnostic — no @nestjs/*, no MCP SDK.
       ▲     ▲
       │     └───────────────┐
-apps/api (NestJS REST)      apps/mcp (MCP server, stdio)
+apps/api (NestJS REST)      apps/mcp (MCP server, stdio + HTTP)
       ▲                            ▲
-      │ HTTP /api/v1               │ stdio (per Claude session)
+      │ HTTP /api/v1               │ stdio (per Claude Desktop session), or
+      │                            │ Streamable HTTP /mcp + an OAuth token from api
 apps/web (React SPA)        vacancy-match-analyzer
 ```
 
@@ -29,7 +30,7 @@ apps/web (React SPA)        vacancy-match-analyzer
 | --- | --- | --- |
 | [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the schema (`Vacancy` with its `StatusChange` journal and `Comment`s) + migrations, the `VacancyService`, `ApplicationService`, `VacancyIntakeService` and `StatsService` (all queries), `writeStatus` (the only writer of status), the timeout rule (`TIMEOUT_DAYS`, `timedOutWhere` in `status.ts`), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
 | `apps/api` | Thin HTTP transport over the core services for the web app. NestJS: DI, DTO validation, versioned routes (`vacancies`, `applications`), a health check. | `core`, `@nestjs/*`, `class-validator`, `zod` |
-| `apps/mcp` | Thin stdio transport over the *same* services, exposing thirteen tools (7 for vacancies, 4 for applications incl. `update_vacancy_status`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. | `core`, `@modelcontextprotocol/sdk`, `zod` |
+| `apps/mcp` | Thin transport over the *same* services, exposing thirteen tools (7 for vacancies, 4 for applications incl. `update_vacancy_status`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. Two entrypoints over one `createServer()`: `src/index.ts` (stdio, no auth) and `src/http.ts` (Streamable HTTP, an OAuth 2.1 resource server checking the API's JWTs — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md)). | `core`, `@modelcontextprotocol/sdk`, `express`, `jose`, `zod` |
 | `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/applications`, `/inbox`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
@@ -96,7 +97,7 @@ draw on under `src/components/ui/` (`ScorePill`, `KpiTile`, `Modal`, `Select`,
 ## Dev stack (Docker Compose)
 
 `docker-compose.yml` runs: `postgres`, a `core` build watcher (`tsc --watch`),
-`api`, `mcp`, `web`.
+`api`, `mcp`, `mcp-http`, `web`.
 
 - **File watchers poll.** Bind-mount change events don't reliably reach containers
   on Windows/Docker Desktop, so `tsc --watch`, `nest start --watch`
@@ -110,10 +111,15 @@ draw on under `src/components/ui/` (`ScorePill`, `KpiTile`, `Modal`, `Select`,
   > **Breaks if you change it:** giving `mcp` a real long-running `command` →
   > only one MCP session at a time, and `docker exec`-based session startup no
   > longer applies.
+- **`mcp-http` is MCP over HTTP** on port 3001 (`npm run dev:http`), a service of its
+  own so a crash there never touches stdio. It fetches the API's JWKS at
+  `AUTH_URL=http://api:3000` — inside a container `localhost` is the container — while
+  the tokens' issuer stays `${BETTER_AUTH_URL}/api/auth`, the public URL.
 - **`api`/`mcp` don't watch `core`'s `dist/`.** They consume the *compiled* output
   of `packages/core`, and their watchers don't react to it changing. After editing
-  `packages/core`, run `docker compose restart api mcp` if the change doesn't show
-  up. This is the friction tracked in
+  `packages/core`, run `docker compose restart api mcp mcp-http` if the change doesn't
+  show up (`mcp-http` runs `tsx` without a watcher: its own source edits want a
+  restart too). This is the friction tracked in
   [ADR-0003](decisions/0003-core-consumed-as-dist.md).
 - **Healthchecks gate startup.** `postgres` has a `pg_isready` healthcheck; `api`
   and `mcp` `depends_on: postgres: condition: service_healthy`; `api` has its own
@@ -127,7 +133,7 @@ container, not just `core`:
 
 - new dependency → `docker compose exec <svc> npm install` in each service that
   imports it (e.g. `web` for a new web dep).
-- `schema.prisma` change → `docker compose restart api mcp core`. Each of the three
+- `schema.prisma` change → `docker compose restart api mcp mcp-http core`. Each of them
   runs `prisma generate` into its own volume before it starts (its `command` in
   `docker-compose.yml`). By hand: `docker compose exec <svc> npm --prefix /repo run
   generate`. Symptoms of a missed
