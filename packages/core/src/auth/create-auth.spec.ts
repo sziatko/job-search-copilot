@@ -1,3 +1,4 @@
+import { handleOAuthUserInfo } from 'better-auth/oauth2';
 import { describe, expect, it } from 'vitest';
 import { getPrisma } from '../prisma-client';
 import { createAuth } from './create-auth';
@@ -46,5 +47,17 @@ describe('createAuth', () => {
       userId: user.id,
     });
     expect((await ctx.internalAdapter.findSession(session.token))?.user.id).toBe(user.id);
+  });
+
+  it('will not link a second provider whose email is unverified (no trustedProviders)', async () => {
+    await signUpWithGoogle('me@example.com');
+    const context = await auth.$context;
+    // The refusal path reads only `c.context`; a full endpoint context is not needed.
+    const result = await handleOAuthUserInfo({ context } as never, {
+      userInfo: { id: 'li-sub', email: 'me@example.com', emailVerified: false, name: 'Someone' },
+      account: { providerId: 'linkedin', accountId: 'li-sub' },
+    });
+    expect(result.error).toBe('account not linked');
+    expect(await prisma.account.count()).toBe(1);
   });
 });

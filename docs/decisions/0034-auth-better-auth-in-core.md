@@ -56,8 +56,9 @@ issues tokens. Moving to an IdP later changes the backend only.
   `MachineTokenGuard` ([ADR-0036](0036-machine-token-for-n8n.md)). Marking one anonymous
   exposes data: `Vacancy` has no owner.
 - Removing the allowlist before `userId` lands gives every new account all the data.
-- `trustedProviders` must list only providers that set `email_verified` truthfully;
-  adding one that does not lets an unverified address take over an account.
+- Account linking is left empty of `trustedProviders`: an account links to an existing
+  user only when the provider says `email_verified`. Adding a trusted provider skips
+  that check and lets an unverified address there take over the account.
 - `WEB_ORIGIN` must equal the web's origin exactly: it is both the CORS allowlist and
   Better Auth's `trustedOrigins`; a mismatch fails every sign-in with a CSRF error.
 - `PASSKEY_RP_ID` is baked into every stored passkey; changing the domain invalidates

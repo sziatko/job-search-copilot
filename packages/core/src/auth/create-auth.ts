@@ -47,9 +47,10 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
       linkedin: config.linkedin,
     },
     account: {
-      // A trusted provider's account links to an existing user with the same email even
-      // without `email_verified` — list only providers that verify emails themselves.
-      accountLinking: { enabled: true, trustedProviders: ['google', 'linkedin'] },
+      // Links to an existing user with the same email only when the provider says
+      // `email_verified`. No `trustedProviders` on purpose: a trusted provider skips that
+      // check, so an unverified address there could take over the user (ADR-0034).
+      accountLinking: { enabled: true },
     },
     databaseHooks: {
       user: {
