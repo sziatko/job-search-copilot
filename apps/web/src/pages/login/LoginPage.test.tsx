@@ -58,6 +58,12 @@ describe('sign-in', () => {
     );
   });
 
+  it("keeps an MCP client's signed request in the URL, for sign-in to post back", async () => {
+    const router = renderAt('/login?client_id=c1&ba_param=client_id&sig=s1');
+    await screen.findByRole('button', { name: /sign in with a passkey/i });
+    expect(router.state.location.search).toMatchObject({ client_id: 'c1', sig: 's1' });
+  });
+
   it('signs out and lands on /login', async () => {
     let signedOut = false;
     mswServer.use(

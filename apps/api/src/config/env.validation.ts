@@ -35,6 +35,8 @@ const envSchema = z.object({
   PASSKEY_RP_ID: z.string().min(1),
   /** n8n's bearer token for the intake and analysis routes (ADR-0036). */
   INTAKE_TOKEN: z.string().min(32),
+  /** The MCP server's URL as clients call it: the audience of the tokens JSC issues (ADR-0035). */
+  MCP_PUBLIC_URL: z.url(),
 });
 
 export type Env = z.infer<typeof envSchema>;

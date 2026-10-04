@@ -12,6 +12,7 @@ const auth = createAuth(prisma, {
   linkedin: provider,
   allowedEmails: [' Me@Example.com '],
   passkeyRpId: 'localhost',
+  mcpUrl: 'http://localhost:3001/mcp',
 });
 
 // What a social sign-in's callback calls once Google has vouched for the email.

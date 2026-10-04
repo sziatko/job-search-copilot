@@ -38,6 +38,7 @@ jobs:
       AUTH_ALLOWED_EMAILS: me@example.com
       PASSKEY_RP_ID: localhost
       INTAKE_TOKEN: test-intake-token-at-least-32-characters
+      MCP_PUBLIC_URL: http://localhost:3001/mcp
 
     steps:
       - uses: actions/checkout@v4

@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { ApplicationsModule } from './applications/applications.module';
+import { WellKnownController } from './auth/well-known.controller';
 import { type Env, validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -37,6 +38,7 @@ import { VacanciesModule } from './vacancies/vacancies.module';
             },
             allowedEmails: env('AUTH_ALLOWED_EMAILS'),
             passkeyRpId: env('PASSKEY_RP_ID'),
+            mcpUrl: env('MCP_PUBLIC_URL'),
           }),
           // Nest's own parser is off (bodyParser: false — Better Auth reads the raw body
           // on /api/auth/*); the module re-adds it for every other route. Express' default
@@ -52,5 +54,6 @@ import { VacanciesModule } from './vacancies/vacancies.module';
     ApplicationsModule,
     StatsModule,
   ],
+  controllers: [WellKnownController],
 })
 export class AppModule {}

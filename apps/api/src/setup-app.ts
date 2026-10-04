@@ -18,8 +18,10 @@ export function configureApp(app: NestExpressApplication, config: ConfigService<
   app.enableCors({ origin: config.get('WEB_ORIGIN', { infer: true }), credentials: true });
 
   // Everything lives under /api except /health, which infra (docker-compose,
-  // load balancers) expects at the root.
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  // load balancers) expects at the root, and the OAuth metadata, which RFC 8414 puts there.
+  app.setGlobalPrefix('api', {
+    exclude: ['health', '.well-known/oauth-authorization-server/api/auth'],
+  });
   // URI versioning: /api/v1/... . New breaking shapes get a v2 controller instead
   // of mutating v1 under clients' feet.
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });

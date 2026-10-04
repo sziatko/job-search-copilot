@@ -5,6 +5,7 @@ import { authClient } from './lib/auth';
 import type { RouteMeta } from './lib/routeMeta';
 import { ApplicationsPage } from './pages/applications/ApplicationsPage';
 import { applicationStatusFilterSchema } from './pages/applications/types';
+import { ConsentPage } from './pages/consent/ConsentPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { InboxPage, inboxTabSchema } from './pages/inbox/InboxPage';
 import { LoginPage } from './pages/login/LoginPage';
@@ -34,7 +35,9 @@ const appRoute = createRoute({
 });
 
 // `error` is what Better Auth appends to `errorCallbackURL` when a social sign-in
-// fails — an email outside AUTH_ALLOWED_EMAILS, a cancelled consent.
+// fails — an email outside AUTH_ALLOWED_EMAILS, a cancelled consent. The keys it drops
+// stay in the URL (the router's `search.strict` is off): an MCP client's authorization
+// request arrives here as a signed query that sign-in must post back (lib/auth.ts).
 const loginSearchSchema = z.object({ error: z.string().optional().catch(undefined) });
 
 const loginRoute = createRoute({
@@ -42,6 +45,14 @@ const loginRoute = createRoute({
   path: '/login',
   component: LoginPage,
   validateSearch: (search): z.infer<typeof loginSearchSchema> => loginSearchSchema.parse(search),
+});
+
+// An MCP client asking for access (ADR-0035). Outside the shell, like /login; the API
+// sends only a signed-in user here. Its query is the signed request, read raw.
+const consentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/consent',
+  component: ConsentPage,
 });
 
 /**
@@ -162,6 +173,7 @@ export const routeTree = rootRoute.addChildren([
     profileRoute,
   ]),
   loginRoute,
+  consentRoute,
 ]);
 
 export const router = createRouter({ routeTree });

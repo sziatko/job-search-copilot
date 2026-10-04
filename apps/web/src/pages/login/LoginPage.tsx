@@ -37,10 +37,12 @@ export function LoginPage() {
   async function passkey() {
     setBusy(true);
     setError(null);
-    const { error } = await authClient.signIn.passkey();
+    const { data, error } = await authClient.signIn.passkey();
     setBusy(false);
     if (error) setError(error.message ?? 'Passkey sign-in failed');
-    else await navigate({ to: '/' });
+    // Mid-way through an MCP client's authorization the API answers `{ redirect, url }`
+    // (to /consent or back to the client), and the library is already following it.
+    else if (!(data && 'redirect' in data)) await navigate({ to: '/' });
   }
 
   return (

@@ -127,9 +127,10 @@ register Claude as a client. Hence JSC's own authorization server.
   (stdio) is unchanged.
 - **Env** (invariant 8): `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `WEB_ORIGIN`,
   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`,
-  `LINKEDIN_CLIENT_SECRET`, `AUTH_ALLOWED_EMAILS`, `PASSKEY_RP_ID`, `INTAKE_TOKEN`;
-  for mcp `AUTH_URL`, `MCP_HTTP_PORT`, `MCP_PUBLIC_URL`. Fake values in `.env.example`
-  and `.env.test`.
+  `LINKEDIN_CLIENT_SECRET`, `AUTH_ALLOWED_EMAILS`, `PASSKEY_RP_ID`, `INTAKE_TOKEN`,
+  `MCP_PUBLIC_URL` (the tokens' audience; one `.env` value for both apps); for mcp
+  `AUTH_URL`, `MCP_HTTP_PORT`, `MCP_PUBLIC_URL`. Fake values in `.env.example` and
+  `.env.test`.
 - **A new invariant:** every REST route is closed by default; anonymous access is
   explicit (`@AllowAnonymous()`), machine access is explicit (`MachineTokenGuard`).
 
@@ -195,10 +196,26 @@ register Claude as a client. Hence JSC's own authorization server.
   sends absolute `callbackURL` / `errorCallbackURL` on `WEB_ORIGIN`, so they pass
   Better Auth's `trustedOrigins`; a failure lands on `/login?error=…`.
 
-- [ ] **4 · The OAuth 2.1 authorization server.** `jwt` + `oauthProvider` (dynamic
+- [x] **4 · The OAuth 2.1 authorization server.** `jwt` + `oauthProvider` (dynamic
   client registration on), the migration for their tables, `/consent` in the web.
   Tests: `/.well-known/oauth-authorization-server`, a client registered over DCR, the
-  JWKS endpoint.
+  JWKS endpoint. — *2026-10-04.* `oauthProvider` is its own package,
+  `@better-auth/oauth-provider` 1.7.7 (also in web, for `oauthProviderClient`).
+  Migration `20261004120000_oauth_provider`, test DB only — **the dev DB needs
+  `npm run migrate:dev`, and `.env` needs `MCP_PUBLIC_URL`** (the API reads it now;
+  `http://localhost:3001/mcp` in `.env.example`, so step 5's `MCP_HTTP_PORT` is 3001).
+  For step 5: issuer (`iss`) = `${BETTER_AUTH_URL}/api/auth`; metadata at the API's root,
+  RFC 8414 path-inserted: `/.well-known/oauth-authorization-server/api/auth` (the
+  protected-resource document's `authorization_servers` = the issuer); JWKS at
+  `/api/auth/jwks` (EdDSA). `aud` = `MCP_PUBLIC_URL` only when the client sends
+  `resource=<MCP_PUBLIC_URL>` on authorize and token (RFC 8707) — without it the token
+  is opaque. DCR wants `application_type: 'native'` for an `http://localhost` redirect
+  (the default `web` refuses it; the Inspector sends `native`). A test mints a real
+  token the way `apps/api/test/oauth.e2e.spec.ts` does (register → authorize with a
+  session cookie → consent with the signed query → token with PKCE); for mcp, which has
+  no API in-process, signing a JWT with `jose` against a local key set is simpler.
+  The `OauthResource` row is seeded at boot, insert-only: changing `MCP_PUBLIC_URL`
+  adds a row, it does not edit the old one. core/api/mcp/web 501/501, lint and typecheck clean.
 
 - [ ] **5 · MCP over HTTP.** `apps/mcp/src/http.ts`, its port in `docker-compose.yml`,
   an npm script. **Check first:** how to verify `oauthProvider`'s tokens from a separate
