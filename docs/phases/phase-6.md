@@ -182,15 +182,15 @@ register Claude as a client. Hence JSC's own authorization server.
   e2e app must be created with `bodyParser: false` (`createTestApp()`), or the 5 MB
   limit is lost. Only the api project was run here (63/63); core, mcp, web unchanged.
 
-- [ ] **3 · Web: sign-in.** `/login` (Google, LinkedIn, Sign in with a passkey), the
+- [x] **3 · Web: sign-in.** `/login` (Google, LinkedIn, Sign in with a passkey), the
   root guard redirecting to `/login`, sign-out, Passkeys on `/profile`, `credentials`.
   MSW tests: no session → `/login`; the buttons are there. **The user first creates**
   a Google Cloud OAuth client and a LinkedIn app (it must be tied to a LinkedIn Page),
   redirect URIs `http://localhost:3000/api/auth/callback/google` and `…/linkedin`, and
   puts the credentials in `.env`. Then by hand in a browser: Google, then LinkedIn with
   the same email (one user), add a passkey, sign out, sign in with it.
-  — *Code and MSW tests done 2026-10-04; the by-hand check is pending* (no OAuth
-  credentials yet, dev DB not migrated). Web project 160/160, lint and typecheck clean;
+  — *Code and MSW tests done 2026-10-04; by hand 2026-10-04: Google, LinkedIn and a
+  passkey all sign in.* Web project 160/160, lint and typecheck clean;
   core, api, mcp not run (unchanged). Pages behind the guard now have route ids under
   `/_app` (`useSearch({ from: '/_app/vacancies' })`); `/login` and step 4's `/consent`
   sit outside it. The MSW server installs a signed-in `get-session` by default
@@ -228,16 +228,24 @@ register Claude as a client. Hence JSC's own authorization server.
   MCP Inspector (phase 5.1) or `claude mcp add --transport http` runs the OAuth flow
   end to end. Update `architecture.md`, `contracts.md`, the root `README.md`. No skill
   changes: no tool or field changes.
-  — *Code and tests done 2026-10-04; the by-hand check is pending*, together with the
-  phase's end-to-end verification below (no OAuth credentials, dev DB not migrated).
+  — *Code and tests done 2026-10-04; by hand 2026-10-04:* the Inspector and Claude Code
+  (`claude mcp add --transport http`) both ran the OAuth flow and connected; the intake
+  route gives 401 without / with a wrong token and passes the guard with `INTAKE_TOKEN`.
+  stdio MCP in Claude Desktop still writes (the analyzer's latest run). The Inspector (2.x) takes the server
+  on the command line — `mcp-inspector --web --transport http --server-url
+  http://localhost:3001/mcp`; not `--protocol-era auto`, whose `2026-07-28` probe the
+  1.x SDK refuses (shown as "Re-authentication required"). Claude Desktop cannot reach
+  `localhost` over HTTP (its connectors call from Anthropic's servers): stdio stays its
+  transport until the deploy row.
   Tokens are checked with `jose` (`jwtVerify` against `createRemoteJWKSet`, `typ:
   at+jwt`) inside the SDK's `requireBearerAuth`; Better Auth's resource client would
   pull `better-auth` into mcp for the same check. `src/http-app.ts` is the testable
   factory, `src/http.ts` the entrypoint. Own Express app, not the SDK's
   `createMcpExpressApp`: its JSON limit is 100 KB, too small for the batch tools. A
   service of its own in Compose, `mcp-http` (port 3001), so stdio's `mcp` is untouched;
-  **the containers need `docker compose up -d --build`** (new deps: `express`, `jose`;
-  SDK 1.30 → 1.32). Stayed on `@modelcontextprotocol/sdk` 1.x: the split v2 packages
+  **the containers need `docker compose up -d --build`, then `docker compose up -d -V`**
+  (new deps: `express`, `jose`; SDK 1.30 → 1.32): a recreate keeps the old anonymous
+  `node_modules` volumes, so without `-V` the api fails on a missing module. Stayed on `@modelcontextprotocol/sdk` 1.x: the split v2 packages
   (`@modelcontextprotocol/server` 2.x) are a migration of every tool file, not this
   step. No CORS on the MCP server: Claude Code and the Inspector's proxy call it from
   Node, not a browser. mcp project 41/41; core, api, web not run (unchanged).
