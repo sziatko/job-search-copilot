@@ -1,4 +1,4 @@
-import { API_BASE, type CursorPage, errorMessage, parseResponse } from '@/lib/api';
+import { API_BASE, apiFetch, type CursorPage, errorMessage, parseResponse } from '@/lib/api';
 import {
   type ApplicationListItem,
   type ApplicationStatus,
@@ -42,7 +42,7 @@ export async function listApplicationsPage(
   if (params.sameCompanyAs) query.set('sameCompanyAs', params.sameCompanyAs);
   if (params.cursor !== undefined) query.set('cursor', String(params.cursor));
 
-  const res = await fetch(`${API_BASE}/applications?${query}`);
+  const res = await apiFetch(`${API_BASE}/applications?${query}`);
   if (!res.ok) {
     throw new Error(`Failed to load applications: HTTP ${res.status}`);
   }
@@ -52,7 +52,7 @@ export async function listApplicationsPage(
 export async function recordApplication(
   input: RecordApplicationInput,
 ): Promise<RecordApplicationResponse> {
-  const res = await fetch(`${API_BASE}/applications`, {
+  const res = await apiFetch(`${API_BASE}/applications`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -69,7 +69,7 @@ export async function updateApplicationStatus(
   id: number,
   status: ApplicationStatus,
 ): Promise<ApplicationListItem> {
-  const res = await fetch(`${API_BASE}/applications/${id}/status`, {
+  const res = await apiFetch(`${API_BASE}/applications/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
@@ -84,7 +84,7 @@ export async function updateApplication(
   id: number,
   input: UpdateApplicationInput,
 ): Promise<ApplicationListItem> {
-  const res = await fetch(`${API_BASE}/applications/${id}`, {
+  const res = await apiFetch(`${API_BASE}/applications/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),

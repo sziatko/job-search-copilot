@@ -119,8 +119,8 @@ register Claude as a client. Hence JSC's own authorization server.
   Auth's `trustedOrigins` = `WEB_ORIGIN`.
 - **`apps/web`** — `credentials: 'include'` in `src/lib/api.ts`; `better-auth/react`'s
   client (not a `core` import, so invariant 5 holds); `/login`, `/consent`; a guard in
-  the root route's `beforeLoad`; sign-out; a Passkeys section on `/profile` (add, list,
-  remove).
+  the `beforeLoad` of a pathless layout route (`_app`, the shell) that holds every page
+  but `/login`; sign-out; a Passkeys section on `/profile` (add, list, remove).
 - **`apps/mcp`** — `src/http.ts`, a second entrypoint: Streamable HTTP over the existing
   `createServer()` ([ADR-0010](../decisions/0010-mcp-server-factory.md)), the
   protected-resource document, JWT verification against the API's JWKS. `src/index.ts`
@@ -185,6 +185,15 @@ register Claude as a client. Hence JSC's own authorization server.
   redirect URIs `http://localhost:3000/api/auth/callback/google` and `…/linkedin`, and
   puts the credentials in `.env`. Then by hand in a browser: Google, then LinkedIn with
   the same email (one user), add a passkey, sign out, sign in with it.
+  — *Code and MSW tests done 2026-10-04; the by-hand check is pending* (no OAuth
+  credentials yet, dev DB not migrated). Web project 160/160, lint and typecheck clean;
+  core, api, mcp not run (unchanged). Pages behind the guard now have route ids under
+  `/_app` (`useSearch({ from: '/_app/vacancies' })`); `/login` and step 4's `/consent`
+  sit outside it. The MSW server installs a signed-in `get-session` by default
+  (`sessionHandler()`); a test of signing in overrides it. The `web` container needs its
+  `node_modules` refreshed for `better-auth` + `@better-auth/passkey`. Social sign-in
+  sends absolute `callbackURL` / `errorCallbackURL` on `WEB_ORIGIN`, so they pass
+  Better Auth's `trustedOrigins`; a failure lands on `/login?error=…`.
 
 - [ ] **4 · The OAuth 2.1 authorization server.** `jwt` + `oauthProvider` (dynamic
   client registration on), the migration for their tables, `/consent` in the web.

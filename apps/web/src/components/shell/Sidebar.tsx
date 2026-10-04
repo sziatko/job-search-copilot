@@ -49,9 +49,8 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       {
         to: '/profile',
         label: 'Profile & forms',
-        title: 'Profile & forms — soon',
+        title: 'Profile & forms',
         icon: IconPerson,
-        badge: 'SOON',
       },
     ],
   },

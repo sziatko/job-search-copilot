@@ -46,7 +46,7 @@ function statusesFor(filter: StatusFilterValue): readonly VacancyStatus[] {
 /** /vacancies: the status filter, in the URL, over the shared vacancy rows. Search is
  * the search modal's, never this table's. */
 export function useVacancies() {
-  const search = useSearch({ from: '/vacancies' });
+  const search = useSearch({ from: '/_app/vacancies' });
   const navigate = useNavigate({ from: '/vacancies' });
 
   // NOT_REVIEWED (the triage queue) is the absent value.

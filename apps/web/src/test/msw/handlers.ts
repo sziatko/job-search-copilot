@@ -355,3 +355,21 @@ export function fakeStats(overrides: Partial<Stats> = {}): Stats {
 export function statsHandler(stats: Stats = fakeStats()) {
   return http.get(`${API_URL}/stats`, () => HttpResponse.json(stats));
 }
+
+export const AUTH_URL = 'http://localhost:3000/api/auth';
+
+/** GET /api/auth/get-session: a signed-in user, or Better Auth's `null` for none. The
+ * shell's guard asks it on every navigation, so `server.ts` installs the signed-in one
+ * for every test; a test about signing in overrides it. */
+export function sessionHandler(signedIn = true) {
+  return http.get(`${AUTH_URL}/get-session`, () =>
+    HttpResponse.json(
+      signedIn
+        ? {
+            session: { id: 's1', userId: 'u1', token: 't', expiresAt: '2099-01-01T00:00:00.000Z' },
+            user: { id: 'u1', email: 'me@example.com', name: 'Me', emailVerified: true },
+          }
+        : null,
+    ),
+  );
+}

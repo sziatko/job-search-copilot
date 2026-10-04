@@ -38,7 +38,7 @@ interface StatusChange {
 
 export function useApplications() {
   const queryClient = useQueryClient();
-  const search = useSearch({ from: '/applications' });
+  const search = useSearch({ from: '/_app/applications' });
   const navigate = useNavigate({ from: '/applications' });
 
   const statusFilter: ApplicationStatusFilter = search.status ?? STATUS_FILTER_ALL;

@@ -1,5 +1,30 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { toast } from 'sonner';
 import { IconMenu } from '@/components/icons';
+import { authClient } from '@/lib/auth';
 import { ThemeToggle } from './ThemeToggle';
+
+/** Ends the session on the API (the cookie goes with it), drops the cached data, and
+ * leaves for /login. */
+function SignOutButton() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  async function signOut() {
+    const { error } = await authClient.signOut();
+    if (error) {
+      toast.error(error.message ?? 'Sign-out failed');
+      return;
+    }
+    queryClient.clear();
+    await navigate({ to: '/login' });
+  }
+  return (
+    <button type="button" className="btn" onClick={signOut}>
+      Sign out
+    </button>
+  );
+}
 
 /**
  * `title` is an <h1> rather than the mockup's <div> — same rendering (preflight
@@ -22,6 +47,7 @@ export function Topbar({ title, onOpenMobile }: { title: string; onOpenMobile: (
       </div>
       <div className="flex items-center gap-[14px]">
         <ThemeToggle />
+        <SignOutButton />
       </div>
     </header>
   );

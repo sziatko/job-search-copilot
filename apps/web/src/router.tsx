@@ -1,17 +1,48 @@
-import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
+import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
 import { RootLayout } from './components/RootLayout';
+import { authClient } from './lib/auth';
 import type { RouteMeta } from './lib/routeMeta';
 import { ApplicationsPage } from './pages/applications/ApplicationsPage';
 import { applicationStatusFilterSchema } from './pages/applications/types';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { InboxPage, inboxTabSchema } from './pages/inbox/InboxPage';
+import { LoginPage } from './pages/login/LoginPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { statusFilterSchema as vacancyStatusFilterSchema } from './pages/vacancies/types';
 import { VacanciesPage } from './pages/vacancies/VacanciesPage';
 import { VacancyPage } from './pages/vacancy/VacancyPage';
 
-const rootRoute = createRootRoute({ component: RootLayout });
+// The root renders only its <Outlet />: /login has no shell around it.
+const rootRoute = createRootRoute();
+
+/**
+ * Every page but /login: the shell, behind a session. A pathless layout route, so the
+ * guard sits on one node and /login, its sibling, is outside it. No session (or no
+ * answer from the API) → /login; the API refuses every route without one anyway
+ * (invariant 9), this only spares the user a page of 401s.
+ */
+// ponytail: one GET /api/auth/get-session per navigation; cache it if that ever shows.
+const appRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_app',
+  component: RootLayout,
+  beforeLoad: async () => {
+    const { data } = await authClient.getSession();
+    if (!data) throw redirect({ to: '/login' });
+  },
+});
+
+// `error` is what Better Auth appends to `errorCallbackURL` when a social sign-in
+// fails — an email outside AUTH_ALLOWED_EMAILS, a cancelled consent.
+const loginSearchSchema = z.object({ error: z.string().optional().catch(undefined) });
+
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/login',
+  component: LoginPage,
+  validateSearch: (search): z.infer<typeof loginSearchSchema> => loginSearchSchema.parse(search),
+});
 
 /**
  * Chrome metadata, read by RootLayout through `useMatches()`. Typed as
@@ -47,7 +78,7 @@ const PROFILE_META: RouteMeta = {
 };
 
 const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/',
   component: DashboardPage,
   staticData: DASHBOARD_META,
@@ -70,7 +101,7 @@ const vacanciesSearchSchema = z.object({
 });
 
 const vacanciesRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/vacancies',
   component: VacanciesPage,
   staticData: VACANCIES_META,
@@ -80,7 +111,7 @@ const vacanciesRoute = createRoute({
 
 // One vacancy. A sibling of /vacancies, not its child: /vacancies renders no <Outlet />.
 const vacancyRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/vacancies/$id',
   component: VacancyPage,
   staticData: VACANCY_META,
@@ -92,16 +123,15 @@ const inboxSearchSchema = z.object({
 });
 
 const inboxRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/inbox',
   component: InboxPage,
   staticData: INBOX_META,
   validateSearch: (search): z.infer<typeof inboxSearchSchema> => inboxSearchSchema.parse(search),
 });
 
-// No backend behind this one yet — see the page for what is missing.
 const profileRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/profile',
   component: ProfilePage,
   staticData: PROFILE_META,
@@ -114,7 +144,7 @@ const applicationsSearchSchema = z.object({
 });
 
 const applicationsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/applications',
   component: ApplicationsPage,
   staticData: APPLICATIONS_META,
@@ -123,12 +153,15 @@ const applicationsRoute = createRoute({
 });
 
 export const routeTree = rootRoute.addChildren([
-  indexRoute,
-  vacanciesRoute,
-  vacancyRoute,
-  applicationsRoute,
-  inboxRoute,
-  profileRoute,
+  appRoute.addChildren([
+    indexRoute,
+    vacanciesRoute,
+    vacancyRoute,
+    applicationsRoute,
+    inboxRoute,
+    profileRoute,
+  ]),
+  loginRoute,
 ]);
 
 export const router = createRouter({ routeTree });

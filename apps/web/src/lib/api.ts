@@ -1,7 +1,15 @@
 import { z } from 'zod';
 
+export const API_ORIGIN: string = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 // The API serves everything under /api/v1 (see apps/api setup-app.ts).
-export const API_BASE = `${import.meta.env.VITE_API_URL ?? 'http://localhost:3000'}/api/v1`;
+export const API_BASE = `${API_ORIGIN}/api/v1`;
+
+/** `fetch` with the session cookie: every API route wants it (invariant 9). The cookie
+ * is the API's (`localhost:3000`), and a cross-origin request carries it only with
+ * `credentials: 'include'`. */
+export function apiFetch(input: string, init?: RequestInit) {
+  return fetch(input, { ...init, credentials: 'include' });
+}
 
 /** A cursor page (ADR-0030). `total` is the rows matching the filter, not the page
  * size; `nextCursor` is null on the last page. */
