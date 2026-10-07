@@ -42,6 +42,9 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0031](0031-stats-endpoint.md) | One stats endpoint; the funnel counts the journal, and timeout moves to core | Accepted |
 | [0032](0032-same-company-normalised-name.md) | Same company = an equal normalised name | Accepted (amends 0025) |
 | [0033](0033-unscored-vacancies-in-one-table.md) | Unscored vacancies live in `Vacancy`: the log merges in, `NEW` and `FILTERED_OUT` | Accepted (replaces 0026, amends 0005) |
+| [0034](0034-auth-better-auth-in-core.md) | Auth: Better Auth in `core`, cookie sessions, Google/LinkedIn + passkeys | Accepted |
+| [0035](0035-mcp-over-http-oauth-resource-server.md) | MCP over HTTP as an OAuth 2.1 resource server; stdio stays open | Accepted |
+| [0036](0036-machine-token-for-n8n.md) | n8n reaches the API with a static bearer token, on three routes only | Accepted |
 
 A gap in the numbers is a deleted ADR. The ADR that replaced it names it on its
 `Replaces:` line (an ADR whose code is simply gone has none), and

@@ -25,6 +25,7 @@ and *what a change here breaks over there*.
 | [`phases/phase-4.3.md`](phases/phase-4.3.md) | Fixes after phase 4.2: skeletons in place of every "Loading…", the company-history modal (a CV column, Details in a new tab, the current row scrolled into view), the salary label, a toaster that follows the theme toggle, a toast after every write, a review card as tall as the funnel, and one company whatever its spelling (ADR-0032). Its `## Status` is the live checklist. |
 | [`phases/phase-5.md`](phases/phase-5.md) | Unscored vacancies in one table: the vacancy log merged into `Vacancy`, the `NEW` / `FILTERED_OUT` statuses, an intake endpoint for n8n, analysis pulled and submitted over MCP, an `/inbox` page, per-page status contexts, search in a modal, and the `salaryInApplication` rename. Its `## Status` is the live checklist. |
 | [`phases/phase-5.1.md`](phases/phase-5.1.md) | API docs: Swagger UI at `/api/docs` for REST (`@nestjs/swagger` and its CLI plugin, requests only), the MCP Inspector for MCP. Its `## Status` is the live checklist. |
+| [`phases/phase-6.md`](phases/phase-6.md) | Auth: sign-in with Google, LinkedIn and passkeys (Better Auth, cookie sessions), every REST route closed by default, a machine token for n8n, JSC as an OAuth 2.1 authorization server, MCP over HTTP. Explains what the library does under the hood. Its `## Status` is the live checklist. |
 | [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions
@@ -47,15 +48,8 @@ and *what a change here breaks over there*.
 - **Credentials live in untracked files, never in tracked ones.** The apps read config
   from env vars loaded at boot ([ADR-0007](decisions/0007-env-config-and-loading.md));
   the values sit in `.env` / `.env.test`, which `.gitignore` covers — only
-  `.env.example` is tracked. Claude Code's own credentials sit in
-  `~/.claude/keys/<profile>.key` — outside the repository working tree entirely, not
-  merely gitignored. `.claude/settings.json` carries no credential — only an
-  `apiKeyHelper` that prints the selected one (`~/.claude/get-key.mjs`, profile named in
-  `~/.claude/profiles.json`). Switch providers with
-  `claude-profile <deepseek|glm|claude|omniroute>`, which rewrites `env` and
-  `apiKeyHelper` in the current project's settings; `claude` means no custom endpoint at
-  all. The file stays gitignored because the helper path is machine-specific, not because
-  it holds a secret.
+  `.env.example` is tracked. Claude Code's own config (`.claude/settings*.json`) is
+  machine-specific and gitignored too.
 - **If a key does reach a commit, rotating it is the fix.** Rewriting history is the
   cleanup, not the remedy: by the time you notice, the key has been through clones,
   backups, and whatever the host caches. Do both, and rotate first.

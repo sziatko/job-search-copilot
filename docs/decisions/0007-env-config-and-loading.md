@@ -19,8 +19,8 @@ Two problems from the early scaffold:
 
 ## Decision
 - **Validation:** `apps/api/src/config/env.validation.ts` holds a `zod` schema
-  (`DATABASE_URL` as `z.url()`, `API_PORT` coerced int default 3000,
-  `CORS_ORIGINS` default `''`) and exports `validateEnv()`. `ConfigModule.forRoot({
+  (`DATABASE_URL` as `z.url()`, `API_PORT` coerced int default 3000, the auth
+  vars of [ADR-0034](0034-auth-better-auth-in-core.md)) and exports `validateEnv()`. `ConfigModule.forRoot({
   isGlobal: true, ignoreEnvFile: true, validate: validateEnv })` runs it at boot;
   a bad value throws a readable multi-line message and the app doesn't start.
   `main.ts` and `PrismaService` read via `ConfigService.get(..., { infer: true })`.

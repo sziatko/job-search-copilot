@@ -326,7 +326,7 @@ it. So the jsdom suite was green throughout, and could never have been otherwise
   `#560` / `#564` / `#559` / `#565` at list indices 2 / 1 / 3 / 0: the marker follows
   the clicked row rather than the first one, exactly one `.tag.accent` exists in the
   dialog, and it sits inline with the title (pill top 220 against the title's bottom
-  240) beside `contoso #593`. With a real pointer parked on the marked row Chrome
+  240) beside a `contoso` row. With a real pointer parked on the marked row Chrome
   confirms `:hover` and the tint is unchanged — `oklab(…)/0.5`, not
   `--color-surface-alt` — with the pill still distinguishable from the row it is on.
 

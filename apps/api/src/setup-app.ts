@@ -10,21 +10,18 @@ import type { Env } from './config/env.validation';
  * exercise the same pipes/filters/routing the deployed app runs and the two can't drift.
  */
 export function configureApp(app: NestExpressApplication, config: ConfigService<Env, true>): void {
-  // Express' default is 100 KB; POST /vacancies/intake takes up to 100 postings with
-  // their text (~0.5–1 MB). Registered before init, so Nest skips its own JSON parser.
-  app.useBodyParser('json', { limit: '5mb' });
+  // The body parsers (JSON up to 5 MB) are AuthModule's — see app.module.ts; the app is
+  // created with `bodyParser: false`.
 
-  const allowlist = config
-    .get('CORS_ORIGINS', { infer: true })
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  // Empty allowlist → reflect any origin (local dev). Set CORS_ORIGINS before deploy.
-  app.enableCors({ origin: allowlist.length > 0 ? allowlist : true });
+  // The session cookie rides cross-origin from the web (localhost:5173 → :3000), so
+  // credentials, and an exact origin: credentials never go with a reflected one.
+  app.enableCors({ origin: config.get('WEB_ORIGIN', { infer: true }), credentials: true });
 
   // Everything lives under /api except /health, which infra (docker-compose,
-  // load balancers) expects at the root.
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  // load balancers) expects at the root, and the OAuth metadata, which RFC 8414 puts there.
+  app.setGlobalPrefix('api', {
+    exclude: ['health', '.well-known/oauth-authorization-server/api/auth'],
+  });
   // URI versioning: /api/v1/... . New breaking shapes get a v2 controller instead
   // of mutating v1 under clients' feet.
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });

@@ -15,6 +15,11 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     isolate: false, // see the root vitest.config.mts
+    // Run web after core/api/mcp, never interleaved with their files. vitest 5.0.0's
+    // jsdom teardown does not restore global `Request`; a second jsdom setup in the
+    // same worker makes its compat `Request` extend itself, and `instanceof` recurses
+    // until the stack overflows — the full `npm test` hung on it (2026-10-04).
+    sequence: { groupOrder: 1 },
     // Every page test boots the whole router in jsdom, which is CPU-bound: the
     // heaviest take 2–5 s on a quiet machine, and this machine has run the suite up
     // to 4× slower (85 s vs 372 s). Vitest's 5 s left about 2× headroom, so under

@@ -10,6 +10,9 @@ import { VacancyIntakeService } from './vacancy-intake.service';
 const intake = new VacancyIntakeService();
 const prisma = getPrisma();
 
+/** Posting text long enough to be stored (MIN_TEXT_LENGTH). */
+const text = (label: string) => `${label} `.padEnd(200, 'x');
+
 const entry = (overrides: Record<string, string | null> = {}) => ({
   url: 'https://acme.com/jobs/1',
   company: 'Acme',
@@ -77,8 +80,16 @@ describe('VacancyIntakeService.intake', () => {
   });
 
   it('stores the text when the new entry carries some', async () => {
-    await intake.intake(entry({ fullText: 'The posting.' }));
-    expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBe('The posting.');
+    await intake.intake(entry({ fullText: text('The posting.') }));
+    expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBe(text('The posting.'));
+  });
+
+  it('takes text under 200 characters as none, so a later full text still fills it', async () => {
+    await intake.intake(entry({ fullText: `  ${'Sign in'.padEnd(199, '.')}  ` }));
+    expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBeNull();
+
+    await intake.intake(entry({ fullText: text('The posting.') }));
+    expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBe(text('The posting.'));
   });
 
   it('matches a LinkedIn locale link with slug and ?trk= against the www key', async () => {
@@ -108,16 +119,16 @@ describe('VacancyIntakeService.intake', () => {
     await prisma.vacancy.update({ where: { id }, data: { status: 'FILTERED_OUT' } });
 
     await intake.intake(
-      entry({ company: 'Other Name', title: 'Other', source: 'linkedin', fullText: 'Text.' }),
+      entry({ company: 'Other Name', title: 'Other', source: 'linkedin', fullText: text('Text.') }),
     );
-    await intake.intake(entry({ fullText: 'A second text.' }));
+    await intake.intake(entry({ fullText: text('A second text.') }));
 
     expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
       company: 'Acme',
       title: 'Dev',
       source: null,
       status: 'FILTERED_OUT',
-      fullText: 'Text.',
+      fullText: text('Text.'),
       recommendation: null,
     });
   });
@@ -138,7 +149,11 @@ describe('VacancyIntakeService.intake', () => {
     });
     expect(
       await intake.intake(
-        entry({ url: 'https://acme.com/jobs/10', title: 'Backend  Engineer', fullText: 'New.' }),
+        entry({
+          url: 'https://acme.com/jobs/10',
+          title: 'Backend  Engineer',
+          fullText: text('New.'),
+        }),
       ),
     ).toEqual({ new: false });
 

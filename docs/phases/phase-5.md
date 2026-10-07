@@ -65,9 +65,9 @@ auth, per-column filters, `source` on `StatusChange`.
 
 ### Dev DB, 2026-10-03 (read-only)
 
-Log: 1421 rows; 541 also in `Vacancy`; ~880 only in the log; 12 without company or
-title. `Vacancy`: 605 rows, 201 placeholders (`fullText = 'N/A'`). The analyzer writes
-to the dev DB, so recount before migrating.
+Log: most rows only in the log, a minority also in `Vacancy`, a handful without company
+or title. `Vacancy`: about a third placeholders (`fullText = 'N/A'`). The analyzer
+writes to the dev DB, so recount before migrating.
 
 ## The model (step 2)
 
@@ -235,8 +235,8 @@ to the dev DB, so recount before migrating.
 
 - [x] **4 · Intake: REST and MCP.** — *2026-10-03.* `npm test` 463/463 (core 233, api 57,
   mcp 36, web 137). No migration. **Dev DB migrated 2026-10-03 after this step**
-  (backup `pg_dump` first; steps 1–2 migrations; backfill 64 keys, 12 `— / —` left
-  null; 1485 vacancies, 880 `FILTERED_OUT`, every journal starts `NEW`, 118 salaries
+  (backup `pg_dump` first; steps 1–2 migrations; backfill the keys, the `— / —` ones
+  left null; the log's rows land as `FILTERED_OUT`, every journal starts `NEW`, salaries
   kept). Decided then: in the manual flow a SKIP / <50% verdict goes back through
   `submit_analysis` without text (id from `list_vacancies({ applyUrl })`), so the row
   leaves `NEW` and is never analysed twice. The url-only batch checks are gone, so step 2's dev-DB

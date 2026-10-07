@@ -9,7 +9,8 @@ import type { Env } from './config/env.validation';
 import { configureApp } from './setup-app';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Better Auth reads /api/auth/*'s raw body; AuthModule re-adds the parsers elsewhere.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   const config = app.get<ConfigService<Env, true>>(ConfigService);
   configureApp(app, config);
   const port = config.get('API_PORT', { infer: true });

@@ -46,7 +46,7 @@ const TABS: Record<
 /** `/inbox` — the vacancies before triage: the analysis queue, the ones still without
  * text, and the ones screened out. Newest first, paged by the server (ADR-0030). */
 export function InboxPage() {
-  const search = useSearch({ from: '/inbox' });
+  const search = useSearch({ from: '/_app/inbox' });
   const navigate = useNavigate({ from: '/inbox' });
   const tab = search.tab ?? INBOX_TAB.queue;
   const { status, hasText, empty } = TABS[tab];

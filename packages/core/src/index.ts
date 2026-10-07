@@ -15,6 +15,8 @@ export type {
   VacancyResolution,
 } from './application.types';
 export { APPLICATION_STATES } from './application.types';
+export type { Auth, AuthConfig } from './auth/create-auth';
+export { createAuth } from './auth/create-auth';
 export {
   AlreadyAnalysedError,
   AlreadyAppliedError,

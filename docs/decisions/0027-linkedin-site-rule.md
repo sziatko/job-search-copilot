@@ -16,8 +16,8 @@ https://www.linkedin.com/comm/jobs/view/3900000002/
 The query and the trailing slash are already dropped. The locale host, the title slug
 and the `/comm/` prefix (which email digests use) are not.
 
-The vacancy log (ADR-0026) has 1136 rows, and 901 of them are LinkedIn: 441 on `www`,
-280 on `pl`, 171 on `nl`, and 9 `/comm/`. **Every one** matches
+Most of the vacancy log's (ADR-0026) rows are LinkedIn, spread across `www`, `pl`,
+`nl` and `/comm/`. **Every one** matches
 `/(comm/)?jobs/view/(<slug>-)?<id>`. The file already shows the duplicate this causes:
 Globex's `3900000001` is logged twice, once through `www` and once through `pl`.
 

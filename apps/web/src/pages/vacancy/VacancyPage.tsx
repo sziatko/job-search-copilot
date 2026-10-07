@@ -86,7 +86,7 @@ export function VacancyPage() {
 }
 
 function VacancyView() {
-  const { id: rawId } = useParams({ from: '/vacancies/$id' });
+  const { id: rawId } = useParams({ from: '/_app/vacancies/$id' });
   const id = Number(rawId);
   const page = useVacancyPage(id);
   const { data: vacancy, isPending, error } = page.vacancy;

@@ -1,4 +1,4 @@
-import { API_BASE, type CursorPage, errorMessage, parseResponse } from '@/lib/api';
+import { API_BASE, apiFetch, type CursorPage, errorMessage, parseResponse } from '@/lib/api';
 import {
   type Recommendation,
   type VacancyDetail,
@@ -40,7 +40,7 @@ export async function listVacanciesPage(
   if (params.sort) query.set('sort', params.sort);
   if (params.cursor !== undefined) query.set('cursor', String(params.cursor));
 
-  const res = await fetch(`${API_BASE}/vacancies?${query}`);
+  const res = await apiFetch(`${API_BASE}/vacancies?${query}`);
   if (!res.ok) {
     throw new Error(`Failed to load vacancies: HTTP ${res.status}`);
   }
@@ -51,7 +51,7 @@ export async function updateVacancyStatus(
   id: number,
   status: VacancyStatus,
 ): Promise<VacancyListItem> {
-  const res = await fetch(`${API_BASE}/vacancies/${id}/status`, {
+  const res = await apiFetch(`${API_BASE}/vacancies/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
@@ -66,7 +66,7 @@ export async function updateVacancyStatus(
 
 /** One vacancy, whole; null for an id the server does not know. */
 export async function getVacancy(id: number): Promise<VacancyDetail | null> {
-  const res = await fetch(`${API_BASE}/vacancies/${id}`);
+  const res = await apiFetch(`${API_BASE}/vacancies/${id}`);
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to load vacancy ${id}: HTTP ${res.status}`);
@@ -80,7 +80,7 @@ export async function getVacancy(id: number): Promise<VacancyDetail | null> {
  * schema refuses a triage status, and the caller refetches the vacancy anyway.
  */
 export async function addComment(id: number, comment: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/applications/${id}`, {
+  const res = await apiFetch(`${API_BASE}/applications/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ comment }),
