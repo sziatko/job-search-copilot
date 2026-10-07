@@ -25,6 +25,7 @@ export const PIPELINE_STATUSES = [
   'RECRUITER_SCREEN',
   'REPLIED',
   'INTERVIEW',
+  'AWAITING',
   'OFFER',
   'REJECTED',
 ] as const satisfies readonly VacancyStatus[];

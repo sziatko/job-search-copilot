@@ -13,6 +13,7 @@ const ACTIVITY: Record<ApplicationStatus, { verb: string; dot: 'good' | 'warn' |
   RECRUITER_SCREEN: { verb: 'Recruiter screen booked', dot: 'good' },
   REPLIED: { verb: 'Got a reply', dot: 'accent' },
   INTERVIEW: { verb: 'Interview scheduled', dot: 'good' },
+  AWAITING: { verb: 'Awaiting feedback', dot: 'accent' },
   OFFER: { verb: 'Offer received', dot: 'good' },
   REJECTED: { verb: 'Rejected', dot: 'warn' },
 };

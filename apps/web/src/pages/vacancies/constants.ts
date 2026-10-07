@@ -38,6 +38,7 @@ export const STATUS_TAGS = {
   RECRUITER_SCREEN: { text: STATUS_LABELS.RECRUITER_SCREEN, variant: 'good' },
   REPLIED: { text: STATUS_LABELS.REPLIED, variant: 'good' },
   INTERVIEW: { text: STATUS_LABELS.INTERVIEW, variant: 'good' },
+  AWAITING: { text: STATUS_LABELS.AWAITING, variant: 'good' },
   OFFER: { text: STATUS_LABELS.OFFER, variant: 'good' },
   REJECTED: { text: STATUS_LABELS.REJECTED, variant: 'bad' },
 } satisfies Record<VacancyStatus, { text: string; variant: string }>;

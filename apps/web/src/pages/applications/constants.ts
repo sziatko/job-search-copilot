@@ -15,6 +15,7 @@ export const APPLICATION_STATUS_LABELS = {
   RECRUITER_SCREEN: 'Recruiter screen',
   REPLIED: 'Replied',
   INTERVIEW: 'Interview',
+  AWAITING: 'Awaiting',
   OFFER: 'Offer',
   REJECTED: 'Rejected',
 } satisfies Record<ApplicationStatus, string>;
@@ -23,10 +24,11 @@ export const APPLICATION_STATUS_LABELS = {
 export const APPLICATION_STATUS_ORDER = {
   OFFER: 0,
   INTERVIEW: 1,
-  REPLIED: 2,
-  RECRUITER_SCREEN: 3,
-  APPLIED: 4,
-  REJECTED: 5,
+  AWAITING: 2,
+  REPLIED: 3,
+  RECRUITER_SCREEN: 4,
+  APPLIED: 5,
+  REJECTED: 6,
 } satisfies Record<ApplicationStatus, number>;
 
 /** Labels for the derived filter values. The strip's tiles and the dropdown both read

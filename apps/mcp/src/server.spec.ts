@@ -123,6 +123,29 @@ describe('job-search-copilot MCP server', () => {
     expect(referenced.filter((ref) => !registered.has(ref.split(': ')[1]))).toEqual([]);
   });
 
+  // The email sync maps each Gmail label to a status in a table (`| label | \`STATUS\` |`):
+  // a status the server no longer takes would fail only on the day such an email comes.
+  it.skipIf(!existsSync(skillsDir))(
+    'every status a skill table maps to is one update_vacancy_status takes',
+    async () => {
+      const client = await connectedClient();
+      const { tools } = await client.listTools();
+      const tool = tools.find((t) => t.name === 'update_vacancy_status');
+      const status = tool?.inputSchema.properties?.status as { enum: string[] } | undefined;
+      const accepted = status?.enum ?? [];
+
+      const mapped = readdirSync(skillsDir, { withFileTypes: true })
+        .filter((entry) => existsSync(path.join(skillsDir, entry.name, 'SKILL.md')))
+        .flatMap((entry) => {
+          const text = readFileSync(path.join(skillsDir, entry.name, 'SKILL.md'), 'utf8');
+          return [...text.matchAll(/\| `([A-Z_]+)`/g)].map((m) => m[1]);
+        });
+
+      expect(mapped).toContain('AWAITING');
+      expect(mapped.filter((status) => !accepted.includes(status))).toEqual([]);
+    },
+  );
+
   it('works the analysis queue: list NEW with text → get_vacancies_batch → submit_analyses_batch', async () => {
     const client = await connectedClient();
     // Intake stores posting text from 200 characters (a shorter one is a login wall).

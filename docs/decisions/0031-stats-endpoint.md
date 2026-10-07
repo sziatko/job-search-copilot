@@ -38,7 +38,7 @@ dashboard and the `/applications` KPI strip read it; neither loads a list to cou
 | `applied` | vacancies with an `APPLIED` journal row, ever |
 | `declined` | … currently `DECLINED` (the user's no) |
 | `unavailable` | … currently `UNAVAILABLE` (the posting stopped taking applications) |
-| `responded` | … with a `REPLIED`, `RECRUITER_SCREEN`, `INTERVIEW` or `OFFER` row, ever |
+| `responded` | … with a `REPLIED`, `RECRUITER_SCREEN`, `INTERVIEW`, `AWAITING` (phase 6.1) or `OFFER` row, ever |
 | `interview` | … with an `INTERVIEW` or `OFFER` row, ever |
 | `recruiterScreen` | … currently in `RECRUITER_SCREEN` |
 | `pipeline` | the `/applications` strip: `byStatus` (current), `active`, `timedOut`, `total` |

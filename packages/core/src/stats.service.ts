@@ -11,7 +11,13 @@ import {
 const RECENT_SIZE = 6;
 
 /** Past a reply: the company has answered. */
-const RESPONDED: VacancyStatus[] = ['REPLIED', 'RECRUITER_SCREEN', 'INTERVIEW', 'OFFER'];
+const RESPONDED: VacancyStatus[] = [
+  'REPLIED',
+  'RECRUITER_SCREEN',
+  'INTERVIEW',
+  'AWAITING',
+  'OFFER',
+];
 const INTERVIEWED: VacancyStatus[] = ['INTERVIEW', 'OFFER'];
 
 /** `GET /stats` (ADR-0031). The funnel stages count the journal ("ever reached"),

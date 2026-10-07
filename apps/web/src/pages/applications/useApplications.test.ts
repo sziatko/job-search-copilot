@@ -261,6 +261,28 @@ describe('ApplicationsPage / useApplications', () => {
     mswServer.events.removeAllListeners();
   });
 
+  it('shows an Awaiting tile that filters by AWAITING, as the dropdown does', async () => {
+    serve(
+      [
+        application({ id: 1, company: 'Waiting Co', status: 'AWAITING' }),
+        application({ id: 2, company: 'Fresh Co' }),
+      ],
+      pipeline({ AWAITING: 1, APPLIED: 1 }, 2),
+    );
+    renderApplications();
+    await screen.findByText('Waiting Co');
+    expect(
+      within(screen.getByLabelText('Status')).getByRole('option', { name: 'Awaiting' }),
+    ).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Awaiting: 1' }));
+
+    await waitFor(() => expect(screen.queryByText('Fresh Co')).not.toBeInTheDocument());
+    expect(screen.getByText('Waiting Co')).toBeInTheDocument();
+    expect(screen.getByLabelText('Status')).toHaveValue('AWAITING');
+  });
+
   it('loads the next page when the table scrolls to the last loaded row', async () => {
     serve(
       Array.from({ length: 130 }, (_, i) =>

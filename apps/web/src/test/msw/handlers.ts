@@ -341,6 +341,7 @@ export function fakeStats(overrides: Partial<Stats> = {}): Stats {
         RECRUITER_SCREEN: 0,
         REPLIED: 0,
         INTERVIEW: 0,
+        AWAITING: 0,
         OFFER: 0,
         REJECTED: 0,
       },

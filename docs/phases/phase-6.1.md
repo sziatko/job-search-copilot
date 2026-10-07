@@ -95,7 +95,12 @@ width; screenshots before and after.
 - [x] **1 · Logo, favicon, mobile icons.** — *2026-10-07.* `favicon.svg` gained a
   `<title>` and `site.webmanifest` was reformatted: Biome checks `apps/web/public/`.
 - [x] **2 · Save for later → a dialog with an optional comment.** — *2026-10-07.*
-- [ ] **3 · `AWAITING`.**
+- [x] **3 · `AWAITING`.** — *2026-10-07.* Migration `20261007120000_add_awaiting_status`,
+  written by hand and applied to the test DB only; the dev DB and the Docker restart are
+  left to the main session. The skill's table is keyed by Gmail label: its row needs a
+  new "Job search/Чекаю фідбек" label, which the user creates by hand. `contracts.md`
+  had no status list — `/stats`' `byStatus` row lists them now, and ADR-0031's
+  `responded` row gained `AWAITING`.
 - [x] **4 · Room for the tables, a centred compact title.** — *2026-10-07.* Measured
   at 1440×900 and 390×844 in Chrome (same-origin iframes: the window would not resize).
   Title centre vs topbar centre: +3.1 / +6.1px (flat / compact) → −0.4, as the buttons.
