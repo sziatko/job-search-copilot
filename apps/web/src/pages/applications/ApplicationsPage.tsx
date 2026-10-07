@@ -43,7 +43,7 @@ export function ApplicationsPage() {
       )}
 
       <div className="card">
-        <div className="toolbar pt-[16px]">
+        <div className="toolbar">
           {!loadError && !loading && (
             <span className="toolbar-count">
               Showing {visibleItems.length} of {total}

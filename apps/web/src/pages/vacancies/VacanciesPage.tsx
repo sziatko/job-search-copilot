@@ -51,7 +51,7 @@ export function VacanciesPage() {
             tracker's: "Showing 0 of 0" during the first load is a claim about the
             data, and there is no data yet. Search is a modal with its own results
             (SearchModal); it never filters this table. */}
-        <div className="toolbar pt-[16px]">
+        <div className="toolbar">
           {!loadError && !loading && (
             <span className="toolbar-count">
               Showing {items.length} of {total}

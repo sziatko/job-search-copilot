@@ -82,7 +82,11 @@ width; screenshots before and after.
   shared rules, not page by page.
 - A large gap between the table's `<thead>` and its first row, cause not yet known — a
   stale `paddingTop` spacer row from `useVirtualRows` is one suspect. Find the cause
-  before changing anything.
+  before changing anything. *Not reproduced (2026-10-07): at scroll 0 the first `<tr>`
+  is row 0, not a spacer, and it starts 0px under the `<th>` on all three pages, both
+  widths, after scrolling down and back (wheel and programmatic) and after a tile
+  filter. Nothing changed for it; it needs a repro (which page, width, what was done
+  before).*
 - CSS only: the evidence is the screenshots and a green `npm test`.
 
 ## Status
@@ -92,4 +96,11 @@ width; screenshots before and after.
   `<title>` and `site.webmanifest` was reformatted: Biome checks `apps/web/public/`.
 - [x] **2 · Save for later → a dialog with an optional comment.** — *2026-10-07.*
 - [ ] **3 · `AWAITING`.**
-- [ ] **4 · Room for the tables, a centred compact title.**
+- [x] **4 · Room for the tables, a centred compact title.** — *2026-10-07.* Measured
+  at 1440×900 and 390×844 in Chrome (same-origin iframes: the window would not resize).
+  Title centre vs topbar centre: +3.1 / +6.1px (flat / compact) → −0.4, as the buttons.
+  `.view` pt 24 → 16 (phone 18 → 12), `.kpi-row` mb 20 → 12 (the compact and phone
+  overrides lost their now-equal `mb`), `.toolbar` pb 14 → 10, the pages' `pt-[16px]`
+  → `.view-fill > .card > .toolbar` pt 12. The table's scroll box at 1440: /applications
+  604 → 628px flat, 685 → 701 compact; /vacancies and /inbox +16. The `<thead>` gap was
+  not reproduced (see the step). Only web was run (169/169).

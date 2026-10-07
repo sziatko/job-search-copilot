@@ -66,7 +66,7 @@ export function InboxPage() {
   return (
     <section className="view view-fill">
       <div className="card">
-        <div className="toolbar pt-[16px]">
+        <div className="toolbar">
           <fieldset className="tabs">
             <legend className="sr-only">Inbox tab</legend>
             {inboxTabSchema.options.map((value) => (

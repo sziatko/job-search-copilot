@@ -209,7 +209,7 @@
   }
 
   .topbar {
-    @apply sticky top-0 z-20 flex items-end justify-between gap-[16px] border-b border-border px-[28px] py-[16px] backdrop-blur-[8px];
+    @apply sticky top-0 z-20 flex items-center justify-between gap-[16px] border-b border-border px-[28px] py-[16px] backdrop-blur-[8px];
     background: color-mix(in srgb, var(--color-bg) 88%, transparent);
     transition: padding 0.18s ease;
   }
@@ -229,7 +229,7 @@
   }
 
   .view {
-    @apply px-[28px] pb-[56px] pt-[24px];
+    @apply px-[28px] pb-[56px] pt-[16px];
   }
   /* The table pages (/vacancies, /applications, /inbox): the table's scroll box runs
      to the window's bottom, so the page itself does not scroll. A flex column from
@@ -260,7 +260,7 @@
 
   /* ---------- shared bits ---------- */
   .kpi-row {
-    @apply mb-[20px] grid gap-[12px];
+    @apply mb-[12px] grid gap-[12px];
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
   .kpi-tile {
@@ -304,7 +304,7 @@
      gets the height back. Scoped to .view-fill, so the dashboard's tiles keep their
      grid. The same rules are repeated in the media query. */
   .main[data-compact] .view-fill .kpi-row {
-    @apply mb-[12px] flex gap-[8px] overflow-x-auto;
+    @apply flex gap-[8px] overflow-x-auto;
   }
   .main[data-compact] .view-fill .kpi-tile {
     @apply flex flex-none items-baseline gap-[6px] rounded-full px-[12px] py-[5px];
@@ -330,7 +330,11 @@
   }
 
   .toolbar {
-    @apply flex flex-wrap items-center gap-[10px] px-[18px] pb-[14px];
+    @apply flex flex-wrap items-center gap-[10px] px-[18px] pb-[10px];
+  }
+  /* The table pages' toolbar opens their card. */
+  .view-fill > .card > .toolbar {
+    @apply pt-[12px];
   }
   .search-input {
     @apply min-w-[160px] flex-1 basis-[220px] rounded-[9px] border border-border-strong bg-surface-sunken px-[12px] py-[8px] text-[13px] text-ink;
@@ -1016,7 +1020,7 @@
       @apply px-[16px] py-[14px];
     }
     .view {
-      @apply px-[14px] pb-[44px] pt-[18px];
+      @apply px-[14px] pb-[44px] pt-[12px];
     }
     .view.view-fill {
       @apply pb-[18px];
@@ -1026,7 +1030,7 @@
     }
     /* /applications' compact strip, always on here — see .main[data-compact] above. */
     .view-fill .kpi-row {
-      @apply mb-[12px] flex gap-[8px] overflow-x-auto;
+      @apply flex gap-[8px] overflow-x-auto;
     }
     .view-fill .kpi-tile {
       @apply flex flex-none items-baseline gap-[6px] rounded-full px-[12px] py-[5px];
