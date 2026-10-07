@@ -9,6 +9,9 @@
  * the label — so the single <svg> below is aria-hidden. That is also why they
  * funnel through one `Icon`: the a11y lint reads attributes literally, so a
  * shared props object spread into a dozen <svg>s is invisible to it.
+ *
+ * `JscLogo` is the exception on both counts: fixed brand colours, and an image
+ * with its own name.
  */
 import type { ReactNode, SVGProps } from 'react';
 
@@ -30,13 +33,28 @@ function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: Reac
   );
 }
 
-export function IconBriefcase(props: SVGProps<SVGSVGElement>) {
+/** The brand mark. Colours are fixed on purpose: the same look in light and dark themes. */
+export function JscLogo({ size = 30, className }: { size?: number; className?: string }) {
   return (
-    <Icon {...props}>
-      <path d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5" />
-      <rect x="2" y="9" width="20" height="12" rx="2" />
-      <path d="M2 13h20M9 13v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-    </Icon>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      fill="none"
+      role="img"
+      aria-label="Job Search Copilot"
+      className={className}
+    >
+      <rect width="48" height="48" rx="12" fill="#2E5CD6" />
+      <path
+        d="M11.6 24.9 32.4 15.6 23.1 36.4 20.9 27.1Z"
+        fill="#FFFFFF"
+        stroke="#FFFFFF"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <circle cx="37" cy="11" r="3.4" fill="#17A874" stroke="#FFFFFF" strokeWidth="2" />
+    </svg>
   );
 }
 

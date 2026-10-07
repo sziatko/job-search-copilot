@@ -134,13 +134,6 @@
   .brand {
     @apply flex items-center gap-[10px] px-[8px] py-[4px];
   }
-  .brand-mark {
-    @apply flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[8px] text-white;
-    background: linear-gradient(155deg, var(--color-accent), var(--color-accent-ink));
-  }
-  .brand-mark svg {
-    @apply h-[17px] w-[17px];
-  }
   .brand-name {
     @apply text-[15px] font-extrabold leading-[1.15] tracking-[-0.01em];
   }

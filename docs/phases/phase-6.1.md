@@ -32,8 +32,9 @@ Decided with the user on 2026-10-07:
 it to the root of `dist`; nginx serves it as is). `index.html` gets the five head tags:
 `icon` (ico, `sizes="48x48"`), `icon` (svg), `apple-touch-icon`, `manifest`,
 `theme-color` `#2E5CD6`. `JscLogo` replaces `.brand-mark` + `IconBriefcase` in the
-sidebar (the `.brand-mark` CSS goes) and the briefcase on the login and consent pages;
-`IconBriefcase` goes if nothing else uses it. Then `docs/design/images/` is deleted.
+sidebar (the `.brand-mark` CSS goes) and the briefcase on the login and consent pages
+(there it replaces the `.soon-icon` tile too, at 52px — the logo draws its own tile);
+`IconBriefcase` goes, nothing else used it. Then `docs/design/images/` is deleted.
 Test: the sidebar renders an `img` named "Job Search Copilot".
 
 **2 · Save for later → a dialog with an optional comment.**
@@ -87,7 +88,8 @@ width; screenshots before and after.
 ## Status
 
 - [x] **0 · Docs.** This doc, its row in `docs/README.md`. — *2026-10-07.* Docs only.
-- [ ] **1 · Logo, favicon, mobile icons.**
+- [x] **1 · Logo, favicon, mobile icons.** — *2026-10-07.* `favicon.svg` gained a
+  `<title>` and `site.webmanifest` was reformatted: Biome checks `apps/web/public/`.
 - [ ] **2 · Save for later → a dialog with an optional comment.**
 - [ ] **3 · `AWAITING`.**
 - [ ] **4 · Room for the tables, a centred compact title.**

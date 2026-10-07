@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -40,6 +40,15 @@ describe('router', () => {
     // The log's place, now the inbox's (phase 5).
     expect(screen.getByRole('link', { name: /^inbox$/i })).toHaveAttribute('href', '/inbox');
     expect(screen.queryByRole('link', { name: /vacancy log/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the brand logo in the sidebar', async () => {
+    renderIndex();
+    const sidebar = (await screen.findByRole('link', { name: /^dashboard$/i })).closest('aside');
+    expect(sidebar).not.toBeNull();
+    expect(
+      within(sidebar as HTMLElement).getByRole('img', { name: 'Job Search Copilot' }),
+    ).toBeInTheDocument();
   });
 
   it('has no /log page any more', async () => {
