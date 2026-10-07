@@ -35,6 +35,7 @@ Node 24.
 ```bash
 cp .env.example .env
 npm install
+npm run generate                # the Prisma client; npm install does not make it
 docker compose up -d            # postgres + api + mcp + web + a core build watcher
 
 # First run only: create the schema and the separate test database
@@ -42,6 +43,14 @@ npm run migrate:dev             # dev DB (job_search_copilot)
 docker compose exec postgres psql -U postgres -c "CREATE DATABASE job_search_copilot_test"
 npm run test:db:migrate         # test DB (job_search_copilot_test)
 ```
+
+**The owner's fresh clone.** Git does not clone these, so after a new `git clone`:
+
+- the skills: `git clone https://github.com/sziatko/job-search-copilot-skills.git skills`
+  (private; without it the skill↔MCP sync test in `apps/mcp` skips), then an empty
+  `skills/.git/info/publish-guard-off` — that repo holds real data on purpose;
+- the publish-guard term list for this repo, `.git/info/private-terms`, copied from
+  wherever it is kept outside the repo.
 
 | Service | URL |
 | --- | --- |
