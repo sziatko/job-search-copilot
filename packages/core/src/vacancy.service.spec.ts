@@ -1005,5 +1005,36 @@ describe('VacancyService', () => {
         'NOT_REVIEWED',
       ]);
     });
+
+    it('saves a comment with the move, as a USER comment', async () => {
+      const { vacancy } = await service.save(input());
+      const saved = await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER', '  Back in May.  ');
+      expect(saved?.status).toBe('SAVED_FOR_LATER');
+      expect(saved?.comments.map((c) => [c.source, c.body])).toEqual([
+        ['ANALYZER', 'Strong match.'],
+        ['USER', 'Back in May.'],
+      ]);
+    });
+
+    it('adds no comment for a blank one', async () => {
+      const { vacancy } = await service.save(input());
+      const saved = await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER', '   ');
+      expect(saved?.status).toBe('SAVED_FOR_LATER');
+      expect(await getPrisma().comment.count({ where: { vacancyId: vacancy.id } })).toBe(1);
+    });
+
+    it('returns null for an unknown id with a comment, and writes nothing', async () => {
+      expect(await service.updateStatus(999_999, 'SAVED_FOR_LATER', 'note')).toBeNull();
+      expect(await getPrisma().comment.count()).toBe(0);
+    });
+
+    it('writes no comment when the move is refused', async () => {
+      const { vacancy } = await service.save(input());
+      await service.updateStatus(vacancy.id, 'SAVED_FOR_LATER');
+      await expect(service.updateStatus(vacancy.id, 'SAVED_FOR_LATER', 'Again.')).rejects.toThrow(
+        SameStatusError,
+      );
+      expect(await getPrisma().comment.count({ where: { vacancyId: vacancy.id } })).toBe(1);
+    });
   });
 });

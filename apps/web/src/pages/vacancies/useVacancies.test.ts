@@ -76,6 +76,26 @@ function offered(company: string) {
   return STATUS_VERBS.filter((name) => rowOf(company).queryByRole('button', { name }));
 }
 
+/** Save for later through its dialog: the row button opens it, OK (or Enter in the
+ * comment) sends it. */
+async function saveForLater(user: ReturnType<typeof userEvent.setup>, company: string) {
+  await user.click(rowOf(company).getByRole('button', { name: 'Save for later' }));
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Save for later' }),
+  );
+}
+
+/** The bodies of the PATCH /status requests sent, in order. */
+function recordStatusBodies(): unknown[] {
+  const bodies: unknown[] = [];
+  mswServer.events.on('request:start', async ({ request }) => {
+    if (request.method === 'PATCH' && request.url.endsWith('/status')) {
+      bodies.push(await request.clone().json());
+    }
+  });
+  return bodies;
+}
+
 /** What `ALL` sends on /vacancies — the page's context. */
 const CONTEXT_STATUSES = 'NOT_REVIEWED,SAVED_FOR_LATER,DECLINED,UNAVAILABLE';
 
@@ -98,7 +118,10 @@ function cachedStatus(client: QueryClient, key: readonly string[]) {
 
 // The toast spies below are file-scoped: a spy that outlives the test it belongs
 // to makes the next one's assertion meaningless.
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  mswServer.events.removeAllListeners();
+});
 
 describe('VacanciesPage / useVacancies', () => {
   it('defaults to the NOT_REVIEWED filter and hides everything else', async () => {
@@ -262,7 +285,7 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Showing 130 of 130');
 
     const user = userEvent.setup();
-    await user.click(rowOf('Co 1').getByRole('button', { name: 'Save for later' }));
+    await saveForLater(user, 'Co 1');
 
     const secondPage = () =>
       client.getQueryData<InfiniteData<{ items: VacancyListItem[] }>>(['vacancies', 'NOT_REVIEWED'])
@@ -354,21 +377,61 @@ describe('VacanciesPage / useVacancies', () => {
     expect(rowOf('Beta Corp').getByText('Declined', { selector: '.tag' })).toBeInTheDocument();
   });
 
-  it('saves Save for later straight away, with no dialog, and says so', async () => {
+  it('opens a dialog for Save for later; an empty one sends no comment, and says so', async () => {
     const success = vi.spyOn(toast, 'success');
     mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
+    const bodies = recordStatusBodies();
     renderVacancies();
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
     await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByRole('textbox', { name: 'Comment' })).toHaveValue('');
+    // Whitespace only counts as empty.
+    await user.type(dialog.getByRole('textbox', { name: 'Comment' }), '   ');
+    await user.click(dialog.getByRole('button', { name: 'Save for later' }));
 
-    // NOT_REVIEWED filter still active -> nothing to confirm, the row just drops out.
+    // NOT_REVIEWED filter still active -> the row drops out.
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
+    await waitFor(() => expect(bodies).toEqual([{ status: 'SAVED_FOR_LATER' }]));
     // The row is gone from view, so the toast names it.
     expect(success).toHaveBeenCalledWith('Moved to Saved for later', {
       description: expect.stringMatching(/ — Acme$/),
     });
+  });
+
+  it('sends the Save for later comment with the move', async () => {
+    const items = [vacancy({ id: 1, company: 'Acme' })];
+    mswServer.use(...buildHandlers(items));
+    const bodies = recordStatusBodies();
+    renderVacancies();
+    await screen.findByText('Acme');
+
+    const user = userEvent.setup();
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
+    await user.type(screen.getByRole('textbox', { name: 'Comment' }), 'After the holidays.{Enter}');
+
+    await waitFor(() =>
+      expect(bodies).toEqual([{ status: 'SAVED_FOR_LATER', comment: 'After the holidays.' }]),
+    );
+    expect(items[0].comments.at(-1)).toMatchObject({ source: 'USER', body: 'After the holidays.' });
+  });
+
+  it('cancels a pending Save for later without saving it', async () => {
+    mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })]));
+    const bodies = recordStatusBodies();
+    renderVacancies();
+    await screen.findByText('Acme');
+
+    const user = userEvent.setup();
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
+    await user.type(screen.getByRole('textbox', { name: 'Comment' }), 'Never mind');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+    expect(bodies).toEqual([]);
   });
 
   it('sets Unavailable with no confirm, and filters by it', async () => {
@@ -511,7 +574,7 @@ describe('VacanciesPage / useVacancies', () => {
 
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
+    await saveForLater(user, 'Acme');
 
     // All four in one `waitFor`: they come from the same `saving` flag, so they
     // have to agree on a single render — checking them one at a time can catch the
@@ -693,7 +756,7 @@ describe('VacanciesPage / useVacancies', () => {
     // the rows on screen are the *older* filter's page, held by `keepPreviousData`.
     expect(client.getQueryData(['vacancies', 'ALL'])).toBeUndefined();
 
-    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
+    await saveForLater(user, 'Acme');
 
     // The optimistic write lands on the entry that exists — the exact-key write it
     // replaced hit the absent one and did nothing. Asserted on the cache, not the
@@ -737,7 +800,7 @@ describe('VacanciesPage / useVacancies', () => {
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
     await waitFor(() => expect(list.state.started).toBe(1));
 
-    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
+    await saveForLater(user, 'Acme');
 
     // Mid-flight: the optimistic write is *in* the cached page, which is what makes
     // the rollback below a real rollback rather than a no-op on an untouched entry.
@@ -766,7 +829,7 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    await user.click(rowOf('Acme').getByRole('button', { name: 'Save for later' }));
+    await saveForLater(user, 'Acme');
 
     // The optimistic write put the row out of the NOT_REVIEWED view; the rollback
     // has to bring it back, tag and all.
@@ -884,7 +947,7 @@ describe('VacanciesPage / useVacancies', () => {
       await modal.findByText('Data Engineer');
       await user.click(modal.getByRole('button', { name: 'Close' }));
 
-      await user.click(rowOf('Backend Engineer').getByRole('button', { name: 'Save for later' }));
+      await saveForLater(user, 'Backend Engineer');
       await waitFor(() =>
         expect(
           rowOf('Backend Engineer').getByText('Saved for later', { selector: '.tag' }),

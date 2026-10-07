@@ -69,8 +69,10 @@ export function useVacancyPage(id: number) {
     othersPending: others.isPending,
     statusSaving: statusWrite.isPending,
     statusError: statusWrite.error?.message ?? null,
-    moveTriage: (status: RowAction) =>
-      statusWrite.mutate(() => updateVacancyStatus(id, status), { onSuccess: moved(status) }),
+    moveTriage: (status: RowAction, comment?: string) =>
+      statusWrite.mutate(() => updateVacancyStatus(id, status, comment), {
+        onSuccess: moved(status),
+      }),
     movePipeline: (status: ApplicationStatus) =>
       statusWrite.mutate(() => updateApplicationStatus(id, status), {
         onSuccess: moved(status),

@@ -5,7 +5,7 @@ import { escapeLikePattern } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
-import { firstStatus, statusAfterAnalysis, writeStatus } from './status';
+import { commentOn, firstStatus, statusAfterAnalysis, writeStatus } from './status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
 import type {
   ListVacanciesFilters,
@@ -431,13 +431,16 @@ export class VacancyService {
   }
 
   /** Moves the vacancy to `status` through writeStatus — a repeated pipeline status is
-   * an event, a repeated triage one throws SameStatusError. Returns null when no vacancy
-   * has this id. */
-  updateStatus(id: number, status: VacancyStatus): Promise<VacancyDetail | null> {
+   * an event, a repeated triage one throws SameStatusError. `comment`, when not blank,
+   * becomes a USER comment in the same transaction (Save for later's note). Returns null
+   * when no vacancy has this id. */
+  updateStatus(id: number, status: VacancyStatus, comment?: string): Promise<VacancyDetail | null> {
     return this.db.$transaction(async (tx) => {
       await writeStatus(tx, id, status);
       const row = await tx.vacancy.findUnique({ where: { id }, include: DETAIL_INCLUDE });
-      return row ? toDetail(row) : null;
+      const data = commentOn(comment, 'USER');
+      if (!row || !data.comments) return row && toDetail(row);
+      return toDetail(await tx.vacancy.update({ where: { id }, data, include: DETAIL_INCLUDE }));
     });
   }
 }

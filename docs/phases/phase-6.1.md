@@ -90,6 +90,6 @@ width; screenshots before and after.
 - [x] **0 · Docs.** This doc, its row in `docs/README.md`. — *2026-10-07.* Docs only.
 - [x] **1 · Logo, favicon, mobile icons.** — *2026-10-07.* `favicon.svg` gained a
   `<title>` and `site.webmanifest` was reformatted: Biome checks `apps/web/public/`.
-- [ ] **2 · Save for later → a dialog with an optional comment.**
+- [x] **2 · Save for later → a dialog with an optional comment.** — *2026-10-07.*
 - [ ] **3 · `AWAITING`.**
 - [ ] **4 · Room for the tables, a centred compact title.**

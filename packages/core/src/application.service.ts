@@ -22,6 +22,7 @@ import { getPrisma } from './prisma-client';
 import { deriveRecommendationFromScore } from './recommendation';
 import {
   activeWhere,
+  commentOn,
   firstStatus,
   isTimedOut,
   PIPELINE_STATUSES,
@@ -69,16 +70,6 @@ function flatten({ statusChanges, ...row }: ApplicationRow, now = new Date()): A
     timedOut: isTimedOut(row.status, row.statusChangedAt, now),
     appliedAt: statusChanges[0]?.createdAt ?? null,
   };
-}
-
-/** A nested write that adds `body` to the vacancy as a `source` comment; nothing when
- * it is blank. */
-function commentOn(
-  body: string | null | undefined,
-  source: CommentSource,
-): Prisma.VacancyUpdateInput {
-  const note = body?.trim();
-  return note ? { comments: { create: { body: note, source } } } : {};
 }
 
 /** One update, returned flattened; null when no vacancy has this id (P2025 — let the

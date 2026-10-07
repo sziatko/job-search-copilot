@@ -1,4 +1,4 @@
-import type { Prisma, Recommendation, VacancyStatus } from '@prisma/client';
+import type { CommentSource, Prisma, Recommendation, VacancyStatus } from '@prisma/client';
 import { AnalysedNotNewError, SameStatusError } from './errors';
 
 /** The statuses before the pipeline: the analysis queue (NEW), the user's triage, and
@@ -64,6 +64,16 @@ export function isTimedOut(status: VacancyStatus, statusChangedAt: Date, now: Da
     (OPEN_PIPELINE_STATUSES as readonly VacancyStatus[]).includes(status) &&
     statusChangedAt < timeoutCutoff(now)
   );
+}
+
+/** A nested write that adds `body` to the vacancy as a `source` comment; nothing when
+ * it is blank. Rides along with a status move, in the same transaction. */
+export function commentOn(
+  body: string | null | undefined,
+  source: CommentSource,
+): Prisma.VacancyUpdateInput {
+  const note = body?.trim();
+  return note ? { comments: { create: { body: note, source } } } : {};
 }
 
 /** A new vacancy's journal: NEW (the column's default), dated `at` along with

@@ -20,6 +20,7 @@ import { ApplyDialog } from '../vacancies/components/ApplyDialog';
 import { ConfirmDialog } from '../vacancies/components/ConfirmDialog';
 import { CopyVacancyButton } from '../vacancies/components/CopyVacancyButton';
 import { RecommendationTag } from '../vacancies/components/RecommendationTag';
+import { SaveForLaterDialog } from '../vacancies/components/SaveForLaterDialog';
 import { actionsFor } from '../vacancies/components/VacancyTable';
 import { STATUS_LABELS, STATUS_TAGS } from '../vacancies/constants';
 import {
@@ -294,7 +295,7 @@ function Header({
 
 /**
  * Before APPLIED, the /vacancies actions — Applied records the application through its
- * dialog, Declined confirms first; from APPLIED on, the /applications pipeline select.
+ * dialog, Declined confirms first, Saved for later asks for an optional comment; from APPLIED on, the /applications pipeline select.
  * NEW and FILTERED_OUT come before triage: their select offers what the row buttons do
  * (`actionsFor`), under the status itself.
  */
@@ -305,7 +306,7 @@ function StatusControl({
   vacancy: VacancyDetail;
   page: ReturnType<typeof useVacancyPage>;
 }) {
-  const [pending, setPending] = useState<'apply' | 'decline' | null>(null);
+  const [pending, setPending] = useState<'apply' | 'decline' | 'save' | null>(null);
   const { status } = vacancy;
 
   if (isPipelineStatus(status)) {
@@ -321,6 +322,7 @@ function StatusControl({
   function change(next: RowAction) {
     if (next === VACANCY_ACTION.APPLIED) setPending('apply');
     else if (next === VACANCY_ACTION.DECLINED) setPending('decline');
+    else if (next === VACANCY_ACTION.SAVED_FOR_LATER) setPending('save');
     else page.moveTriage(next);
   }
 
@@ -358,6 +360,17 @@ function StatusControl({
           onCancel={() => setPending(null)}
           onConfirm={() => {
             page.moveTriage(VACANCY_ACTION.DECLINED);
+            setPending(null);
+          }}
+        />
+      )}
+      {pending === 'save' && (
+        <SaveForLaterDialog
+          company={vacancy.company}
+          title={vacancy.title}
+          onCancel={() => setPending(null)}
+          onConfirm={(comment) => {
+            page.moveTriage(VACANCY_ACTION.SAVED_FOR_LATER, comment);
             setPending(null);
           }}
         />

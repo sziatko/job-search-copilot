@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ApplyDialog } from './components/ApplyDialog';
 import { CompanyHistoryModal } from './components/CompanyHistoryModal';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { SaveForLaterDialog } from './components/SaveForLaterDialog';
 import { SearchModal } from './components/SearchModal';
 import { StatusFilterSelect } from './components/StatusFilterSelect';
 import { VacancyTable } from './components/VacancyTable';
@@ -18,13 +19,16 @@ export function VacanciesPage() {
     savingIds,
     rowErrors,
     pendingDecline,
+    pendingSave,
     pendingApply,
     statusFilter,
     setStatusFilter,
     requestActionChange,
     confirmDecline,
+    confirmSave,
     confirmApply,
     cancelDecline,
+    cancelSave,
     cancelApply,
   } = useVacancies();
 
@@ -83,6 +87,15 @@ export function VacanciesPage() {
           confirmLabel="Yes, decline"
           onCancel={cancelDecline}
           onConfirm={confirmDecline}
+        />
+      )}
+
+      {pendingSave && (
+        <SaveForLaterDialog
+          company={pendingSave.company}
+          title={pendingSave.title}
+          onCancel={cancelSave}
+          onConfirm={confirmSave}
         />
       )}
 
