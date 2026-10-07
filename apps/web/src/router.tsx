@@ -31,6 +31,7 @@ const appRoute = createRoute({
   beforeLoad: async () => {
     const { data } = await authClient.getSession();
     if (!data) throw redirect({ to: '/login' });
+    return { user: data.user };
   },
 });
 

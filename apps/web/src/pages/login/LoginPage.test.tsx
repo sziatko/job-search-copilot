@@ -83,6 +83,24 @@ describe('sign-in', () => {
   });
 });
 
+describe('the shell', () => {
+  it('shows the signed-in user in the sidebar', async () => {
+    mswServer.use(
+      http.get(`${AUTH_URL}/get-session`, () =>
+        HttpResponse.json({
+          session: { id: 's1', userId: 'u1', token: 't', expiresAt: '2099-01-01T00:00:00.000Z' },
+          user: { id: 'u1', email: 'jane@example.com', name: 'Jane Doe', emailVerified: true },
+        }),
+      ),
+      http.get(`${AUTH_URL}/passkey/list-user-passkeys`, () => HttpResponse.json([])),
+    );
+    renderAt('/profile');
+
+    expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
+    expect(screen.getByText('JD')).toHaveClass('avatar');
+  });
+});
+
 describe('passkeys on /profile', () => {
   it('lists the passkeys and removes one', async () => {
     let keys = [{ id: 'pk1', name: 'Laptop', createdAt: '2026-10-01T00:00:00.000Z' }];

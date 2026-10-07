@@ -9,16 +9,16 @@ There is no `Company` entity: a vacancy stores the name the posting gave, so one
 company arrives under several spellings. ADR-0025 grouped them by substring: the
 company button's `companyMatchCount` and the modal's list were "every vacancy whose
 `company` contains this row's company". That rule only works in one direction. On
-the dev DB, #807 (`contoso`) listed 11 other vacancies and #761 (`contoso Polska`)
+the dev DB, `contoso` listed 11 other vacancies and `contoso Polska`
 listed 4: `contoso` is inside `contoso Polska`, but not the other way round.
 
-Across the dev DB's 448 company names (2026-10-02), the same rule also:
+Across the dev DB's company names (2026-10-02), the same rule also:
 
 - **joined unrelated companies**: `iO` matched 26 other names (`Apollo.io`,
-  `Nerdio`, `Software Mansion`, …), `Box` matched `Mapbox`, `Hays` matched
-  `Haystack People`, `Tailspin` matched `Tenth Tailspinion Group`;
-- **missed spellings where neither name contains the other**: `Sii Polska` /
-  `Sii Poland`.
+  `Nerdex`, `Software Garden`, …), `Ark` matched `Parkway`, `Nord` matched
+  `Nordstar People`, `Tailspin` matched `Tenth Tailspinion Group`;
+- **missed spellings where neither name contains the other**: `Vexa Polska` /
+  `Vexa Poland`.
 
 ## Decision
 
@@ -47,7 +47,7 @@ Across the dev DB's 448 company names (2026-10-02), the same rule also:
   more (`Spilberg (client: …)` contains `iO`). It also isn't transitive: with three
   spellings, the middle one sees more rows than the outer two, so counts still
   disagree.
-- **Grouping by the first word.** That merges `Software Mind` with `Software
+- **Grouping by the first word.** That merges `Software Grove` with `Software
   Mansion`, and `The Flex` with `The Trade Desk`.
 - **A `Company` table, or normalising names when they are saved.** That needs a
   migration, and it throws away what the analyzer wrote (`Fabrikam (partner
@@ -56,12 +56,12 @@ Across the dev DB's 448 company names (2026-10-02), the same rule also:
 
 ## Consequences
 
-- On the dev DB the key forms 20 groups of two or more spellings (contoso, Sii,
-  Luxoft, ALTEN, Fabrikam ×6, 7N, Exadel, …), and none of them joins unrelated
+- On the dev DB the key forms 20 groups of two or more spellings (contoso, Vexa,
+  Lumen, BRANDT, Fabrikam ×6, 9Q, Lumora, …), and none of them joins unrelated
   companies.
 - **Accepted miss:** a longer name that is still the same company, such as
-  `Picnic` / `Picnic Technologies`, `Nedap` / `Nedap Beveiligingstechniek B.V.` or
-  `co.brick` / `co.brick Talents`. The old rule found these only from the short
+  `Quokka` / `Quokka Technologies`, `Velto` / `Velto Beveiligingstechniek B.V.` or
+  `co.loop` / `co.loop Talents`. The old rule found these only from the short
   name.
 - Both helpers read every distinct company on each list call. That is fine at a few
   hundred names (a `ponytail:` note marks it); at scale, store the key in an indexed

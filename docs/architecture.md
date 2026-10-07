@@ -8,7 +8,7 @@ score, a recommendation, and reasoning. This repo is the plumbing around that
 output: somewhere to store each analysed vacancy, and a UI to work through them
 from *not reviewed* to *applied* or *declined*.
 
-Single user (the user), signed in with Google / LinkedIn / a passkey (phase 6); no
+Single user, signed in with Google / LinkedIn / a passkey (phase 6); no
 multi-tenancy. Local-first: Docker Compose on a laptop, Postgres in a container.
 
 ## The four packages
@@ -198,6 +198,12 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    `Vacancy` has no owner, so an anonymous route exposes all the data.
    → [ADR-0034](decisions/0034-auth-better-auth-in-core.md),
    [ADR-0036](decisions/0036-machine-token-for-n8n.md)
+10. **No real job-search data in the repo.** The repo is public; the dev DB holds the
+    owner's real search. Code, tests, fixtures, docs and commit messages use made-up
+    companies, ids, rates and counts (`Acme`, `3912345678`, `100 PLN/h`), never ones
+    copied from the dev DB, a log or a mailbox. Git keeps what was ever committed, so a
+    leak means rewriting history. The owner's personal skills, which do hold real data,
+    live in a separate private repo cloned into the gitignored `skills/`.
 
 ## Stack
 

@@ -138,7 +138,7 @@ Both write paths already called this function before the dedup lookup
 - **It was run on 2026-09-21**: 107 of 360 rows rewritten, 42 synthetic
   `tracker://` rows skipped (they fail the scheme gate by design and cannot
   drift), 0 non-canonical rows left. Two collision pairs had to be resolved by
-  hand first — Box and Kraken, each stored twice because one posting arrived with
+  hand first — Ark and Zephyr, each stored twice because one posting arrived with
   `?trk=public_jobs_topcard-title` — and in both the *newer* row was the
   analyzer's, carrying no application, so it was deleted and the row holding the
   application was canonicalized. One further row (ABN AMRO, `Front-end

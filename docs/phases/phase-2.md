@@ -97,13 +97,12 @@ resolve to the same vacancy, an `applyUrl` collision). Not in CI, not re-run.
 - `npm test` → **120 passed, 11 files**; `npm run lint` / `typecheck` / `build` clean.
   Both counts are the snapshot from when these steps landed — the suite has grown
   since (Post-phase work below records the current numbers).
-- **Tracker import run (2026-09-11):** 206 rows written in one transaction against
-  the dev DB — 3 linked to already-analysed vacancies (their `userAction` flipped to
-  `APPLIED`), 203 created placeholder `EstimatedVacancy` rows (40 with a synthetic
-  `tracker://` URL, `fullText:'N/A'`). One row (line 189, a re-application to
-  an agency for the same title) was disambiguated in `tracker.md`
-  before the run. The mapper also infers `usedTailoredResume` from the notes
-  ("Резюме адаптоване…", "Adaptовано CV…"; 11 rows) and would pull a quoted salary
+- **Tracker import run (2026-09-11):** every row written in one transaction against
+  the dev DB — a few linked to already-analysed vacancies (their `userAction` flipped
+  to `APPLIED`), the rest created placeholder `EstimatedVacancy` rows (some with a
+  synthetic `tracker://` URL, `fullText:'N/A'`). One ambiguous row (a re-application
+  to the same title) was disambiguated in `tracker.md` before the run. The mapper
+  also infers `usedTailoredResume` from the notes ("Резюме адаптоване…") and would pull a quoted salary
   out of the notes when the column is blank (0 matches in this file). Re-import is
   via `import:tracker --reset --commit` (wipes prior applications + placeholder
   vacancies, keeps real analysed ones).

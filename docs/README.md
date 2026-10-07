@@ -48,15 +48,8 @@ and *what a change here breaks over there*.
 - **Credentials live in untracked files, never in tracked ones.** The apps read config
   from env vars loaded at boot ([ADR-0007](decisions/0007-env-config-and-loading.md));
   the values sit in `.env` / `.env.test`, which `.gitignore` covers — only
-  `.env.example` is tracked. Claude Code's own credentials sit in
-  `~/.claude/keys/<profile>.key` — outside the repository working tree entirely, not
-  merely gitignored. `.claude/settings.json` carries no credential — only an
-  `apiKeyHelper` that prints the selected one (`~/.claude/get-key.mjs`, profile named in
-  `~/.claude/profiles.json`). Switch providers with
-  `claude-profile <deepseek|glm|claude|omniroute>`, which rewrites `env` and
-  `apiKeyHelper` in the current project's settings; `claude` means no custom endpoint at
-  all. The file stays gitignored because the helper path is machine-specific, not because
-  it holds a secret.
+  `.env.example` is tracked. Claude Code's own config (`.claude/settings*.json`) is
+  machine-specific and gitignored too.
 - **If a key does reach a commit, rotating it is the fix.** Rewriting history is the
   cleanup, not the remedy: by the time you notice, the key has been through clones,
   backups, and whatever the host caches. Do both, and rotate first.

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -99,16 +99,19 @@ describe('job-search-copilot MCP server', () => {
 
   // The skills in skills/ call these tools by name and are uploaded to claude.ai by
   // hand, so a rename here leaves them calling a tool that no longer exists — silently.
-  it('every JSC tool a skill names is registered', async () => {
+  // They live in a separate private repo cloned into skills/ (gitignored): without
+  // that clone (CI, a fresh checkout) there is nothing to check.
+  const skillsDir = path.resolve(import.meta.dirname, '../../../skills');
+  it.skipIf(!existsSync(skillsDir))('every JSC tool a skill names is registered', async () => {
     const client = await connectedClient();
     const { tools } = await client.listTools();
     const registered = new Set(tools.map((t) => t.name));
 
-    const skillsDir = path.resolve(import.meta.dirname, '../../../skills');
     // ponytail: a tool is recognised by its noun (`<verb>_vacanc…/application…/analys…`);
     // one named after another noun goes unchecked — widen the pattern when one appears.
     const referenced = readdirSync(skillsDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
+      // A skill is a folder with a SKILL.md — not the clone's own .git.
+      .filter((entry) => existsSync(path.join(skillsDir, entry.name, 'SKILL.md')))
       .flatMap((entry) => {
         const text = readFileSync(path.join(skillsDir, entry.name, 'SKILL.md'), 'utf8');
         return [...text.matchAll(/`([a-z]+_(?:vacanc|application|analys)[a-z_]*)`/g)].map(

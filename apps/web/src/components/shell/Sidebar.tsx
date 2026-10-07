@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useRouteContext } from '@tanstack/react-router';
 import type { ComponentType, SVGProps } from 'react';
 import {
   IconBriefcase,
@@ -67,6 +67,15 @@ export function Sidebar({
   onToggleRail: () => void;
   onCloseMobile: () => void;
 }) {
+  // The signed-in user, from the shell's session guard (router.tsx).
+  const { user } = useRouteContext({ from: '/_app' });
+  const name = user.name || user.email;
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join('');
+
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'open' : ''}`}>
       <div className="brand">
@@ -112,10 +121,9 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar-foot">
-        <div className="avatar">SZ</div>
+        <div className="avatar">{initials}</div>
         <div className="foot-text">
-          <div className="foot-name">User</div>
-          <div className="foot-role">Senior Frontend / TL</div>
+          <div className="foot-name">{name}</div>
         </div>
       </div>
     </aside>

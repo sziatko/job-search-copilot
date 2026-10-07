@@ -16,8 +16,8 @@ step 7 changes core and two REST list params.
   reload.
 - **A toast after every write** (added 2026-10-02): only Apply showed one.
 - **"Needs your review"** ends far above the Pipeline funnel card on the dashboard.
-- **"Other vacancies" counts disagree** for one company: #807 `contoso` lists 11
-  others, #761 `contoso Polska` lists 4. The company filter and `companyMatchCount`
+- **"Other vacancies" counts disagree** for one company: `contoso` lists 11
+  others, `contoso Polska` lists 4. The company filter and `companyMatchCount`
   are "rows whose company contains this name" (ADR-0025), which works one way only.
 
 Decided with the user on 2026-10-02:
@@ -32,7 +32,7 @@ Decided with the user on 2026-10-02:
   fills that height and scrolls inside; on a phone (one column) all 10 show.
 - **Same company = equal normalised name** (lowercase; parentheses, legal forms and
   trailing country words dropped) — [ADR-0032](../decisions/0032-same-company-normalised-name.md).
-  Accepted miss: "Picnic" vs "Picnic Technologies". The substring `company` filter
+  Accepted miss: "Quokka" vs "Quokka Technologies". The substring `company` filter
   stays for MCP and the skills.
 
 Out of scope, kept in the backlog: Recent activity with every status move (needs a
@@ -145,6 +145,6 @@ Out of scope, kept in the backlog: Recent activity with every status move (needs
     `sameCompanyAs`; the MSW fake mirrors it with lowercased equality.
   - Docs: ADR-0032; ADR-0025 points to it; `contracts.md`.
   - **Tests.** `companyKey` on the dev DB's real pairs and non-matches (iO / Apollo.io,
-    Box / Mapbox, Hays / Haystack People); `list({ sameCompanyAs })` and
+    Ark / Parkway, Nord / Nordstar People); `list({ sameCompanyAs })` and
     `companyMatchCount` equal from either spelling; the API passes the param; the web
     sends it.

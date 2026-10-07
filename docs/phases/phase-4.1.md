@@ -5,12 +5,12 @@
 Web fixes found while using phase 4. One small core change (the stats fields); MCP and
 the skills do not change.
 
-What the dev data showed on 2026-09-28 (`GET /stats`): logged 1248, analysed 324,
-recommended 524, applied 255. The `Vacancy` table holds 524 rows, every one APPLY or
-APPLY_WITH_CAVEATS — the skill saves only ≥50% and not SKIP — so 1248 − 524 = 724 were
-dropped by the analyzer, and nothing shows that number. `analysed` counts `ANALYZER`
-comments; the 200 placeholders imported from the tracker (ADR-0019) have none, so the
-funnel's second stage was smaller than Recommended and read as nonsense.
+What the dev data showed on 2026-09-28 (`GET /stats`): logged > recommended >
+analysed, applied a large share of recommended. The `Vacancy` table held only APPLY or
+APPLY_WITH_CAVEATS rows — the skill saves only ≥50% and not SKIP — so logged − Vacancy
+were dropped by the analyzer, and nothing showed that number. `analysed` counts
+`ANALYZER` comments; the placeholders imported from the tracker (ADR-0019) have none, so
+the funnel's second stage was smaller than Recommended and read as nonsense.
 
 The timeout stays derived in core (`timedOutWhere`, 30 days, ADR-0022). It never
 writes `status` or a `StatusChange` row, so a timed-out application never shows in

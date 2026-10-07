@@ -56,28 +56,28 @@ function countsByCompany(items: VacancyListItem[]): Record<string, number> {
   return Object.fromEntries(items.map((item) => [item.company, item.companyMatchCount]));
 }
 
-// Pairs and near-misses from the dev DB's 448 company names (2026-10-02).
+// Pairs and near-misses from the dev DB's company names (2026-10-02).
 describe('companyKey', () => {
   it.each([
     ['contoso', 'contoso Polska'],
-    ['Sii Polska', 'Sii Poland'],
-    ['ALTEN', 'ALTEN Spain'],
-    ['UST', 'UST España & Latam'],
+    ['Vexa Polska', 'Vexa Poland'],
+    ['BRANDT', 'BRANDT Spain'],
+    ['QXT', 'QXT España & Latam'],
     ['Fabrikam', 'Fabrikam (partner company, anonymized)'],
-    ['7N', '7N Sp. z o. o.'],
-    ['Exadel', 'Exadel Inc'],
-    ['Connectis', 'Connectis_'],
-    ['iTeamly', 'Iteamly'],
+    ['9Q', '9Q Sp. z o. o.'],
+    ['Lumora', 'Lumora Inc'],
+    ['Optivo', 'Optivo_'],
+    ['iPlanly', 'Iplanly'],
   ])('%j and %j are one company', (a, b) => {
     expect(companyKey(a)).toBe(companyKey(b));
   });
 
   it.each([
     ['iO', 'Apollo.io'],
-    ['Box', 'Mapbox'],
-    ['Hays', 'Haystack People'],
+    ['Ark', 'Parkway'],
+    ['Nord', 'Nordstar People'],
     ['Tailspin', 'Tenth Tailspinion Group'],
-    ['Software Mind', 'Software Mansion'],
+    ['Software Grove', 'Software Garden'],
   ])('%j and %j are not', (a, b) => {
     expect(companyKey(a)).not.toBe(companyKey(b));
   });
@@ -664,7 +664,7 @@ describe('VacancyService', () => {
 
       it('is the same from every spelling of the company (ADR-0032)', async () => {
         // The substring rule this replaced counted 'Acme Polska' into Acme's 2 and
-        // gave 'Acme Polska' itself 1 — #807 / #761 on the dev DB, 11 vs 4.
+        // gave 'Acme Polska' itself 1 — 11 vs 4 on the dev DB.
         await service.save(
           input({ applyUrl: 'https://example.com/jobs/d', company: 'Acme Polska' }),
         );

@@ -1,0 +1,1031 @@
+<title>Job Search Copilot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+
+    --color-bg: #F5F7FB;
+    --color-surface: #FFFFFF;
+    --color-surface-alt: #EEF2FA;
+    --color-surface-sunken: #E7EDF7;
+    --color-border: #DAE3F0;
+    --color-border-strong: #BECDE3;
+    --color-ink: #12151E;
+    --color-ink-soft: #3A4252;
+    --color-ink-muted: #69738A;
+    --color-ink-faint: #99A2B4;
+    --color-accent: #2E5CD6;
+    --color-accent-ink: #1F45B0;
+    --color-accent-soft: #E6EDFC;
+    --color-accent-soft-border: #C2D3F5;
+    --color-good: #17A874;
+    --color-good-soft: #E2F6EC;
+    --color-good-soft-border: #BAE9D1;
+    --color-warn: #B4780A;
+    --color-warn-soft: #FBF0DA;
+    --color-warn-soft-border: #EFD79C;
+    --color-bad: #DC3D3D;
+    --color-bad-soft: #FBEAEA;
+    --color-bad-soft-border: #F2C3C3;
+
+    --shadow-card: 0 1px 2px rgba(18, 21, 30, 0.06);
+    --shadow-pop: 0 8px 22px rgba(18, 21, 30, 0.09);
+  }
+
+  @layer base {
+    body { @apply bg-bg text-ink antialiased font-sans; }
+    h1, h2, h3 { text-wrap: balance; margin: 0; }
+    a { @apply text-accent; }
+    button { font-family: inherit; }
+  }
+
+  @layer components {
+    .mono { @apply font-mono tabular-nums; }
+
+    /* shell */
+    .app { @apply flex; min-height: 100vh; }
+
+    .sidebar {
+      --rail-w: 72px;
+      @apply fixed inset-y-0 left-0 z-40 flex w-[244px] flex-none flex-col gap-[18px] overflow-y-auto overflow-x-hidden border-r border-border bg-surface px-[14px] py-[18px];
+      transition: width .18s ease, transform .22s ease;
+    }
+    .sidebar.collapsed { width: var(--rail-w); @apply px-[10px]; }
+    .sidebar.collapsed .brand { @apply justify-center px-0 py-[4px]; }
+    .sidebar.collapsed .brand-text,
+    .sidebar.collapsed .nav-label,
+    .sidebar.collapsed .nav-text,
+    .sidebar.collapsed .nav-count,
+    .sidebar.collapsed .soon-pill,
+    .sidebar.collapsed .foot-text,
+    .sidebar.collapsed .rail-toggle .rail-toggle-text { @apply hidden; }
+    .sidebar.collapsed .nav-item { @apply justify-center px-0 py-[10px]; }
+    .sidebar.collapsed .nav-item svg { opacity: 1; }
+    .sidebar.collapsed .sidebar-foot { @apply justify-center px-0; }
+    .sidebar.collapsed .rail-toggle { @apply justify-center; }
+    .sidebar.collapsed .rail-toggle svg { transform: rotate(180deg); }
+
+    .brand { @apply flex items-center gap-[10px] px-[8px] py-[4px]; }
+    .brand-mark {
+      @apply flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[8px] text-white;
+      background: linear-gradient(155deg, var(--color-accent), var(--color-accent-ink));
+    }
+    .brand-mark svg { @apply h-[17px] w-[17px]; }
+    .brand-name { @apply text-[15px] font-extrabold leading-[1.15] tracking-[-0.01em]; }
+    .brand-sub { @apply text-[11px] text-ink-muted; }
+
+    .nav { @apply flex flex-col gap-[2px]; }
+    .nav-label { @apply px-[10px] pb-[4px] pt-[10px] text-[10.5px] font-bold uppercase tracking-[.07em] text-ink-faint; }
+    .nav-item {
+      @apply flex w-full cursor-pointer items-center gap-[10px] rounded-[9px] border border-transparent bg-transparent px-[10px] py-[9px] text-left text-[13.5px] font-semibold text-ink-soft no-underline;
+    }
+    .nav-item svg { @apply h-[16px] w-[16px] flex-none opacity-80; }
+    .nav-item:hover { @apply bg-surface-alt text-ink; }
+    .nav-item.active { @apply border-accent-soft-border bg-accent-soft text-accent-ink; }
+    .nav-item.active svg { opacity: 1; }
+    .nav-count { @apply ml-auto rounded-[6px] bg-surface-sunken px-[6px] py-[1px] font-mono text-[11px] text-ink-faint; }
+    .nav-item.active .nav-count { @apply text-accent-ink; background: #fff2; }
+    .nav-item.disabled { @apply cursor-default opacity-55; }
+    .nav-item.disabled:hover { @apply bg-transparent text-ink-soft; }
+    .soon-pill { @apply ml-auto rounded-[20px] border border-border bg-surface-sunken px-[6px] py-[1px] text-[9.5px] font-bold tracking-[.04em] text-ink-muted; }
+
+    .sidebar-foot { @apply mt-auto flex items-center gap-[9px] border-t border-border px-[8px] pb-[4px] pt-[10px]; }
+    .avatar { @apply flex h-[28px] w-[28px] flex-none items-center justify-center rounded-full border border-border bg-surface-sunken text-[11px] font-bold text-ink-muted; }
+    .foot-name { @apply text-[12.5px] font-bold leading-[1.2]; }
+    .foot-role { @apply text-[10.5px] text-ink-muted; }
+
+    .scrim { @apply hidden; }
+
+    .main { @apply flex min-w-0 flex-1 flex-col; margin-left: 244px; transition: margin-left .18s ease; }
+    .main.rail { margin-left: 72px; }
+
+    .rail-toggle { @apply my-[2px] flex w-full cursor-pointer items-center gap-[10px] rounded-[9px] border border-border bg-surface-alt px-[10px] py-[8px] text-[12px] font-bold text-ink-muted; }
+    .rail-toggle:hover { @apply border-border-strong text-ink; }
+    .rail-toggle svg { @apply h-[15px] w-[15px] flex-none; transition: transform .18s ease; }
+
+    .topbar {
+      @apply sticky top-0 z-20 flex items-end justify-between gap-[16px] border-b border-border px-[28px] py-[16px] backdrop-blur-[8px];
+      background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+    }
+    .topbar-title { @apply text-[20px] font-extrabold tracking-[-0.01em]; }
+    .topbar-sub { @apply mt-[3px] text-[12.5px] text-ink-muted; }
+    .menu-toggle { @apply hidden h-[34px] w-[34px] flex-none cursor-pointer items-center justify-center rounded-[8px] border border-border bg-surface text-ink-soft; }
+    .topbar-meta { @apply whitespace-nowrap text-right text-[11.5px] text-ink-faint; }
+
+    .view { @apply px-[28px] pb-[56px] pt-[24px]; }
+    .view[hidden] { display: none; }
+
+    /* shared bits */
+    .kpi-row { @apply mb-[20px] grid gap-[12px]; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    .kpi-tile { @apply rounded-[12px] border border-border bg-surface px-[16px] py-[14px] shadow-card; }
+    .kpi-tile .kpi-label { @apply text-[11px] font-bold uppercase tracking-[.04em] text-ink-muted; }
+    .kpi-tile .kpi-value { @apply mt-[6px] font-mono text-[25px] font-semibold tracking-[-0.01em]; }
+    .kpi-tile .kpi-note { @apply mt-[3px] text-[11.5px] text-ink-faint; }
+    .kpi-tile.accent .kpi-value { @apply text-accent-ink; }
+    .kpi-tile.good .kpi-value { @apply text-good; }
+    .kpi-tile.bad .kpi-value { @apply text-bad; }
+
+    .card { @apply rounded-[14px] border border-border bg-surface shadow-card; }
+    .card-head { @apply flex flex-wrap items-center justify-between gap-[12px] px-[18px] pb-[12px] pt-[16px]; }
+    .card-head h2 { @apply text-[15px] font-extrabold; }
+    .card-head .count { @apply mt-[2px] text-[12px] text-ink-muted; }
+
+    .toolbar { @apply flex flex-wrap items-center gap-[10px] px-[18px] pb-[14px]; }
+    .search-input { @apply min-w-[160px] flex-1 basis-[220px] rounded-[9px] border border-border-strong bg-surface-sunken px-[12px] py-[8px] text-[13px] text-ink; }
+    .search-input:focus { @apply bg-surface outline outline-2 outline-accent-soft-border; outline-offset: 0; }
+    select.filter-select, select.status-select { @apply rounded-[9px] border border-border-strong bg-surface px-[10px] py-[7px] text-[12.5px] font-semibold text-ink; }
+    .filter-group { @apply flex items-center gap-[7px] text-[12px] font-semibold text-ink-muted; }
+
+    .table-scroll { @apply overflow-x-auto; }
+    table { @apply w-full border-collapse; min-width: 760px; }
+    thead th { @apply sticky top-0 border-b border-border bg-surface px-[18px] py-[9px] text-left text-[10.5px] font-bold uppercase tracking-[.05em] text-ink-faint; }
+    tbody td { @apply border-b border-border px-[18px] py-[13px] align-top text-[13px]; }
+    tbody tr:last-child td { @apply border-b-0; }
+    tbody tr:hover { @apply bg-surface-alt; }
+    .table-body-scroll { @apply overflow-y-auto; max-height: 560px; }
+
+    .role-title { @apply text-[13.5px] font-bold text-ink; }
+    .role-meta { @apply mt-[2px] text-[12px] text-ink-muted; }
+    .role-meta .id { @apply text-ink-faint; }
+    .date-cell { @apply whitespace-nowrap text-[12.5px] text-ink-soft; }
+    .date-upd { @apply mt-[1px] text-[10.5px] text-ink-faint; }
+
+    .pill { @apply inline-flex items-center gap-[4px] whitespace-nowrap rounded-[20px] border border-transparent px-[9px] py-[2px] font-mono text-[12px] font-semibold; }
+    .pill.score-hi { @apply border-good-soft-border bg-good-soft text-good; }
+    .pill.score-mid { @apply border-warn-soft-border bg-warn-soft text-warn; }
+    .pill.score-lo { @apply border-border bg-surface-sunken text-ink-muted; }
+    .tag { @apply whitespace-nowrap rounded-[20px] border border-transparent px-[9px] py-[3px] font-sans text-[11px] font-bold; }
+    .tag.good { @apply border-good-soft-border bg-good-soft text-good; }
+    .tag.warn { @apply border-warn-soft-border bg-warn-soft text-warn; }
+    .tag.bad { @apply border-bad-soft-border bg-bad-soft text-bad; }
+    .tag.neutral { @apply border-border bg-surface-sunken text-ink-muted; }
+    .tag.accent { @apply border-accent-soft-border bg-accent-soft text-accent-ink; }
+
+    .comment-cell { @apply max-w-[340px] text-[12.5px] leading-[1.5] text-ink-soft; }
+    .comment-cell .clamp { @apply line-clamp-2; }
+    .comment-cell.expanded .clamp { -webkit-line-clamp: unset; }
+    .show-more { @apply cursor-pointer border-none bg-transparent pt-[3px] text-[12px] font-bold text-accent; }
+
+    .icon-btn { @apply relative inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[8px] border border-border-strong bg-surface text-ink-muted; }
+    .icon-btn:hover { @apply border-accent-soft-border bg-accent-soft text-accent-ink; }
+    .icon-btn svg { @apply h-[14px] w-[14px]; }
+    .copied-flag {
+      @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-ink px-[7px] py-[3px] text-[10.5px] font-bold text-bg opacity-0;
+      transition: opacity .15s ease;
+    }
+    .icon-btn.flash .copied-flag { @apply opacity-100; }
+
+    .empty-state { @apply px-[18px] py-[46px] text-center text-[13px] text-ink-muted; }
+    .table-foot { @apply border-t border-border px-[18px] pb-[16px] pt-[12px] text-[11.5px] text-ink-faint; }
+
+    /* dashboard */
+    .dash-grid { @apply grid items-start gap-[16px]; grid-template-columns: 1.3fr 1fr; }
+    .funnel { @apply flex flex-col gap-[10px] px-[18px] pb-[18px] pt-[6px]; }
+    .funnel-row { @apply grid items-center gap-[10px]; grid-template-columns: 118px 1fr 64px 70px; }
+    .funnel-name { @apply text-[12.5px] font-bold text-ink-soft; }
+    .funnel-track { @apply h-[20px] overflow-hidden rounded-[7px] bg-surface-sunken; }
+    .funnel-fill { @apply h-full rounded-[7px] bg-accent; min-width: 3%; }
+    .funnel-value { @apply text-right font-mono text-[13px] font-semibold; }
+    .funnel-conv { @apply whitespace-nowrap text-right font-mono text-[11px] text-ink-faint; }
+
+    .attn-list, .activity-list { @apply flex flex-col; }
+    .attn-item, .activity-item { @apply flex items-center gap-[11px] border-b border-border px-[18px] py-[11px]; }
+    .attn-item:last-child, .activity-item:last-child { @apply border-b-0; }
+    .attn-score { @apply min-w-[40px] flex-none rounded-[8px] border border-good-soft-border bg-good-soft px-[7px] py-[5px] text-center font-mono text-[12.5px] font-bold text-good; }
+    .attn-body, .activity-body { @apply min-w-0 flex-1; }
+    .attn-title, .activity-title { @apply overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold; }
+    .attn-sub, .activity-sub { @apply mt-[1px] text-[11.5px] text-ink-muted; }
+    .attn-go { @apply flex-none cursor-pointer rounded-[7px] border border-accent-soft-border bg-accent-soft px-[9px] py-[5px] text-[11.5px] font-bold text-accent; }
+    .activity-dot { @apply h-[8px] w-[8px] flex-none rounded-full; }
+    .activity-dot.good { @apply bg-good; }
+    .activity-dot.warn { @apply bg-warn; }
+    .activity-dot.accent { @apply bg-accent; }
+    .activity-time { @apply flex-none font-mono text-[11px] text-ink-faint; }
+
+    /* profile / soon */
+    .soon-wrap { @apply mx-auto flex max-w-[420px] flex-col items-center gap-[14px] px-[20px] py-[70px] text-center; }
+    .soon-icon { @apply flex h-[52px] w-[52px] items-center justify-center rounded-[14px] border border-accent-soft-border bg-accent-soft text-accent-ink; }
+    .soon-icon svg { @apply h-[24px] w-[24px]; }
+    .soon-wrap h2 { @apply text-[17px]; }
+    .soon-wrap p { @apply text-[13px] leading-[1.55] text-ink-muted; }
+    .soon-list { @apply flex w-full flex-col gap-[5px] rounded-[10px] border border-border bg-surface-alt px-[16px] py-[12px] text-left text-[12.5px] text-ink-soft; }
+
+    /* responsive */
+    @media (max-width: 860px) {
+      .sidebar, .sidebar.collapsed { @apply w-[244px] px-[14px]; transform: translateX(-100%); box-shadow: var(--shadow-pop); }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar.collapsed .brand-text, .sidebar.collapsed .nav-label, .sidebar.collapsed .nav-text,
+      .sidebar.collapsed .nav-count, .sidebar.collapsed .soon-pill, .sidebar.collapsed .foot-text,
+      .sidebar.collapsed .rail-toggle-text { display: revert; }
+      .sidebar.collapsed .brand { @apply justify-start; }
+      .sidebar.collapsed .nav-item { @apply justify-start px-[10px] py-[9px]; }
+      .sidebar.collapsed .sidebar-foot { @apply justify-start; }
+      .rail-toggle { @apply hidden; }
+      .main, .main.rail { margin-left: 0; }
+      .menu-toggle { @apply inline-flex; }
+      .scrim.show { @apply fixed inset-0 z-30 block; background: rgba(10,12,16,.4); }
+      .topbar { @apply px-[16px] py-[14px]; }
+      .view { @apply px-[14px] pb-[44px] pt-[18px]; }
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .funnel-row { grid-template-columns: 84px 1fr 44px; }
+      .funnel-conv { @apply hidden; }
+    }
+    @media (max-width: 980px) {
+      .dash-grid { grid-template-columns: 1fr; }
+    }
+  }
+</style>
+<style>
+  /* Runtime theme tokens: Tailwind's utilities above reference these via var(),
+     so redefining them here (media query + explicit override) re-themes every
+     utility and @apply rule that used them, exactly like the color tokens do. */
+  :root { color-scheme: light; }
+  :root[data-theme="light"] { color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --color-bg: #12151C;
+      --color-surface: #1A1E27;
+      --color-surface-alt: #21262F;
+      --color-surface-sunken: #0F1218;
+      --color-border: #2C3240;
+      --color-border-strong: #3B4252;
+      --color-ink: #EAEDF2;
+      --color-ink-soft: #C2C9D6;
+      --color-ink-muted: #8B93A3;
+      --color-ink-faint: #5E6577;
+      --color-accent: #6E9EE8;
+      --color-accent-ink: #9BBEF2;
+      --color-accent-soft: #22304A;
+      --color-accent-soft-border: #35456A;
+      --color-good: #4CBB87;
+      --color-good-soft: #17301F;
+      --color-good-soft-border: #275639;
+      --color-warn: #DCAB3F;
+      --color-warn-soft: #362A0E;
+      --color-warn-soft-border: #5C481B;
+      --color-bad: #E17575;
+      --color-bad-soft: #3A1D1D;
+      --color-bad-soft-border: #5E2E2E;
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-bg: #12151C;
+    --color-surface: #1A1E27;
+    --color-surface-alt: #21262F;
+    --color-surface-sunken: #0F1218;
+    --color-border: #2C3240;
+    --color-border-strong: #3B4252;
+    --color-ink: #EAEDF2;
+    --color-ink-soft: #C2C9D6;
+    --color-ink-muted: #8B93A3;
+    --color-ink-faint: #5E6577;
+    --color-accent: #6E9EE8;
+    --color-accent-ink: #9BBEF2;
+    --color-accent-soft: #22304A;
+    --color-accent-soft-border: #35456A;
+    --color-good: #4CBB87;
+    --color-good-soft: #17301F;
+    --color-good-soft-border: #275639;
+    --color-warn: #DCAB3F;
+    --color-warn-soft: #362A0E;
+    --color-warn-soft-border: #5C481B;
+    --color-bad: #E17575;
+    --color-bad-soft: #3A1D1D;
+    --color-bad-soft-border: #5E2E2E;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
+  }
+</style>
+
+<div class="app">
+  <div class="scrim" id="scrim"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5"/><rect x="2" y="9" width="20" height="12" rx="2"/><path d="M2 13h20M9 13v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Job Search Copilot</div>
+      </div>
+    </div>
+
+    <button class="rail-toggle" id="sidebarToggle" title="Collapse sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/><path d="M8 6v12"/></svg>
+      <span class="rail-toggle-text" id="toggleLabel">Collapse</span>
+    </button>
+
+    <nav class="nav">
+      <div class="nav-label">Overview</div>
+      <button class="nav-item active" data-view="dashboard" title="Dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span class="nav-text">Dashboard</span>
+      </button>
+
+      <div class="nav-label">Pipeline</div>
+      <button class="nav-item" data-view="analyzed" title="Analyzed vacancies">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m4 6 1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>
+        <span class="nav-text">Analyzed vacancies</span>
+      </button>
+      <button class="nav-item" data-view="tracker" title="Application tracker">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-8-8 18-2-8-8-2Z"/></svg>
+        <span class="nav-text">Application tracker</span>
+      </button>
+      <button class="nav-item" data-view="log" title="Vacancy log">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg>
+        <span class="nav-text">Vacancy log</span>
+      </button>
+
+      <div class="nav-label">Account</div>
+      <button class="nav-item disabled" data-view="profile" title="Profile & forms — soon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span class="nav-text">Profile &amp; forms</span>
+        <span class="soon-pill">SOON</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="avatar">AK</div>
+      <div class="foot-text">
+        <div class="foot-name">Alex K.</div>
+        <div class="foot-role">Signed in</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main" id="mainArea">
+    <header class="topbar">
+      <div style="display:flex; align-items:flex-end; gap:12px;">
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div>
+          <div class="topbar-title" id="topbarTitle">Dashboard</div>
+          <div class="topbar-sub" id="topbarSub">Your job search, at a glance</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <button class="icon-btn" id="themeToggle" title="Switch theme" aria-label="Toggle color theme"></button>
+      </div>
+    </header>
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="view" id="view-dashboard">
+      <div class="kpi-row">
+        <div class="kpi-tile">
+          <div class="kpi-label">Logged</div>
+          <div class="kpi-value">412</div>
+          <div class="kpi-note">unique postings ever seen</div>
+        </div>
+        <div class="kpi-tile">
+          <div class="kpi-label">Duplicates caught</div>
+          <div class="kpi-value">58</div>
+          <div class="kpi-note">cache hits, re-scoring skipped</div>
+        </div>
+        <div class="kpi-tile accent">
+          <div class="kpi-label">Awaiting triage</div>
+          <div class="kpi-value">86</div>
+          <div class="kpi-note">scored, not yet decided</div>
+        </div>
+        <div class="kpi-tile">
+          <div class="kpi-label">Applications sent</div>
+          <div class="kpi-value">215</div>
+          <div class="kpi-note">4.2% reply rate</div>
+        </div>
+        <div class="kpi-tile good">
+          <div class="kpi-label">Interviews</div>
+          <div class="kpi-value">3</div>
+          <div class="kpi-note">+1 recruiter screen</div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Pipeline funnel</h2>
+              <div class="count">From first sighting to interview</div>
+            </div>
+          </div>
+          <div class="funnel">
+            <div class="funnel-row">
+              <div class="funnel-name">Logged</div>
+              <div class="funnel-track"><div class="funnel-fill" style="width:100%; opacity:1"></div></div>
+              <div class="funnel-value">412</div>
+              <div class="funnel-conv">baseline</div>
+            </div>
+            <div class="funnel-row">
+              <div class="funnel-name">Passed screening</div>
+              <div class="funnel-track"><div class="funnel-fill" style="width:73%; opacity:.88"></div></div>
+              <div class="funnel-value">301</div>
+              <div class="funnel-conv">73% of logged</div>
+            </div>
+            <div class="funnel-row">
+              <div class="funnel-name">Applied</div>
+              <div class="funnel-track"><div class="funnel-fill" style="width:52%; opacity:.76"></div></div>
+              <div class="funnel-value">215</div>
+              <div class="funnel-conv">71% of scored</div>
+            </div>
+            <div class="funnel-row">
+              <div class="funnel-name">Got a response</div>
+              <div class="funnel-track"><div class="funnel-fill" style="width:8%; opacity:.64"></div></div>
+              <div class="funnel-value">9</div>
+              <div class="funnel-conv">4.2% of applied</div>
+            </div>
+            <div class="funnel-row">
+              <div class="funnel-name">Interview</div>
+              <div class="funnel-track"><div class="funnel-fill" style="width:4%; opacity:.52"></div></div>
+              <div class="funnel-value">3</div>
+              <div class="funnel-conv">33% of replies</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Needs your review</h2>
+              <div class="count">Highest-scored, not yet triaged</div>
+            </div>
+          </div>
+          <div class="attn-list" id="attnList"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-head">
+          <div>
+            <h2>Recent activity</h2>
+            <div class="count">Latest status changes across applications</div>
+          </div>
+        </div>
+        <div class="activity-list" id="activityList"></div>
+      </div>
+    </section>
+
+    <!-- ============ ANALYZED VACANCIES ============ -->
+    <section class="view" id="view-analyzed" hidden>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Analyzed vacancies</h2>
+            <div class="count"><span id="analyzedShowing">16</span> of 86 vacancies</div>
+          </div>
+          <div class="filter-group">
+            Status
+            <select class="filter-select" id="analyzedFilter">
+              <option value="all">All</option>
+              <option value="Not reviewed" selected>Not reviewed</option>
+              <option value="Ready to apply">Ready to apply</option>
+              <option value="Applied">Applied</option>
+              <option value="Skipped">Skipped</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <div class="table-body-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:80px">Added</th>
+                  <th>Vacancy</th>
+                  <th style="width:64px">Score</th>
+                  <th style="width:96px">Rec.</th>
+                  <th>Comment</th>
+                  <th style="width:44px">Copy</th>
+                  <th style="width:150px">Action</th>
+                </tr>
+              </thead>
+              <tbody id="analyzedBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="table-foot">Scroll for more · scores from the vacancy-evaluator skill</div>
+      </div>
+    </section>
+
+    <!-- ============ APPLICATION TRACKER ============ -->
+    <section class="view" id="view-tracker" hidden>
+      <div class="kpi-row" id="trackerKpis"></div>
+
+      <div class="card">
+        <div class="toolbar" style="padding-top:16px;">
+          <input class="search-input" id="trackerSearch" type="text" placeholder="Search company or role…">
+          <div class="filter-group">
+            Status
+            <select class="filter-select" id="trackerFilter">
+              <option value="all">All</option>
+              <option>Interview</option>
+              <option>Recruiter screen</option>
+              <option>Replied</option>
+              <option>Applied</option>
+              <option>Rejected</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <div class="table-body-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:90px">Date</th>
+                  <th>Role</th>
+                  <th style="width:64px">Score</th>
+                  <th style="width:100px">Salary</th>
+                  <th style="width:90px">CV</th>
+                  <th>Comment</th>
+                  <th style="width:44px">Copy</th>
+                  <th style="width:150px">Status</th>
+                </tr>
+              </thead>
+              <tbody id="trackerBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="table-foot" id="trackerFoot"></div>
+      </div>
+    </section>
+
+    <!-- ============ VACANCY LOG ============ -->
+    <section class="view" id="view-log" hidden>
+      <div class="kpi-row">
+        <div class="kpi-tile">
+          <div class="kpi-label">Total logged</div>
+          <div class="kpi-value">412</div>
+          <div class="kpi-note">all sources, since May</div>
+        </div>
+        <div class="kpi-tile">
+          <div class="kpi-label">Duplicates</div>
+          <div class="kpi-value">58</div>
+          <div class="kpi-note">matched an existing entry</div>
+        </div>
+        <div class="kpi-tile">
+          <div class="kpi-label">Below threshold</div>
+          <div class="kpi-value">53</div>
+          <div class="kpi-note">filtered before scoring</div>
+        </div>
+        <div class="kpi-tile accent">
+          <div class="kpi-label">Scored</div>
+          <div class="kpi-value">301</div>
+          <div class="kpi-note">passed to the analyzer</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Vacancy log</h2>
+            <div class="count">Dedup cache — every posting seen, regardless of source or verdict</div>
+          </div>
+          <div class="filter-group">
+            Status
+            <select class="filter-select" id="logFilter">
+              <option value="all">All</option>
+              <option>Scored</option>
+              <option>Duplicate</option>
+              <option>Below threshold</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <div class="table-body-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:80px">Seen</th>
+                  <th>Vacancy</th>
+                  <th style="width:110px">Source</th>
+                  <th style="width:120px">Status</th>
+                  <th style="width:64px">Score</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody id="logBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="table-foot">Showing 24 of 412 — search sources to narrow this list</div>
+      </div>
+    </section>
+
+    <!-- ============ PROFILE (placeholder) ============ -->
+    <section class="view" id="view-profile" hidden>
+      <div class="soon-wrap">
+        <div class="soon-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </div>
+        <h2>Profile &amp; forms — coming soon</h2>
+        <p>This is where your candidate profile will live: target roles, salary floor, locations, and the resume variants the analyzer scores against.</p>
+        <div class="soon-list">
+          <div>· Editable profile (stack, seniority, target rate)</div>
+          <div>· Resume variants per market (PL / NL / US)</div>
+          <div>· Saved search filters and alert rules</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- data ---------------- */
+
+  var analyzedData = [
+    { added: "Sep 14", title: "Senior Frontend Engineer", company: "Acme", id: "467", score: 78, rec: "Apply", status: "Not reviewed", comment: "React/TypeScript senior role with a clear scope; salary range published and in line with the target; remote within the EU." },
+    { added: "Sep 14", title: "Senior React Developer", company: "Globex", id: "463", score: 78, rec: "Apply", status: "Not reviewed", comment: "Strong stack fit (React, TanStack Query, design system work); hybrid two days a week, rate not published." },
+    { added: "Sep 16", title: "Frontend Team Lead", company: "Initech", id: "526", score: 76, rec: "Apply", status: "Not reviewed", comment: "Lead role with hands-on React; small team, code review and tests in place; salary on request." },
+    { added: "Sep 14", title: "Senior Angular Developer", company: "Umbrella Labs", id: "487", score: 76, rec: "Apply", status: "Not reviewed", comment: "React/TypeScript senior role with a clear scope; salary range published and in line with the target; remote within the EU." },
+    { added: "Sep 14", title: "Staff Frontend Engineer", company: "Hooli", id: "504", score: 75, rec: "Apply", status: "Not reviewed", comment: "Strong stack fit (React, TanStack Query, design system work); hybrid two days a week, rate not published." },
+    { added: "Sep 13", title: "Senior Full Stack Engineer (React/Node)", company: "Vandelay", id: "491", score: 74, rec: "Apply", status: "Not reviewed", comment: "Lead role with hands-on React; small team, code review and tests in place; salary on request." },
+    { added: "Sep 13", title: "Lead Frontend Engineer", company: "Stark Digital", id: "489", score: 73, rec: "Apply", status: "Not reviewed", comment: "React/TypeScript senior role with a clear scope; salary range published and in line with the target; remote within the EU." },
+    { added: "Sep 12", title: "Senior TypeScript Engineer", company: "Wayne Tech", id: "480", score: 71, rec: "Apply", status: "Not reviewed", comment: "Strong stack fit (React, TanStack Query, design system work); hybrid two days a week, rate not published." },
+    { added: "Sep 12", title: "Frontend Engineer, Design Systems", company: "Wonka Systems", id: "477", score: 69, rec: "Consider", status: "Not reviewed", comment: "Solid stack, but the scope is vague and on-call is expected; worth a recruiter call to clarify." },
+    { added: "Sep 11", title: "Senior Software Engineer (React)", company: "Cyberdyne", id: "471", score: 67, rec: "Consider", status: "Not reviewed", comment: "Good frontend fit, but hybrid three days a week in another city and the rate is not published." },
+    { added: "Sep 10", title: "Senior Web Engineer", company: "Tyrell", id: "468", score: 66, rec: "Consider", status: "Not reviewed", comment: "Angular-first role with React as a plus; rate slightly under the target, mostly remote." },
+    { added: "Sep 9", title: "Frontend Engineer (Angular)", company: "Monarch", id: "460", score: 65, rec: "Consider", status: "Not reviewed", comment: "Solid stack, but the scope is vague and on-call is expected; worth a recruiter call to clarify." },
+    { added: "Sep 9", title: "Senior Frontend Engineer", company: "Pied Piper", id: "455", score: 61, rec: "Consider", status: "Not reviewed", comment: "Good frontend fit, but hybrid three days a week in another city and the rate is not published." },
+    { added: "Sep 8", title: "Senior React Developer", company: "Aperture", id: "449", score: 52, rec: "Pass", status: "Not reviewed", comment: "Junior/mid level and a CMS-heavy stack — well below the profile." },
+    { added: "Sep 6", title: "WordPress Developer", company: "Black Mesa", id: "441", score: 48, rec: "Pass", status: "Applied", comment: "PHP role; the frontend part is limited to templates." },
+    { added: "Sep 5", title: "Senior Angular Developer", company: "Massive Dynamic", id: "437", score: 74, rec: "Apply", status: "Ready to apply", comment: "React/TypeScript senior role with a clear scope; salary range published and in line with the target; remote within the EU." }
+  ];
+
+  var trackerData = [
+    { date: "Sep 16, 26", upd: "Sep 16, 26", role: "Staff Frontend Engineer", company: "Nakatomi", id: "421", score: 78, salary: "—", cv: "—", status: "Applied", comment: "Applied through the company careers page; confirmation email received." },
+    { date: "Sep 16, 26", upd: "Sep 16, 26", role: "Senior Full Stack Engineer (React/Node)", company: "Oscorp", id: "420", score: 78, salary: "—", cv: "—", status: "Applied", comment: "Applied through the company careers page; confirmation email received." },
+    { date: "Sep 16, 26", upd: "Sep 16, 26", role: "Lead Frontend Engineer", company: "Virtucon", id: "419", score: 78, salary: "—", cv: "—", status: "Interview", comment: "Invited to a technical interview after the recruiter screen." },
+    { date: "Sep 16, 26", upd: "Sep 16, 26", role: "Senior TypeScript Engineer", company: "Dunder Data", id: "418", score: 79, salary: "100 PLN/h", cv: "—", status: "Applied", comment: "Applied through the company careers page; confirmation email received." },
+    { date: "Sep 15, 26", upd: "Sep 16, 26", role: "Frontend Engineer, Design Systems", company: "Pied Piper", id: "410", score: 74, salary: "—", cv: "Sent", status: "Recruiter screen", comment: "Recruiter screen booked for next week." },
+    { date: "Sep 15, 26", upd: "Sep 15, 26", role: "Senior Software Engineer (React)", company: "Monarch", id: "406", score: 71, salary: "—", cv: "—", status: "Replied", comment: "Recruiter replied asking about availability and notice period." },
+    { date: "Sep 14, 26", upd: "Sep 15, 26", role: "Senior Web Engineer", company: "Acme", id: "467", score: 78, salary: "100 PLN/h", cv: "Sent", status: "Replied", comment: "Recruiter replied asking about availability and notice period." },
+    { date: "Sep 14, 26", upd: "Sep 14, 26", role: "Frontend Engineer (Angular)", company: "Globex", id: "463", score: 78, salary: "—", cv: "Sent", status: "Applied", comment: "Applied through the company careers page; confirmation email received." },
+    { date: "Sep 13, 26", upd: "Sep 14, 26", role: "Senior Frontend Engineer", company: "Umbrella Labs", id: "487", score: 76, salary: "100 PLN/h", cv: "Sent", status: "Applied", comment: "Applied through the company careers page; confirmation email received." },
+    { date: "Sep 13, 26", upd: "Sep 13, 26", role: "Senior React Developer", company: "Vandelay", id: "491", score: 74, salary: "—", cv: "Sent", status: "Applied", comment: "Applied through the company careers page; confirmation email received." },
+    { date: "Sep 12, 26", upd: "Sep 12, 26", role: "Frontend Team Lead", company: "Stark Digital", id: "489", score: 73, salary: "—", cv: "Sent", status: "Applied", comment: "Applied through the company careers page; confirmation email received." },
+    { date: "Sep 12, 26", upd: "Sep 12, 26", role: "Senior Angular Developer", company: "Wayne Tech", id: "480", score: 71, salary: "—", cv: "Sent", status: "Applied", comment: "Applied through the company careers page; confirmation email received." },
+    { date: "Sep 8, 26", upd: "Sep 10, 26", role: "Staff Frontend Engineer", company: "Aperture", id: "449", score: 52, salary: "—", cv: "Sent", status: "Rejected", comment: "Rejection email after the first round; no specific feedback." },
+    { date: "Sep 6, 26", upd: "Sep 9, 26", role: "Junior Frontend Developer", company: "Black Mesa", id: "441", score: 48, salary: "100 PLN/h", cv: "—", status: "Rejected", comment: "Rejection email after the first round; no specific feedback." },
+    { date: "Sep 2, 26", upd: "Sep 7, 26", role: "Lead Frontend Engineer", company: "Prestige Worldwide", id: "398", score: 70, salary: "—", cv: "Sent", status: "Rejected", comment: "Rejection email after the first round; no specific feedback." }
+  ];
+
+  var logData = [
+    { seen: "Sep 16", title: "Senior TypeScript Engineer", company: "Initech", id: "526", source: "Email digest", status: "Scored", score: 76, note: "First seen — passed to analyzer" },
+    { seen: "Sep 16", title: "Frontend Engineer, Design Systems", company: "Nakatomi", id: "421", source: "Manual", status: "Scored", score: 78, note: "First seen — passed to analyzer" },
+    { seen: "Sep 16", title: "Senior Software Engineer (React)", company: "Monarch", id: "525", source: "LinkedIn scrape", status: "Duplicate", score: null, note: "Already in the log — skipped" },
+    { seen: "Sep 15", title: "Senior Web Engineer", company: "Massive Dynamic", id: "437", source: "Email digest", status: "Scored", score: 74, note: "First seen — passed to analyzer" },
+    { seen: "Sep 15", title: "Backend Engineer (Java)", company: "Sterling Cooper", id: "520", source: "Email digest", status: "Below threshold", score: 31, note: "Scored below 50 — filtered out" },
+    { seen: "Sep 15", title: "Senior Frontend Engineer", company: "Pied Piper", id: "410", source: "Manual", status: "Scored", score: 74, note: "First seen — passed to analyzer" },
+    { seen: "Sep 14", title: "Senior React Developer", company: "Acme", id: "467", source: "Email digest", status: "Scored", score: 78, note: "First seen — passed to analyzer" },
+    { seen: "Sep 14", title: "Frontend Team Lead", company: "Globex", id: "463", source: "LinkedIn scrape", status: "Scored", score: 78, note: "First seen — passed to analyzer" },
+    { seen: "Sep 14", title: "Senior Angular Developer", company: "Umbrella Labs", id: "487", source: "Email digest", status: "Scored", score: 76, note: "First seen — passed to analyzer" },
+    { seen: "Sep 14", title: "Staff Frontend Engineer", company: "Hooli", id: "504", source: "Manual", status: "Scored", score: 75, note: "First seen — passed to analyzer" },
+    { seen: "Sep 14", title: "Senior Full Stack Engineer (React/Node)", company: "Acme", id: "467-b", source: "LinkedIn scrape", status: "Duplicate", score: null, note: "Already in the log — skipped" },
+    { seen: "Sep 13", title: "Lead Frontend Engineer", company: "Vandelay", id: "491", source: "Email digest", status: "Scored", score: 74, note: "First seen — passed to analyzer" },
+    { seen: "Sep 13", title: "Senior TypeScript Engineer", company: "Stark Digital", id: "489", source: "Manual", status: "Scored", score: 73, note: "First seen — passed to analyzer" },
+    { seen: "Sep 13", title: "Full Stack Developer (PHP)", company: "Bluth Digital", id: "494", source: "Email digest", status: "Below threshold", score: 22, note: "Scored below 50 — filtered out" },
+    { seen: "Sep 12", title: "Senior Software Engineer (React)", company: "Wayne Tech", id: "480", source: "Email digest", status: "Scored", score: 71, note: "First seen — passed to analyzer" },
+    { seen: "Sep 12", title: "Senior Web Engineer", company: "Wonka Systems", id: "477", source: "LinkedIn scrape", status: "Scored", score: 69, note: "First seen — passed to analyzer" },
+    { seen: "Sep 11", title: "Frontend Engineer (Angular)", company: "Cyberdyne", id: "471", source: "Manual", status: "Scored", score: 67, note: "First seen — passed to analyzer" },
+    { seen: "Sep 11", title: "Full Stack Developer (PHP)", company: "Kaiju Labs", id: "473", source: "Email digest", status: "Below threshold", score: 18, note: "Scored below 50 — filtered out" },
+    { seen: "Sep 10", title: "Senior React Developer", company: "Tyrell", id: "468", source: "Email digest", status: "Scored", score: 66, note: "First seen — passed to analyzer" },
+    { seen: "Sep 9", title: "Frontend Team Lead", company: "Monarch", id: "460", source: "LinkedIn scrape", status: "Scored", score: 65, note: "First seen — passed to analyzer" },
+    { seen: "Sep 9", title: "Senior Angular Developer", company: "Pied Piper", id: "455", source: "Manual", status: "Scored", score: 61, note: "First seen — passed to analyzer" },
+    { seen: "Sep 8", title: "Staff Frontend Engineer", company: "Aperture", id: "449", source: "Email digest", status: "Scored", score: 52, note: "First seen — passed to analyzer" },
+    { seen: "Sep 8", title: "Senior Full Stack Engineer (React/Node)", company: "Brightline", id: "451", source: "Email digest", status: "Duplicate", score: null, note: "Already in the log — skipped" },
+    { seen: "Sep 6", title: "WordPress Developer", company: "Black Mesa", id: "441", source: "Manual", status: "Scored", score: 48, note: "First seen — passed to analyzer" }
+  ];
+
+  /* ---------------- helpers ---------------- */
+
+  function scoreClass(s) { return s >= 70 ? "score-hi" : s >= 55 ? "score-mid" : "score-lo"; }
+  function recTag(r) {
+    if (r === "Apply") return '<span class="tag good">Apply</span>';
+    if (r === "Consider") return '<span class="tag warn">Consider</span>';
+    return '<span class="tag bad">Pass</span>';
+  }
+  function statusTag(s) {
+    var map = {
+      "Interview": "good", "Recruiter screen": "good", "Replied": "accent",
+      "Applied": "neutral", "Rejected": "bad", "Not reviewed": "neutral",
+      "Ready to apply": "accent", "Skipped": "bad", "Scored": "good",
+      "Duplicate": "neutral", "Below threshold": "bad"
+    };
+    return '<span class="tag ' + (map[s] || "neutral") + '">' + s + '</span>';
+  }
+  function copySvg() {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+  }
+  function copyText(btn, text) {
+    try {
+      navigator.clipboard.writeText(text).catch(function(){});
+    } catch (e) {}
+    btn.classList.add("flash");
+    setTimeout(function () { btn.classList.remove("flash"); }, 1100);
+  }
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  /* ---------------- render: analyzed ---------------- */
+
+  function renderAnalyzed() {
+    var filter = document.getElementById("analyzedFilter").value;
+    var rows = analyzedData.filter(function (r) { return filter === "all" || r.status === filter; });
+    document.getElementById("analyzedShowing").textContent = rows.length;
+    var body = document.getElementById("analyzedBody");
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="7"><div class="empty-state">No vacancies match this filter.</div></td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(function (r, i) {
+      var copyStr = r.title + " — " + r.company + " (#" + r.id + ")";
+      return (
+        '<tr>' +
+          '<td class="date-cell">' + r.added + '</td>' +
+          '<td><div class="role-title">' + escapeHtml(r.title) + '</div><div class="role-meta">' + escapeHtml(r.company) + ' <span class="id">#' + r.id + '</span></div></td>' +
+          '<td><span class="pill ' + scoreClass(r.score) + '">' + r.score + '%</span></td>' +
+          '<td>' + recTag(r.rec) + '</td>' +
+          '<td><div class="comment-cell" id="ac-' + i + '"><div class="clamp">' + escapeHtml(r.comment) + '</div><button class="show-more" onclick="document.getElementById(\'ac-' + i + '\').classList.toggle(\'expanded\'); this.textContent = document.getElementById(\'ac-' + i + '\').classList.contains(\'expanded\') ? \'Show less\' : \'Show more\'">Show more</button></div></td>' +
+          '<td><button class="icon-btn" onclick="window.__copy(this,' + "'" + copyStr.replace(/'/g, "\\'") + "'" + ')">' + copySvg() + '<span class="copied-flag">Copied</span></button></td>' +
+          '<td><select class="status-select" data-idx="' + i + '" onchange="window.__setAnalyzedStatus(this)">' +
+            ["Not reviewed", "Ready to apply", "Applied", "Skipped"].map(function (s) {
+              return '<option' + (s === r.status ? ' selected' : '') + '>' + s + '</option>';
+            }).join("") +
+          '</select></td>' +
+        '</tr>'
+      );
+    }).join("");
+  }
+
+  window.__setAnalyzedStatus = function (sel) {
+    var visible = analyzedData.filter(function (r) {
+      var f = document.getElementById("analyzedFilter").value;
+      return f === "all" || r.status === f;
+    });
+    var idx = Number(sel.getAttribute("data-idx"));
+    var record = visible[idx];
+    if (record) record.status = sel.value;
+    renderDashboard();
+  };
+
+  /* ---------------- render: tracker ---------------- */
+
+  function trackerCounts() {
+    var c = { total: trackerData.length, Interview: 0, Replied: 0, "Recruiter screen": 0, Applied: 0, Rejected: 0 };
+    trackerData.forEach(function (r) { if (c[r.status] !== undefined) c[r.status]++; });
+    return c;
+  }
+
+  function renderTrackerKpis() {
+    var c = trackerCounts();
+    var el = document.getElementById("trackerKpis");
+    el.innerHTML =
+      '<div class="kpi-tile accent"><div class="kpi-label">Total</div><div class="kpi-value">215</div><div class="kpi-note">' + c.total + ' shown in sample</div></div>' +
+      '<div class="kpi-tile good"><div class="kpi-label">Interview</div><div class="kpi-value">3</div></div>' +
+      '<div class="kpi-tile"><div class="kpi-label">Replied</div><div class="kpi-value">5</div></div>' +
+      '<div class="kpi-tile"><div class="kpi-label">Recruiter screen</div><div class="kpi-value">1</div></div>' +
+      '<div class="kpi-tile"><div class="kpi-label">Applied</div><div class="kpi-value">131</div></div>' +
+      '<div class="kpi-tile bad"><div class="kpi-label">Rejected</div><div class="kpi-value">75</div></div>';
+  }
+
+  function renderTracker() {
+    var filter = document.getElementById("trackerFilter").value;
+    var q = document.getElementById("trackerSearch").value.trim().toLowerCase();
+    var rows = trackerData.filter(function (r) {
+      var matchStatus = filter === "all" || r.status === filter;
+      var matchQ = !q || r.role.toLowerCase().indexOf(q) > -1 || r.company.toLowerCase().indexOf(q) > -1;
+      return matchStatus && matchQ;
+    });
+    var body = document.getElementById("trackerBody");
+    document.getElementById("trackerFoot").textContent = "Showing " + rows.length + " of 215 applications";
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="8"><div class="empty-state">No applications match this search.</div></td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(function (r, i) {
+      var copyStr = r.role + " — " + r.company + " (#" + r.id + ")";
+      return (
+        '<tr>' +
+          '<td class="date-cell">' + r.date + '<div class="date-upd">upd: ' + r.upd + '</div></td>' +
+          '<td><div class="role-title">' + escapeHtml(r.role) + '</div><div class="role-meta">' + escapeHtml(r.company) + ' <span class="id">#' + r.id + '</span></div></td>' +
+          '<td><span class="pill ' + scoreClass(r.score) + '">' + r.score + '%</span></td>' +
+          '<td class="mono" style="font-size:12px;">' + r.salary + '</td>' +
+          '<td style="font-size:12px; color:var(--color-ink-muted);">' + r.cv + '</td>' +
+          '<td><div class="comment-cell" id="tc-' + i + '"><div class="clamp">' + escapeHtml(r.comment) + '</div><button class="show-more" onclick="document.getElementById(\'tc-' + i + '\').classList.toggle(\'expanded\'); this.textContent = document.getElementById(\'tc-' + i + '\').classList.contains(\'expanded\') ? \'Show less\' : \'Show more\'">Show more</button></div></td>' +
+          '<td><button class="icon-btn" onclick="window.__copy(this,' + "'" + copyStr.replace(/'/g, "\\'") + "'" + ')">' + copySvg() + '<span class="copied-flag">Copied</span></button></td>' +
+          '<td><select class="status-select" data-idx="' + i + '" onchange="window.__setTrackerStatus(this)">' +
+            ["Applied", "Replied", "Recruiter screen", "Interview", "Rejected"].map(function (s) {
+              return '<option' + (s === r.status ? ' selected' : '') + '>' + s + '</option>';
+            }).join("") +
+          '</select></td>' +
+        '</tr>'
+      );
+    }).join("");
+  }
+
+  window.__setTrackerStatus = function (sel) {
+    var filter = document.getElementById("trackerFilter").value;
+    var q = document.getElementById("trackerSearch").value.trim().toLowerCase();
+    var visible = trackerData.filter(function (r) {
+      var matchStatus = filter === "all" || r.status === filter;
+      var matchQ = !q || r.role.toLowerCase().indexOf(q) > -1 || r.company.toLowerCase().indexOf(q) > -1;
+      return matchStatus && matchQ;
+    });
+    var idx = Number(sel.getAttribute("data-idx"));
+    var record = visible[idx];
+    if (record) record.status = sel.value;
+    renderTrackerKpis();
+    renderDashboard();
+  };
+
+  /* ---------------- render: log ---------------- */
+
+  function renderLog() {
+    var filter = document.getElementById("logFilter").value;
+    var rows = logData.filter(function (r) { return filter === "all" || r.status === filter; });
+    var body = document.getElementById("logBody");
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="6"><div class="empty-state">No log entries match this filter.</div></td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(function (r) {
+      return (
+        '<tr>' +
+          '<td class="date-cell">' + r.seen + '</td>' +
+          '<td><div class="role-title">' + escapeHtml(r.title) + '</div><div class="role-meta">' + escapeHtml(r.company) + ' <span class="id">#' + r.id + '</span></div></td>' +
+          '<td><span class="tag neutral">' + r.source + '</span></td>' +
+          '<td>' + statusTag(r.status) + '</td>' +
+          '<td>' + (r.score !== null ? '<span class="pill ' + scoreClass(r.score) + '">' + r.score + '%</span>' : '<span style="color:var(--color-ink-faint)">—</span>') + '</td>' +
+          '<td style="font-size:12.5px; color:var(--color-ink-soft);">' + escapeHtml(r.note) + '</td>' +
+        '</tr>'
+      );
+    }).join("");
+  }
+
+  /* ---------------- render: dashboard ---------------- */
+
+  function timeAgoLabel(i) {
+    var labels = ["2h ago", "6h ago", "yesterday", "yesterday", "2d ago", "3d ago"];
+    return labels[i] || (i + "d ago");
+  }
+
+  function renderDashboard() {
+    var notReviewed = analyzedData.filter(function (r) { return r.status === "Not reviewed"; })
+      .slice().sort(function (a, b) { return b.score - a.score; }).slice(0, 5);
+    document.getElementById("attnList").innerHTML = notReviewed.map(function (r) {
+      return (
+        '<div class="attn-item">' +
+          '<div class="attn-score">' + r.score + '%</div>' +
+          '<div class="attn-body"><div class="attn-title">' + escapeHtml(r.title) + '</div><div class="attn-sub">' + escapeHtml(r.company) + ' · added ' + r.added + '</div></div>' +
+          '<button class="attn-go" onclick="window.__goToAnalyzed()">Review</button>' +
+        '</div>'
+      );
+    }).join("") || '<div class="empty-state">Everything is triaged. Nice.</div>';
+
+    var recent = trackerData.slice().sort(function (a, b) { return 0; }).slice(0, 6);
+    document.getElementById("activityList").innerHTML = recent.map(function (r, i) {
+      var dot = r.status === "Interview" || r.status === "Recruiter screen" ? "good" : r.status === "Rejected" ? "warn" : "accent";
+      var verb = r.status === "Interview" ? "Interview scheduled" : r.status === "Recruiter screen" ? "Recruiter screen booked" : r.status === "Replied" ? "Got a reply" : r.status === "Rejected" ? "Rejected" : "Applied";
+      return (
+        '<div class="activity-item">' +
+          '<div class="activity-dot ' + dot + '"></div>' +
+          '<div class="activity-body"><div class="activity-title">' + verb + ' — ' + escapeHtml(r.company) + '</div><div class="activity-sub">' + escapeHtml(r.role) + '</div></div>' +
+          '<div class="activity-time">' + timeAgoLabel(i) + '</div>' +
+        '</div>'
+      );
+    }).join("");
+  }
+
+  window.__goToAnalyzed = function () { switchView("analyzed"); };
+  window.__copy = function (btn, text) { copyText(btn, text); };
+
+  /* ---------------- nav / routing ---------------- */
+
+  var titles = {
+    dashboard: ["Dashboard", "Your job search, at a glance"],
+    analyzed: ["Analyzed vacancies", "Review the analyzer's shortlist and triage what to apply to"],
+    tracker: ["Application tracker", "Every application you've sent and where it stands"],
+    log: ["Vacancy log", "Dedup cache of every posting the pipeline has ever seen"],
+    profile: ["Profile & forms", "Coming soon"]
+  };
+
+  // Table-heavy views auto-collapse the sidebar to an icon rail so the
+  // tables get the extra width; the dashboard keeps it fully open.
+  var RAIL_BY_DEFAULT = { analyzed: true, tracker: true, log: true, dashboard: false, profile: false };
+  var manualRailOverride = null; // set by the toggle button; cleared on the next nav click
+
+  function isMobile() { return window.innerWidth <= 860; }
+
+  function setSidebarCollapsed(collapsed) {
+    var sidebar = document.getElementById("sidebar");
+    var main = document.getElementById("mainArea");
+    sidebar.classList.toggle("collapsed", collapsed);
+    main.classList.toggle("rail", collapsed);
+    document.getElementById("toggleLabel").textContent = collapsed ? "Expand" : "Collapse";
+    document.getElementById("sidebarToggle").title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  }
+
+  function switchView(view) {
+    document.querySelectorAll(".view").forEach(function (v) { v.hidden = true; });
+    var target = document.getElementById("view-" + view);
+    if (target) target.hidden = false;
+    document.querySelectorAll(".nav-item").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-view") === view);
+    });
+    document.getElementById("topbarTitle").textContent = titles[view][0];
+    document.getElementById("topbarSub").textContent = titles[view][1];
+    manualRailOverride = null;
+    if (!isMobile()) setSidebarCollapsed(!!RAIL_BY_DEFAULT[view]);
+    closeSidebar();
+    window.scrollTo(0, 0);
+  }
+
+  function openSidebar() {
+    document.getElementById("sidebar").classList.add("open");
+    document.getElementById("scrim").classList.add("show");
+  }
+  function closeSidebar() {
+    document.getElementById("sidebar").classList.remove("open");
+    document.getElementById("scrim").classList.remove("show");
+  }
+
+  document.querySelectorAll(".nav-item").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      if (btn.classList.contains("disabled")) { switchView("profile"); return; }
+      switchView(btn.getAttribute("data-view"));
+    });
+  });
+  document.getElementById("menuToggle").addEventListener("click", openSidebar);
+  document.getElementById("scrim").addEventListener("click", closeSidebar);
+  document.getElementById("sidebarToggle").addEventListener("click", function () {
+    var collapsedNow = document.getElementById("sidebar").classList.contains("collapsed");
+    manualRailOverride = !collapsedNow;
+    setSidebarCollapsed(!collapsedNow);
+  });
+
+  document.getElementById("analyzedFilter").addEventListener("change", renderAnalyzed);
+  document.getElementById("trackerFilter").addEventListener("change", renderTracker);
+  document.getElementById("trackerSearch").addEventListener("input", renderTracker);
+  document.getElementById("logFilter").addEventListener("change", renderLog);
+
+  /* ---------------- theme toggle ---------------- */
+
+  var SUN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  var MOON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>';
+
+  function getStoredTheme() {
+    try { return localStorage.getItem("jsc-theme"); } catch (e) { return null; }
+  }
+  function setStoredTheme(value) {
+    try { localStorage.setItem("jsc-theme", value); } catch (e) {}
+  }
+  function systemPrefersDark() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+  function applyTheme(theme) {
+    if (theme === "light" || theme === "dark") {
+      document.documentElement.setAttribute("data-theme", theme);
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+    var isDark = theme === "dark" || (theme !== "light" && systemPrefersDark());
+    var btn = document.getElementById("themeToggle");
+    btn.innerHTML = isDark ? SUN_ICON : MOON_ICON;
+    btn.title = isDark ? "Switch to light theme" : "Switch to dark theme";
+  }
+
+  document.getElementById("themeToggle").addEventListener("click", function () {
+    var stored = getStoredTheme();
+    var isDarkNow = stored === "dark" || (stored !== "light" && systemPrefersDark());
+    var next = isDarkNow ? "light" : "dark";
+    setStoredTheme(next);
+    applyTheme(next);
+  });
+
+  /* ---------------- boot ---------------- */
+
+  function start() {
+    renderAnalyzed();
+    renderTrackerKpis();
+    renderTracker();
+    renderLog();
+    renderDashboard();
+    applyTheme(getStoredTheme());
+  }
+
+  if (window.claude && window.claude.hot && window.claude.hot.ready) {
+    window.claude.hot.ready(start);
+  } else {
+    start();
+  }
+})();
+</script>

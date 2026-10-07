@@ -147,6 +147,9 @@ vite.config.ts.timestamp-*
 *.config.mjs.map
 *.config.d.mts
 
-# Local Claude Code config — machine-specific and holds an API token, so it never
-# belongs in the repo. Overrides live in the untracked settings.local.json.
+# Local Claude Code config — machine-specific, so it never belongs in the repo.
 .claude/settings.json
+.claude/settings.local.json
+
+# The user's job-search skills: a separate private repo, cloned here (CLAUDE.md).
+skills/

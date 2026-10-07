@@ -1,6 +1,6 @@
 # Job Search Copilot
 
-A personal tool for running a job search: vacancies are analyzed against the user's
+A personal tool for running a job search: vacancies are analyzed against its owner's
 profile (match score + recommendation + reasoning), stored once, and then tracked
 through the states that matter — *not reviewed → ready to apply → applied / declined*.
 

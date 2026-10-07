@@ -247,9 +247,8 @@ context between steps.
       mode.
 
 - [x] **4 · One status + `StatusChange`; `Application` merges into `Vacancy`** (end to
-  end). 2026-09-26. Deployed to dev: 464 vacancies, 877 journal rows, 0 mismatches
-  against the old status / salary / CV / `appliedAt` (rehearsed on a copy twice). 208
-  applications predated their placeholder's `createdAt`, so the backfill dates
+  end). 2026-09-26. Deployed to dev: 0 mismatches against the old status / salary /
+  CV / `appliedAt` (rehearsed on a copy twice). Many applications predated their placeholder's `createdAt`, so the backfill dates
   `NOT_REVIEWED` at `LEAST(createdAt, appliedAt)`. A pre-deploy dump is in the postgres
   container at `/tmp/jsc_before_step4.dump` (gone with the container). Beyond the plan:
   `record` journals `APPLIED` first, then a given pipeline `status`, so `appliedAt`
