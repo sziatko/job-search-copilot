@@ -10,7 +10,7 @@ client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (Re
 - [`docs/architecture.md`](docs/architecture.md) — the system map. Start here.
 - [`docs/contracts.md`](docs/contracts.md) — surfaces other code depends on.
 - [`docs/domain-model.md`](docs/domain-model.md) — the two independent axes.
-- [`docs/decisions/`](docs/decisions/) — 31 ADRs, one per load-bearing decision.
+- [`docs/decisions/`](docs/decisions/) — 32 ADRs, one per load-bearing decision.
 - [`docs/design/`](docs/design/) — visual references (HTML mockups). Not prose; open
   in a browser rather than reading.
 - `skills/` — the user's Claude skills that drive the MCP server, uploaded to
@@ -57,6 +57,11 @@ checkbox. A core edit touches api and mcp too — they read core's `dist/`, whic
 Docker `core` watcher rebuilds (without the stack up, `npm run build
 --workspace=@job-search-copilot/core` first). The full list, including the
 per-app dev servers, is in the root [`README.md` § Scripts](README.md#scripts-repo-root).
+
+**End-to-end (`npm run test:e2e`, Playwright, [ADR-0037](docs/decisions/0037-e2e-playwright.md))
+is not part of `npm test` and does not gate a step's checkbox.** Run it only: the spec of
+the area you change, when you edit a feature it covers (`npm run test:e2e -- vacancies`);
+the full set before a push or PR. CI runs it on pull requests.
 
 ## Phase workflow
 

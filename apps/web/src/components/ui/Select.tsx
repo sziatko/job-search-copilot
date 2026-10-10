@@ -7,6 +7,7 @@ export interface SelectOption<T extends string> {
  * (`filter-select` for toolbars, `status-select` for a table row). */
 export function Select<T extends string>({
   id,
+  label,
   value,
   options,
   disabled,
@@ -14,6 +15,8 @@ export function Select<T extends string>({
   onChange,
 }: {
   id?: string;
+  /** The accessible name, for a select with no `<label>` of its own. */
+  label?: string;
   value: T;
   options: readonly SelectOption<T>[];
   disabled?: boolean;
@@ -23,6 +26,7 @@ export function Select<T extends string>({
   return (
     <select
       id={id}
+      aria-label={label}
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as T)}

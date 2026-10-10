@@ -80,7 +80,7 @@ describe('VacancyPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('We build things.')).toBeInTheDocument();
     // Past APPLIED, the pipeline select.
-    expect(screen.getByRole('combobox')).toHaveValue('APPLIED');
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue('APPLIED');
 
     const timeline = await card(/status history/i);
     expect(timeline.getByText('Not reviewed')).toBeInTheDocument();
@@ -248,7 +248,7 @@ describe('VacancyPage', () => {
 
   /** The status select's options, as labels, in order. */
   function statusOptions() {
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    const select = screen.getByRole('combobox', { name: 'Status' }) as HTMLSelectElement;
     return [...select.options].map((option) => option.textContent);
   }
 
@@ -262,7 +262,7 @@ describe('VacancyPage', () => {
     expect(await screen.findByRole('combobox')).toHaveValue('NEW');
     expect(statusOptions()).toEqual(['New', 'Filtered out']);
 
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'FILTERED_OUT');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'FILTERED_OUT');
     await waitFor(() => expect(rows[0].status).toBe('FILTERED_OUT'));
     expect(writes).toEqual(['PATCH /api/v1/vacancies/1/status']);
     // Unanalysed, so it can go back to the queue.
@@ -275,9 +275,9 @@ describe('VacancyPage', () => {
 
     expect(await screen.findByRole('combobox')).toHaveValue('FILTERED_OUT');
     expect(statusOptions()).toEqual(['Filtered out', 'New']);
-    expect(screen.getByRole('combobox')).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'Status' })).toBeEnabled();
 
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'NEW');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'NEW');
     await waitFor(() => expect(rows[0].status).toBe('NEW'));
   });
 
@@ -289,7 +289,7 @@ describe('VacancyPage', () => {
     // The server refuses NEW on an analysed row, as on /inbox.
     expect(await screen.findByRole('combobox')).toHaveValue('FILTERED_OUT');
     expect(statusOptions()).toEqual(['Filtered out']);
-    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Status' })).toBeDisabled();
   });
 
   it('offers a triage vacancy the /vacancies actions, as before', async () => {
@@ -303,7 +303,7 @@ describe('VacancyPage', () => {
       'Unavailable',
       'Applied',
     ]);
-    expect(screen.getByRole('combobox')).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'Status' })).toBeEnabled();
   });
 
   it('applies through the apply dialog, which records the application', async () => {

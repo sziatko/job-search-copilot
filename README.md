@@ -77,6 +77,8 @@ MCP Inspector with transport *Streamable HTTP* and that URL.
 | `npm run dev:mcp:http` | MCP over Streamable HTTP on the host (`MCP_HTTP_PORT`, behind OAuth; needs the API up) |
 | `npm run mcp:inspect` | the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) web UI over the MCP server (stdio, needs `.env`) — browse the tools and call them |
 | `npm test` / `npm run test:watch` | Vitest across all workspaces (needs the test DB) |
+| `npm run test:e2e` | Playwright end-to-end over its own api, web and `job_search_copilot_e2e` ([ADR-0037](docs/decisions/0037-e2e-playwright.md)); not part of `npm test` — from phase 6.3 step 4 |
+| `npm run seed` | reset the e2e database to the made-up seed (refuses any DB not named `*_e2e` / `*_test` / `*_demo`) — from phase 6.3 step 3 |
 | `npm run lint` / `npm run lint:fix` / `npm run format` | Biome |
 | `npm run typecheck` | `tsc --noEmit` across every workspace |
 | `npm run build` | build all workspaces |
@@ -86,7 +88,8 @@ MCP Inspector with transport *Streamable HTTP* and that URL.
 | `npm run studio` | Prisma Studio |
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
-Postgres service on every push and PR.
+Postgres service on every push and PR; on a PR a second job, `e2e`, runs
+`npm run test:e2e` ([ADR-0037](docs/decisions/0037-e2e-playwright.md)).
 
 ## Design docs
 

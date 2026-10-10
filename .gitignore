@@ -151,5 +151,11 @@ vite.config.ts.timestamp-*
 .claude/settings.json
 .claude/settings.local.json
 
+# Playwright (e2e/): its output, the api built for it, the signed-in cookie.
+test-results/
+playwright-report/
+e2e/.api/
+e2e/.auth/
+
 # The user's job-search skills: a separate private repo, cloned here (CLAUDE.md).
 skills/

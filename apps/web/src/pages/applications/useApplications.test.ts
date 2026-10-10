@@ -78,6 +78,9 @@ function renderApplications(path = '/applications') {
   };
 }
 
+/** The toolbar's Status filter — each row's pipeline select is named "Status" too. */
+const statusFilter = () => screen.getByLabelText('Status', { selector: '.filter-select' });
+
 afterEach(() => vi.restoreAllMocks());
 
 describe('ApplicationsPage / useApplications', () => {
@@ -167,7 +170,10 @@ describe('ApplicationsPage / useApplications', () => {
 
     const user = userEvent.setup();
     const olderRow = screen.getAllByRole('row').find((r) => r.textContent?.includes('Older Co'));
-    await user.selectOptions(within(olderRow as HTMLElement).getByRole('combobox'), 'REPLIED');
+    await user.selectOptions(
+      within(olderRow as HTMLElement).getByRole('combobox', { name: 'Status' }),
+      'REPLIED',
+    );
 
     await waitFor(() => expect(companyOrder()).toEqual(['Older Co', 'Newer Co']));
   });
@@ -181,7 +187,7 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText('Status'), 'REJECTED');
+    await user.selectOptions(statusFilter(), 'REJECTED');
 
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
     expect(screen.getByText('Beta Corp')).toBeInTheDocument();
@@ -197,7 +203,7 @@ describe('ApplicationsPage / useApplications', () => {
     renderApplications();
 
     await screen.findByText('Acme');
-    expect(screen.getByLabelText('Status')).toHaveValue('ALL');
+    expect(statusFilter()).toHaveValue('ALL');
     expect(screen.queryByText('Triage Co')).not.toBeInTheDocument();
     expect(lists.at(-1)?.searchParams.has('status')).toBe(false);
     mswServer.events.removeAllListeners();
@@ -252,7 +258,7 @@ describe('ApplicationsPage / useApplications', () => {
 
     await waitFor(() => expect(screen.queryByText('Fresh Co')).not.toBeInTheDocument());
     expect(screen.getByText('Stale Co')).toBeInTheDocument();
-    expect(screen.getByLabelText('Status')).toHaveValue('TIMEOUT');
+    expect(statusFilter()).toHaveValue('TIMEOUT');
     expect(requests.at(-1)).toMatch(/[?&]state=timedOut/);
     expect(requests.at(-1)).not.toMatch(/[?&]status=/);
 
@@ -271,16 +277,14 @@ describe('ApplicationsPage / useApplications', () => {
     );
     renderApplications();
     await screen.findByText('Waiting Co');
-    expect(
-      within(screen.getByLabelText('Status')).getByRole('option', { name: 'Awaiting' }),
-    ).toBeInTheDocument();
+    expect(within(statusFilter()).getByRole('option', { name: 'Awaiting' })).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Awaiting: 1' }));
 
     await waitFor(() => expect(screen.queryByText('Fresh Co')).not.toBeInTheDocument());
     expect(screen.getByText('Waiting Co')).toBeInTheDocument();
-    expect(screen.getByLabelText('Status')).toHaveValue('AWAITING');
+    expect(statusFilter()).toHaveValue('AWAITING');
   });
 
   it('loads the next page when the table scrolls to the last loaded row', async () => {
@@ -309,7 +313,7 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    const rowSelect = within(screen.getByRole('table')).getByRole('combobox');
+    const rowSelect = within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' });
     await user.selectOptions(rowSelect, 'INTERVIEW');
 
     await waitFor(() => expect((rowSelect as HTMLSelectElement).value).toBe('INTERVIEW'));
@@ -333,7 +337,7 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    const rowSelect = within(screen.getByRole('table')).getByRole('combobox');
+    const rowSelect = within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' });
     await user.selectOptions(rowSelect, 'INTERVIEW');
 
     await screen.findByText(/failed to save|HTTP 500/i);
@@ -442,7 +446,10 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    await user.selectOptions(within(screen.getByRole('table')).getByRole('combobox'), 'INTERVIEW');
+    await user.selectOptions(
+      within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' }),
+      'INTERVIEW',
+    );
     // Let onMutate's `await cancelQueries` settle — and nothing else, since the
     // response is still half a second away.
     await act(async () => {});
@@ -468,7 +475,10 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    await user.selectOptions(within(screen.getByRole('table')).getByRole('combobox'), 'APPLIED');
+    await user.selectOptions(
+      within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' }),
+      'APPLIED',
+    );
     await act(async () => {});
 
     const row = cachedRows(client).find((i) => i.id === 1);
@@ -492,7 +502,10 @@ describe('ApplicationsPage / useApplications', () => {
     client.setQueryData(['vacancies', ''], { items: [], total: 0 });
 
     const user = userEvent.setup();
-    await user.selectOptions(within(screen.getByRole('table')).getByRole('combobox'), 'INTERVIEW');
+    await user.selectOptions(
+      within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' }),
+      'INTERVIEW',
+    );
 
     await waitFor(() => expect(statsRequests).toBe(2));
     expect(client.getQueryState(['vacancies', ''])?.isInvalidated).toBe(true);

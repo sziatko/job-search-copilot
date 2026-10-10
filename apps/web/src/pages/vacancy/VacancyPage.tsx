@@ -335,6 +335,7 @@ function StatusControl({
     <>
       <Select
         className="status-select"
+        label="Status"
         value={status}
         options={options}
         // An analysed FILTERED_OUT vacancy has nowhere to go.

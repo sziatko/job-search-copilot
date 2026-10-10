@@ -64,3 +64,68 @@ jobs:
       - run: npm test
 
       - run: npm run build
+
+  # Playwright over the real api, web and DB (ADR-0037). Pull requests only: minutes,
+  # not seconds, and a push to main has passed it on its PR.
+  e2e:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          # A superuser: the snapshot restore sets session_replication_role.
+          # prepare-db.ts creates job_search_copilot_e2e and migrates it.
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Every variable of .env.e2e (gitignored, so CI has none) — fake values.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/job_search_copilot_e2e
+      BETTER_AUTH_SECRET: e2e-secret-at-least-32-characters-long
+      BETTER_AUTH_URL: http://localhost:3100
+      WEB_ORIGIN: http://localhost:5174
+      GOOGLE_CLIENT_ID: e2e-google-client-id
+      GOOGLE_CLIENT_SECRET: e2e-google-client-secret
+      LINKEDIN_CLIENT_ID: e2e-linkedin-client-id
+      LINKEDIN_CLIENT_SECRET: e2e-linkedin-client-secret
+      AUTH_ALLOWED_EMAILS: me@example.com
+      PASSKEY_RP_ID: localhost
+      INTAKE_TOKEN: e2e-intake-token-at-least-32-characters
+      MCP_PUBLIC_URL: http://localhost:3001/mcp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run generate --workspace=@job-search-copilot/core
+
+      # The e2e files and the api read core's dist/.
+      - name: Build core
+        run: npm run build --workspace=@job-search-copilot/core
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

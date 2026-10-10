@@ -10,6 +10,9 @@ docs a step needs — the subagent does, in its own context. That is the point: 
 context stays small (phase 4: ~32M tokens chained vs ~169M for 3.1 step by step).
 
 CLAUDE.md § Phase workflow still holds for every step; this is what changes in a chain.
+E2E (`npm run test:e2e`) is not part of a step's checks, neither the subagent's nor the
+verification below — except the spec a step itself writes or changes (ADR-0037). The
+full e2e set runs once, before the push or PR.
 
 ## Per step K
 
