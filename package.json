@@ -10,6 +10,7 @@
     "generate": "npm run generate --workspace=@job-search-copilot/core",
     "migrate:dev": "npm run migrate:dev --workspace=@job-search-copilot/core",
     "studio": "npm run studio --workspace=@job-search-copilot/core",
+    "seed": "npm run seed --workspace=@job-search-copilot/core",
     "build": "npm run build --workspaces --if-present",
     "dev:api": "npm run start:dev --workspace=@job-search-copilot/api",
     "dev:mcp": "npm run dev --workspace=@job-search-copilot/mcp",

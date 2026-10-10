@@ -36,6 +36,8 @@ export {
   normalizeRecommendation,
   RECOMMENDATION_INPUT_VALUES,
 } from './recommendation';
+export { SEED_VACANCIES } from './seed/data';
+export { resetToSeed } from './seed/reset-to-seed';
 export type { Stats } from './stats.service';
 export { StatsService } from './stats.service';
 export type { PipelineStatus } from './status';

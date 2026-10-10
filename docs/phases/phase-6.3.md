@@ -42,9 +42,9 @@ one. The test stays out of `apps/api/tsconfig.build.json`, and the typecheck doe
 pull web's DOM files into api. Proven once by breaking a schema locally (not committed).
 
 **3 · The seed.** `packages/core/src/seed/`: the data, and `resetToSeed(prisma)` — an
-idempotent "make the DB the seed". It refuses unless the database name in
-`DATABASE_URL` ends in `_e2e`, `_test` or `_demo`: it deletes every vacancy, and the
-dev DB holds real data. About 150 vacancies, so a list runs past one page of 100:
+idempotent "make the DB the seed". It refuses unless the name of the database the
+client is connected to (`current_database()`) ends in `_e2e`, `_test` or `_demo`: it
+deletes every vacancy (users and sessions stay), and the dev DB holds real data. About 150 vacancies, so a list runs past one page of 100:
 every status (`NEW` with and without text, `FILTERED_OUT` with and without an analysis,
 `NOT_REVIEWED` with APPLY / CONSIDER / SKIP, `SAVED_FOR_LATER`, `DECLINED`,
 `UNAVAILABLE`), the pipeline `APPLIED … REJECTED` with `AWAITING`, timed-out
@@ -117,7 +117,11 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
 - [x] **2 · The web↔API contract test.** — *2026-10-10.* No mismatch found. The alias
   is vitest-only: no api tsconfig maps `@/`, so tsc never checks the spec (as with every
   api test) and an editor marks its `@/` imports unresolved.
-- [ ] **3 · The seed.**
+- [x] **3 · The seed.** — *2026-10-10.* A reset takes about 9 s here (the service
+  writes; the re-dating is three SQL statements) — before each test that adds up, so
+  step 4 may want to measure it. `.env.e2e` exists locally (gitignored, like
+  `.env.test`), and so does a migrated `job_search_copilot_e2e`; CI has neither.
+  Core exports `resetToSeed` and `SEED_VACANCIES` (for expected counts).
 - [ ] **4 · Playwright scaffold.**
 - [ ] **5 · Shell and dashboard.**
 - [ ] **6 · Vacancies and Inbox.**

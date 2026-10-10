@@ -9,6 +9,7 @@
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "studio": "dotenv -e ../../.env -- prisma studio",
+    "seed": "dotenv -e ../../.env.e2e -- tsx scripts/seed.ts",
     "backfill:match-keys": "dotenv -e ../../.env -- tsx scripts/backfill-match-keys.ts",
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch"
