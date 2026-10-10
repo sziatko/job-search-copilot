@@ -72,6 +72,7 @@ export function VacanciesPage() {
             loading={loading}
             items={items}
             onEndReached={loadMore}
+            filterKey={statusFilter}
             savingIds={savingIds}
             rowErrors={rowErrors}
             onActionChange={requestActionChange}

@@ -44,9 +44,10 @@ them: update in the same step, tell the user to re-upload. Tests: core (if touch
 
 ## Status
 
-- [x] **0 · Docs.** This doc, its row in `docs/README.md`, the backlog rows marked — *2026-10-10.*
-  `planned (phase 6.2)`.
-- [ ] **1 · Scroll reset.**
+- [x] **0 · Docs.** This doc, its row in `docs/README.md`, the backlog rows marked `planned (phase 6.2)` — *2026-10-10.*
+- [x] **1 · Scroll reset.** *2026-10-10.* `useVirtualRows` takes a 4th arg `resetKey`; both
+  tables (`VacancyTable`, `ApplicationsTable`) got a required `filterKey` prop, passed by the
+  three pages (status filter / inbox tab). A new table must pass one.
 - [ ] **2 · Phone topbar title.**
 - [ ] **3 · `Modal` focus.**
 - [ ] **4 · 401 → `/login`.**
