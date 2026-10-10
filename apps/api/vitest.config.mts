@@ -10,6 +10,10 @@ const rootDir = path.resolve(import.meta.dirname, '../..');
 
 export default defineConfig({
   plugins: [swc.vite()],
+  // The web's own alias, so test/contract.e2e.spec.ts imports the web's zod schemas as
+  // they are (their files import `@/lib/api`). Vitest only: tsconfig.build.json leaves
+  // test/ out, so the typecheck never pulls the web's DOM files into api.
+  resolve: { alias: { '@': path.resolve(rootDir, 'apps/web/src') } },
   test: {
     name: 'api',
     environment: 'node',

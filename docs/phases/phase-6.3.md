@@ -114,7 +114,9 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
 - [x] **1 · The flaky full `npm test`.** — *2026-10-10.* No cause found, so the
   timeout was raised (api `hookTimeout` 30 s). The stall did not recur in 3 full runs;
   if an e2e step sees one, it is still unexplained, not fixed.
-- [ ] **2 · The web↔API contract test.**
+- [x] **2 · The web↔API contract test.** — *2026-10-10.* No mismatch found. The alias
+  is vitest-only: no api tsconfig maps `@/`, so tsc never checks the spec (as with every
+  api test) and an editor marks its `@/` imports unresolved.
 - [ ] **3 · The seed.**
 - [ ] **4 · Playwright scaffold.**
 - [ ] **5 · Shell and dashboard.**
