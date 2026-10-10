@@ -27,6 +27,7 @@ and *what a change here breaks over there*.
 | [`phases/phase-5.1.md`](phases/phase-5.1.md) | API docs: Swagger UI at `/api/docs` for REST (`@nestjs/swagger` and its CLI plugin, requests only), the MCP Inspector for MCP. Its `## Status` is the live checklist. |
 | [`phases/phase-6.md`](phases/phase-6.md) | Auth: sign-in with Google, LinkedIn and passkeys (Better Auth, cookie sessions), every REST route closed by default, a machine token for n8n, JSC as an OAuth 2.1 authorization server, MCP over HTTP. Explains what the library does under the hood. Its `## Status` is the live checklist. |
 | [`phases/phase-6.1.md`](phases/phase-6.1.md) | Fixes after phase 6: the logo, favicon and home-screen icons, an optional comment on Save for later, an `AWAITING` pipeline status, and less space around the tables with a centred compact title. Its `## Status` is the live checklist. |
+| [`phases/phase-6.2.md`](phases/phase-6.2.md) | Small fixes from the backlog: the table's scroll reset on a filter change, the phone topbar title, `Modal` focus, a 401 redirect to `/login`, and two MCP tools (edit an application, add a comment). Its `## Status` is the live checklist. |
 | [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions
