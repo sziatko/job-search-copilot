@@ -146,7 +146,10 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
   rows (/vacancies' All is 76, the pipeline 44): a test that needs a second page inserts
   rows with `db`, and the snapshot restore drops them. Nothing in a vitest project
   changed, so no `npm test` run was due.
-- [ ] **7 · The vacancy page.**
+- [x] **7 · The vacancy page.** — *2026-10-10.* On /applications every row's select is
+  now named "Status" as well as the toolbar filter: `getByLabel('Status')` there is
+  ambiguous — scope it (`.filter-select`, or the row). The vacancy page has two `h1`s
+  (the topbar's and `.detail-title`).
 - [ ] **8 · Applications.**
 - [ ] **9 · Sign-in, passkeys, consent.**
 - [ ] **10 · CI.**

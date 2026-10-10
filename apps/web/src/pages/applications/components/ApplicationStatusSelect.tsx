@@ -22,6 +22,7 @@ export function ApplicationStatusSelect({
   return (
     <Select
       className="status-select"
+      label="Status"
       value={value}
       options={OPTIONS}
       disabled={disabled}
