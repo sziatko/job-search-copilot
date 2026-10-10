@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { listApplicationsPage } from '@/pages/applications/api';
@@ -26,6 +26,7 @@ export function SearchModal({
   onClose: () => void;
 }) {
   const titleId = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
   const scopeName = useId();
   // The box's raw text (SearchInput debounces it); `term` is what the server is asked.
   const [text, setText] = useState('');
@@ -65,13 +66,18 @@ export function SearchModal({
   const items = data?.items ?? [];
 
   return (
-    <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName="max-w-3xl">
+    <Modal
+      onClose={onClose}
+      labelledBy={titleId}
+      maxWidthClassName="max-w-3xl"
+      initialFocus={searchRef}
+    >
       <h2 id={titleId} className="dialog-title">
         Search vacancies
       </h2>
 
       <div className="mt-[14px] flex flex-wrap items-center gap-x-[16px] gap-y-[10px]">
-        <SearchInput value={text} onChange={setText} />
+        <SearchInput value={text} onChange={setText} inputRef={searchRef} />
         <fieldset className="flex items-center gap-[12px]">
           <legend className="sr-only">Search in</legend>
           <label className="field-check">

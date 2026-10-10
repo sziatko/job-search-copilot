@@ -6,9 +6,20 @@ export const API_BASE = `${API_ORIGIN}/api/v1`;
 
 /** `fetch` with the session cookie: every API route wants it (invariant 9). The cookie
  * is the API's (`localhost:3000`), and a cross-origin request carries it only with
- * `credentials: 'include'`. */
-export function apiFetch(input: string, init?: RequestInit) {
-  return fetch(input, { ...init, credentials: 'include' });
+ * `credentials: 'include'`.
+ *
+ * A 401 means the session ended mid-use: the web goes to /login (the router guard only
+ * checks on navigation). Not from /login or /consent themselves — no loop. The session
+ * check is `authClient`'s own fetch, not this one. The response is still returned, so the
+ * caller's error path runs as before. The router is imported on demand: it imports
+ * every page, and the pages import this file. */
+export async function apiFetch(input: string, init?: RequestInit) {
+  const res = await fetch(input, { ...init, credentials: 'include' });
+  if (res.status === 401 && !['/login', '/consent'].includes(window.location.pathname)) {
+    const { router } = await import('@/router');
+    void router.navigate({ to: '/login' });
+  }
+  return res;
 }
 
 /** A cursor page (ADR-0030). `total` is the rows matching the filter, not the page

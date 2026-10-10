@@ -49,6 +49,12 @@ async function openSearch() {
 afterEach(() => mswServer.events.removeAllListeners());
 
 describe('SearchModal', () => {
+  it('focuses the search field on open', async () => {
+    renderAt('/vacancies', [fakeVacancy()]);
+    const { modal } = await openSearch();
+    expect(modal.getByRole('searchbox')).toHaveFocus();
+  });
+
   it.each([
     ['/vacancies', 'NOT_REVIEWED,SAVED_FOR_LATER,DECLINED,UNAVAILABLE'],
     ['/applications', 'APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,AWAITING,OFFER,REJECTED'],

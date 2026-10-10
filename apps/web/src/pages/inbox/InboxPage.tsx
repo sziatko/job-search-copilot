@@ -104,6 +104,7 @@ export function InboxPage() {
             loading={loading}
             items={items}
             onEndReached={loadMore}
+            filterKey={tab}
             savingIds={savingIds}
             rowErrors={rowErrors}
             onActionChange={requestActionChange}

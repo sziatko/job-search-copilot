@@ -39,6 +39,7 @@ export function ApplicationsTable({
   onEdit,
   onShowCompanyHistory,
   onEndReached,
+  filterKey,
   emptyMessage,
 }: {
   /** The first page is on its way — VacancyTable's `loading`. */
@@ -51,6 +52,8 @@ export function ApplicationsTable({
   onShowCompanyHistory: (company: string, vacancyId: number) => void;
   /** The next page, when the last loaded row scrolls into the window (ADR-0030). */
   onEndReached?: () => void;
+  /** The page's filter: a change scrolls the box back to the top. */
+  filterKey: string;
   emptyMessage: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -58,6 +61,7 @@ export function ApplicationsTable({
     scrollRef,
     items.length,
     onEndReached,
+    filterKey,
   );
 
   return (

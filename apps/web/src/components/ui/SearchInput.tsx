@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type Ref, useEffect, useRef, useState } from 'react';
 
 /** Debounced text search over company / role — the search modal's box. Local state
  * keeps typing snappy; `onChange` gets the text once typing pauses. The server matches
@@ -6,9 +6,11 @@ import { useEffect, useRef, useState } from 'react';
 export function SearchInput({
   value,
   onChange,
+  inputRef,
 }: {
   value: string;
   onChange: (value: string) => void;
+  inputRef?: Ref<HTMLInputElement>;
 }) {
   const [text, setText] = useState(value);
   const onChangeRef = useRef(onChange);
@@ -25,6 +27,7 @@ export function SearchInput({
 
   return (
     <input
+      ref={inputRef}
       type="search"
       aria-label="Search company or role"
       value={text}

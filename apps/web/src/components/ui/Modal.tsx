@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -7,20 +7,29 @@ export function Modal({
   onClose,
   labelledBy,
   maxWidthClassName = 'max-w-sm',
+  initialFocus,
   children,
 }: {
   onClose: () => void;
   /** id of the element (usually an <h2>) that names this dialog, for aria-labelledby. */
   labelledBy?: string;
   maxWidthClassName?: string;
+  /** Focused on open instead of the dialog itself (its ref is set when the effect runs). */
+  initialFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Held in a ref so a parent's inline `onClose` does not re-run the effect, which would
+  // restore focus to the opener and re-focus the dialog on every parent render.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const initialFocusRef = useRef(initialFocus);
+  initialFocusRef.current = initialFocus;
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const dialog = dialogRef.current;
-    dialog?.focus();
+    (initialFocusRef.current?.current ?? dialog)?.focus();
 
     // Lock background scroll while the modal is open.
     const originalOverflow = document.body.style.overflow;
@@ -28,7 +37,7 @@ export function Modal({
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !dialog) return;
@@ -54,7 +63,7 @@ export function Modal({
       document.body.style.overflow = originalOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

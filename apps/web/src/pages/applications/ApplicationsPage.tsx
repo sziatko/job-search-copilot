@@ -67,6 +67,7 @@ export function ApplicationsPage() {
             onEdit={setEditing}
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
             onEndReached={loadMore}
+            filterKey={statusFilter}
             emptyMessage={emptyMessage}
           />
         )}

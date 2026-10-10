@@ -244,6 +244,22 @@ export class ApplicationService {
   }
 
   /**
+   * A new dated `source` comment on any vacancy, no status move. Earlier comments are
+   * never changed. Throws InvalidApplicationInputError for a blank body; returns null
+   * for an unknown id.
+   */
+  async addComment(
+    id: number,
+    body: string,
+    source: CommentSource,
+  ): Promise<ApplicationListItem | null> {
+    if (!body.trim()) {
+      throw new InvalidApplicationInputError('`body` must not be blank.');
+    }
+    return updateRow(this.db, id, commentOn(body, source));
+  }
+
+  /**
    * Same as updateStatus, but for a caller that only knows (company, title) — the
    * natural shape for an agent reading e.g. a rejection/offer email, which has no
    * id. A unique case-insensitive (company, title) match among the vacancies already

@@ -1019,6 +1019,10 @@
     .topbar {
       @apply px-[16px] py-[14px];
     }
+    /* 16px keeps "Application tracker" on one line at 390px: the topbar stays 66px. */
+    .topbar-title {
+      @apply text-[16px];
+    }
     .view {
       @apply px-[14px] pb-[44px] pt-[12px];
     }
