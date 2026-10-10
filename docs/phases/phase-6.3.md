@@ -111,7 +111,9 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
   Playwright row `planned (phase 6.3)`, the e2e rule in `CLAUDE.md` and the
   `chain-steps` skill, the root README's scripts. — *2026-10-10.* Docs only; `npm
   run test:e2e` is documented ahead of step 4.
-- [ ] **1 · The flaky full `npm test`.**
+- [x] **1 · The flaky full `npm test`.** — *2026-10-10.* No cause found, so the
+  timeout was raised (api `hookTimeout` 30 s). The stall did not recur in 3 full runs;
+  if an e2e step sees one, it is still unexplained, not fixed.
 - [ ] **2 · The web↔API contract test.**
 - [ ] **3 · The seed.**
 - [ ] **4 · Playwright scaffold.**
