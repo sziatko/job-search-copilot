@@ -51,6 +51,7 @@ them: update in the same step, tell the user to re-upload. Tests: core (if touch
 - [x] **2 · Phone topbar title.** *2026-10-10.* `.topbar-title` is 16px inside the 860px
   media query (one rule in `index.css`); at 390px all three table pages measure 66px. Evidence:
   `.playwright-mcp/step2-before.png` / `step2-after.png` (the topbar was 89px, title on 2 lines).
-- [ ] **3 · `Modal` focus.**
+- [x] **3 · `Modal` focus.** *2026-10-10.* `Modal` takes `initialFocus?: RefObject`; `SearchInput` got an
+  optional `inputRef` prop to feed it.
 - [ ] **4 · 401 → `/login`.**
 - [ ] **5 · MCP: edit application, add comment.**
