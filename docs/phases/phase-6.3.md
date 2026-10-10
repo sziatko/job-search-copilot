@@ -158,4 +158,9 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
 - [x] **9 · Sign-in, passkeys, consent.** — *2026-10-10.* `e2e/auth.spec.ts`. The
   passkey test drives Chromium's CDP (`WebAuthn.*`), so it stays Chromium-only. Nothing
   in a vitest project changed, so no `npm test` run was due.
-- [ ] **10 · CI.**
+- [x] **10 · CI.** — *2026-10-11.* Validated locally only: actionlint (Docker) passes
+  `ci.yml`, and the full e2e set ran green (49, 8.3 min) with `CI=1` and the job's env
+  exported. Unproven until the first PR run: the Postgres service and
+  `playwright install --with-deps` on ubuntu, and the run time there. The report lands
+  in the root `playwright-report/` (not `e2e/`); uploaded on failure only. Nothing in a
+  vitest project changed, so no `npm test` run was due.

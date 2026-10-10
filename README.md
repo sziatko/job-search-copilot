@@ -88,7 +88,8 @@ MCP Inspector with transport *Streamable HTTP* and that URL.
 | `npm run studio` | Prisma Studio |
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
-Postgres service on every push and PR.
+Postgres service on every push and PR; on a PR a second job, `e2e`, runs
+`npm run test:e2e` ([ADR-0037](docs/decisions/0037-e2e-playwright.md)).
 
 ## Design docs
 
