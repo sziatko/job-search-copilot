@@ -155,5 +155,7 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
   ~3–4 s here, and the default 5 s failed once under load. `e2e/seed.ts` gained
   `seedOpen` / `seedTimedOut` (the ADR-0031 rule over the seed). Nothing in a vitest
   project changed, so no `npm test` run was due.
-- [ ] **9 · Sign-in, passkeys, consent.**
+- [x] **9 · Sign-in, passkeys, consent.** — *2026-10-10.* `e2e/auth.spec.ts`. The
+  passkey test drives Chromium's CDP (`WebAuthn.*`), so it stays Chromium-only. Nothing
+  in a vitest project changed, so no `npm test` run was due.
 - [ ] **10 · CI.**
