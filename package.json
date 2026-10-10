@@ -18,11 +18,12 @@
     "mcp:inspect": "mcp-inspector npm run dev:mcp",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test -c e2e",
     "test:db:migrate": "dotenv -e .env.test -- npm run migrate:deploy --workspace=@job-search-copilot/core",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "typecheck": "npm run build --workspace=@job-search-copilot/core && tsc -p apps/api/tsconfig.build.json --noEmit && tsc -p apps/mcp/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit"
+    "typecheck": "npm run build --workspace=@job-search-copilot/core && tsc -p apps/api/tsconfig.build.json --noEmit && tsc -p apps/mcp/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit && tsc -p e2e/tsconfig.json"
   },
   "allowScripts": {
     "@prisma/engines@7.10.0": true,
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
     "@modelcontextprotocol/inspector": "^2.9.0",
+    "@playwright/test": "^1.64.0",
     "dotenv-cli": "^11.0.0",
     "vitest": "^5.0.0"
   }

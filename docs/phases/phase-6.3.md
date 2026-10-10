@@ -55,14 +55,20 @@ with Prisma. `npm run seed` against `.env.e2e`. Tests (core): two runs leave the
 counts; a database name without the suffix is refused.
 
 **4 · Playwright scaffold.** A root `e2e/` folder: `playwright.config.ts`,
-`tsconfig.json`, `global-setup.ts`, `fixtures.ts`, `.env.e2e` (fake values, as
-`.env.test`). `@playwright/test` in the root devDependencies, Chromium only.
+`tsconfig.json`, `global-setup.ts`, `fixtures.ts`, `db.ts`, `prepare-db.ts`; the root
+`.env.e2e` (fake values, as `.env.test`; step 3 put it there, `npm run seed` reads it).
+`@playwright/test` in the root devDependencies, Chromium only.
 `webServer`: the api on :3100 (the e2e DB, `WEB_ORIGIN=http://localhost:5174`) and vite
 on :5174 (`VITE_API_URL=http://localhost:3100`) — not the dev stack's 3000 / 5173, so
-both run at once. Global setup: create `job_search_copilot_e2e` if missing,
-`prisma migrate deploy`; an allowlisted user and a session through core's `createAuth`,
-the cookie signed as `signIn()` in `apps/api/test/test-app.ts` does → `storageState`.
-A fixture runs `resetToSeed` before each test; `workers: 1` (one DB). `npm run
+both run at once. Playwright starts its webServers *before* global setup and the api
+connects at boot, so the api's command first runs `prepare-db.ts` (create
+`job_search_copilot_e2e` if missing, `prisma migrate deploy`), then builds the api to
+`e2e/.api` and runs it. Global setup: `resetToSeed`; an allowlisted user and a session
+through core's `createAuth`, the cookie signed as `signIn()` in
+`apps/api/test/test-app.ts` does → `storageState`; then a copy of every table into an
+`e2e_snapshot` schema. A fixture restores that snapshot before each test (`resetToSeed`
+takes ~9 s, the restore ~0.1–1 s), refusing any database not named `*_e2e`;
+`workers: 1` (one DB). `npm run
 test:e2e`; lint and typecheck cover `e2e/`; `.gitignore` gets `test-results/` and
 `playwright-report/`. First spec (smoke): the dashboard shows the seed's numbers; with
 no cookie the browser lands on `/login`.
@@ -122,7 +128,15 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
   step 4 may want to measure it. `.env.e2e` exists locally (gitignored, like
   `.env.test`), and so does a migrated `job_search_copilot_e2e`; CI has neither.
   Core exports `resetToSeed` and `SEED_VACANCIES` (for expected counts).
-- [ ] **4 · Playwright scaffold.**
+- [x] **4 · Playwright scaffold.** — *2026-10-10.* A spec imports `test`, `expect` from
+  `./fixtures`, never `@playwright/test`; every test starts signed in, from the seed.
+  Signed out: `test.use({ storageState: { cookies: [], origins: [] } })`. The DB: the
+  worker fixture `db` (core's PrismaClient on the e2e DB). The snapshot holds every
+  table, the session too, so a test may sign out or delete it: the next one gets it
+  back. A run starts in ~1 min (the api's `tsc` build, ~20 s cold). CI (step 10): build
+  core first (the e2e files and the api read its `dist/`), set every `.env.e2e`
+  variable in the job's env, and connect as a superuser (the restore sets
+  `session_replication_role`).
 - [ ] **5 · Shell and dashboard.**
 - [ ] **6 · Vacancies and Inbox.**
 - [ ] **7 · The vacancy page.**
