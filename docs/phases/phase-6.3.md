@@ -137,7 +137,9 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
   core first (the e2e files and the api read its `dist/`), set every `.env.e2e`
   variable in the job's env, and connect as a superuser (the restore sets
   `session_replication_role`).
-- [ ] **5 · Shell and dashboard.**
+- [x] **5 · Shell and dashboard.** — *2026-10-10.* Expected counts come from
+  `e2e/seed.ts` (`seedStatus`, `seedCount`, `reached`), derived from `SEED_VACANCIES`,
+  not hard-coded. Nothing in a vitest project changed, so no `npm test` run was due.
 - [ ] **6 · Vacancies and Inbox.**
 - [ ] **7 · The vacancy page.**
 - [ ] **8 · Applications.**
