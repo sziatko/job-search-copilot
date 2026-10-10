@@ -57,4 +57,4 @@ them: update in the same step, tell the user to re-upload. Tests: core (if touch
   `/login` and `/consent`, dynamically imports `@/router` (a static import is a cycle: router →
   pages → api) and navigates; the response is still returned. The session check goes through
   `authClient`, not `apiFetch`, so it is exempt by construction. Test: `lib/api.test.ts`.
-- [ ] **5 · MCP: edit application, add comment.**
+- [x] **5 · MCP: edit application, add comment.** *2026-10-10.* New core method `ApplicationService.addComment(id, body, source)` (blank body throws, unknown id null); `update_application` reuses core `update`. `add_comment` `source` defaults to AGENT. No skill calls the new tools, so `skills/` is unchanged and nothing to re-upload.

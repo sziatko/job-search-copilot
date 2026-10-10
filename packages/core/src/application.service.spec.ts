@@ -583,6 +583,26 @@ describe('ApplicationService', () => {
     });
   });
 
+  describe('addComment', () => {
+    it('adds a trimmed comment with the given source, and moves nothing', async () => {
+      const vacancy = await seedVacancy();
+      const { application } = await applications.record({ vacancyId: vacancy.id });
+
+      const edited = await applications.addComment(vacancy.id, '  Recruiter wrote.  ', 'AGENT');
+      expect(notes(edited)).toEqual([ANALYZED, ['AGENT', 'Recruiter wrote.']]);
+      expect(edited?.statusChangedAt).toEqual(application.statusChangedAt);
+      expect(await journal(vacancy.id)).toEqual(['NEW', 'NOT_REVIEWED', 'APPLIED']);
+    });
+
+    it('refuses a blank body and returns null for an unknown id', async () => {
+      const vacancy = await seedVacancy();
+      await expect(applications.addComment(vacancy.id, '  ', 'USER')).rejects.toBeInstanceOf(
+        InvalidApplicationInputError,
+      );
+      expect(await applications.addComment(999_999, 'x', 'USER')).toBeNull();
+    });
+  });
+
   describe('updateStatusByVacancy', () => {
     it('resolves a unique (company, title) match and updates it', async () => {
       const vacancy = await seedVacancy({ company: 'Delta Co', title: 'Dev' });

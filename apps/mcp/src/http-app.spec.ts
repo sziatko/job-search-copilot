@@ -86,7 +86,7 @@ describe('MCP over HTTP', () => {
       }),
     );
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(13);
+    expect(tools).toHaveLength(15);
     await client.close();
   });
 

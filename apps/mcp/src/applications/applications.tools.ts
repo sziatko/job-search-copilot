@@ -12,7 +12,7 @@ import {
 
 const APPLICATION_LIST_MAX = 500;
 
-/** Registers the 4 application-tracking tools on `server`, backed by `applications` —
+/** Registers the 6 application-tracking tools on `server`, backed by `applications` —
  * update_vacancy_status among them: it moves any vacancy, and carries a comment. */
 export function registerApplicationTools(
   server: McpServer,
@@ -153,6 +153,61 @@ export function registerApplicationTools(
         return toolError(`${target} not found`);
       }
       return json({ success: true, vacancy: ref(application) });
+    }),
+  );
+
+  server.registerTool(
+    'update_application',
+    {
+      title: 'Edit what was entered when applying',
+      description:
+        'Correct the application form data of a vacancy: `salaryInApplication` (what the ' +
+        "applicant entered in the form — not the posting's salary; a blank string clears " +
+        'it) and/or `usedTailoredResume`. A field left out is untouched. Moves no status ' +
+        'and adds no comment — use update_vacancy_status or add_comment. `id` is the ' +
+        'vacancy\'s (from list_applications); an unknown id reports "not found". Returns ' +
+        '{ success: true, application: { id, company, title } }.',
+      inputSchema: {
+        id: z.number().int(),
+        salaryInApplication: z.string().optional(),
+        usedTailoredResume: z.boolean().optional(),
+      },
+    },
+    withDomainErrors(async ({ id, salaryInApplication, usedTailoredResume }) => {
+      const application = await applications.update(id, {
+        salaryInApplication,
+        usedTailoredResume,
+      });
+      if (!application) {
+        return toolError(`Vacancy ${id} not found`);
+      }
+      return json({ success: true, application: ref(application) });
+    }),
+  );
+
+  server.registerTool(
+    'add_comment',
+    {
+      title: 'Add a comment to a vacancy',
+      description:
+        'Add a new dated comment to a vacancy without moving its status — a note, not an ' +
+        "event. `source` is USER when the comment is the user's own words, AGENT (the " +
+        'default) for your own note; never the analysis (that is the ANALYZER comment ' +
+        'submit_analysis writes). Earlier comments are never changed. `id` is the ' +
+        'vacancy\'s; an unknown id reports "not found", a blank `body` is an error. ' +
+        'Returns { success: true, vacancy: { id, company, title } }.',
+      inputSchema: {
+        id: z.number().int(),
+        body: z.string().min(1),
+        source: z.enum(['USER', 'AGENT']).default('AGENT'),
+      },
+    },
+    withDomainErrors(async ({ id, body, source }) => {
+      const vacancy = await applications.addComment(id, body, source);
+      if (!vacancy) {
+        return toolError(`Vacancy ${id} not found`);
+      }
+      return json({ success: true, vacancy: ref(vacancy) });
     }),
   );
 }
