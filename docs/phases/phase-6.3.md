@@ -150,6 +150,10 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
   now named "Status" as well as the toolbar filter: `getByLabel('Status')` there is
   ambiguous — scope it (`.filter-select`, or the row). The vacancy page has two `h1`s
   (the topbar's and `.detail-title`).
-- [ ] **8 · Applications.**
+- [x] **8 · Applications.** — *2026-10-10.* The expect timeout is now 10 s
+  (`playwright.config.ts`): a test's first page load (vite dev, a fresh context) takes
+  ~3–4 s here, and the default 5 s failed once under load. `e2e/seed.ts` gained
+  `seedOpen` / `seedTimedOut` (the ADR-0031 rule over the seed). Nothing in a vitest
+  project changed, so no `npm test` run was due.
 - [ ] **9 · Sign-in, passkeys, consent.**
 - [ ] **10 · CI.**

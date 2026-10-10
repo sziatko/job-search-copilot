@@ -18,6 +18,9 @@ export default defineConfig({
   workers: 1, // one database, reset before each test
   forbidOnly: !!process.env.CI,
   reporter: [['list'], ['html', { open: 'never' }]],
+  // Each test's first page load is vite dev, unbundled, in a fresh context: ~3–4 s here
+  // before the first assertion can pass, so the default 5 s failed once under load.
+  expect: { timeout: 10_000 },
   use: {
     baseURL: webOrigin,
     storageState: path.join(__dirname, '.auth', 'state.json'), // written by global setup
