@@ -44,7 +44,8 @@ pull web's DOM files into api. Proven once by breaking a schema locally (not com
 **3 · The seed.** `packages/core/src/seed/`: the data, and `resetToSeed(prisma)` — an
 idempotent "make the DB the seed". It refuses unless the name of the database the
 client is connected to (`current_database()`) ends in `_e2e`, `_test` or `_demo`: it
-deletes every vacancy (users and sessions stay), and the dev DB holds real data. About 150 vacancies, so a list runs past one page of 100:
+deletes every vacancy (users and sessions stay), and the dev DB holds real data. About 150 vacancies, though no single list passes one page of 100 (an
+infinite-scroll test inserts its own overflow rows — see step 6):
 every status (`NEW` with and without text, `FILTERED_OUT` with and without an analysis,
 `NOT_REVIEWED` with APPLY / CONSIDER / SKIP, `SAVED_FOR_LATER`, `DECLINED`,
 `UNAVAILABLE`), the pipeline `APPLIED … REJECTED` with `AWAITING`, timed-out
@@ -82,7 +83,8 @@ action) → `/login`. Dashboard: the tiles, the funnel, "Needs your review" with
 Review links, the Recent activity links.
 
 **6 · Vacancies and Inbox.** The Status select and `?status=`; infinite scroll past
-100 rows, and the scroll reset on a filter change. Actions: Save for later with a
+100 rows (the seed's /vacancies context holds under 100, so the test adds rows through
+`db`), and the scroll reset on a filter change. Actions: Save for later with a
 comment (the comment shows on the vacancy page), Decline (Cancel / "Yes, decline"),
 Mark unavailable, Mark not reviewed, the Apply dialog (the vacancy shows in
 /applications), Copy (clipboard permission). The company-history modal ("Current",
@@ -140,7 +142,10 @@ Postgres service, `npx playwright install --with-deps chromium`, `npm run test:e
 - [x] **5 · Shell and dashboard.** — *2026-10-10.* Expected counts come from
   `e2e/seed.ts` (`seedStatus`, `seedCount`, `reached`), derived from `SEED_VACANCIES`,
   not hard-coded. Nothing in a vitest project changed, so no `npm test` run was due.
-- [ ] **6 · Vacancies and Inbox.**
+- [x] **6 · Vacancies and Inbox.** — *2026-10-10.* No list in the seed runs past 100
+  rows (/vacancies' All is 76, the pipeline 44): a test that needs a second page inserts
+  rows with `db`, and the snapshot restore drops them. Nothing in a vitest project
+  changed, so no `npm test` run was due.
 - [ ] **7 · The vacancy page.**
 - [ ] **8 · Applications.**
 - [ ] **9 · Sign-in, passkeys, consent.**
