@@ -47,14 +47,16 @@ export async function listVacanciesPage(
   return parseResponse(vacancyPageSchema, await res.json(), 'Load vacancies');
 }
 
+/** `comment`, when given, lands as a USER comment with the move. */
 export async function updateVacancyStatus(
   id: number,
   status: VacancyStatus,
+  comment?: string,
 ): Promise<VacancyListItem> {
   const res = await apiFetch(`${API_BASE}/vacancies/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, comment }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update vacancy ${id}: HTTP ${res.status}`);

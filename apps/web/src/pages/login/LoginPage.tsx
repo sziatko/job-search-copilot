@@ -1,6 +1,6 @@
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { IconBriefcase } from '@/components/icons';
+import { JscLogo } from '@/components/icons';
 import { authClient } from '@/lib/auth';
 
 const route = getRouteApi('/login');
@@ -47,9 +47,7 @@ export function LoginPage() {
 
   return (
     <main className="soon-wrap">
-      <div className="soon-icon">
-        <IconBriefcase />
-      </div>
+      <JscLogo size={52} />
       <h2>Sign in to Job Search Copilot</h2>
       {shown && (
         <p role="alert" className="text-bad">

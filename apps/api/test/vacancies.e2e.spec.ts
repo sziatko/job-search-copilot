@@ -417,6 +417,23 @@ describe('Vacancies (e2e)', () => {
       expect(res.body.estimationComment).toBe(validPayload.estimationComment);
     });
 
+    it('adds the comment as a USER comment with the move', async () => {
+      const created = await api.post('/api/v1/vacancies').send(validPayload);
+      const res = await api
+        .patch(`/api/v1/vacancies/${created.body.id}/status`)
+        .send({ status: 'SAVED_FOR_LATER', comment: 'After the holidays.' })
+        .expect(200);
+      expect(res.body.status).toBe('SAVED_FOR_LATER');
+      expect(res.body.comments.at(-1)).toMatchObject({
+        source: 'USER',
+        body: 'After the holidays.',
+      });
+      await api
+        .patch(`/api/v1/vacancies/${created.body.id}/status`)
+        .send({ status: 'DECLINED', comment: 42 })
+        .expect(400);
+    });
+
     it('sets UNAVAILABLE, and filters by it', async () => {
       const created = await api.post('/api/v1/vacancies').send(validPayload);
       const res = await api

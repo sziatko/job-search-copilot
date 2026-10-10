@@ -77,10 +77,11 @@ describe('job-search-copilot MCP server', () => {
     expect(instructions).toContain('update_vacancy_status');
   });
 
-  it('registers exactly the thirteen tools', async () => {
+  it('registers exactly the fifteen tools', async () => {
     const client = await connectedClient();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'add_comment',
       'get_vacancies_batch',
       'get_vacancy',
       'intake_vacancies_batch',
@@ -93,6 +94,7 @@ describe('job-search-copilot MCP server', () => {
       'save_vacancy',
       'submit_analyses_batch',
       'submit_analysis',
+      'update_application',
       'update_vacancy_status',
     ]);
   });
@@ -122,6 +124,29 @@ describe('job-search-copilot MCP server', () => {
     expect(referenced.length).toBeGreaterThan(0);
     expect(referenced.filter((ref) => !registered.has(ref.split(': ')[1]))).toEqual([]);
   });
+
+  // The email sync maps each Gmail label to a status in a table (`| label | \`STATUS\` |`):
+  // a status the server no longer takes would fail only on the day such an email comes.
+  it.skipIf(!existsSync(skillsDir))(
+    'every status a skill table maps to is one update_vacancy_status takes',
+    async () => {
+      const client = await connectedClient();
+      const { tools } = await client.listTools();
+      const tool = tools.find((t) => t.name === 'update_vacancy_status');
+      const status = tool?.inputSchema.properties?.status as { enum: string[] } | undefined;
+      const accepted = status?.enum ?? [];
+
+      const mapped = readdirSync(skillsDir, { withFileTypes: true })
+        .filter((entry) => existsSync(path.join(skillsDir, entry.name, 'SKILL.md')))
+        .flatMap((entry) => {
+          const text = readFileSync(path.join(skillsDir, entry.name, 'SKILL.md'), 'utf8');
+          return [...text.matchAll(/\| `([A-Z_]+)`/g)].map((m) => m[1]);
+        });
+
+      expect(mapped).toContain('AWAITING');
+      expect(mapped.filter((status) => !accepted.includes(status))).toEqual([]);
+    },
+  );
 
   it('works the analysis queue: list NEW with text → get_vacancies_batch → submit_analyses_batch', async () => {
     const client = await connectedClient();
@@ -787,6 +812,80 @@ describe('job-search-copilot MCP server', () => {
     });
     expect(result.isError).toBe(true);
   });
+  it('update_application edits salary and CV flag only; isError for an unknown id', async () => {
+    const client = await connectedClient();
+    const recorded = await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Eta Co', title: 'Dev', salaryInApplication: '100 PLN/h' },
+    });
+    const { application } = JSON.parse(textOf(recorded));
+
+    const updated = await client.callTool({
+      name: 'update_application',
+      arguments: { id: application.id, usedTailoredResume: true },
+    });
+    expect(JSON.parse(textOf(updated))).toEqual({
+      success: true,
+      application: { id: application.id, company: 'Eta Co', title: 'Dev' },
+    });
+    expect(await prisma.vacancy.findUniqueOrThrow({ where: { id: application.id } })).toMatchObject(
+      { salaryInApplication: '100 PLN/h', usedTailoredResume: true, status: 'APPLIED' },
+    );
+
+    await client.callTool({
+      name: 'update_application',
+      arguments: { id: application.id, salaryInApplication: '' },
+    });
+    expect(
+      (await prisma.vacancy.findUniqueOrThrow({ where: { id: application.id } }))
+        .salaryInApplication,
+    ).toBeNull();
+
+    const missing = await client.callTool({
+      name: 'update_application',
+      arguments: { id: 999_999, usedTailoredResume: true },
+    });
+    expect(missing.isError).toBe(true);
+  });
+
+  it('add_comment adds an AGENT comment by default, or a USER one, without a status move', async () => {
+    const client = await connectedClient();
+    const recorded = await client.callTool({
+      name: 'record_application',
+      arguments: { company: 'Theta Co', title: 'Dev' },
+    });
+    const { application } = JSON.parse(textOf(recorded));
+
+    await client.callTool({
+      name: 'add_comment',
+      arguments: { id: application.id, body: 'Email from recruiter.' },
+    });
+    const added = await client.callTool({
+      name: 'add_comment',
+      arguments: { id: application.id, body: 'My own note.', source: 'USER' },
+    });
+    expect(JSON.parse(textOf(added)).vacancy.id).toBe(application.id);
+
+    const list = await client.callTool({
+      name: 'list_applications',
+      arguments: { company: 'Theta Co' },
+    });
+    const [item] = JSON.parse(textOf(list)).items;
+    expect(item.status).toBe('APPLIED');
+    expect(item.comments.map((c: { source: string; body: string }) => [c.source, c.body])).toEqual([
+      ['AGENT', 'Email from recruiter.'],
+      ['USER', 'My own note.'],
+    ]);
+
+    for (const arguments_ of [
+      { id: 999_999, body: 'x' },
+      { id: application.id, body: '   ' },
+    ]) {
+      const result = await client.callTool({ name: 'add_comment', arguments: arguments_ });
+      expect(result.isError).toBe(true);
+    }
+  });
+
   it('intake_vacancy creates a new posting as a NEW vacancy, then reports a duplicate', async () => {
     const client = await connectedClient();
     const url = 'https://pl.linkedin.com/jobs/view/engineer-at-acme-3900000001?trk=x';

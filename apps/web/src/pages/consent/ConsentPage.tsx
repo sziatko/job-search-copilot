@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from '@tanstack/react-router';
 import { useState } from 'react';
-import { IconBriefcase } from '@/components/icons';
+import { JscLogo } from '@/components/icons';
 import { authClient } from '@/lib/auth';
 
 /**
@@ -39,9 +39,7 @@ export function ConsentPage() {
 
   return (
     <main className="soon-wrap">
-      <div className="soon-icon">
-        <IconBriefcase />
-      </div>
+      <JscLogo size={52} />
       <h2>{name} wants to use Job Search Copilot</h2>
       <p>
         It will act as you through the MCP tools: read and change your vacancies and applications.

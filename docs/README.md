@@ -10,7 +10,7 @@ and *what a change here breaks over there*.
 | --- | --- |
 | [`architecture.md`](architecture.md) | The system map: the four packages, their boundaries, the request lifecycle, the dev stack. Start here. |
 | [`domain-model.md`](domain-model.md) | `Vacancy`, the two independent axes (analyzer `recommendation` vs the user's `status`), the `StatusChange` journal, the status lifecycle, analyze-once, the DB-level rules. |
-| [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the thirteen MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
+| [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the fifteen MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
 | [`decisions/`](decisions/) | One Architecture Decision Record (ADR) per load-bearing choice — context, the decision, why not the alternatives, and what it constrains. |
 | [`backlog.md`](backlog.md) | What is not yet planned into a phase, in two lists: ideas (new capabilities) and improvements / fixes. Only open and planned rows; done and not-relevant ones move to [`backlog-archive.md`](backlog-archive.md). |
 | [`phases/phase-1.md`](phases/phase-1.md) | What Phase 1 delivered and its status. |
@@ -26,6 +26,8 @@ and *what a change here breaks over there*.
 | [`phases/phase-5.md`](phases/phase-5.md) | Unscored vacancies in one table: the vacancy log merged into `Vacancy`, the `NEW` / `FILTERED_OUT` statuses, an intake endpoint for n8n, analysis pulled and submitted over MCP, an `/inbox` page, per-page status contexts, search in a modal, and the `salaryInApplication` rename. Its `## Status` is the live checklist. |
 | [`phases/phase-5.1.md`](phases/phase-5.1.md) | API docs: Swagger UI at `/api/docs` for REST (`@nestjs/swagger` and its CLI plugin, requests only), the MCP Inspector for MCP. Its `## Status` is the live checklist. |
 | [`phases/phase-6.md`](phases/phase-6.md) | Auth: sign-in with Google, LinkedIn and passkeys (Better Auth, cookie sessions), every REST route closed by default, a machine token for n8n, JSC as an OAuth 2.1 authorization server, MCP over HTTP. Explains what the library does under the hood. Its `## Status` is the live checklist. |
+| [`phases/phase-6.1.md`](phases/phase-6.1.md) | Fixes after phase 6: the logo, favicon and home-screen icons, an optional comment on Save for later, an `AWAITING` pipeline status, and less space around the tables with a centred compact title. Its `## Status` is the live checklist. |
+| [`phases/phase-6.2.md`](phases/phase-6.2.md) | Small fixes from the backlog: the table's scroll reset on a filter change, the phone topbar title, `Modal` focus, a 401 redirect to `/login`, and two MCP tools (edit an application, add a comment). Its `## Status` is the live checklist. |
 | [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions

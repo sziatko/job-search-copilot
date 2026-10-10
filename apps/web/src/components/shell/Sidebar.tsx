@@ -1,13 +1,13 @@
 import { Link, useRouteContext } from '@tanstack/react-router';
 import type { ComponentType, SVGProps } from 'react';
 import {
-  IconBriefcase,
   IconChecklist,
   IconChevronLeft,
   IconDashboard,
   IconInbox,
   IconPerson,
   IconSend,
+  JscLogo,
 } from '@/components/icons';
 
 interface NavItem {
@@ -79,9 +79,7 @@ export function Sidebar({
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'open' : ''}`}>
       <div className="brand">
-        <div className="brand-mark">
-          <IconBriefcase />
-        </div>
+        <JscLogo className="flex-none" />
         <div className="brand-text">
           <div className="brand-name">Job Search Copilot</div>
         </div>

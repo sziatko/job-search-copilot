@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ApplyDialog } from './components/ApplyDialog';
 import { CompanyHistoryModal } from './components/CompanyHistoryModal';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { SaveForLaterDialog } from './components/SaveForLaterDialog';
 import { SearchModal } from './components/SearchModal';
 import { StatusFilterSelect } from './components/StatusFilterSelect';
 import { VacancyTable } from './components/VacancyTable';
@@ -18,13 +19,16 @@ export function VacanciesPage() {
     savingIds,
     rowErrors,
     pendingDecline,
+    pendingSave,
     pendingApply,
     statusFilter,
     setStatusFilter,
     requestActionChange,
     confirmDecline,
+    confirmSave,
     confirmApply,
     cancelDecline,
+    cancelSave,
     cancelApply,
   } = useVacancies();
 
@@ -47,7 +51,7 @@ export function VacanciesPage() {
             tracker's: "Showing 0 of 0" during the first load is a claim about the
             data, and there is no data yet. Search is a modal with its own results
             (SearchModal); it never filters this table. */}
-        <div className="toolbar pt-[16px]">
+        <div className="toolbar">
           {!loadError && !loading && (
             <span className="toolbar-count">
               Showing {items.length} of {total}
@@ -68,6 +72,7 @@ export function VacanciesPage() {
             loading={loading}
             items={items}
             onEndReached={loadMore}
+            filterKey={statusFilter}
             savingIds={savingIds}
             rowErrors={rowErrors}
             onActionChange={requestActionChange}
@@ -83,6 +88,15 @@ export function VacanciesPage() {
           confirmLabel="Yes, decline"
           onCancel={cancelDecline}
           onConfirm={confirmDecline}
+        />
+      )}
+
+      {pendingSave && (
+        <SaveForLaterDialog
+          company={pendingSave.company}
+          title={pendingSave.title}
+          onCancel={cancelSave}
+          onConfirm={confirmSave}
         />
       )}
 

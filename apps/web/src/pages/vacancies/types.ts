@@ -30,6 +30,7 @@ export const vacancyStatusSchema = z.enum([
   'RECRUITER_SCREEN',
   'REPLIED',
   'INTERVIEW',
+  'AWAITING',
   'OFFER',
   'REJECTED',
 ]);
@@ -51,6 +52,7 @@ export const STATUS_CONTEXT = {
     'RECRUITER_SCREEN',
     'REPLIED',
     'INTERVIEW',
+    'AWAITING',
     'OFFER',
     'REJECTED',
   ]),

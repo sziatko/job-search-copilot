@@ -66,7 +66,7 @@ export function InboxPage() {
   return (
     <section className="view view-fill">
       <div className="card">
-        <div className="toolbar pt-[16px]">
+        <div className="toolbar">
           <fieldset className="tabs">
             <legend className="sr-only">Inbox tab</legend>
             {inboxTabSchema.options.map((value) => (
@@ -104,6 +104,7 @@ export function InboxPage() {
             loading={loading}
             items={items}
             onEndReached={loadMore}
+            filterKey={tab}
             savingIds={savingIds}
             rowErrors={rowErrors}
             onActionChange={requestActionChange}

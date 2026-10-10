@@ -12,9 +12,9 @@ const DAY = 86_400_000;
 
 /** Every status but FILTERED_OUT — All with Hide Filtered out on, the default. */
 const ALL_BUT_FILTERED_OUT =
-  'NEW,NOT_REVIEWED,SAVED_FOR_LATER,DECLINED,UNAVAILABLE,APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,OFFER,REJECTED';
+  'NEW,NOT_REVIEWED,SAVED_FOR_LATER,DECLINED,UNAVAILABLE,APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,AWAITING,OFFER,REJECTED';
 const EVERY_STATUS =
-  'NEW,NOT_REVIEWED,SAVED_FOR_LATER,DECLINED,UNAVAILABLE,FILTERED_OUT,APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,OFFER,REJECTED';
+  'NEW,NOT_REVIEWED,SAVED_FOR_LATER,DECLINED,UNAVAILABLE,FILTERED_OUT,APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,AWAITING,OFFER,REJECTED';
 
 /** Every GET the page and the modal send, by path and query. */
 function recordRequests() {
@@ -49,9 +49,15 @@ async function openSearch() {
 afterEach(() => mswServer.events.removeAllListeners());
 
 describe('SearchModal', () => {
+  it('focuses the search field on open', async () => {
+    renderAt('/vacancies', [fakeVacancy()]);
+    const { modal } = await openSearch();
+    expect(modal.getByRole('searchbox')).toHaveFocus();
+  });
+
   it.each([
     ['/vacancies', 'NOT_REVIEWED,SAVED_FOR_LATER,DECLINED,UNAVAILABLE'],
-    ['/applications', 'APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,OFFER,REJECTED'],
+    ['/applications', 'APPLIED,RECRUITER_SCREEN,REPLIED,INTERVIEW,AWAITING,OFFER,REJECTED'],
     ['/inbox', 'NEW,FILTERED_OUT'],
   ])("opens from %s's toolbar; Context sends that page's statuses", async (path, context) => {
     const requests = recordRequests();

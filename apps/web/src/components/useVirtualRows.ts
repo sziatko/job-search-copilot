@@ -24,12 +24,13 @@ import { type RefObject, useEffect, useRef } from 'react';
  * `onEndReached` is the infinite-scroll trigger (ADR-0030): called when the last
  * loaded row enters the rendered window — the overscan puts that ~12 rows before the
  * user sees it. The caller decides whether a page is due (`useInfiniteList`'s
- * `loadMore`).
+ * `loadMore`). `resetKey` (the filter) scrolls the box back to the top when it changes.
  */
 export function useVirtualRows(
   scrollRef: RefObject<HTMLElement | null>,
   count: number,
   onEndReached?: () => void,
+  resetKey?: string,
 ) {
   const virtualizer = useVirtualizer({
     count,
@@ -48,6 +49,12 @@ export function useVirtualRows(
   useEffect(() => {
     if (count > 0 && lastIndex >= count - 1) onEndRef.current?.();
   }, [lastIndex, count]);
+  // A new filter is a new list (the `useInfiniteList` key): start it from the top
+  // instead of at the old list's offset. `resetKey` is only a trigger.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resetKey is the trigger
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [resetKey]);
   const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
   const paddingBottom =
     virtualItems.length > 0

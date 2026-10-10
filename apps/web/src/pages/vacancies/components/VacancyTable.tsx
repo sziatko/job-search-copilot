@@ -83,6 +83,7 @@ export function VacancyTable({
   onActionChange,
   onShowCompanyHistory,
   onEndReached,
+  filterKey,
 }: {
   /** The first page is on its way: skeleton rows under the real header. `items` is
    * empty until then, so `onEndReached` cannot fire over the skeleton. */
@@ -96,12 +97,15 @@ export function VacancyTable({
   onShowCompanyHistory: (company: string, vacancyId: number) => void;
   /** The next page, when the last loaded row scrolls into the window (ADR-0030). */
   onEndReached: () => void;
+  /** The page's filter: a change scrolls the box back to the top. */
+  filterKey: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { virtualItems, paddingTop, paddingBottom, measureElement } = useVirtualRows(
     scrollRef,
     items.length,
     onEndReached,
+    filterKey,
   );
 
   return (

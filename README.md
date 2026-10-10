@@ -49,8 +49,6 @@ npm run test:db:migrate         # test DB (job_search_copilot_test)
 - the skills: `git clone https://github.com/sziatko/job-search-copilot-skills.git skills`
   (private; without it the skill↔MCP sync test in `apps/mcp` skips), then an empty
   `skills/.git/info/publish-guard-off` — that repo holds real data on purpose;
-- the publish-guard term list for this repo, `.git/info/private-terms`, copied from
-  wherever it is kept outside the repo;
 - `git config user.name` / `user.email` in both repos, if git has no global identity
   (the GitHub noreply address).
 

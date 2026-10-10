@@ -104,7 +104,7 @@ export class VacanciesController {
 
   @Patch(':id/status')
   async updateStatus(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateVacancyStatusDto) {
-    const vacancy = await this.vacancies.updateStatus(id, dto.status);
+    const vacancy = await this.vacancies.updateStatus(id, dto.status, dto.comment);
     if (!vacancy) {
       throw new NotFoundException(`Vacancy ${id} not found`);
     }

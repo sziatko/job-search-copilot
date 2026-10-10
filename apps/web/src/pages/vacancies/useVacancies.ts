@@ -33,6 +33,7 @@ interface PendingVacancy {
 interface ActionChange {
   id: number;
   status: RowAction;
+  comment?: string;
 }
 
 type CachedPages = InfiniteData<VacancyPage, number | undefined>;
@@ -69,8 +70,8 @@ export function useVacancies() {
 
 /**
  * A table of vacancy rows — /vacancies' and /inbox's: the server's list, paged, and the
- * row writes (a status move, optimistic and toasted; Decline and Apply behind their
- * dialogs). `filters` are the page's own, keyed under ['vacancies'].
+ * row writes (a status move, optimistic and toasted; Decline, Save for later and Apply
+ * behind their dialogs). `filters` are the page's own, keyed under ['vacancies'].
  */
 export function useVacancyRows(
   filters: readonly unknown[],
@@ -112,6 +113,7 @@ export function useVacancyRows(
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
   const [rowErrors, setRowErrors] = useState<Map<number, string>>(new Map());
   const [pendingDecline, setPendingDecline] = useState<PendingVacancy | null>(null);
+  const [pendingSave, setPendingSave] = useState<PendingVacancy | null>(null);
   const [pendingApply, setPendingApply] = useState<PendingVacancy | null>(null);
 
   /** Undo a `patchCachedItem` — every key it wrote, back to the snapshot.
@@ -140,7 +142,7 @@ export function useVacancyRows(
   }
 
   const actionMutation = useMutation({
-    mutationFn: ({ id, status }: ActionChange) => updateVacancyStatus(id, status),
+    mutationFn: ({ id, status, comment }: ActionChange) => updateVacancyStatus(id, status, comment),
     onMutate: async ({ id, status }) => {
       // Don't let an in-flight refetch clobber the optimistic write.
       await queryClient.cancelQueries({ queryKey });
@@ -182,9 +184,13 @@ export function useVacancyRows(
     // only (the table disables its controls too).
     if (!item || item.status === status || isPipelineStatus(item.status)) return;
     // Declining/applying are a bit more consequential, so confirm first instead of
-    // saving straight away like the other actions.
+    // saving straight away like the other actions; saving for later asks why.
     if (status === VACANCY_ACTION.DECLINED) {
       setPendingDecline({ id, company: item.company, title: item.title });
+      return;
+    }
+    if (status === VACANCY_ACTION.SAVED_FOR_LATER) {
+      setPendingSave({ id, company: item.company, title: item.title });
       return;
     }
     if (status === VACANCY_ACTION.APPLIED) {
@@ -198,6 +204,12 @@ export function useVacancyRows(
     if (!pendingDecline) return;
     actionMutation.mutate({ id: pendingDecline.id, status: VACANCY_ACTION.DECLINED });
     setPendingDecline(null);
+  }
+
+  function confirmSave(comment: string | undefined) {
+    if (!pendingSave) return;
+    actionMutation.mutate({ id: pendingSave.id, status: VACANCY_ACTION.SAVED_FOR_LATER, comment });
+    setPendingSave(null);
   }
 
   // Applying records the application (the dialog's salary / tailored-resume /
@@ -262,11 +274,14 @@ export function useVacancyRows(
     savingIds,
     rowErrors,
     pendingDecline,
+    pendingSave,
     pendingApply,
     requestActionChange,
     confirmDecline,
+    confirmSave,
     confirmApply,
     cancelDecline: () => setPendingDecline(null),
+    cancelSave: () => setPendingSave(null),
     cancelApply: () => setPendingApply(null),
   };
 }

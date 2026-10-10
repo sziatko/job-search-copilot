@@ -218,8 +218,9 @@ export function buildHandlers(rows: FakeVacancy[]) {
       if (!row) {
         return new HttpResponse(null, { status: 404 });
       }
-      const body = (await request.json()) as { status: VacancyStatus };
+      const body = (await request.json()) as { status: VacancyStatus; comment?: string };
       moveTo(row, body.status);
+      addComment(row, body.comment);
       return HttpResponse.json(row);
     }),
     // POST /applications — applying on the /vacancies page. Moves the row to APPLIED
@@ -340,6 +341,7 @@ export function fakeStats(overrides: Partial<Stats> = {}): Stats {
         RECRUITER_SCREEN: 0,
         REPLIED: 0,
         INTERVIEW: 0,
+        AWAITING: 0,
         OFFER: 0,
         REJECTED: 0,
       },

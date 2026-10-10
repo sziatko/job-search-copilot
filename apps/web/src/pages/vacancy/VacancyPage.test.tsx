@@ -200,15 +200,50 @@ describe('VacancyPage', () => {
     const writes = recordWrites();
     renderAt('/vacancies/1', rows);
 
-    await userEvent.selectOptions(await screen.findByRole('combobox'), 'SAVED_FOR_LATER');
+    await userEvent.selectOptions(await screen.findByRole('combobox'), 'UNAVAILABLE');
 
     const timeline = await card(/status history/i);
-    expect(await timeline.findByText('Saved for later')).toBeInTheDocument();
+    expect(await timeline.findByText('Unavailable')).toBeInTheDocument();
+    expect(writes).toEqual(['PATCH /api/v1/vacancies/1/status']);
+    expect(rows[0].status).toBe('UNAVAILABLE');
+    expect(success).toHaveBeenCalledWith('Moved to Unavailable', {
+      description: expect.stringContaining(' — '),
+    });
+  });
+
+  it('saves for later through its dialog, with the comment', async () => {
+    const success = vi.spyOn(toast, 'success');
+    const rows = [fakeVacancy({ id: 1, status: 'NOT_REVIEWED' })];
+    const writes = recordWrites();
+    renderAt('/vacancies/1', rows);
+
+    await userEvent.selectOptions(await screen.findByRole('combobox'), 'SAVED_FOR_LATER');
+    // Nothing written until the dialog is sent.
+    const dialog = within(screen.getByRole('dialog'));
+    expect(writes).toEqual([]);
+    await userEvent.type(dialog.getByRole('textbox', { name: 'Comment' }), 'Back in May.');
+    await userEvent.click(dialog.getByRole('button', { name: 'Save for later' }));
+
+    const comments = await card(/^comments/i);
+    expect(await comments.findByText('Back in May.')).toBeInTheDocument();
     expect(writes).toEqual(['PATCH /api/v1/vacancies/1/status']);
     expect(rows[0].status).toBe('SAVED_FOR_LATER');
     expect(success).toHaveBeenCalledWith('Moved to Saved for later', {
       description: expect.stringContaining(' — '),
     });
+  });
+
+  it('writes nothing when the Save for later dialog is cancelled', async () => {
+    const rows = [fakeVacancy({ id: 1, status: 'NOT_REVIEWED' })];
+    const writes = recordWrites();
+    renderAt('/vacancies/1', rows);
+
+    await userEvent.selectOptions(await screen.findByRole('combobox'), 'SAVED_FOR_LATER');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(writes).toEqual([]);
+    expect(rows[0].status).toBe('NOT_REVIEWED');
   });
 
   /** The status select's options, as labels, in order. */

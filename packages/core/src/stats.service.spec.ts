@@ -65,6 +65,7 @@ describe('StatsService.get', () => {
           RECRUITER_SCREEN: 0,
           REPLIED: 0,
           INTERVIEW: 0,
+          AWAITING: 0,
           OFFER: 0,
           REJECTED: 0,
         },
@@ -152,17 +153,28 @@ describe('StatsService.get', () => {
     expect(await stats.get(NOW)).toMatchObject({ applied: 1, responded: 1, interview: 1 });
   });
 
+  it('counts AWAITING as responded, not as an interview', async () => {
+    await seed(['APPLIED', 'AWAITING']); // a test task sent, waiting on their feedback
+    await seed(['APPLIED']);
+
+    const result = await stats.get(NOW);
+
+    expect(result).toMatchObject({ applied: 2, responded: 1, interview: 0 });
+    expect(result.pipeline.byStatus.AWAITING).toBe(1);
+  });
+
   it('times out an open row at the 30-day boundary, never a closed one', async () => {
     const cutoff = NOW.getTime() - TIMEOUT_DAYS * DAY;
     await seed(['APPLIED'], { lastMoveAt: new Date(cutoff + MINUTE) }); // active
     await seed(['APPLIED'], { lastMoveAt: new Date(cutoff - MINUTE) }); // timed out
     await seed(['APPLIED', 'RECRUITER_SCREEN'], { lastMoveAt: new Date(cutoff - DAY) }); // timed out
+    await seed(['APPLIED', 'AWAITING'], { lastMoveAt: new Date(cutoff - DAY) }); // open: timed out
     await seed(['APPLIED', 'REJECTED'], { lastMoveAt: new Date(cutoff - DAY) }); // closed
     await seed(['APPLIED', 'OFFER'], { lastMoveAt: new Date(cutoff - DAY) }); // closed
 
     const { pipeline, recruiterScreen } = await stats.get(NOW);
 
-    expect(pipeline).toMatchObject({ active: 1, timedOut: 2, total: 5 });
+    expect(pipeline).toMatchObject({ active: 1, timedOut: 3, total: 6 });
     // The partition: every pipeline row is active, timed out, rejected or an offer.
     expect(pipeline.total).toBe(
       pipeline.active + pipeline.timedOut + pipeline.byStatus.REJECTED + pipeline.byStatus.OFFER,

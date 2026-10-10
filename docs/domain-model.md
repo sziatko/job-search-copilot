@@ -29,7 +29,7 @@ pipeline.
 | `matchScore` | `Int?` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. `null` = not analysed yet. |
 | `recommendation` | `Recommendation?` enum | **The analyzer's call.** `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`; `null` = not analysed yet — with `matchScore`, both or neither (a CHECK). |
 | `comments` | `Comment[]` | Every note on the vacancy — see [`Comment`](#comment) below. The analyzer's reasoning is its `ANALYZER` row: reads still return it as `estimationComment` (`string \| null`), derived from the first one. |
-| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (one exception — the analysis moves it out of `NEW`, below). Triage, `TRIAGE_STATUSES` — `NEW` \| `NOT_REVIEWED` \| `SAVED_FOR_LATER` \| `DECLINED` \| `UNAVAILABLE` \| `FILTERED_OUT` — then the pipeline, `PIPELINE_STATUSES`: `APPLIED` \| `RECRUITER_SCREEN` \| `REPLIED` \| `INTERVIEW` \| `OFFER` \| `REJECTED`. A cache of the latest [`StatusChange`](#statuschange). `NEW` = waiting for an analysis (never on an analysed row — a CHECK); `FILTERED_OUT` = screened out before triage, by the analyzer's `SKIP` or the user; `REJECTED` = the company said no; `DECLINED` = "I read the analysis and chose not to apply"; `UNAVAILABLE` = the posting no longer takes applications (triage only — never on `/applications`). |
+| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (one exception — the analysis moves it out of `NEW`, below). Triage, `TRIAGE_STATUSES` — `NEW` \| `NOT_REVIEWED` \| `SAVED_FOR_LATER` \| `DECLINED` \| `UNAVAILABLE` \| `FILTERED_OUT` — then the pipeline, `PIPELINE_STATUSES`: `APPLIED` \| `RECRUITER_SCREEN` \| `REPLIED` \| `INTERVIEW` | `AWAITING` | `OFFER` | `REJECTED`. \| `OFFER` \| `REJECTED`. A cache of the latest [`StatusChange`](#statuschange). `NEW` = waiting for an analysis (never on an analysed row — a CHECK); `FILTERED_OUT` = screened out before triage, by the analyzer's `SKIP` or the user; `AWAITING` = a test task sent or an interview done, waiting on their feedback (open, so it times out; `GET /stats` counts it as *responded*, not *interview*); `REJECTED` = the company said no; `DECLINED` = "I read the analysis and chose not to apply"; `UNAVAILABLE` = the posting no longer takes applications (triage only — never on `/applications`). |
 | `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. Timeout and the `/applications` sort read it. |
 | `salaryInApplication` | `String?` | Free text ("130 PLN/h"), entered when applying. |
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
@@ -62,8 +62,8 @@ select offers the same): a `NEW` row gets Filter out only, a `FILTERED_OUT` one 
 queue only without an analysis, the rest the `/vacancies` actions:
 
 ```
-     analysis, not SKIP               ┌─▶ SAVED_FOR_LATER ─┬─▶ APPLIED ─▶ RECRUITER_SCREEN ─▶ REPLIED ─▶ INTERVIEW ─┬─▶ OFFER
-NEW ─────────────────▶ NOT_REVIEWED ──┼────────────────────┘      (any pipeline status) ────────────────────────────┴─▶ REJECTED
+     analysis, not SKIP               ┌─▶ SAVED_FOR_LATER ─┬─▶ APPLIED ─▶ RECRUITER_SCREEN ─▶ REPLIED ─▶ INTERVIEW ─▶ AWAITING ─┬─▶ OFFER
+NEW ─────────────────▶ NOT_REVIEWED ──┼────────────────────┘      (any pipeline status) ────────────────────────────────────────┴─▶ REJECTED
  │ ▲                                  ├─▶ DECLINED ◀── (from SAVED_FOR_LATER too)
  │ │ back to the queue                └─▶ UNAVAILABLE ◀── (from SAVED_FOR_LATER too)
  │ │ (no analysis only)
