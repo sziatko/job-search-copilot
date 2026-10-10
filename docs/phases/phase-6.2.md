@@ -53,5 +53,8 @@ them: update in the same step, tell the user to re-upload. Tests: core (if touch
   `.playwright-mcp/step2-before.png` / `step2-after.png` (the topbar was 89px, title on 2 lines).
 - [x] **3 · `Modal` focus.** *2026-10-10.* `Modal` takes `initialFocus?: RefObject`; `SearchInput` got an
   optional `inputRef` prop to feed it.
-- [ ] **4 · 401 → `/login`.**
+- [x] **4 · 401 → `/login`.** *2026-10-10.* `apiFetch` is now async and, on 401 outside
+  `/login` and `/consent`, dynamically imports `@/router` (a static import is a cycle: router →
+  pages → api) and navigates; the response is still returned. The session check goes through
+  `authClient`, not `apiFetch`, so it is exempt by construction. Test: `lib/api.test.ts`.
 - [ ] **5 · MCP: edit application, add comment.**
