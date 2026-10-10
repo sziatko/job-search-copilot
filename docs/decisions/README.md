@@ -45,6 +45,7 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0034](0034-auth-better-auth-in-core.md) | Auth: Better Auth in `core`, cookie sessions, Google/LinkedIn + passkeys | Accepted |
 | [0035](0035-mcp-over-http-oauth-resource-server.md) | MCP over HTTP as an OAuth 2.1 resource server; stdio stays open | Accepted |
 | [0036](0036-machine-token-for-n8n.md) | n8n reaches the API with a static bearer token, on three routes only | Accepted |
+| [0037](0037-e2e-playwright.md) | End-to-end tests: Playwright on its own database, run on demand, not in `npm test` | Accepted |
 
 A gap in the numbers is a deleted ADR. The ADR that replaced it names it on its
 `Replaces:` line (an ADR whose code is simply gone has none), and
