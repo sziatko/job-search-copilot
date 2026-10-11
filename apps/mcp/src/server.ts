@@ -53,7 +53,7 @@ export interface ServerContext {
  * instead of real stdio (ADR-0010).
  */
 export function createServer({
-  userId: _userId, // carried, not used yet: the services take it in phase 7 step 3a
+  userId,
   vacancies = new VacancyService(),
   applications = new ApplicationService(),
   intake = new VacancyIntakeService(),
@@ -63,9 +63,9 @@ export function createServer({
     { instructions: SERVER_INSTRUCTIONS },
   );
 
-  registerVacancyTools(server, vacancies);
-  registerApplicationTools(server, applications);
-  registerIntakeTools(server, intake);
+  registerVacancyTools(server, vacancies, userId);
+  registerApplicationTools(server, applications, userId);
+  registerIntakeTools(server, intake, userId);
 
   return server;
 }

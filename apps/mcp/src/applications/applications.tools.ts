@@ -17,6 +17,7 @@ const APPLICATION_LIST_MAX = 500;
 export function registerApplicationTools(
   server: McpServer,
   applications: ApplicationService,
+  userId: string,
 ): void {
   server.registerTool(
     'record_application',
@@ -41,7 +42,7 @@ export function registerApplicationTools(
       inputSchema: RecordApplicationItemSchema.shape,
     },
     withDomainErrors(async (input) => {
-      const result = await applications.record(toRecordInput(input));
+      const result = await applications.record(userId, toRecordInput(input));
       return json({ success: true, application: ref(result.application) });
     }),
   );
@@ -60,7 +61,7 @@ export function registerApplicationTools(
       inputSchema: { applications: z.array(RecordApplicationItemSchema).min(1).max(BATCH_MAX) },
     },
     withDomainErrors(async ({ applications: items }) => {
-      const { results } = await applications.recordMany(items.map(toRecordInput));
+      const { results } = await applications.recordMany(userId, items.map(toRecordInput));
       const compact = results.map((r) => ({ success: true, application: ref(r.application) }));
       return json(compact);
     }),
@@ -93,7 +94,7 @@ export function registerApplicationTools(
     },
     async (filters) => {
       // `nextCursor` is the web's (ADR-0030); this tool pages by offset.
-      const { items, total } = await applications.list(filters);
+      const { items, total } = await applications.list(userId, filters);
       return json({ items, total });
     },
   );
@@ -135,9 +136,10 @@ export function registerApplicationTools(
     withDomainErrors(async ({ id, company, title, status, comment }) => {
       let application: Awaited<ReturnType<typeof applications.updateStatus>>;
       if (id != null) {
-        application = await applications.updateStatus(id, status, comment, 'AGENT');
+        application = await applications.updateStatus(userId, id, status, comment, 'AGENT');
       } else if (company && title) {
         application = await applications.updateStatusByVacancy(
+          userId,
           company,
           title,
           status,
@@ -174,7 +176,7 @@ export function registerApplicationTools(
       },
     },
     withDomainErrors(async ({ id, salaryInApplication, usedTailoredResume }) => {
-      const application = await applications.update(id, {
+      const application = await applications.update(userId, id, {
         salaryInApplication,
         usedTailoredResume,
       });
@@ -203,7 +205,7 @@ export function registerApplicationTools(
       },
     },
     withDomainErrors(async ({ id, body, source }) => {
-      const vacancy = await applications.addComment(id, body, source);
+      const vacancy = await applications.addComment(userId, id, body, source);
       if (!vacancy) {
         return toolError(`Vacancy ${id} not found`);
       }

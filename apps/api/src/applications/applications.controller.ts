@@ -13,6 +13,7 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { CurrentUserId } from '../auth/api-key.guard';
 import { ListApplicationsQueryDto } from './dto/list-applications.dto';
 import { RecordApplicationDto } from './dto/record-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
@@ -30,8 +31,12 @@ export class ApplicationsController {
    * needs `resolution` in the JSON, not a header.
    */
   @Post()
-  async record(@Body() dto: RecordApplicationDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.applications.record(dto);
+  async record(
+    @CurrentUserId() userId: string,
+    @Body() dto: RecordApplicationDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.applications.record(userId, dto);
     res.status(201);
     res.setHeader('Location', `/api/v1/applications/${result.application.id}`);
     return result;
@@ -39,16 +44,16 @@ export class ApplicationsController {
 
   /** `{ items, total, nextCursor }`; paged by `offset` or `cursor`, not both (ADR-0030). */
   @Get()
-  list(@Query() query: ListApplicationsQueryDto) {
+  list(@CurrentUserId() userId: string, @Query() query: ListApplicationsQueryDto) {
     if (query.cursor !== undefined && query.offset !== undefined) {
       throw new BadRequestException('cursor and offset cannot be combined');
     }
-    return this.applications.list(query);
+    return this.applications.list(userId, query);
   }
 
   @Get(':id')
-  async getById(@Param('id', ParseIntPipe) id: number) {
-    const application = await this.applications.getById(id);
+  async getById(@CurrentUserId() userId: string, @Param('id', ParseIntPipe) id: number) {
+    const application = await this.applications.getById(userId, id);
     if (!application) {
       throw new NotFoundException(`Application ${id} not found`);
     }
@@ -57,10 +62,17 @@ export class ApplicationsController {
 
   @Patch(':id/status')
   async updateStatus(
+    @CurrentUserId() userId: string,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateApplicationStatusDto,
   ) {
-    const application = await this.applications.updateStatus(id, dto.status, dto.comment, 'USER');
+    const application = await this.applications.updateStatus(
+      userId,
+      id,
+      dto.status,
+      dto.comment,
+      'USER',
+    );
     if (!application) {
       throw new NotFoundException(`Application ${id} not found`);
     }
@@ -68,8 +80,12 @@ export class ApplicationsController {
   }
 
   @Patch(':id')
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateApplicationDto) {
-    const application = await this.applications.update(id, dto);
+  async update(
+    @CurrentUserId() userId: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateApplicationDto,
+  ) {
+    const application = await this.applications.update(userId, id, dto);
     if (!application) {
       throw new NotFoundException(`Application ${id} not found`);
     }

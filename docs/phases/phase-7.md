@@ -106,11 +106,14 @@ carried to where step 3a will use it.
   an operation it does not know, and a create needs `userId`. Then every service onto
   it, `userId` the first argument of every public method; each site in the list above
   covered. `resetToSeed(prisma, userId)` scoped, its id read too. Callers (controllers,
-  MCP tools, `e2e/global-setup.ts`) pass the user step 2 resolved.
+  MCP tools, `e2e/global-setup.ts`) pass the user step 2 resolved; `npm run seed`
+  (`scripts/seed.ts`) seeds as the first `AUTH_ALLOWED_EMAILS` user, upserted.
 - Tests: a table-driven isolation test — every public method called as user B with A's
   id or data → null / not found, and A's row unchanged; one `applyUrl` for two users →
   two rows; B's list, stats, company history and intake duplicate check untouched by A.
-  A grep test: `this.db.vacancy` / `tx.vacancy` appear nowhere outside `forUser`.
+  A grep test: `this.db.vacancy` / `tx.vacancy` appear nowhere outside `forUser`, and
+  `this.db` only as `forUser(this.db, userId)` — so a scoped handle, a transaction's
+  included, is named `db`, never `tx`.
 
 **3b · Isolation end to end.** api: B gets a 404 on A's `GET` and `PATCH`; an intake with
 B's key lands in B. mcp: a server for B does not see A's vacancy. e2e: a second account
@@ -142,6 +145,13 @@ put it in n8n's credential and Claude Desktop's stdio env.
   `JSC_API_KEY`: on the dev DB that needs `npm run migrate:dev` first (no `apikey` table
   yet) and a key in `.env`, the `mcp` container's `npm run dev:mcp` included. The local
   `.env` still carries an unused `INTAKE_TOKEN` (harmless; the user's file).
-- [ ] **3a · Core: data belongs to a user.**
+- [x] **3a · Core: data belongs to a user.** — *2026-10-11.* The dev DB is not migrated
+  (migration `20261011130000_vacancy_owner`): the running `api` / `mcp` containers now
+  run code that reads `Vacancy.userId`, so the dev app fails until 3b's
+  `npm run migrate:dev` + restart. On ≠ 1 user with vacancies it refuses, naming the
+  emails and the `migrate resolve` command (checked on a scratch DB, 0 and 2 users).
+  Test helpers for 3b: core `tests/user.ts` `createUser()`; api `signIn()` returns
+  `{ cookie, userId }` and `signedInAgent(app).userId`; mcp `server.spec.ts` acts as
+  a real module-level user.
 - [ ] **3b · Isolation end to end.**
 - [ ] **4 · Close-out.**

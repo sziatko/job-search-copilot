@@ -16,6 +16,7 @@ import {
   AmbiguousVacancyMatchError,
   InvalidApplicationInputError,
 } from './errors';
+import { forUser, type UserDb, type UserTx } from './for-user';
 import { escapeLikePattern } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
@@ -58,8 +59,8 @@ const APPLICATION_SELECT = {
 
 type ApplicationRow = Prisma.VacancyGetPayload<{ select: typeof APPLICATION_SELECT }>;
 
-/** Any Prisma client or interactive-transaction client. */
-type Db = PrismaClient | Prisma.TransactionClient;
+/** A scoped client or its interactive transaction. */
+type Db = UserDb | UserTx;
 
 const PIPELINE: VacancyStatus[] = [...PIPELINE_STATUSES];
 
@@ -72,8 +73,9 @@ function flatten({ statusChanges, ...row }: ApplicationRow, now = new Date()): A
   };
 }
 
-/** One update, returned flattened; null when no vacancy has this id (P2025 — let the
- * UPDATE fail rather than check first). */
+/** One update, returned flattened; null when no vacancy of this user has this id (P2025
+ * — let the UPDATE fail rather than check first; `forUser` puts the owner in its
+ * `where`). */
 async function updateRow(
   db: Db,
   id: number,
@@ -94,7 +96,8 @@ async function updateRow(
  * status zone — applying moves the vacancy's own `status`, and `id` is the vacancy's.
  */
 export class ApplicationService {
-  /** @param db defaults (on construction, not import) to the lazy process-wide client —
+  /** @param db only ever used through `forUser` (every public method takes the user's id
+   *   first, ADR-0038). Defaults (on construction, not import) to the lazy process-wide client —
    *   same rationale as VacancyService. Nest passes its managed client. */
   constructor(private readonly db: PrismaClient = getPrisma()) {}
 
@@ -106,34 +109,41 @@ export class ApplicationService {
    * input, an unknown id, an ambiguous (company,title) match, or a vacancy already in
    * the pipeline.
    */
-  record(input: RecordApplicationInput): Promise<RecordApplicationResult> {
-    return this.db.$transaction((tx) => recordWithin(tx, input));
+  record(userId: string, input: RecordApplicationInput): Promise<RecordApplicationResult> {
+    return forUser(this.db, userId).$transaction((db) => recordWithin(db, userId, input));
   }
 
   /**
    * Record a whole batch atomically — one transaction, all rows or none. A thrown
    * row rolls everything back, so a failed batch leaves nothing and is safe to retry.
    */
-  recordMany(inputs: RecordApplicationInput[]): Promise<RecordManyApplicationsResult> {
-    return this.db.$transaction(async (tx) => {
+  recordMany(
+    userId: string,
+    inputs: RecordApplicationInput[],
+  ): Promise<RecordManyApplicationsResult> {
+    return forUser(this.db, userId).$transaction(async (db) => {
       const results: RecordApplicationResult[] = [];
       for (const input of inputs) {
-        results.push(await recordWithin(tx, input));
+        results.push(await recordWithin(db, userId, input));
       }
       return { results };
     });
   }
 
   /** Null when no vacancy has this id, or it is not in the pipeline. */
-  async getById(id: number): Promise<ApplicationListItem | null> {
-    const row = await this.db.vacancy.findFirst({
+  async getById(userId: string, id: number): Promise<ApplicationListItem | null> {
+    const row = await forUser(this.db, userId).vacancy.findFirst({
       where: { id, status: { in: PIPELINE } },
       select: APPLICATION_SELECT,
     });
     return row ? flatten(row) : null;
   }
 
-  async list(filters: ListApplicationsFilters = {}): Promise<ListApplicationsResult> {
+  async list(
+    userId: string,
+    filters: ListApplicationsFilters = {},
+  ): Promise<ListApplicationsResult> {
+    const db = forUser(this.db, userId);
     // search/company/title each contribute one clause; AND-ed together so giving more
     // than one narrows (a caller normally gives just one — search is the /applications
     // free-text box, company/title are the MCP tool — but composing them via AND
@@ -160,7 +170,7 @@ export class ApplicationService {
     }
     if (filters.sameCompanyAs) {
       vacancyFilters.push({
-        company: { in: await sameCompanyNames(this.db, filters.sameCompanyAs) },
+        company: { in: await sameCompanyNames(db, filters.sameCompanyAs) },
       });
     }
     // One clock for the filter and each item's flag, so a row cannot match
@@ -180,7 +190,7 @@ export class ApplicationService {
     const { cursor } = filters;
 
     const [rows, total] = await Promise.all([
-      this.db.vacancy.findMany({
+      db.vacancy.findMany({
         where,
         // The last move first — a fresh application tops the list; a comment or an
         // edit does not reorder. `statusChangedAt` alone is not a total order (a
@@ -191,12 +201,12 @@ export class ApplicationService {
         ...cursorArgs(cursor, limit),
         select: APPLICATION_SELECT,
       }),
-      this.db.vacancy.count({ where }),
+      db.vacancy.count({ where }),
     ]);
 
     const { items, nextCursor } = toCursorPage(rows, cursor, limit);
     const counts = await companyMatchCounts(
-      this.db,
+      db,
       items.map((row) => row.company),
     );
     return {
@@ -217,14 +227,15 @@ export class ApplicationService {
    * caller's: AGENT over MCP, USER over REST. Returns null when no vacancy has this id.
    */
   updateStatus(
+    userId: string,
     id: number,
     status: VacancyStatus,
     note: string | undefined,
     source: CommentSource,
   ): Promise<ApplicationListItem | null> {
-    return this.db.$transaction(async (tx) => {
-      await writeStatus(tx, id, status);
-      return updateRow(tx, id, commentOn(note, source));
+    return forUser(this.db, userId).$transaction(async (db) => {
+      await writeStatus(db, id, status);
+      return updateRow(db, id, commentOn(note, source));
     });
   }
 
@@ -233,10 +244,14 @@ export class ApplicationService {
    * out is untouched; a blank string clears it. A non-blank `comment` adds a USER
    * comment — it edits none. Returns null for an unknown id.
    */
-  update(id: number, input: UpdateApplicationInput): Promise<ApplicationListItem | null> {
+  update(
+    userId: string,
+    id: number,
+    input: UpdateApplicationInput,
+  ): Promise<ApplicationListItem | null> {
     const text = (value: string | null | undefined) =>
       value === undefined ? undefined : value?.trim() || null;
-    return updateRow(this.db, id, {
+    return updateRow(forUser(this.db, userId), id, {
       salaryInApplication: text(input.salaryInApplication),
       usedTailoredResume: input.usedTailoredResume,
       ...commentOn(input.comment, 'USER'),
@@ -249,6 +264,7 @@ export class ApplicationService {
    * for an unknown id.
    */
   async addComment(
+    userId: string,
     id: number,
     body: string,
     source: CommentSource,
@@ -256,7 +272,7 @@ export class ApplicationService {
     if (!body.trim()) {
       throw new InvalidApplicationInputError('`body` must not be blank.');
     }
-    return updateRow(this.db, id, commentOn(body, source));
+    return updateRow(forUser(this.db, userId), id, commentOn(body, source));
   }
 
   /**
@@ -269,6 +285,7 @@ export class ApplicationService {
    * AmbiguousVacancyMatchError for 2+ matches.
    */
   async updateStatusByVacancy(
+    userId: string,
     company: string,
     title: string,
     status: VacancyStatus,
@@ -281,9 +298,9 @@ export class ApplicationService {
       throw new InvalidApplicationInputError('company and title are required');
     }
 
-    const matches = (await findVacancyMatches(this.db, trimmedCompany, trimmedTitle)).filter((m) =>
-      PIPELINE.includes(m.status),
-    );
+    const matches = (
+      await findVacancyMatches(forUser(this.db, userId), trimmedCompany, trimmedTitle)
+    ).filter((m) => PIPELINE.includes(m.status));
     if (matches.length > 1) {
       throw new AmbiguousVacancyMatchError(
         `"${trimmedCompany}" / "${trimmedTitle}" matches ${matches.length} applied vacancies ` +
@@ -294,7 +311,7 @@ export class ApplicationService {
       return null;
     }
 
-    return this.updateStatus(matches[0].id, status, note, source);
+    return this.updateStatus(userId, matches[0].id, status, note, source);
   }
 }
 
@@ -324,7 +341,8 @@ interface ResolvedVacancy {
 }
 
 async function resolveVacancy(
-  db: Db,
+  db: UserTx,
+  userId: string,
   input: RecordApplicationInput,
   at: Date,
 ): Promise<ResolvedVacancy> {
@@ -373,6 +391,7 @@ async function resolveVacancy(
   try {
     const created = await db.vacancy.create({
       data: {
+        userId,
         company,
         title,
         applyUrl,
@@ -400,23 +419,29 @@ async function resolveVacancy(
 }
 
 async function recordWithin(
-  tx: Prisma.TransactionClient,
+  db: UserTx,
+  userId: string,
   input: RecordApplicationInput,
 ): Promise<RecordApplicationResult> {
   const at = new Date();
-  const { vacancy, resolution, vacancyCreated, analysis } = await resolveVacancy(tx, input, at);
+  const { vacancy, resolution, vacancyCreated, analysis } = await resolveVacancy(
+    db,
+    userId,
+    input,
+    at,
+  );
 
   if (PIPELINE.includes(vacancy.status)) {
     throw new AlreadyAppliedError(`Vacancy ${vacancy.id} is already ${vacancy.status}`);
   }
 
   // APPLIED first, so an application recorded further along still has its applied date.
-  await writeStatus(tx, vacancy.id, 'APPLIED', at);
+  await writeStatus(db, vacancy.id, 'APPLIED', at);
   if (input.status && input.status !== 'APPLIED') {
-    await writeStatus(tx, vacancy.id, input.status, at);
+    await writeStatus(db, vacancy.id, input.status, at);
   }
 
-  const row = await tx.vacancy.update({
+  const row = await db.vacancy.update({
     where: { id: vacancy.id },
     data: {
       salaryInApplication: input.salaryInApplication?.trim() || null,

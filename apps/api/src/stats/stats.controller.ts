@@ -1,5 +1,6 @@
 import { StatsService } from '@job-search-copilot/core';
 import { Controller, Get } from '@nestjs/common';
+import { CurrentUserId } from '../auth/api-key.guard';
 
 @Controller('stats')
 export class StatsController {
@@ -7,7 +8,7 @@ export class StatsController {
 
   /** The dashboard's numbers (ADR-0031): the funnel from the journal, the pipeline now. */
   @Get()
-  get() {
-    return this.stats.get();
+  get(@CurrentUserId() userId: string) {
+    return this.stats.get(userId);
   }
 }

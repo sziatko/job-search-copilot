@@ -20,7 +20,11 @@ const ANALYSIS_RULE =
 
 /** Registers the 7 vacancy tools on `server`, backed by `vacancies`. A vacancy's status
  * is set through update_vacancy_status, with the application tools. */
-export function registerVacancyTools(server: McpServer, vacancies: VacancyService): void {
+export function registerVacancyTools(
+  server: McpServer,
+  vacancies: VacancyService,
+  userId: string,
+): void {
   server.registerTool(
     'save_vacancy',
     {
@@ -38,7 +42,7 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       inputSchema: SaveVacancyItemSchema.shape,
     },
     withDomainErrors(async (input) => {
-      const result = await vacancies.save(input);
+      const result = await vacancies.save(userId, input);
       return json({
         success: result.created || result.attached,
         vacancy: ref(result.vacancy),
@@ -60,7 +64,7 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       inputSchema: { vacancies: z.array(SaveVacancyItemSchema).min(1).max(BATCH_MAX) },
     },
     withDomainErrors(async ({ vacancies: items }) => {
-      const { results } = await vacancies.saveMany(items);
+      const { results } = await vacancies.saveMany(userId, items);
       const compact = results.map((r) => ({
         success: r.created || r.attached,
         vacancy: ref(r.vacancy),
@@ -82,7 +86,7 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       inputSchema: SubmitAnalysisItemSchema.shape,
     },
     withDomainErrors(async (input) =>
-      json({ success: true, vacancy: ref(await vacancies.submitAnalysis(input)) }),
+      json({ success: true, vacancy: ref(await vacancies.submitAnalysis(userId, input)) }),
     ),
   );
 
@@ -101,7 +105,7 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       },
     },
     withDomainErrors(async ({ analyses }) => {
-      const rows = await vacancies.submitAnalyses(analyses);
+      const rows = await vacancies.submitAnalyses(userId, analyses);
       return json(rows.map((row) => ({ success: true, vacancy: ref(row) })));
     }),
   );
@@ -117,7 +121,7 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       inputSchema: { id: z.number().int() },
     },
     async ({ id }) => {
-      const vacancy = await vacancies.getById(id);
+      const vacancy = await vacancies.getById(userId, id);
       if (!vacancy) {
         return {
           isError: true,
@@ -141,7 +145,7 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
       inputSchema: { ids: z.array(z.number().int()).min(1).max(ANALYSIS_BATCH_MAX) },
     },
     async ({ ids }) => {
-      const rows = await Promise.all(ids.map((id) => vacancies.getById(id)));
+      const rows = await Promise.all(ids.map((id) => vacancies.getById(userId, id)));
       const missing = ids.filter((_, i) => rows[i] === null);
       return missing.length > 0 ? toolError(`Vacancy ${missing.join(', ')} not found`) : json(rows);
     },
@@ -173,7 +177,7 @@ export function registerVacancyTools(server: McpServer, vacancies: VacancyServic
     },
     async (filters) => {
       // `nextCursor` is the web's (ADR-0030); this tool pages by offset.
-      const { items, total } = await vacancies.list(filters);
+      const { items, total } = await vacancies.list(userId, filters);
       return json({ items, total });
     },
   );

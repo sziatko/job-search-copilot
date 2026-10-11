@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createUser } from '../tests/user';
 import { InvalidIntakeEntryError } from './errors';
 import { getPrisma } from './prisma-client';
 import { VacancyService } from './vacancy.service';
 import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 import { VacancyIntakeService } from './vacancy-intake.service';
+
+/** Every call acts as this test's user (ADR-0038). */
+let userId: string;
+beforeEach(async () => {
+  userId = await createUser();
+});
 
 // Integration tests against the real (test) Postgres — same rationale as
 // vacancy.service.spec.ts.
@@ -59,7 +66,9 @@ describe('the match keys', () => {
 describe('VacancyIntakeService.intake', () => {
   it('creates a NEW vacancy, unanalysed, with its url clean; the raw form is then a duplicate', async () => {
     const raw = 'https://acme.com/jobs/1/?utm_source=x&trk=y#apply';
-    expect(await intake.intake(entry({ url: raw, source: 'justjoin' }))).toEqual({ new: true });
+    expect(await intake.intake(userId, entry({ url: raw, source: 'justjoin' }))).toEqual({
+      new: true,
+    });
 
     const stored = await prisma.vacancy.findFirstOrThrow();
     expect(stored).toMatchObject({
@@ -75,27 +84,28 @@ describe('VacancyIntakeService.intake', () => {
       status: 'NEW',
     });
     expect(await journal(stored.id)).toEqual(['NEW']);
-    expect(await intake.intake(entry({ url: raw }))).toEqual({ new: false });
+    expect(await intake.intake(userId, entry({ url: raw }))).toEqual({ new: false });
     expect(await prisma.vacancy.count()).toBe(1);
   });
 
   it('stores the text when the new entry carries some', async () => {
-    await intake.intake(entry({ fullText: text('The posting.') }));
+    await intake.intake(userId, entry({ fullText: text('The posting.') }));
     expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBe(text('The posting.'));
   });
 
   it('takes text under 200 characters as none, so a later full text still fills it', async () => {
-    await intake.intake(entry({ fullText: `  ${'Sign in'.padEnd(199, '.')}  ` }));
+    await intake.intake(userId, entry({ fullText: `  ${'Sign in'.padEnd(199, '.')}  ` }));
     expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBeNull();
 
-    await intake.intake(entry({ fullText: text('The posting.') }));
+    await intake.intake(userId, entry({ fullText: text('The posting.') }));
     expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBe(text('The posting.'));
   });
 
   it('matches a LinkedIn locale link with slug and ?trk= against the www key', async () => {
-    await intake.intake(entry({ url: 'https://www.linkedin.com/jobs/view/3900000001' }));
+    await intake.intake(userId, entry({ url: 'https://www.linkedin.com/jobs/view/3900000001' }));
     expect(
       await intake.intake(
+        userId,
         entry({
           url: 'https://pl.linkedin.com/jobs/view/senior-engineer-at-globex-3900000001?trk=public_jobs',
           company: 'Other',
@@ -106,22 +116,26 @@ describe('VacancyIntakeService.intake', () => {
   });
 
   it('catches the same role under a new link by company + title, suffix ignored', async () => {
-    await intake.intake(entry({ company: 'Acme Sp. z o.o.' }));
+    await intake.intake(userId, entry({ company: 'Acme Sp. z o.o.' }));
     expect(
-      await intake.intake(entry({ url: 'https://acme.com/jobs/2', company: 'ACME', title: 'dev' })),
+      await intake.intake(
+        userId,
+        entry({ url: 'https://acme.com/jobs/2', company: 'ACME', title: 'dev' }),
+      ),
     ).toEqual({ new: false });
     expect(await prisma.vacancy.count()).toBe(1);
   });
 
   it('on a hit fills only the missing text — never a status, a source or a name', async () => {
-    await intake.intake(entry());
+    await intake.intake(userId, entry());
     const { id } = await prisma.vacancy.findFirstOrThrow();
     await prisma.vacancy.update({ where: { id }, data: { status: 'FILTERED_OUT' } });
 
     await intake.intake(
+      userId,
       entry({ company: 'Other Name', title: 'Other', source: 'linkedin', fullText: text('Text.') }),
     );
-    await intake.intake(entry({ fullText: text('A second text.') }));
+    await intake.intake(userId, entry({ fullText: text('A second text.') }));
 
     expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
       company: 'Acme',
@@ -134,7 +148,7 @@ describe('VacancyIntakeService.intake', () => {
   });
 
   it('finds an analysed vacancy by url or by keys, and leaves it untouched', async () => {
-    const { vacancy } = await new VacancyService().save({
+    const { vacancy } = await new VacancyService().save(userId, {
       company: 'Acme Inc.',
       title: 'Backend Engineer',
       applyUrl: 'https://acme.com/jobs/9',
@@ -144,11 +158,12 @@ describe('VacancyIntakeService.intake', () => {
       estimationComment: 'Strong match.',
     });
 
-    expect(await intake.intake(entry({ url: 'https://acme.com/jobs/9?ref=x' }))).toEqual({
+    expect(await intake.intake(userId, entry({ url: 'https://acme.com/jobs/9?ref=x' }))).toEqual({
       new: false,
     });
     expect(
       await intake.intake(
+        userId,
         entry({
           url: 'https://acme.com/jobs/10',
           title: 'Backend  Engineer',
@@ -172,17 +187,17 @@ describe('VacancyIntakeService.intake', () => {
     [{ company: null }],
     [{ title: '  ' }],
   ])('rejects %j — a vacancy needs all three — and creates nothing', async (overrides) => {
-    await expect(intake.intake(entry(overrides))).rejects.toThrow(InvalidIntakeEntryError);
+    await expect(intake.intake(userId, entry(overrides))).rejects.toThrow(InvalidIntakeEntryError);
     expect(await prisma.vacancy.count()).toBe(0);
   });
 });
 
 describe('VacancyIntakeService.intakeMany', () => {
   it('returns the raw url of each new entry, in order', async () => {
-    await intake.intake(entry());
+    await intake.intake(userId, entry());
     const raw = 'https://acme.com/jobs/2?utm_source=mail';
     expect(
-      await intake.intakeMany([
+      await intake.intakeMany(userId, [
         entry({ url: 'https://acme.com/jobs/1/' }),
         entry({ url: raw, title: 'QA' }),
         entry({ url: 'https://acme.com/jobs/3', title: 'Lead' }),
@@ -192,7 +207,7 @@ describe('VacancyIntakeService.intakeMany', () => {
 
   it('lets a later entry match an earlier one in the same batch', async () => {
     expect(
-      await intake.intakeMany([
+      await intake.intakeMany(userId, [
         entry({ url: 'https://acme.com/jobs/4' }),
         entry({ url: 'https://acme.com/jobs/4#x' }),
       ]),
@@ -201,7 +216,7 @@ describe('VacancyIntakeService.intakeMany', () => {
 
   it('skips entries without a usable url, a company or a title', async () => {
     expect(
-      await intake.intakeMany([
+      await intake.intakeMany(userId, [
         entry({ url: null }),
         entry({ url: 'ftp://acme.com/1' }),
         { url: 'https://acme.com/jobs/6' },

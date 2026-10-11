@@ -20,10 +20,11 @@ pipeline.
 | `id` | `Int` autoincrement | Primary key. Server-assigned; the URI for a row. |
 | `createdAt` | `DateTime @default(now())` | When first saved. |
 | `updatedAt` | `DateTime @default(now()) @updatedAt` | Bumped on any row update — a status, salary or CV change; analysis fields are never updated (analyze-once). Not a semantic date: read `statusChangedAt` or the journal. |
+| `userId` | `String` → `User` | The owner, `onDelete: Cascade`. Every query reaches the row through `forUser` (core), which adds it; `Comment` and `StatusChange` are owned through their vacancy. Leads the list indexes. → [ADR-0038](decisions/0038-multi-user-shared-schema.md) |
 | `company` | `String` | |
 | `title` | `String` | |
-| `applyUrl` | `String @unique` | **The natural key.** The `@unique` constraint is what enforces analyze-once at the DB level. Stored **canonicalized** — `normalizeApplyUrl()` drops the query string, the fragment and a trailing slash, so the spellings one posting arrives in share one row. Exception: a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept. → [ADR-0023](decisions/0023-canonical-applyurl.md) |
-| `companyKey` / `titleKey` | `String?` | Intake's second match: `normalizeCompanyKey` / `normalizeTitleKey` (`vacancy-intake.ts` — lowercase, punctuation collapsed, company legal suffixes stripped). `@@index([companyKey, titleKey])`. Written on every create (intake, `save()`, `record()`); `null` only when the name normalizes to nothing (`—`), and such a row is matched by url only. Not `companyKey()` in `vacancy.service.ts` — ADR-0032's company identity, which also drops places and notes. |
+| `applyUrl` | `String`, `@@unique([userId, applyUrl])` | **The natural key, per user** — two users may track one posting. The unique constraint is what enforces analyze-once at the DB level. Stored **canonicalized** — `normalizeApplyUrl()` drops the query string, the fragment and a trailing slash, so the spellings one posting arrives in share one row. Exception: a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept. → [ADR-0023](decisions/0023-canonical-applyurl.md) |
+| `companyKey` / `titleKey` | `String?` | Intake's second match: `normalizeCompanyKey` / `normalizeTitleKey` (`vacancy-intake.ts` — lowercase, punctuation collapsed, company legal suffixes stripped). `@@index([userId, companyKey, titleKey])`. Written on every create (intake, `save()`, `record()`); `null` only when the name normalizes to nothing (`—`), and such a row is matched by url only. Not `companyKey()` in `vacancy.service.ts` — ADR-0032's company identity, which also drops places and notes. |
 | `source` | `String?` | Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source needs no migration; `null` on rows from `save()`, `record()` and the migrated log. |
 | `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet (intake without text, a placeholder). A list item carries `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
 | `matchScore` | `Int?` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. `null` = not analysed yet. |
@@ -35,8 +36,8 @@ pipeline.
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
 | `statusChanges` | `StatusChange[]` | The journal — see below. |
 
-Indexes: `@@index([recommendation])`, `@@index([status, statusChangedAt])`,
-`@@index([companyKey, titleKey])`, and GIN `gin_trgm_ops` indexes on `company` and
+Indexes: `@@index([userId, recommendation])`, `@@index([userId, status, statusChangedAt])`,
+`@@index([userId, companyKey, titleKey])`, and GIN `gin_trgm_ops` indexes on `company` and
 `title` (see "pg_trgm index" below).
 
 ## Two independent axes: `recommendation` vs `status`
@@ -247,10 +248,10 @@ which takes the row lock — a concurrent analysis waits, then finds the row ana
 then from `NEW` the rule's status through `writeStatus`, then the analysis and its
 `ANALYZER` comment. Any status but `NEW` is left as it is (a pipeline placeholder).
 
-- `save()`: *find by `applyUrl`* — none → create it in `NEW` and write the analysis
+- `save()`: *find by the user's `applyUrl`* — none → create it in `NEW` and write the analysis
   (`created: true`); found without an analysis (intake took it in) → attach this one,
   and `fullText` when the row has none (`attached: true`); found with one → return it
-  untouched (both `false`). The `@unique` constraint is the real guard — a lost race on
+  untouched (both `false`). The `(userId, applyUrl)` unique constraint is the real guard — a lost race on
   `create` (P2002) is caught and re-resolved to the existing row. MCP's `success` is
   `created || attached`; REST answers `201` only for `created`.
 - `submitAnalysis({ id, … })` / `submitAnalyses([...])` (≤ `ANALYSIS_BATCH_MAX` = 10,

@@ -1,5 +1,6 @@
 import type { PrismaClient, VacancyStatus } from '@prisma/client';
 import { ApplicationService } from '../application.service';
+import { forUser } from '../for-user';
 import { PIPELINE_STATUSES, statusAfterAnalysis } from '../status';
 import { VacancyService } from '../vacancy.service';
 import { ANALYSIS_BATCH_MAX } from '../vacancy.types';
@@ -13,23 +14,26 @@ const MINUTE = 60_000;
 const DISPOSABLE_DB = /_(e2e|test|demo)$/;
 
 /**
- * Makes the database the seed (ADR-0037): deletes every vacancy, then writes
- * SEED_VACANCIES through the services, so the journal and the comments are the ones the
- * app itself writes. Users and sessions are left alone. Then every date is moved back
+ * Makes `userId`'s data the seed (ADR-0037): deletes that user's vacancies, then writes
+ * SEED_VACANCIES through the services as that user, so the journal and the comments are
+ * the ones the app itself writes. Users, sessions and other users' vacancies are left
+ * alone. Then every date is moved back
  * relative to now — the last move `daysAgo` days ago, one day per earlier step — so the
  * timeout rule gives the same answer on every run. Refuses, before any write, a database
  * whose name (asked of the connection itself) does not end in `_e2e`, `_test` or `_demo`.
  */
-export async function resetToSeed(prisma: PrismaClient): Promise<void> {
+export async function resetToSeed(prisma: PrismaClient, userId: string): Promise<void> {
   const [{ name }] = await prisma.$queryRaw<{ name: string }[]>`SELECT current_database() AS name`;
   if (!DISPOSABLE_DB.test(name)) {
     throw new Error(`resetToSeed refuses "${name}": only a *_e2e, *_test or *_demo database`);
   }
 
-  await prisma.vacancy.deleteMany();
+  const db = forUser(prisma, userId);
+  await db.vacancy.deleteMany();
   const vacancies = new VacancyService(prisma);
   const applications = new ApplicationService(prisma);
   await new VacancyIntakeService(prisma).intakeMany(
+    userId,
     SEED_VACANCIES.map((v) => ({
       url: v.applyUrl,
       company: v.company,
@@ -39,7 +43,7 @@ export async function resetToSeed(prisma: PrismaClient): Promise<void> {
     })),
   );
   // Created in seed order on an emptied table, so ids follow it.
-  const ids = (await prisma.vacancy.findMany({ orderBy: { id: 'asc' }, select: { id: true } })).map(
+  const ids = (await db.vacancy.findMany({ orderBy: { id: 'asc' }, select: { id: true } })).map(
     (row) => row.id,
   );
 
@@ -55,6 +59,7 @@ export async function resetToSeed(prisma: PrismaClient): Promise<void> {
   for (let start = 0; start < analysed.length; start += ANALYSIS_BATCH_MAX) {
     const batch = analysed.slice(start, start + ANALYSIS_BATCH_MAX);
     await vacancies.submitAnalyses(
+      userId,
       batch.map(({ i, comment, ...analysis }) => ({
         id: ids[i],
         ...analysis,
@@ -69,30 +74,31 @@ export async function resetToSeed(prisma: PrismaClient): Promise<void> {
   for (const [i, v] of SEED_VACANCIES.entries()) {
     for (const { to, note } of v.moves) {
       if (to === 'APPLIED') {
-        await applications.record({
+        await applications.record(userId, {
           vacancyId: ids[i],
           salaryInApplication: v.salary,
           usedTailoredResume: v.tailored,
           comment: note,
         });
       } else if ((PIPELINE_STATUSES as readonly VacancyStatus[]).includes(to)) {
-        await applications.updateStatus(ids[i], to, note, 'AGENT');
+        await applications.updateStatus(userId, ids[i], to, note, 'AGENT');
       } else {
-        await vacancies.updateStatus(ids[i], to, note);
+        await vacancies.updateStatus(userId, ids[i], to, note);
       }
       record(i, to, note);
     }
   }
 
   const [changes, comments] = await Promise.all([
-    prisma.statusChange.findMany({ orderBy: { id: 'asc' }, select: { id: true, vacancyId: true } }),
-    prisma.comment.findMany({ orderBy: { id: 'asc' }, select: { id: true, vacancyId: true } }),
+    db.statusChange.findMany({ orderBy: { id: 'asc' }, select: { id: true, vacancyId: true } }),
+    db.comment.findMany({ orderBy: { id: 'asc' }, select: { id: true, vacancyId: true } }),
   ]);
   const byVacancy = (rows: { id: number; vacancyId: number }[], vacancyId: number) =>
     rows.filter((row) => row.vacancyId === vacancyId).map((row) => row.id);
 
   // The new dates, as (ids, dates) column pairs: three UPDATEs instead of one per row
-  // (about 700, seconds against Docker on Windows).
+  // (about 700, seconds against Docker on Windows). Raw SQL is outside forUser: the ids
+  // were read through it, and the Vacancy UPDATE checks the owner as well.
   const now = Date.now();
   const dated = {
     change: { ids: [] as number[], at: [] as string[] },
@@ -126,6 +132,6 @@ export async function resetToSeed(prisma: PrismaClient): Promise<void> {
     prisma.$executeRaw`UPDATE "Vacancy" AS t SET "createdAt" = d.c, "statusChangedAt" = d.m
       FROM unnest(${vacancy.ids}::int[], ${vacancy.createdAt}::timestamp(3)[],
         ${vacancy.movedAt}::timestamp(3)[]) AS d(id, c, m)
-      WHERE t.id = d.id`,
+      WHERE t.id = d.id AND t."userId" = ${userId}`,
   ]);
 }

@@ -16,19 +16,23 @@ describe('Auth (e2e)', () => {
   const prisma = getPrisma();
   const analysis = { matchScore: 30, recommendation: 'SKIP', estimationComment: 'Backend.' };
 
-  /** What /profile's "Create" does: a key for a new user, shown once. */
+  /** What /profile's "Create" does: a key for a new user, shown once; `userId` its owner. */
   async function createKey() {
     const user = await prisma.user.create({
       data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
     });
     const auth = app.get<AuthService<Auth>>(AuthService);
     const created = await auth.api.createApiKey({ body: { name: 'n8n', userId: user.id } });
-    return { key: created.key, id: created.id };
+    return { key: created.key, id: created.id, userId: user.id };
   }
 
-  async function queued(url: string): Promise<number> {
-    await new VacancyIntakeService(prisma).intake({ url, company: 'Queued Co', title: url });
-    return (await prisma.vacancy.findUniqueOrThrow({ where: { applyUrl: url } })).id;
+  async function queued(userId: string, url: string): Promise<number> {
+    await new VacancyIntakeService(prisma).intake(userId, {
+      url,
+      company: 'Queued Co',
+      title: url,
+    });
+    return (await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
   }
 
   beforeAll(async () => {
@@ -50,7 +54,7 @@ describe('Auth (e2e)', () => {
       const server = app.getHttpServer();
       await request(server).get('/api/v1/vacancies').expect(401);
 
-      const cookie = await signIn(app);
+      const { cookie } = await signIn(app);
       await request(server).get('/api/v1/vacancies').set('Cookie', `${cookie}x`).expect(401);
       await request(server).get('/api/v1/vacancies').set('Cookie', cookie).expect(200);
     });
@@ -65,7 +69,8 @@ describe('Auth (e2e)', () => {
   });
 
   describe('an API key, on the three n8n routes', () => {
-    const routes: [string, () => Promise<[string, object]>][] = [
+    /** [route, (the key owner's id) → [path, body]]: the owner's vacancies, so 200. */
+    const routes: [string, (userId: string) => Promise<[string, object]>][] = [
       [
         'POST /vacancies/intake',
         async () => [
@@ -75,16 +80,16 @@ describe('Auth (e2e)', () => {
       ],
       [
         'POST /vacancies/:id/analysis',
-        async () => [
-          `/api/v1/vacancies/${await queued('https://acme.com/q/1')}/analysis`,
+        async (userId) => [
+          `/api/v1/vacancies/${await queued(userId, 'https://acme.com/q/1')}/analysis`,
           analysis,
         ],
       ],
       [
         'POST /vacancies/analysis',
-        async () => [
+        async (userId) => [
           '/api/v1/vacancies/analysis',
-          { analyses: [{ id: await queued('https://acme.com/q/2'), ...analysis }] },
+          { analyses: [{ id: await queued(userId, 'https://acme.com/q/2'), ...analysis }] },
         ],
       ],
     ];
@@ -92,10 +97,10 @@ describe('Auth (e2e)', () => {
     it.each(routes)(
       '%s: 401 with no key, a bad or revoked one; 200 with a key',
       async (_, setup) => {
-        const { key } = await createKey();
+        const { key, userId } = await createKey();
         const revoked = await createKey();
         await prisma.apikey.delete({ where: { id: revoked.id } }); // what Revoke does
-        const [path, body] = await setup();
+        const [path, body] = await setup(userId);
         const post = () => request(app.getHttpServer()).post(path).send(body);
 
         await post().expect(401);
@@ -109,15 +114,15 @@ describe('Auth (e2e)', () => {
     it('lets a session through too', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/vacancies/intake')
-        .set('Cookie', await signIn(app))
+        .set('Cookie', (await signIn(app)).cookie)
         .send({ entries: [{ url: 'https://acme.com/jobs/2', company: 'Acme', title: 'Dev' }] })
         .expect(200);
     });
   });
 
   describe('@CurrentUserId()', () => {
-    // Nest keeps a param decorator's factory in the route's metadata; no route uses it
-    // until the services take a user (phase 7 step 3a).
+    // Nest keeps a param decorator's factory in the route's metadata: resolved here on a
+    // probe, for the branches the routes' tests do not each reach.
     class Probe {
       handler(@CurrentUserId() _userId: string) {}
     }

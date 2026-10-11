@@ -14,9 +14,13 @@ model Vacancy {
   id                  Int             @id @default(autoincrement())
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @default(now()) @updatedAt
+  // The owner (ADR-0038): every query reaches this table through `forUser`, which adds it.
+  userId              String
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   company             String
   title               String
-  applyUrl            String          @unique
+  // Unique per user (`@@unique` below), not globally: two users may track one posting.
+  applyUrl            String
   // Intake's second match (ADR-0033): normalizeCompanyKey / normalizeTitleKey
   // (vacancy-intake.ts) — not vacancy.service's `companyKey()`, ADR-0032's company
   // identity. Null only when the name normalizes to nothing (`—`).
@@ -46,9 +50,10 @@ model Vacancy {
   // Every status the vacancy has been in, with its date.
   statusChanges StatusChange[]
 
-  @@index([recommendation])
-  @@index([status, statusChangedAt])
-  @@index([companyKey, titleKey])
+  @@unique([userId, applyUrl])
+  @@index([userId, recommendation])
+  @@index([userId, status, statusChangedAt])
+  @@index([userId, companyKey, titleKey])
   @@index([company(ops: raw("gin_trgm_ops"))], type: Gin)
   // /applications searches company OR title as ILIKE '%term%' — same reason company has
   // a trigram GIN index, title needs one too.
@@ -134,6 +139,7 @@ model User {
   oauthaccesstokens  OauthAccessToken[]
   oauthconsents      OauthConsent[]
   apikeys            Apikey[]
+  vacancies          Vacancy[]
 
   @@unique([email])
 }

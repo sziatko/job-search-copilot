@@ -17,7 +17,7 @@ import {
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Response } from 'express';
-import { ApiKeyGuard } from '../auth/api-key.guard';
+import { ApiKeyGuard, CurrentUserId } from '../auth/api-key.guard';
 import { IntakeVacanciesDto } from './dto/intake-vacancies.dto';
 import { ListVacanciesQueryDto } from './dto/list-vacancies.dto';
 import { SaveVacancyDto } from './dto/save-vacancy.dto';
@@ -39,8 +39,12 @@ export class VacanciesController {
    * client-known URI to PUT to.
    */
   @Post()
-  async save(@Body() dto: SaveVacancyDto, @Res({ passthrough: true }) res: Response) {
-    const { created, vacancy } = await this.vacancies.save(dto);
+  async save(
+    @CurrentUserId() userId: string,
+    @Body() dto: SaveVacancyDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { created, vacancy } = await this.vacancies.save(userId, dto);
     if (created) {
       res.status(201);
       res.setHeader('Location', `/api/v1/vacancies/${vacancy.id}`);
@@ -60,8 +64,8 @@ export class VacanciesController {
   @UseGuards(ApiKeyGuard)
   @ApiBearerAuth()
   @HttpCode(200)
-  intake(@Body() dto: IntakeVacanciesDto) {
-    return this.intakeService.intakeMany(dto.entries);
+  intake(@CurrentUserId() userId: string, @Body() dto: IntakeVacanciesDto) {
+    return this.intakeService.intakeMany(userId, dto.entries);
   }
 
   /**
@@ -74,8 +78,12 @@ export class VacanciesController {
   @UseGuards(ApiKeyGuard)
   @ApiBearerAuth()
   @HttpCode(200)
-  submitAnalysis(@Param('id', ParseIntPipe) id: number, @Body() dto: SubmitAnalysisDto) {
-    return this.vacancies.submitAnalysis({ id, ...dto });
+  submitAnalysis(
+    @CurrentUserId() userId: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SubmitAnalysisDto,
+  ) {
+    return this.vacancies.submitAnalysis(userId, { id, ...dto });
   }
 
   /** Up to ANALYSIS_BATCH_MAX analyses, all or none → 200 and the rows, in order. */
@@ -84,22 +92,22 @@ export class VacanciesController {
   @UseGuards(ApiKeyGuard)
   @ApiBearerAuth()
   @HttpCode(200)
-  submitAnalyses(@Body() dto: SubmitAnalysesDto) {
-    return this.vacancies.submitAnalyses(dto.analyses);
+  submitAnalyses(@CurrentUserId() userId: string, @Body() dto: SubmitAnalysesDto) {
+    return this.vacancies.submitAnalyses(userId, dto.analyses);
   }
 
   /** `{ items, total, nextCursor }`; paged by `offset` or `cursor`, not both (ADR-0030). */
   @Get()
-  list(@Query() query: ListVacanciesQueryDto) {
+  list(@CurrentUserId() userId: string, @Query() query: ListVacanciesQueryDto) {
     if (query.cursor !== undefined && query.offset !== undefined) {
       throw new BadRequestException('cursor and offset cannot be combined');
     }
-    return this.vacancies.list(query);
+    return this.vacancies.list(userId, query);
   }
 
   @Get(':id')
-  async getById(@Param('id', ParseIntPipe) id: number) {
-    const vacancy = await this.vacancies.getById(id);
+  async getById(@CurrentUserId() userId: string, @Param('id', ParseIntPipe) id: number) {
+    const vacancy = await this.vacancies.getById(userId, id);
     if (!vacancy) {
       throw new NotFoundException(`Vacancy ${id} not found`);
     }
@@ -107,8 +115,12 @@ export class VacanciesController {
   }
 
   @Patch(':id/status')
-  async updateStatus(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateVacancyStatusDto) {
-    const vacancy = await this.vacancies.updateStatus(id, dto.status, dto.comment);
+  async updateStatus(
+    @CurrentUserId() userId: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateVacancyStatusDto,
+  ) {
+    const vacancy = await this.vacancies.updateStatus(userId, id, dto.status, dto.comment);
     if (!vacancy) {
       throw new NotFoundException(`Vacancy ${id} not found`);
     }

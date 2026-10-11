@@ -81,7 +81,7 @@ describe('OAuth authorization server (e2e)', () => {
   it('issues a JWT for the MCP resource after sign-in and consent (code + PKCE)', async () => {
     const server = app.getHttpServer();
     const { client_id } = await register();
-    const cookie = await signIn(app);
+    const { cookie } = await signIn(app);
     const verifier = randomBytes(32).toString('base64url');
     const challenge = createHash('sha256').update(verifier).digest('base64url');
 
