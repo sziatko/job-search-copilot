@@ -66,8 +66,11 @@ MCP Inspector with transport *Streamable HTTP* and that URL.
 
 **API keys** ([ADR-0039](docs/decisions/0039-api-keys-per-user.md)) — create one on
 `/profile`; it is shown once. The stdio MCP acts as the key's owner and refuses to boot
-without a valid one: `JSC_API_KEY=jsc_…` in `.env`, or in the `env` of Claude Desktop's
-stdio server config. A client without OAuth reaches the HTTP MCP with
+without a valid one: `JSC_API_KEY=jsc_…` in the repo-root `.env` (mounted into the `mcp`
+container; `apps/mcp/src/env.ts` loads it). The `env` of Claude Desktop's stdio server
+config alone does not reach it: that config runs `docker exec`, so its `env` is set on
+the host's `docker` process, not inside the container — to keep the key there, add
+`-e JSC_API_KEY` to the `docker exec` arguments, which passes it through. A client without OAuth reaches the HTTP MCP with
 `Authorization: Bearer jsc_…` (`mcp-remote --header`). n8n's credential, the same
 header on the intake and analysis routes, holds a key too: intake fails between the
 deploy that dropped `INTAKE_TOKEN` and the swap.
@@ -75,7 +78,10 @@ deploy that dropped `INTAKE_TOKEN` and the swap.
 > After changing dependencies or `packages/core/prisma/schema.prisma`, the
 > containers' `node_modules` / generated client go stale — re-run
 > `docker compose exec <svc> npm install` / `npm run generate`, or
-> `docker compose up -d --build`.
+> `docker compose up -d --build`. Each service has its own `node_modules`, so a new
+> dependency needs `npm install` in every service that uses it — one added to `core`
+> means `core`, `api`, `mcp`, `mcp-http` and `web` — then
+> `docker compose restart` of the same services.
 
 ## Scripts (repo root)
 

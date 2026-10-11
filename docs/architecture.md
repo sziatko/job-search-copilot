@@ -195,7 +195,7 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 9. **Every REST route is closed by default** (phase 6, from step 2). A global guard
    wants a session; anonymous access is explicit (`@AllowAnonymous()`, `/health` only),
    machine access is explicit (`ApiKeyGuard`, the three n8n routes only).
-   `Vacancy` has no owner, so an anonymous route exposes all the data.
+   An anonymous route has no user to scope its queries to (invariant 11).
    → [ADR-0034](decisions/0034-auth-better-auth-in-core.md),
    [ADR-0039](decisions/0039-api-keys-per-user.md)
 10. **No real job-search data in the repo.** The repo is public; the dev DB holds the

@@ -89,8 +89,8 @@ carried to where step 3a will use it.
 - Tests: api `auth.e2e.spec.ts` for keys (valid, revoked, none, a key on a REST read
   route → 401); mcp `http-app.spec.ts` (a key gets past `requireBearerAuth`, a bad key
   401, a JWT still works). README: the n8n credential is a key from `/profile` (intake
-  fails between the deploy and the swap — acceptable); Claude Desktop's stdio config
-  gets `JSC_API_KEY`.
+  fails between the deploy and the swap — acceptable); the stdio MCP gets `JSC_API_KEY`
+  (in `.env`: Claude Desktop's config `env` stops at the host's `docker exec`).
 
 **3a · Core: data belongs to a user.**
 - Schema: `Vacancy.userId` → `User` (`onDelete: Cascade`); `@@unique([userId, applyUrl])`
@@ -125,7 +125,8 @@ shows the counts it showed before, stdio with the key lists the same vacancies.
 `contracts.md` (MCP auth, the machine routes); the backlog's Public demo row (the demo
 user's `userId`); the Multi-user row → the archive. The full `npm test` and the full
 `npm run test:e2e` before the PR. For the user, not code: create a key on `/profile`,
-put it in n8n's credential and Claude Desktop's stdio env.
+put it in n8n's credential and in `.env`'s `JSC_API_KEY` for the stdio MCP (or Claude
+Desktop's config `env` plus `-e JSC_API_KEY` in its `docker exec` arguments).
 
 ## Status
 
@@ -159,4 +160,5 @@ put it in n8n's credential and Claude Desktop's stdio env.
   because it needs a key from `/profile`, which is step 4's user action. The new
   `@better-auth/api-key` dependency needed `npm install` inside every container
   (`core api mcp mcp-http web`), and only then the restart.
-- [ ] **4 · Close-out.**
+- [x] **4 · Close-out.** — *2026-10-11.* Left for the user: a key from `/profile` into
+  n8n's credential and `.env`'s `JSC_API_KEY`, then the stdio check 3b skipped.

@@ -28,8 +28,16 @@ a session cookie, else `401`; Better Auth serves `/api/auth/*`. Two exceptions:
 `/health` is anonymous; `POST /vacancies/intake`, `POST /vacancies/analysis` and
 `POST /vacancies/:id/analysis` also take `Authorization: Bearer jsc_…`, an API key
 from `/profile` ([ADR-0039](decisions/0039-api-keys-per-user.md)) — n8n's credentials hold that
-header, so renaming it or its scheme breaks them. Swagger (`/api/docs`) is outside
+header, so renaming it or its scheme breaks them. A key opens only those three: on any
+other route it is a `401`. Swagger (`/api/docs`) is outside
 Nest's router, so the guard does not see it: it stays open.
+
+**Every route acts as one user** ([ADR-0038](decisions/0038-multi-user-shared-schema.md),
+invariant 11) — the session's, or the key's owner. It reads and writes only that
+user's vacancies (their comments and status journal with them), `/stats` included;
+another user's id is a `404`, as an unknown one, never a `403`. An intake with a key
+lands in the key's owner; the duplicate check (`applyUrl`, else company + title) looks
+only at that user's rows, so two users can hold the same posting.
 
 Browse and try it: Swagger UI at `/api/docs`, the OpenAPI document at `/api/docs-json`
 (`@nestjs/swagger`; requests only, responses are untyped). The request fields come
@@ -176,13 +184,17 @@ server on stdio) — it shows what `tools/list` returns, so it is always the rea
 `apps/mcp/src/http.ts` (`npm run dev:mcp:http`, port `MCP_HTTP_PORT`, 3001) serves the
 same tools as Streamable HTTP at `MCP_PUBLIC_URL`'s path (`/mcp`), to an OAuth token or
 an API key (`Bearer jsc_…`, [ADR-0039](decisions/0039-api-keys-per-user.md)); stdio acts
-as the owner of `JSC_API_KEY`, verified at boot.
+as the owner of `JSC_API_KEY`, verified at boot (an invalid key → the process exits with
+an error). Either way the tools see only that user's data: another user's id is
+"not found", as over REST.
 
 - `GET /.well-known/oauth-protected-resource/mcp` (RFC 9728, path-inserted) →
   `{ resource: MCP_PUBLIC_URL, authorization_servers: ["${BETTER_AUTH_URL}/api/auth"],
   bearer_methods_supported: ["header"] }`. The authorization server's own metadata is
   the API's (`/.well-known/oauth-authorization-server/api/auth`).
-- `POST /mcp` wants `Authorization: Bearer <access token>`: a JWT the API's
+- `POST /mcp` wants `Authorization: Bearer <access token>`. A `jsc_…` bearer is an API
+  key, checked against the database (`verifyApiKey`); its owner is the user, and an
+  invalid or revoked key is a `401` as below. Anything else is a JWT the API's
   `oauthProvider` signed (`typ: at+jwt`), checked against the API's JWKS
   (`${AUTH_URL}/api/auth/jwks`, cached) for `iss` = `${BETTER_AUTH_URL}/api/auth`,
   `aud` ∋ `MCP_PUBLIC_URL`, `exp`. No token, or a bad one → `401` with

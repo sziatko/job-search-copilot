@@ -57,7 +57,8 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
     databaseHooks: {
       user: {
         create: {
-          // Stopgap until `Vacancy` has a `userId`: any account sees all the data.
+          // No open sign-up: a new account is someone added to the allowlist; it starts
+          // with no data of its own (ADR-0038).
           before: async (user) => {
             if (!allowed.has(user.email.toLowerCase())) {
               throw new APIError('FORBIDDEN', { message: 'This email may not sign up' });
