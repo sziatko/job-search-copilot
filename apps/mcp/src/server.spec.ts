@@ -13,8 +13,8 @@ const userId = randomUUID();
 // Connects a real MCP Client to createServer() over an in-memory transport pair
 // (the SDK's own recommended way to test a server) instead of spawning stdio —
 // exercises the actual registerTool handlers, input schemas, and error shapes.
-async function connectedClient() {
-  const server = createServer({ userId });
+async function connectedClient(as = userId) {
+  const server = createServer({ userId: as });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test-client', version: '0.0.0' });
   await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -991,5 +991,20 @@ describe('job-search-copilot MCP server', () => {
       },
     });
     expect(oversized.isError).toBe(true);
+  });
+
+  it("a server for another user does not see this user's vacancy", async () => {
+    const id = await queued('https://acme.com/jobs/mine');
+    const other = randomUUID();
+    await prisma.user.create({ data: { id: other, name: 'Other', email: `${other}@example.com` } });
+    try {
+      const client = await connectedClient(other);
+      const list = await client.callTool({ name: 'list_vacancies', arguments: {} });
+      expect(JSON.parse(textOf(list)).total).toBe(0);
+      const got = await client.callTool({ name: 'get_vacancy', arguments: { id } });
+      expect(got.isError).toBe(true);
+    } finally {
+      await prisma.user.delete({ where: { id: other } });
+    }
   });
 });

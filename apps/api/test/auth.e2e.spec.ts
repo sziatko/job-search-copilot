@@ -1,13 +1,11 @@
-import { randomUUID } from 'node:crypto';
-import { type Auth, getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
+import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
 import { type ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { AuthService } from '@thallesp/nestjs-better-auth';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { CurrentUserId } from '../src/auth/api-key.guard';
-import { createTestApp, signIn } from './test-app';
+import { createApiKey, createTestApp, signIn } from './test-app';
 
 // Every route is closed by default (ADR-0034); n8n's three are open to an API key too
 // (ADR-0039). /health's anonymity is health.e2e.spec.ts's.
@@ -16,15 +14,7 @@ describe('Auth (e2e)', () => {
   const prisma = getPrisma();
   const analysis = { matchScore: 30, recommendation: 'SKIP', estimationComment: 'Backend.' };
 
-  /** What /profile's "Create" does: a key for a new user, shown once; `userId` its owner. */
-  async function createKey() {
-    const user = await prisma.user.create({
-      data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
-    });
-    const auth = app.get<AuthService<Auth>>(AuthService);
-    const created = await auth.api.createApiKey({ body: { name: 'n8n', userId: user.id } });
-    return { key: created.key, id: created.id, userId: user.id };
-  }
+  const createKey = () => createApiKey(app);
 
   async function queued(userId: string, url: string): Promise<number> {
     await new VacancyIntakeService(prisma).intake(userId, {

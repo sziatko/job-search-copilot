@@ -153,5 +153,10 @@ put it in n8n's credential and Claude Desktop's stdio env.
   Test helpers for 3b: core `tests/user.ts` `createUser()`; api `signIn()` returns
   `{ cookie, userId }` and `signedInAgent(app).userId`; mcp `server.spec.ts` acts as
   a real module-level user.
-- [ ] **3b · Isolation end to end.**
+- [x] **3b · Isolation end to end.** — *2026-10-11.* Dev DB migrated (one user, every
+  vacancy backfilled to it, status counts unchanged); the owner's stats and list read
+  through core match the counts from before the migration. Not run: stdio with a real key,
+  because it needs a key from `/profile`, which is step 4's user action. The new
+  `@better-auth/api-key` dependency needed `npm install` inside every container
+  (`core api mcp mcp-http web`), and only then the restart.
 - [ ] **4 · Close-out.**

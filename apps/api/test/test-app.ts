@@ -43,3 +43,13 @@ export async function signedInAgent(app: NestExpressApplication) {
 }
 
 export type Api = Awaited<ReturnType<typeof signedInAgent>>;
+
+/** What /profile's "Create" does: a key for a new user, shown once; `userId` its owner. */
+export async function createApiKey(app: NestExpressApplication) {
+  const user = await getPrisma().user.create({
+    data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
+  });
+  const auth = app.get<AuthService<Auth>>(AuthService);
+  const created = await auth.api.createApiKey({ body: { name: 'n8n', userId: user.id } });
+  return { key: created.key, id: created.id, userId: user.id };
+}
