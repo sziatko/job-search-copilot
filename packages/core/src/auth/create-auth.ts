@@ -1,3 +1,4 @@
+import { apiKey } from '@better-auth/api-key';
 import { DEFAULT_OAUTH_SCOPES, oauthProvider } from '@better-auth/oauth-provider';
 import { passkey } from '@better-auth/passkey';
 import type { PrismaClient } from '@prisma/client';
@@ -5,6 +6,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { APIError } from 'better-auth/api';
 import { jwt } from 'better-auth/plugins';
+import { API_KEY_OPTIONS } from './api-key';
 
 /**
  * What `createAuth` needs, already validated. `core` reads no env (invariant 8): the app
@@ -87,6 +89,9 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
         resources: [{ identifier: config.mcpUrl, allowedScopes: [...DEFAULT_OAUTH_SCOPES] }],
         clientRegistrationDefaultResources: [config.mcpUrl],
       }),
+      // Per-user keys for n8n and MCP (ADR-0039), managed on the web's /profile.
+      // `enableSessionForAPIKeys` stays off: on, a key would open every REST route.
+      apiKey(API_KEY_OPTIONS),
     ],
   });
 }

@@ -129,7 +129,12 @@ put it in n8n's credential and Claude Desktop's stdio env.
 - [x] **0 · Docs.** This doc, its row in `docs/README.md`, ADR-0038 and ADR-0039,
   ADR-0035's stdio line, invariant 11, the backlog's Multi-user row
   `planned (phase 7)`, phase 6's auth row archived. — *2026-10-11.* Docs only.
-- [ ] **1 · API keys exist.**
+- [x] **1 · API keys exist.** — *2026-10-11.* The dev DB is not migrated: the API keys
+  card fails there until `npm run migrate:dev` (migration `20261011120000_api_key`).
+  `Apikey.referenceId` got a foreign key to `User` (cascade), which the plugin does not
+  declare. Revoke is the plugin's delete, not `enabled: false`. The verifier logs a
+  Better Auth `ERROR` for every rejected key and a "Base URL is not set" `WARN` once —
+  noise, not failures.
 - [ ] **2 · Every entry knows its user.**
 - [ ] **3a · Core: data belongs to a user.**
 - [ ] **3b · Isolation end to end.**

@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { handleOAuthUserInfo } from 'better-auth/oauth2';
 import { describe, expect, it } from 'vitest';
 import { getPrisma } from '../prisma-client';
+import { verifyApiKey } from './api-key';
 import { createAuth } from './create-auth';
 
 const prisma = getPrisma();
@@ -60,4 +62,59 @@ describe('createAuth', () => {
     expect(result.error).toBe('account not linked');
     expect(await prisma.account.count()).toBe(1);
   });
+});
+
+describe('API keys', () => {
+  // What /profile's "Create" does, as the signed-in user; the key comes back once.
+  async function createKey() {
+    const { user } = await signUpWithGoogle('me@example.com');
+    const created = await auth.api.createApiKey({ body: { name: 'n8n', userId: user.id } });
+    return { userId: user.id, key: created.key, id: created.id };
+  }
+
+  it('issues a jsc_ key, stored hashed, that verifies to its owner', async () => {
+    const { userId, key, id } = await createKey();
+    expect(key).toMatch(/^jsc_/);
+    const row = await prisma.apikey.findUniqueOrThrow({ where: { id } });
+    expect(row.key).not.toBe(key);
+    expect(row.rateLimitEnabled).toBe(false);
+
+    expect(await verifyApiKey(prisma, key)).toBe(userId);
+    expect(await verifyApiKey(prisma, key)).toBe(userId);
+    const used = await prisma.apikey.findUniqueOrThrow({ where: { id } });
+    expect(used.lastRequest).toBeInstanceOf(Date);
+  });
+
+  it('verifies a revoked key, and garbage, to null', async () => {
+    const { key, id } = await createKey();
+    await prisma.apikey.delete({ where: { id } });
+    expect(await verifyApiKey(prisma, key)).toBeNull();
+    expect(await verifyApiKey(prisma, 'jsc_not-a-key')).toBeNull();
+    expect(await verifyApiKey(prisma, '')).toBeNull();
+  });
+
+  // Better Auth reads NODE_ENV once, when it loads, and refuses production without a
+  // secret — so a process of its own: the MCP's env carries no BETTER_AUTH_SECRET.
+  it('boots with NODE_ENV=production and no auth env', () => {
+    const script = `
+      const { verifyApiKey } = await import('./src/auth/api-key.ts');
+      const { createPrismaClient } = await import('./src/prisma-client.ts');
+      const db = createPrismaClient(process.env.DATABASE_URL);
+      process.stdout.write(String(await verifyApiKey(db, 'jsc_not-a-key')));
+      await db.$disconnect();`;
+    const out = execFileSync(
+      process.execPath,
+      ['--import', 'tsx', '--input-type=module', '-e', script],
+      {
+        cwd: new URL('../..', import.meta.url),
+        env: {
+          PATH: process.env.PATH,
+          DATABASE_URL: process.env.DATABASE_URL,
+          NODE_ENV: 'production',
+        },
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    );
+    expect(out.toString()).toBe('null');
+  }, 30_000); // a cold tsx start, ~7 s
 });
