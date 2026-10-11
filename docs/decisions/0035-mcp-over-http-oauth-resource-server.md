@@ -18,7 +18,8 @@ Streamable HTTP over the same `createServer()`, serving
 `/.well-known/oauth-protected-resource`, answering an unauthenticated call with
 `401` + `WWW-Authenticate: Bearer resource_metadata=…`, and verifying the JWT access
 token against the API's JWKS (audience = the MCP URL). `src/index.ts` (stdio) stays,
-with no auth.
+with no auth. *Amended in phase 7 ([ADR-0039](0039-api-keys-per-user.md)): stdio needs
+`JSC_API_KEY` for its user, and the HTTP MCP also takes an API key as the bearer.*
 
 ## Why this and not the alternatives
 - **HTTP only** — one path, but Claude Desktop would go through OAuth for a server on
@@ -38,12 +39,12 @@ with no auth.
 ## What this constrains — breaks if you change it
 - `MCP_PUBLIC_URL` is the token audience and the `resource` in the metadata; it must
   match the URL clients call, or every token is refused.
-- The stdio entrypoint has no auth: it must never be exposed over a network (no
-  wrapping it in a socket or `supergateway`).
+- The stdio entrypoint's key is identity, not auth ([ADR-0039](0039-api-keys-per-user.md)):
+  it must never be exposed over a network (no wrapping it in a socket or `supergateway`).
 - Both entrypoints share `createServer()`; a tool registered only in one diverges
   ([ADR-0010](0010-mcp-server-factory.md)).
 - Rotating the JWKS key invalidates every outstanding MCP token.
 
 ## Related
 [ADR-0004](0004-one-service-two-transports.md), [ADR-0010](0010-mcp-server-factory.md),
-[ADR-0034](0034-auth-better-auth-in-core.md), [`../phases/phase-6.md`](../phases/phase-6.md).
+[ADR-0034](0034-auth-better-auth-in-core.md), [ADR-0039](0039-api-keys-per-user.md), [`../phases/phase-6.md`](../phases/phase-6.md).

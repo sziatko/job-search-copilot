@@ -204,6 +204,13 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
     copied from the dev DB, a log or a mailbox. Git keeps what was ever committed, so a
     leak means rewriting history. The owner's personal skills, which do hold real data,
     live in a separate private repo cloned into the gitignored `skills/`.
+11. **Every domain query is scoped to its user** (phase 7, from step 3a). `Vacancy`
+    has a `userId`; core's services take it as their first argument and query only
+    through `forUser(db, userId)`, which adds the owner to every `Vacancy`, `Comment`
+    and `StatusChange` query. A query on the raw client reads every user's rows; another
+    user's row answers like a missing one (404, never 403).
+    → [ADR-0038](decisions/0038-multi-user-shared-schema.md),
+    [ADR-0039](decisions/0039-api-keys-per-user.md)
 
 ## Stack
 

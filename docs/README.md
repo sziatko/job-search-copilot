@@ -29,6 +29,7 @@ and *what a change here breaks over there*.
 | [`phases/phase-6.1.md`](phases/phase-6.1.md) | Fixes after phase 6: the logo, favicon and home-screen icons, an optional comment on Save for later, an `AWAITING` pipeline status, and less space around the tables with a centred compact title. Its `## Status` is the live checklist. |
 | [`phases/phase-6.2.md`](phases/phase-6.2.md) | Small fixes from the backlog: the table's scroll reset on a filter change, the phone topbar title, `Modal` focus, a 401 redirect to `/login`, and two MCP tools (edit an application, add a comment). Its `## Status` is the live checklist. |
 | [`phases/phase-6.3.md`](phases/phase-6.3.md) | Tests: a web↔API contract test, a made-up seed (shared with the future demo), Playwright over every screen and action, the flaky full `npm test` fixed first. Its `## Status` is the live checklist. |
+| [`phases/phase-7.md`](phases/phase-7.md) | Multi-user: `userId` on every vacancy, isolation enforced in one place (`forUser`), API keys per user for n8n and MCP (HTTP and stdio), a keys card on `/profile`. Its `## Status` is the live checklist. |
 | [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions

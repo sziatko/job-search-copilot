@@ -43,9 +43,11 @@ or [`../contracts.md`](../contracts.md) instead — not as their own ADR.
 | [0032](0032-same-company-normalised-name.md) | Same company = an equal normalised name | Accepted (amends 0025) |
 | [0033](0033-unscored-vacancies-in-one-table.md) | Unscored vacancies live in `Vacancy`: the log merges in, `NEW` and `FILTERED_OUT` | Accepted (replaces 0026, amends 0005) |
 | [0034](0034-auth-better-auth-in-core.md) | Auth: Better Auth in `core`, cookie sessions, Google/LinkedIn + passkeys | Accepted |
-| [0035](0035-mcp-over-http-oauth-resource-server.md) | MCP over HTTP as an OAuth 2.1 resource server; stdio stays open | Accepted |
-| [0036](0036-machine-token-for-n8n.md) | n8n reaches the API with a static bearer token, on three routes only | Accepted |
+| [0035](0035-mcp-over-http-oauth-resource-server.md) | MCP over HTTP as an OAuth 2.1 resource server; stdio stays open | Accepted (amended by 0039) |
+| [0036](0036-machine-token-for-n8n.md) | n8n reaches the API with a static bearer token, on three routes only | Accepted (replaced by 0039 in phase 7 step 2) |
 | [0037](0037-e2e-playwright.md) | End-to-end tests: Playwright on its own database, run on demand, not in `npm test` | Accepted |
+| [0038](0038-multi-user-shared-schema.md) | Multi-user: one schema, `userId` on `Vacancy`, every query through `forUser` | Accepted |
+| [0039](0039-api-keys-per-user.md) | API keys per user, for n8n and MCP | Accepted (replaces 0036) |
 
 A gap in the numbers is a deleted ADR. The ADR that replaced it names it on its
 `Replaces:` line (an ADR whose code is simply gone has none), and
