@@ -1,3 +1,4 @@
+import { getPrisma, verifyApiKey } from '@job-search-copilot/core';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import type { OAuthTokenVerifier } from '@modelcontextprotocol/sdk/server/auth/provider.js';
@@ -20,8 +21,10 @@ export interface HttpAppConfig {
 /**
  * MCP over Streamable HTTP as an OAuth 2.1 resource server (ADR-0035), over the same
  * `createServer()` as stdio (ADR-0010). Stateless: each POST gets its own server and
- * transport, so no session lives in memory. A token is a JWT the API signed; it is
- * checked against the JWKS, never against the database.
+ * transport, so no session lives in memory. A bearer is an API key (`jsc_…`, ADR-0039),
+ * checked in the database, or else a JWT the API signed, checked against the JWKS. Either
+ * way the server is built for its user: the key's owner, the token's `sub` (a public
+ * subject — the user's id; no `pairwiseSecret` is configured).
  */
 export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
   const url = new URL(mcpUrl);
@@ -29,6 +32,13 @@ export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
 
   const verifier: OAuthTokenVerifier = {
     async verifyAccessToken(token) {
+      if (token.startsWith('jsc_')) {
+        const owner = await verifyApiKey(getPrisma(), token);
+        if (!owner) throw new InvalidTokenError('Invalid API key');
+        // A key never expires, but requireBearerAuth refuses an authInfo without expiresAt.
+        const expiresAt = Math.floor(Date.now() / 1000) + 60;
+        return { token, clientId: 'api-key', scopes: [], expiresAt, extra: { sub: owner } };
+      }
       try {
         // `typ: at+jwt` (RFC 9068) keeps an ID token from passing as an access token.
         const { payload } = await jwtVerify(token, jwks, {
@@ -36,6 +46,7 @@ export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
           audience: mcpUrl,
           typ: 'at+jwt',
         });
+        if (!payload.sub) throw new InvalidTokenError('Token has no subject');
         return {
           token,
           clientId: String(payload.client_id ?? payload.azp),
@@ -70,7 +81,7 @@ export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
   });
 
   app.post(url.pathname, requireBearerAuth({ verifier, resourceMetadataUrl }), async (req, res) => {
-    const server = createServer();
+    const server = createServer({ userId: String(req.auth?.extra?.sub) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on('close', () => {
       void transport.close();

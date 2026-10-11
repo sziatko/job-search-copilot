@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { createAuth, getPrisma } from '@job-search-copilot/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
@@ -24,6 +26,26 @@ function token(audience = mcpUrl) {
     .sign(privateKey);
 }
 
+/** What /profile's "Create" does: an API key for a new user, through the API's auth. */
+async function apiKey(): Promise<string> {
+  const prisma = getPrisma();
+  const user = await prisma.user.create({
+    data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
+  });
+  const provider = { clientId: 'test-client-id', clientSecret: 'test-client-secret' };
+  const auth = createAuth(prisma, {
+    secret: 'test-secret-at-least-32-characters-long',
+    baseURL: 'http://localhost:3000',
+    webOrigin: 'http://localhost:5173',
+    google: provider,
+    linkedin: provider,
+    allowedEmails: [user.email],
+    passkeyRpId: 'localhost',
+    mcpUrl,
+  });
+  return (await auth.api.createApiKey({ body: { name: 'cli', userId: user.id } })).key;
+}
+
 describe('MCP over HTTP', () => {
   let server: Server;
   let base: string;
@@ -36,8 +58,9 @@ describe('MCP over HTTP', () => {
     base = `http://localhost:${(server.address() as AddressInfo).port}`;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     server.close();
+    await getPrisma().user.deleteMany(); // their keys go with them (cascade)
   });
 
   const initialize = (headers: Record<string, string> = {}) =>
@@ -88,6 +111,23 @@ describe('MCP over HTTP', () => {
     const { tools } = await client.listTools();
     expect(tools).toHaveLength(15);
     await client.close();
+  });
+
+  it('lists the tools for an API key', async () => {
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
+        requestInit: { headers: { Authorization: `Bearer ${await apiKey()}` } },
+      }),
+    );
+    expect((await client.listTools()).tools).toHaveLength(15);
+    await client.close();
+  });
+
+  it('refuses an unknown API key', async () => {
+    const res = await initialize({ Authorization: 'Bearer jsc_not-a-key' });
+    expect(res.status).toBe(401);
+    expect(res.headers.get('www-authenticate')).toContain('error="invalid_token"');
   });
 
   it('refuses a token issued for another audience', async () => {

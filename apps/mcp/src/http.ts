@@ -3,8 +3,8 @@ import { createRemoteJWKSet } from 'jose';
 import { z } from 'zod';
 import { createHttpApp } from './http-app';
 
-// The second entrypoint (ADR-0035): MCP over Streamable HTTP, behind OAuth. stdio
-// (index.ts) stays as it is, with no auth. Unlike stdio, stdout is free here.
+// The second entrypoint (ADR-0035): MCP over Streamable HTTP, behind OAuth or an API key
+// (ADR-0039). Unlike stdio (index.ts), stdout is free here.
 const envSchema = z.object({
   DATABASE_URL: z.url(),
   /** The API's public origin: the tokens' issuer is `${BETTER_AUTH_URL}/api/auth`. */

@@ -53,7 +53,7 @@ issues tokens. Moving to an IdP later changes the backend only.
   `betterAuth` instance in `apps/api` with its own client breaks invariant 1 and the
   test DB's lifecycle.
 - A new REST route is closed unless marked `@AllowAnonymous()` or guarded by
-  `MachineTokenGuard` ([ADR-0036](0036-machine-token-for-n8n.md)). Marking one anonymous
+  `ApiKeyGuard` ([ADR-0039](0039-api-keys-per-user.md)). Marking one anonymous
   exposes data: `Vacancy` has no owner.
 - Removing the allowlist before `userId` lands gives every new account all the data.
 - Account linking is left empty of `trustedProviders`: an account links to an existing
@@ -67,4 +67,4 @@ issues tokens. Moving to an IdP later changes the backend only.
 ## Related
 [ADR-0002](0002-core-shared-domain-layer.md), [ADR-0007](0007-env-config-and-loading.md),
 [ADR-0035](0035-mcp-over-http-oauth-resource-server.md),
-[ADR-0036](0036-machine-token-for-n8n.md), [`../phases/phase-6.md`](../phases/phase-6.md).
+[ADR-0039](0039-api-keys-per-user.md), [`../phases/phase-6.md`](../phases/phase-6.md).

@@ -10,7 +10,7 @@ import { createServer } from './server';
 // (the SDK's own recommended way to test a server) instead of spawning stdio —
 // exercises the actual registerTool handlers, input schemas, and error shapes.
 async function connectedClient() {
-  const server = createServer();
+  const server = createServer({ userId: 'user-1' }); // unscoped until phase 7 step 3a
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test-client', version: '0.0.0' });
   await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);

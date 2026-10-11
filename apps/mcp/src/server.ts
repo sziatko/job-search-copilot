@@ -39,20 +39,25 @@ export const SERVER_INSTRUCTIONS = [
     'one as a note of its own; never repeat an earlier one.',
 ].join('\n\n');
 
+export interface ServerContext {
+  /** Whose data the tools act on: the OAuth token's `sub` or the API key's owner (ADR-0039). */
+  userId: string;
+  /** Domain services; default to ones on the shared lazy Prisma client, tests can pass their own. */
+  vacancies?: VacancyService;
+  applications?: ApplicationService;
+  intake?: VacancyIntakeService;
+}
+
 /** Builds the MCP server with all tools registered, without connecting a transport.
  * Kept separate from index.ts so tests can connect it to an in-memory transport
- * instead of real stdio.
- *
- * @param vacancies domain service to back the vacancy tools. Defaults to
- *   one on the shared lazy Prisma client; tests can pass their own.
- * @param applications same, for the application-tracking tools.
- * @param intake same, for the intake tools.
+ * instead of real stdio (ADR-0010).
  */
-export function createServer(
-  vacancies: VacancyService = new VacancyService(),
-  applications: ApplicationService = new ApplicationService(),
-  intake: VacancyIntakeService = new VacancyIntakeService(),
-): McpServer {
+export function createServer({
+  userId: _userId, // carried, not used yet: the services take it in phase 7 step 3a
+  vacancies = new VacancyService(),
+  applications = new ApplicationService(),
+  intake = new VacancyIntakeService(),
+}: ServerContext): McpServer {
   const server = new McpServer(
     { name: 'job-search-copilot', version: '0.1.0' },
     { instructions: SERVER_INSTRUCTIONS },

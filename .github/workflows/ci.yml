@@ -37,7 +37,6 @@ jobs:
       LINKEDIN_CLIENT_SECRET: test-linkedin-client-secret
       AUTH_ALLOWED_EMAILS: me@example.com
       PASSKEY_RP_ID: localhost
-      INTAKE_TOKEN: test-intake-token-at-least-32-characters
       MCP_PUBLIC_URL: http://localhost:3001/mcp
 
     steps:
@@ -99,7 +98,6 @@ jobs:
       LINKEDIN_CLIENT_SECRET: e2e-linkedin-client-secret
       AUTH_ALLOWED_EMAILS: me@example.com
       PASSKEY_RP_ID: localhost
-      INTAKE_TOKEN: e2e-intake-token-at-least-32-characters
       MCP_PUBLIC_URL: http://localhost:3001/mcp
 
     steps:

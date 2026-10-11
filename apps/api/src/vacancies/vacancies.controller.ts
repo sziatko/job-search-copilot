@@ -14,9 +14,10 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Response } from 'express';
-import { MachineTokenGuard } from '../auth/machine-token.guard';
+import { ApiKeyGuard } from '../auth/api-key.guard';
 import { IntakeVacanciesDto } from './dto/intake-vacancies.dto';
 import { ListVacanciesQueryDto } from './dto/list-vacancies.dto';
 import { SaveVacancyDto } from './dto/save-vacancy.dto';
@@ -56,7 +57,8 @@ export class VacanciesController {
    */
   @Post('intake')
   @AllowAnonymous()
-  @UseGuards(MachineTokenGuard)
+  @UseGuards(ApiKeyGuard)
+  @ApiBearerAuth()
   @HttpCode(200)
   intake(@Body() dto: IntakeVacanciesDto) {
     return this.intakeService.intakeMany(dto.entries);
@@ -69,7 +71,8 @@ export class VacanciesController {
    */
   @Post(':id/analysis')
   @AllowAnonymous()
-  @UseGuards(MachineTokenGuard)
+  @UseGuards(ApiKeyGuard)
+  @ApiBearerAuth()
   @HttpCode(200)
   submitAnalysis(@Param('id', ParseIntPipe) id: number, @Body() dto: SubmitAnalysisDto) {
     return this.vacancies.submitAnalysis({ id, ...dto });
@@ -78,7 +81,8 @@ export class VacanciesController {
   /** Up to ANALYSIS_BATCH_MAX analyses, all or none → 200 and the rows, in order. */
   @Post('analysis')
   @AllowAnonymous()
-  @UseGuards(MachineTokenGuard)
+  @UseGuards(ApiKeyGuard)
+  @ApiBearerAuth()
   @HttpCode(200)
   submitAnalyses(@Body() dto: SubmitAnalysesDto) {
     return this.vacancies.submitAnalyses(dto.analyses);

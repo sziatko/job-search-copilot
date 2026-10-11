@@ -1,16 +1,30 @@
-import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
+import { randomUUID } from 'node:crypto';
+import { type Auth, getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
+import { type ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { AuthService } from '@thallesp/nestjs-better-auth';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { CurrentUserId } from '../src/auth/api-key.guard';
 import { createTestApp, signIn } from './test-app';
 
-// Every route is closed by default (ADR-0034); n8n's three are open to INTAKE_TOKEN too
-// (ADR-0036). /health's anonymity is health.e2e.spec.ts's.
+// Every route is closed by default (ADR-0034); n8n's three are open to an API key too
+// (ADR-0039). /health's anonymity is health.e2e.spec.ts's.
 describe('Auth (e2e)', () => {
   let app: NestExpressApplication;
   const prisma = getPrisma();
-  const token = process.env.INTAKE_TOKEN ?? '';
   const analysis = { matchScore: 30, recommendation: 'SKIP', estimationComment: 'Backend.' };
+
+  /** What /profile's "Create" does: a key for a new user, shown once. */
+  async function createKey() {
+    const user = await prisma.user.create({
+      data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
+    });
+    const auth = app.get<AuthService<Auth>>(AuthService);
+    const created = await auth.api.createApiKey({ body: { name: 'n8n', userId: user.id } });
+    return { key: created.key, id: created.id };
+  }
 
   async function queued(url: string): Promise<number> {
     await new VacancyIntakeService(prisma).intake({ url, company: 'Queued Co', title: url });
@@ -26,7 +40,7 @@ describe('Auth (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    await prisma.user.deleteMany(); // their keys go with them (cascade)
     await app.close();
     await prisma.$disconnect();
   });
@@ -41,15 +55,16 @@ describe('Auth (e2e)', () => {
       await request(server).get('/api/v1/vacancies').set('Cookie', cookie).expect(200);
     });
 
-    it('is not opened by INTAKE_TOKEN on a read route', async () => {
+    it('is not opened by an API key on a read route', async () => {
+      const { key } = await createKey();
       await request(app.getHttpServer())
         .get('/api/v1/vacancies')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${key}`)
         .expect(401);
     });
   });
 
-  describe('the machine token, on the three n8n routes', () => {
+  describe('an API key, on the three n8n routes', () => {
     const routes: [string, () => Promise<[string, object]>][] = [
       [
         'POST /vacancies/intake',
@@ -75,21 +90,49 @@ describe('Auth (e2e)', () => {
     ];
 
     it.each(routes)(
-      '%s: 401 with no token or a wrong one, 200 with INTAKE_TOKEN',
+      '%s: 401 with no key, a bad or revoked one; 200 with a key',
       async (_, setup) => {
-        expect(token.length).toBeGreaterThanOrEqual(32);
+        const { key } = await createKey();
+        const revoked = await createKey();
+        await prisma.apikey.delete({ where: { id: revoked.id } }); // what Revoke does
         const [path, body] = await setup();
         const post = () => request(app.getHttpServer()).post(path).send(body);
 
         await post().expect(401);
-        await post().set('Authorization', 'Bearer wrong').expect(401);
-        // Same length, last character changed: the comparison is over the whole token.
-        await post()
-          .set('Authorization', `Bearer ${token.slice(0, -1)}${token.endsWith('x') ? 'y' : 'x'}`)
-          .expect(401);
-        await post().set('Authorization', token).expect(401); // no scheme
-        await post().set('Authorization', `Bearer ${token}`).expect(200);
+        await post().set('Authorization', 'Bearer jsc_not-a-key').expect(401);
+        await post().set('Authorization', `Bearer ${revoked.key}`).expect(401);
+        await post().set('Authorization', key).expect(401); // no scheme
+        await post().set('Authorization', `Bearer ${key}`).expect(200);
       },
     );
+
+    it('lets a session through too', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/vacancies/intake')
+        .set('Cookie', await signIn(app))
+        .send({ entries: [{ url: 'https://acme.com/jobs/2', company: 'Acme', title: 'Dev' }] })
+        .expect(200);
+    });
+  });
+
+  describe('@CurrentUserId()', () => {
+    // Nest keeps a param decorator's factory in the route's metadata; no route uses it
+    // until the services take a user (phase 7 step 3a).
+    class Probe {
+      handler(@CurrentUserId() _userId: string) {}
+    }
+    const meta = Reflect.getMetadata(ROUTE_ARGS_METADATA, Probe, 'handler');
+    const factory = (Object.values(meta)[0] as { factory: (d: unknown, c: unknown) => string })
+      .factory;
+    const resolve = (req: object) =>
+      factory(undefined, {
+        switchToHttp: () => ({ getRequest: () => req }),
+      } as unknown as ExecutionContext);
+
+    it("is the session's user, else the key's owner, else 401", () => {
+      expect(resolve({ user: { id: 'u-session' }, apiKeyOwner: 'u-key' })).toBe('u-session');
+      expect(resolve({ user: null, apiKeyOwner: 'u-key' })).toBe('u-key');
+      expect(() => resolve({ user: null })).toThrow(UnauthorizedException);
+    });
   });
 });

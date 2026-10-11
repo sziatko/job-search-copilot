@@ -7,7 +7,7 @@ Phase 6 put sign-in in front of everything, but the data still has no owner:
 - **Every signed-in account sees all the data.** `Vacancy` has no `userId`; the
   `AUTH_ALLOWED_EMAILS` allowlist is the stopgap ([ADR-0034](../decisions/0034-auth-better-auth-in-core.md)).
 - **n8n writes with one static `INTAKE_TOKEN`** that has no user behind it
-  ([ADR-0036](../decisions/0036-machine-token-for-n8n.md)).
+  (ADR-0036, deleted in step 2).
 - **The stdio MCP has no auth and no user** ([ADR-0035](../decisions/0035-mcp-over-http-oauth-resource-server.md)).
 
 This phase makes every vacancy belong to an account and gives each user API keys, so
@@ -135,7 +135,13 @@ put it in n8n's credential and Claude Desktop's stdio env.
   declare. Revoke is the plugin's delete, not `enabled: false`. The verifier logs a
   Better Auth `ERROR` for every rejected key and a "Base URL is not set" `WARN` once —
   noise, not failures.
-- [ ] **2 · Every entry knows its user.**
+- [x] **2 · Every entry knows its user.** — *2026-10-11.* `@CurrentUserId()` (in
+  `api-key.guard.ts`) is on no route yet: 3a puts it on every controller method.
+  `createServer` takes `userId` but drops it, and `server.spec.ts` passes a made-up
+  `'user-1'` — 3a needs a real user row there. stdio now refuses to boot without a valid
+  `JSC_API_KEY`: on the dev DB that needs `npm run migrate:dev` first (no `apikey` table
+  yet) and a key in `.env`, the `mcp` container's `npm run dev:mcp` included. The local
+  `.env` still carries an unused `INTAKE_TOKEN` (harmless; the user's file).
 - [ ] **3a · Core: data belongs to a user.**
 - [ ] **3b · Isolation end to end.**
 - [ ] **4 · Close-out.**

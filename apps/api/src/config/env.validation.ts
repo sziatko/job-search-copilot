@@ -33,8 +33,6 @@ const envSchema = z.object({
     .pipe(z.array(z.email()).min(1)),
   /** The passkeys' relying party id (`localhost` in dev); changing it voids them all. */
   PASSKEY_RP_ID: z.string().min(1),
-  /** n8n's bearer token for the intake and analysis routes (ADR-0036). */
-  INTAKE_TOKEN: z.string().min(32),
   /** The MCP server's URL as clients call it: the audience of the tokens JSC issues (ADR-0035). */
   MCP_PUBLIC_URL: z.url(),
 });

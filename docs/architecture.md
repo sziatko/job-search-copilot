@@ -30,7 +30,7 @@ apps/web (React SPA)        vacancy-match-analyzer
 | --- | --- | --- |
 | [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the schema (`Vacancy` with its `StatusChange` journal and `Comment`s) + migrations, the `VacancyService`, `ApplicationService`, `VacancyIntakeService` and `StatsService` (all queries), `writeStatus` (the only writer of status), the timeout rule (`TIMEOUT_DAYS`, `timedOutWhere` in `status.ts`), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
 | `apps/api` | Thin HTTP transport over the core services for the web app. NestJS: DI, DTO validation, versioned routes (`vacancies`, `applications`), a health check. | `core`, `@nestjs/*`, `class-validator`, `zod` |
-| `apps/mcp` | Thin transport over the *same* services, exposing fifteen tools (7 for vacancies, 6 for applications incl. `update_vacancy_status`, `update_application`, `add_comment`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. Two entrypoints over one `createServer()`: `src/index.ts` (stdio, no auth) and `src/http.ts` (Streamable HTTP, an OAuth 2.1 resource server checking the API's JWTs — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md)). | `core`, `@modelcontextprotocol/sdk`, `express`, `jose`, `zod` |
+| `apps/mcp` | Thin transport over the *same* services, exposing fifteen tools (7 for vacancies, 6 for applications incl. `update_vacancy_status`, `update_application`, `add_comment`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. Two entrypoints over one `createServer()`: `src/index.ts` (stdio, as the owner of `JSC_API_KEY`) and `src/http.ts` (Streamable HTTP, an OAuth 2.1 resource server checking the API's JWTs — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md) — or an API key, [ADR-0039](decisions/0039-api-keys-per-user.md)). | `core`, `@modelcontextprotocol/sdk`, `express`, `jose`, `zod` |
 | `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/applications`, `/inbox`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
@@ -194,10 +194,10 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    message. → [ADR-0007](decisions/0007-env-config-and-loading.md)
 9. **Every REST route is closed by default** (phase 6, from step 2). A global guard
    wants a session; anonymous access is explicit (`@AllowAnonymous()`, `/health` only),
-   machine access is explicit (`MachineTokenGuard`, the three n8n routes only).
+   machine access is explicit (`ApiKeyGuard`, the three n8n routes only).
    `Vacancy` has no owner, so an anonymous route exposes all the data.
    → [ADR-0034](decisions/0034-auth-better-auth-in-core.md),
-   [ADR-0036](decisions/0036-machine-token-for-n8n.md)
+   [ADR-0039](decisions/0039-api-keys-per-user.md)
 10. **No real job-search data in the repo.** The repo is public; the dev DB holds the
     owner's real search. Code, tests, fixtures, docs and commit messages use made-up
     companies, ids, rates and counts (`Acme`, `3912345678`, `100 PLN/h`), never ones
