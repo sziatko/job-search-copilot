@@ -4,7 +4,7 @@ import { ALL_COMMENTS } from './comments';
 import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from './company';
 import { AlreadyAnalysedError, VacancyNotFoundError } from './errors';
 import { forUser, type UserDb, type UserTx } from './for-user';
-import { escapeLikePattern } from './like';
+import { textFilters } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
@@ -311,39 +311,25 @@ export class VacancyService {
   /** List/search — omits fullText to keep results compact. Use getById for the full record. */
   async list(userId: string, filters: ListVacanciesFilters = {}): Promise<ListVacanciesResult> {
     const db = forUser(this.db, userId);
-    // Every term below reaches the pattern unescaped by the caller, so it is
-    // escaped here: `%`/`_` are the user's literal characters, not wildcards
-    // (escapeLikePattern). It happens per clause rather than once up front because
-    // each clause escapes a *different* value.
+    // Under one AND, so `sameCompanyAs` narrows a `company` term rather than replacing it.
+    const and = [
+      ...textFilters(filters),
+      ...(filters.sameCompanyAs
+        ? [
+            { company: { in: await sameCompanyNames(db, filters.sameCompanyAs) } },
+            SAME_COMPANY_STATUSES,
+          ]
+        : []),
+    ];
     const where: Prisma.VacancyWhereInput = {
       ...(filters.recommendation && { recommendation: filters.recommendation }),
       ...(filters.status?.length && { status: { in: filters.status } }),
       ...(filters.applyUrl !== undefined && { applyUrl: applyUrlKey(filters.applyUrl) }),
-      // One clause, not two: `search` is the /vacancies free-text box and widens
-      // (company OR title), where company/title each narrow. Being separate `where`
-      // keys they AND together, so passing both still means "must satisfy both".
-      ...(filters.search && {
-        OR: [
-          { company: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
-          { title: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
-        ],
-      }),
-      ...(filters.company && {
-        company: { contains: escapeLikePattern(filters.company), mode: 'insensitive' },
-      }),
-      ...(filters.title && {
-        title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
-      }),
       ...(filters.hasText !== undefined && {
         fullText: filters.hasText ? { not: null } : null,
       }),
-      // Under AND, so it narrows `company` rather than replacing it.
-      ...(filters.sameCompanyAs && {
-        AND: [
-          { company: { in: await sameCompanyNames(db, filters.sameCompanyAs) } },
-          SAME_COMPANY_STATUSES,
-        ],
-      }),
+      // Only when non-empty: the cursor below treats an empty `where` as its own case.
+      ...(and.length > 0 && { AND: and }),
     };
 
     const limit = filters.limit ?? 20;

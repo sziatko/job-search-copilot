@@ -19,7 +19,7 @@ import {
   InvalidApplicationInputError,
 } from './errors';
 import { forUser, type UserDb, type UserTx } from './for-user';
-import { escapeLikePattern } from './like';
+import { textFilters } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
 import { deriveRecommendationFromScore } from './recommendation';
@@ -145,30 +145,8 @@ export class ApplicationService {
     filters: ListApplicationsFilters = {},
   ): Promise<ListApplicationsResult> {
     const db = forUser(this.db, userId);
-    // search/company/title each contribute one clause; AND-ed together so giving more
-    // than one narrows (a caller normally gives just one — search is the /applications
-    // free-text box, company/title are the MCP tool — but composing them via AND
-    // rather than clobbering keeps it well-defined either way). Escaped like the
-    // vacancy service's: these are the same free-text terms over the same two columns.
-    const vacancyFilters: Prisma.VacancyWhereInput[] = [];
-    if (filters.search) {
-      vacancyFilters.push({
-        OR: [
-          { company: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
-          { title: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
-        ],
-      });
-    }
-    if (filters.company) {
-      vacancyFilters.push({
-        company: { contains: escapeLikePattern(filters.company), mode: 'insensitive' },
-      });
-    }
-    if (filters.title) {
-      vacancyFilters.push({
-        title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
-      });
-    }
+    // Every clause narrows: AND-ed together, so giving more than one is well-defined.
+    const vacancyFilters = textFilters(filters);
     if (filters.sameCompanyAs) {
       vacancyFilters.push({
         company: { in: await sameCompanyNames(db, filters.sameCompanyAs) },

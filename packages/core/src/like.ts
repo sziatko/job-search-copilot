@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 /**
  * LIKE/ILIKE pattern escaping. Kept in one module because every `contains` filter
  * in this package feeds a value the user typed into a pattern, and each one gets
@@ -27,4 +29,28 @@
  */
 export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, '\\$&');
+}
+
+const contains = (term: string) =>
+  ({ contains: escapeLikePattern(term), mode: 'insensitive' }) as const;
+
+/**
+ * The free-text clauses both lists share, to AND together: `search` (a page's search
+ * box) widens to company OR title, `company` / `title` (the MCP tools) each narrow.
+ * Each term is escaped here, so a caller passes what the user typed.
+ */
+export function textFilters(filters: {
+  search?: string;
+  company?: string;
+  title?: string;
+}): Prisma.VacancyWhereInput[] {
+  const clauses: Prisma.VacancyWhereInput[] = [];
+  if (filters.search) {
+    clauses.push({
+      OR: [{ company: contains(filters.search) }, { title: contains(filters.search) }],
+    });
+  }
+  if (filters.company) clauses.push({ company: contains(filters.company) });
+  if (filters.title) clauses.push({ title: contains(filters.title) });
+  return clauses;
 }
