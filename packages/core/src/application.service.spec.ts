@@ -6,6 +6,7 @@ import {
   AlreadyAppliedError,
   AmbiguousVacancyMatchError,
   InvalidApplicationInputError,
+  VacancyNotFoundError,
 } from './errors';
 import { getPrisma } from './prisma-client';
 import { VacancyService } from './vacancy.service';
@@ -107,9 +108,9 @@ describe('ApplicationService', () => {
       expect(application.appliedAt).toEqual(application.statusChangedAt);
     });
 
-    it('throws for an unknown vacancy id', async () => {
+    it('throws VacancyNotFoundError for an unknown vacancy id', async () => {
       await expect(applications.record(userId, { vacancyId: 999_999 })).rejects.toBeInstanceOf(
-        InvalidApplicationInputError,
+        VacancyNotFoundError,
       );
     });
 
@@ -462,10 +463,10 @@ describe('ApplicationService', () => {
   });
 
   describe('updateStatus', () => {
-    it('returns null for an unknown id', async () => {
-      expect(
-        await applications.updateStatus(userId, 999_999, 'INTERVIEW', undefined, 'USER'),
-      ).toBeNull();
+    it('throws VacancyNotFoundError for an unknown id', async () => {
+      await expect(
+        applications.updateStatus(userId, 999_999, 'INTERVIEW', undefined, 'USER'),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError);
     });
 
     it('writes one journal row and keeps the cache in step', async () => {
@@ -595,10 +596,10 @@ describe('ApplicationService', () => {
       expect(notes(unchanged)).toEqual([ANALYZED, ['USER', 'padded']]);
     });
 
-    it('returns null for an unknown id even when a comment is given', async () => {
-      expect(
-        await applications.updateStatus(userId, 999_999, 'INTERVIEW', 'note', 'USER'),
-      ).toBeNull();
+    it('throws VacancyNotFoundError for an unknown id even when a comment is given', async () => {
+      await expect(
+        applications.updateStatus(userId, 999_999, 'INTERVIEW', 'note', 'USER'),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError);
     });
   });
 
@@ -638,8 +639,10 @@ describe('ApplicationService', () => {
       expect(blank?.comments).toHaveLength(3);
     });
 
-    it('returns null for an unknown id', async () => {
-      expect(await applications.update(userId, 999_999, { comment: 'x' })).toBeNull();
+    it('throws VacancyNotFoundError for an unknown id', async () => {
+      await expect(applications.update(userId, 999_999, { comment: 'x' })).rejects.toBeInstanceOf(
+        VacancyNotFoundError,
+      );
     });
   });
 
@@ -659,12 +662,14 @@ describe('ApplicationService', () => {
       expect(await journal(vacancy.id)).toEqual(['NEW', 'NOT_REVIEWED', 'APPLIED']);
     });
 
-    it('refuses a blank body and returns null for an unknown id', async () => {
+    it('refuses a blank body and throws VacancyNotFoundError for an unknown id', async () => {
       const vacancy = await seedVacancy();
       await expect(
         applications.addComment(userId, vacancy.id, '  ', 'USER'),
       ).rejects.toBeInstanceOf(InvalidApplicationInputError);
-      expect(await applications.addComment(userId, 999_999, 'x', 'USER')).toBeNull();
+      await expect(applications.addComment(userId, 999_999, 'x', 'USER')).rejects.toBeInstanceOf(
+        VacancyNotFoundError,
+      );
     });
   });
 
@@ -686,17 +691,18 @@ describe('ApplicationService', () => {
       expect(notes(updated)).toEqual([ANALYZED, ['AGENT', 'Rejection email received.']]);
     });
 
-    it('returns null for a vacancy never applied to, and writes nothing', async () => {
+    it('throws VacancyNotFoundError for a vacancy never applied to, and writes nothing', async () => {
       const vacancy = await seedVacancy({ company: 'Foxtrot Co', title: 'Dev' });
-      const updated = await applications.updateStatusByVacancy(
-        userId,
-        'Foxtrot Co',
-        'Dev',
-        'REJECTED',
-        undefined,
-        'AGENT',
-      );
-      expect(updated).toBeNull();
+      await expect(
+        applications.updateStatusByVacancy(
+          userId,
+          'Foxtrot Co',
+          'Dev',
+          'REJECTED',
+          undefined,
+          'AGENT',
+        ),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError);
       expect(await journal(vacancy.id)).toEqual(['NEW', 'NOT_REVIEWED']);
     });
 
@@ -715,9 +721,9 @@ describe('ApplicationService', () => {
       expect(updated?.id).toBe(applied.id);
     });
 
-    it('returns null when no vacancy matches', async () => {
-      expect(
-        await applications.updateStatusByVacancy(
+    it('throws VacancyNotFoundError when no vacancy matches', async () => {
+      await expect(
+        applications.updateStatusByVacancy(
           userId,
           'Nobody Inc',
           'Ghost Role',
@@ -725,7 +731,7 @@ describe('ApplicationService', () => {
           undefined,
           'AGENT',
         ),
-      ).toBeNull();
+      ).rejects.toBeInstanceOf(VacancyNotFoundError);
     });
 
     it('throws AmbiguousVacancyMatchError for two applied vacancies with the same (company, title)', async () => {
@@ -772,7 +778,7 @@ describe('ApplicationService', () => {
           { vacancyId: 999_999 }, // fails
           { company: 'Never Inserted', title: 'Dev' },
         ]),
-      ).rejects.toBeInstanceOf(InvalidApplicationInputError);
+      ).rejects.toBeInstanceOf(VacancyNotFoundError);
       expect((await applications.list(userId)).total).toBe(0);
       expect((await vacancies.list(userId, { company: 'Rollback Co' })).total).toBe(0);
       // The pre-existing seed vacancy is untouched, its journal included.

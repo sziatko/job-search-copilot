@@ -1013,8 +1013,10 @@ describe('VacancyService', () => {
   });
 
   describe('updateStatus', () => {
-    it('returns null when the id does not exist', async () => {
-      expect(await service.updateStatus(userId, 999_999, 'DECLINED')).toBeNull();
+    it('throws VacancyNotFoundError when the id does not exist', async () => {
+      await expect(service.updateStatus(userId, 999_999, 'DECLINED')).rejects.toBeInstanceOf(
+        VacancyNotFoundError,
+      );
     });
 
     it('writes one journal row and keeps the cache in step', async () => {
@@ -1138,8 +1140,10 @@ describe('VacancyService', () => {
       expect(await getPrisma().comment.count({ where: { vacancyId: vacancy.id } })).toBe(1);
     });
 
-    it('returns null for an unknown id with a comment, and writes nothing', async () => {
-      expect(await service.updateStatus(userId, 999_999, 'SAVED_FOR_LATER', 'note')).toBeNull();
+    it('throws VacancyNotFoundError for an unknown id with a comment, and writes nothing', async () => {
+      await expect(
+        service.updateStatus(userId, 999_999, 'SAVED_FOR_LATER', 'note'),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError);
       expect(await getPrisma().comment.count()).toBe(0);
     });
 

@@ -17,7 +17,7 @@ fields are `NOT NULL`.
 `ApplicationService.record` resolves the vacancy in one transaction:
 
 - **by id** (the web path) — link to the given `vacancyId`; unknown id →
-  `InvalidApplicationInputError`.
+  `VacancyNotFoundError` (REST `404`).
 - **by (company, title)** (MCP) — case-insensitive exact match:
   - exactly one → link to it.
   - zero → **create** a `Vacancy` with placeholder analyzer fields:

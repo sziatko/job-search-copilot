@@ -150,10 +150,6 @@ export function registerApplicationTools(
         return toolError('Provide either `id`, or both `company` and `title`.');
       }
 
-      if (!application) {
-        const target = id != null ? `Vacancy ${id}` : `"${company}" / "${title}"`;
-        return toolError(`${target} not found`);
-      }
       return json({ success: true, vacancy: ref(application) });
     }),
   );
@@ -180,9 +176,6 @@ export function registerApplicationTools(
         salaryInApplication,
         usedTailoredResume,
       });
-      if (!application) {
-        return toolError(`Vacancy ${id} not found`);
-      }
       return json({ success: true, application: ref(application) });
     }),
   );
@@ -206,9 +199,6 @@ export function registerApplicationTools(
     },
     withDomainErrors(async ({ id, body, source }) => {
       const vacancy = await applications.addComment(userId, id, body, source);
-      if (!vacancy) {
-        return toolError(`Vacancy ${id} not found`);
-      }
       return json({ success: true, vacancy: ref(vacancy) });
     }),
   );

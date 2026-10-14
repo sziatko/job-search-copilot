@@ -14,7 +14,7 @@ export class DomainError extends Error {
 /** The `recommendation` input isn't one of the accepted spellings — see recommendation.ts. */
 export class InvalidRecommendationError extends DomainError {}
 
-/** company/title blank, or an explicit vacancyId that doesn't exist. */
+/** company/title blank, or a blank comment body. */
 export class InvalidApplicationInputError extends DomainError {}
 
 /** (company, title) matched more than one Vacancy — the caller must pick one. */

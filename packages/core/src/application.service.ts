@@ -17,8 +17,9 @@ import {
   AlreadyAppliedError,
   AmbiguousVacancyMatchError,
   InvalidApplicationInputError,
+  VacancyNotFoundError,
 } from './errors';
-import { forUser, orNull, type UserDb, type UserTx } from './for-user';
+import { forUser, orNotFound, type UserDb, type UserTx } from './for-user';
 import { textFilters } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
@@ -74,14 +75,16 @@ function flatten({ statusChanges, ...row }: ApplicationRow, now = new Date()): A
   };
 }
 
-/** One update, returned flattened; null when no vacancy of this user has this id (`orNull`). */
+/** One update, returned flattened; VacancyNotFoundError when no vacancy of this user has
+ * this id (`orNotFound`). */
 async function updateRow(
   db: Db,
   id: number,
   data: Prisma.VacancyUpdateInput,
-): Promise<ApplicationListItem | null> {
-  const row = await orNull(db.vacancy.update({ where: { id }, data, select: APPLICATION_SELECT }));
-  return row && flatten(row);
+): Promise<ApplicationListItem> {
+  return flatten(
+    await orNotFound(db.vacancy.update({ where: { id }, data, select: APPLICATION_SELECT }), id),
+  );
 }
 
 /**
@@ -195,7 +198,7 @@ export class ApplicationService {
    * repeated pipeline status is an event, a repeated triage one throws SameStatusError.
    * `note`, when not blank, becomes a new `source`
    * comment in the same transaction. `source` is the
-   * caller's: AGENT over MCP, USER over REST. Returns null when no vacancy has this id.
+   * caller's: AGENT over MCP, USER over REST. Throws VacancyNotFoundError for an unknown id.
    */
   updateStatus(
     userId: string,
@@ -203,7 +206,7 @@ export class ApplicationService {
     status: VacancyStatus,
     note: string | undefined,
     source: CommentSource,
-  ): Promise<ApplicationListItem | null> {
+  ): Promise<ApplicationListItem> {
     return forUser(this.db, userId).$transaction(async (db) => {
       await writeStatus(db, id, status);
       return updateRow(db, id, commentOn(note, source));
@@ -213,13 +216,9 @@ export class ApplicationService {
   /**
    * Edit what was entered when applying — the apply modal re-opened. A field left
    * out is untouched; a blank string clears it. A non-blank `comment` adds a USER
-   * comment — it edits none. Returns null for an unknown id.
+   * comment — it edits none. Throws VacancyNotFoundError for an unknown id.
    */
-  update(
-    userId: string,
-    id: number,
-    input: UpdateApplicationInput,
-  ): Promise<ApplicationListItem | null> {
+  update(userId: string, id: number, input: UpdateApplicationInput): Promise<ApplicationListItem> {
     const text = (value: string | null | undefined) =>
       value === undefined ? undefined : value?.trim() || null;
     return updateRow(forUser(this.db, userId), id, {
@@ -231,15 +230,15 @@ export class ApplicationService {
 
   /**
    * A new dated `source` comment on any vacancy, no status move. Earlier comments are
-   * never changed. Throws InvalidApplicationInputError for a blank body; returns null
-   * for an unknown id.
+   * never changed. Throws InvalidApplicationInputError for a blank body,
+   * VacancyNotFoundError for an unknown id.
    */
   async addComment(
     userId: string,
     id: number,
     body: string,
     source: CommentSource,
-  ): Promise<ApplicationListItem | null> {
+  ): Promise<ApplicationListItem> {
     if (!body.trim()) {
       throw new InvalidApplicationInputError('`body` must not be blank.');
     }
@@ -251,8 +250,8 @@ export class ApplicationService {
    * natural shape for an agent reading e.g. a rejection/offer email, which has no
    * id. A unique case-insensitive (company, title) match among the vacancies already
    * applied to (PIPELINE_STATUSES) — an email about a vacancy never applied to is not
-   * a status move, so it returns null and the agent routes the email to need-attention.
-   * Returns null when nothing matches — it never creates anything. Throws
+   * a status move, so it is not found and the agent routes the email to need-attention.
+   * Throws VacancyNotFoundError when nothing matches — it never creates anything — and
    * AmbiguousVacancyMatchError for 2+ matches.
    */
   async updateStatusByVacancy(
@@ -262,7 +261,7 @@ export class ApplicationService {
     status: VacancyStatus,
     note: string | undefined,
     source: CommentSource,
-  ): Promise<ApplicationListItem | null> {
+  ): Promise<ApplicationListItem> {
     const trimmedCompany = company.trim();
     const trimmedTitle = title.trim();
     if (!trimmedCompany || !trimmedTitle) {
@@ -279,7 +278,7 @@ export class ApplicationService {
       );
     }
     if (matches.length === 0) {
-      return null;
+      throw new VacancyNotFoundError(`"${trimmedCompany}" / "${trimmedTitle}" not found`);
     }
 
     return this.updateStatus(userId, matches[0].id, status, note, source);
@@ -323,7 +322,7 @@ async function resolveVacancy(
       select: { id: true, status: true },
     });
     if (!vacancy) {
-      throw new InvalidApplicationInputError(`Vacancy ${input.vacancyId} not found`);
+      throw new VacancyNotFoundError(`Vacancy ${input.vacancyId} not found`);
     }
     return { vacancy, resolution: 'linked-by-id', vacancyCreated: false };
   }

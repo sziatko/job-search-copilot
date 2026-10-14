@@ -61,34 +61,20 @@ export class ApplicationsController {
   }
 
   @Patch(':id/status')
-  async updateStatus(
+  updateStatus(
     @CurrentUserId() userId: string,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateApplicationStatusDto,
   ) {
-    const application = await this.applications.updateStatus(
-      userId,
-      id,
-      dto.status,
-      dto.comment,
-      'USER',
-    );
-    if (!application) {
-      throw new NotFoundException(`Application ${id} not found`);
-    }
-    return application;
+    return this.applications.updateStatus(userId, id, dto.status, dto.comment, 'USER');
   }
 
   @Patch(':id')
-  async update(
+  update(
     @CurrentUserId() userId: string,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateApplicationDto,
   ) {
-    const application = await this.applications.update(userId, id, dto);
-    if (!application) {
-      throw new NotFoundException(`Application ${id} not found`);
-    }
-    return application;
+    return this.applications.update(userId, id, dto);
   }
 }
