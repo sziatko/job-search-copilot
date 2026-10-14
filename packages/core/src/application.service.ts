@@ -11,6 +11,8 @@ import type {
   VacancyResolution,
 } from './application.types';
 import { isById } from './application.types';
+import { ALL_COMMENTS } from './comments';
+import { companyMatchCounts, sameCompanyNames } from './company';
 import {
   AlreadyAppliedError,
   AmbiguousVacancyMatchError,
@@ -31,7 +33,6 @@ import {
   writeStatus,
 } from './status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
-import { ALL_COMMENTS, companyMatchCounts, sameCompanyNames } from './vacancy.service';
 import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 
 /** The Vacancy fields the /applications page reads. */

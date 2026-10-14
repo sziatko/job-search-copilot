@@ -125,8 +125,8 @@ origin, which is also Better Auth's `trustedOrigins`. `AuthModule`'s own CORS is
 >   `PATCH .../status` response, which carries no derived fields
 >   ([ADR-0025](decisions/0025-vacancies-list-search-server-side.md)). Both derived
 >   fields — `companyMatchCount`, `hasAnalysis`, `hasText` — go through one private
->   `withDerivedFields` in `vacancy.service.ts` (the count through the module-level
->   `companyMatchCounts`, which `ApplicationService.list` calls too; it counts by `companyKey`, [ADR-0032](decisions/0032-same-company-normalised-name.md) — so
+>   `withDerivedFields` in `vacancy.service.ts` (the count through
+>   `companyMatchCounts` in `company.ts`, which `ApplicationService.list` calls too; it counts by `companyKey`, [ADR-0032](decisions/0032-same-company-normalised-name.md) — so
 >   `applicationListItemSchema` has it `.optional()` for the same reason); the MSW fake in
 >   `apps/web/src/test/msw/handlers.ts` derives them the same way, so a fixture
 >   cannot hand-set a value the endpoint would not produce.

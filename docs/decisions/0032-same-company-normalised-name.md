@@ -22,7 +22,7 @@ Across the dev DB's company names (2026-10-02), the same rule also:
 
 ## Decision
 
-1. **`companyKey(name)`** in `packages/core/src/vacancy.service.ts`: the vacancy
+1. **`companyKey(name)`** in `packages/core/src/company.ts`: the vacancy
    log's `normalizeCompanyKey` (case, punctuation, legal forms such as `Sp. z o.o.`,
    `Inc`, `B.V.`; intake's key since [ADR-0033](0033-unscored-vacancies-in-one-table.md)) applied after dropping `( … )`
    notes, then a trailing country or region word (`Polska`, `Poland`, `Spain`,

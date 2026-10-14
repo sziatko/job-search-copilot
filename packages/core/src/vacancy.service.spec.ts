@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createUser } from '../tests/user';
 import { ApplicationService } from './application.service';
+import { companyKey } from './company';
 import {
   AlreadyAnalysedError,
   AnalysedNotNewError,
@@ -9,7 +10,7 @@ import {
   VacancyNotFoundError,
 } from './errors';
 import { getPrisma } from './prisma-client';
-import { companyKey, VacancyService } from './vacancy.service';
+import { VacancyService } from './vacancy.service';
 import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
 import { VacancyIntakeService } from './vacancy-intake.service';
 

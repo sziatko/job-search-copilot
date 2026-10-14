@@ -18,6 +18,7 @@ export { APPLICATION_STATES } from './application.types';
 export { verifyApiKey } from './auth/api-key';
 export type { Auth, AuthConfig } from './auth/create-auth';
 export { createAuth } from './auth/create-auth';
+export { companyKey } from './company';
 export {
   AlreadyAnalysedError,
   AlreadyAppliedError,
@@ -43,7 +44,7 @@ export type { Stats } from './stats.service';
 export { StatsService } from './stats.service';
 export type { PipelineStatus } from './status';
 export { PIPELINE_STATUSES } from './status';
-export { companyKey, VacancyService } from './vacancy.service';
+export { VacancyService } from './vacancy.service';
 export type {
   ListVacanciesFilters,
   ListVacanciesResult,
