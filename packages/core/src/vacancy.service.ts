@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { ALL_COMMENTS } from './comments';
 import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from './company';
 import { AlreadyAnalysedError, VacancyNotFoundError } from './errors';
-import { forUser, type UserDb, type UserTx } from './for-user';
+import { forUser, orNull, type UserDb, type UserTx } from './for-user';
 import { textFilters } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
@@ -371,10 +371,9 @@ export class VacancyService {
   ): Promise<VacancyDetail | null> {
     return forUser(this.db, userId).$transaction(async (db) => {
       await writeStatus(db, id, status);
-      const row = await db.vacancy.findUnique({ where: { id }, include: DETAIL_INCLUDE });
       const data = commentOn(comment, 'USER');
-      if (!row || !data.comments) return row && toDetail(row);
-      return toDetail(await db.vacancy.update({ where: { id }, data, include: DETAIL_INCLUDE }));
+      const row = await orNull(db.vacancy.update({ where: { id }, data, include: DETAIL_INCLUDE }));
+      return row && toDetail(row);
     });
   }
 }

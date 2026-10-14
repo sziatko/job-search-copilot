@@ -18,7 +18,7 @@ import {
   AmbiguousVacancyMatchError,
   InvalidApplicationInputError,
 } from './errors';
-import { forUser, type UserDb, type UserTx } from './for-user';
+import { forUser, orNull, type UserDb, type UserTx } from './for-user';
 import { textFilters } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
@@ -74,22 +74,14 @@ function flatten({ statusChanges, ...row }: ApplicationRow, now = new Date()): A
   };
 }
 
-/** One update, returned flattened; null when no vacancy of this user has this id (P2025
- * — let the UPDATE fail rather than check first; `forUser` puts the owner in its
- * `where`). */
+/** One update, returned flattened; null when no vacancy of this user has this id (`orNull`). */
 async function updateRow(
   db: Db,
   id: number,
   data: Prisma.VacancyUpdateInput,
 ): Promise<ApplicationListItem | null> {
-  try {
-    return flatten(await db.vacancy.update({ where: { id }, data, select: APPLICATION_SELECT }));
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
-      return null;
-    }
-    throw err;
-  }
+  const row = await orNull(db.vacancy.update({ where: { id }, data, select: APPLICATION_SELECT }));
+  return row && flatten(row);
 }
 
 /**
