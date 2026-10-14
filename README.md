@@ -1,14 +1,15 @@
 # Job Search Copilot
 
 A personal tool for running a job search. Vacancies come in from job boards and
-recommendation emails, Claude scores each one against my profile (a match score, a
-recommendation and a short review), and this app keeps them: one place to triage what
-is worth applying to, and to follow each application from *applied* to an offer or a
-rejection.
+recommendation emails, or straight from a chat with Claude. Claude scores each one
+against my profile (a match score, a recommendation and a short review), and this app
+keeps them: one place to triage what is worth applying to, and to follow each
+application from *applied* to an offer or a rejection.
 
-It is not a finished product. The analysis happens in Claude; the app is the part that
-organises, tracks and lets me review fast. It grows as my job search needs it — see the
-[roadmap](#roadmap).
+**This is an early MVP, and it is still being written.** For now it covers what my own
+job search needs right away: keeping vacancies, triaging them and tracking
+applications. The analysis happens in Claude; the app organises, tracks and lets me
+review fast. New parts come as I need them — see the [roadmap](#roadmap).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png">
@@ -53,24 +54,28 @@ All the data in the screenshots is made up.
 
 ## How it works
 
+Vacancies get in two ways:
+
 ```
-job boards, recommendation emails
-        │  n8n workflows (outside this repo)
-        ▼
-POST /api/v1/vacancies/intake        an API key: the vacancy lands in its owner's account
-        │
-        ▼
-Vacancy, status NEW  ──────────────  PostgreSQL, through packages/core only
-        │
-        ▼
-Claude, over MCP                      reads the new ones, scores them against my profile,
-        │                             writes back score + recommendation + review
-        ▼
-Web app                               triage: apply, decline, save for later
-        │
-        ▼
-Application pipeline                  applied → replied → recruiter screen → interview → offer
-                                      (Claude can move a status when a reply email comes in)
+ 1. Collected                              2. From a chat with Claude
+ job boards, recommendation emails         a link, a posting or a whole list
+          │ n8n workflows                           │ Claude scores it right in the chat
+          ▼                                         ▼
+ POST /api/v1/vacancies/intake             MCP: save_vacancy / save_vacancies_batch
+ with an API key; lands unscored (NEW)     lands already scored
+          │                                         │
+          ▼                                         │
+ Claude, over MCP: picks up the NEW ones,           │
+ scores them, submits the analyses                  │
+          │                                         │
+          └────────────────────┬────────────────────┘
+                               ▼
+              PostgreSQL, through packages/core only
+                               ▼
+              Web app: triage — apply, decline, save for later
+                               ▼
+              Application pipeline: applied → replied → recruiter screen → interview → offer
+              (Claude can move a status when a reply email comes in)
 ```
 
 A vacancy has two independent fields: the **recommendation** is Claude's opinion and
@@ -90,8 +95,8 @@ feed the app instead.
   a company's other vacancies in a modal.
 - **Application tracker** — pipeline stages, salary and tailored-CV notes, comments,
   and a 30-day timeout for applications nobody answered.
-- **MCP server** — 15 tools, so Claude can read the queue, submit analyses, record
-  applications and move statuses. Over stdio, or Streamable HTTP with OAuth 2.1.
+- **MCP server** — 15 tools, so Claude can save vacancies scored in a chat, read the
+  queue, submit analyses, record applications and move statuses. Over stdio, or Streamable HTTP with OAuth 2.1.
 - **REST API** — documented with Swagger UI; every route closed unless marked
   otherwise.
 - **Sign-in** — Google, LinkedIn or a passkey; sign-up limited to an allowlist.
