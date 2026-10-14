@@ -26,7 +26,20 @@ export default defineConfig({
     storageState: path.join(__dirname, '.auth', 'state.json'), // written by global setup
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // The README's screenshots (screenshots.ts): only under `npm run screenshots`, so
+    // `npm run test:e2e` and CI never take them.
+    ...(process.env.npm_lifecycle_event === 'screenshots'
+      ? [
+          {
+            name: 'screenshots',
+            testMatch: 'screenshots.ts',
+            use: { ...devices['Desktop Chrome'] },
+          },
+        ]
+      : []),
+  ],
   webServer: [
     {
       // Built to e2e/.api, not apps/api/dist: the dev stack's `nest start --watch` owns

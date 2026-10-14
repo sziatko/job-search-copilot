@@ -67,5 +67,9 @@ and a status history), `/applications`, `/inbox`, each light and dark, viewport
 
 - [x] **0 · Docs.** This doc, its row in `docs/README.md`, the backlog's Screenshots
   row `planned (phase 7.1)`. — *2026-10-14.*
-- [ ] **1 · Screenshots.**
+- [x] **1 · Screenshots.** — *2026-10-14.* The 10 PNGs are in `docs/screenshots/`
+  (~90–200 KB each). A shot waits for `#root` to mount, then `networkidle`, then no
+  `.skeleton`: without the first wait vite dev's first load shot a blank page. The
+  sidebar shows the seed user's name, "E2E User", and the seed's titles repeat ("Frontend
+  Team Lead" down the review list) — a seed change moves every e2e count, so they stay.
 - [ ] **2 · README, `docs/development.md`, close-out.**
