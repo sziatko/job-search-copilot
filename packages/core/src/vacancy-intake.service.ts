@@ -1,5 +1,6 @@
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { InvalidIntakeEntryError } from './errors';
+import { forUser, type UserTx } from './for-user';
 import { getPrisma } from './prisma-client';
 import { firstStatus } from './status';
 import { normalizeApplyUrl } from './url';
@@ -41,7 +42,8 @@ function prepare(entry: VacancyIntakeInput): PreparedEntry | null {
 
 /**
  * How a posting enters `Vacancy` unanalysed (ADR-0033): a new one is created in NEW, a
- * known one is reported as a duplicate. Nothing else is reported.
+ * known one is reported as a duplicate. Nothing else is reported. Per user: another
+ * user's vacancies are never a duplicate (`forUser`, ADR-0038).
  */
 export class VacancyIntakeService {
   /** @param db defaults (on construction, not import) to the lazy process-wide client —
@@ -50,14 +52,16 @@ export class VacancyIntakeService {
 
   /** One posting. An entry without an http(s) url, a company or a title is an error,
    * not a silent skip: the caller must not read "not taken in" as "duplicate". */
-  async intake(entry: VacancyIntakeInput): Promise<{ new: boolean }> {
+  async intake(userId: string, entry: VacancyIntakeInput): Promise<{ new: boolean }> {
     const prepared = prepare(entry);
     if (!prepared) {
       throw new InvalidIntakeEntryError(
         'url (an http(s) link), company and title are all required',
       );
     }
-    return { new: await this.db.$transaction((tx) => intakeOne(tx, prepared)) };
+    return {
+      new: await forUser(this.db, userId).$transaction((db) => intakeOne(db, userId, prepared)),
+    };
   }
 
   /**
@@ -66,13 +70,13 @@ export class VacancyIntakeService {
    * find it in its own list. Entries without a usable url, a company or a title are
    * skipped.
    */
-  async intakeMany(entries: VacancyIntakeInput[]): Promise<{ new: string[] }> {
-    return this.db.$transaction(
-      async (tx) => {
+  async intakeMany(userId: string, entries: VacancyIntakeInput[]): Promise<{ new: string[] }> {
+    return forUser(this.db, userId).$transaction(
+      async (db) => {
         const fresh: string[] = [];
         for (const entry of entries) {
           const prepared = prepare(entry);
-          if (prepared && (await intakeOne(tx, prepared))) {
+          if (prepared && (await intakeOne(db, userId, prepared))) {
             fresh.push(entry.url as string);
           }
         }
@@ -90,12 +94,15 @@ export class VacancyIntakeService {
  * posting text it lacked: never a status, a source or an analysis. Returns true when
  * the entry was new.
  */
-async function intakeOne(tx: Prisma.TransactionClient, entry: PreparedEntry): Promise<boolean> {
+async function intakeOne(db: UserTx, userId: string, entry: PreparedEntry): Promise<boolean> {
   const select = { id: true, fullText: true } as const;
   const row =
-    (await tx.vacancy.findUnique({ where: { applyUrl: entry.applyUrl }, select })) ??
+    (await db.vacancy.findUnique({
+      where: { userId_applyUrl: { userId, applyUrl: entry.applyUrl } },
+      select,
+    })) ??
     (entry.companyKey && entry.titleKey
-      ? await tx.vacancy.findFirst({
+      ? await db.vacancy.findFirst({
           where: { companyKey: entry.companyKey, titleKey: entry.titleKey },
           orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           select,
@@ -103,11 +110,11 @@ async function intakeOne(tx: Prisma.TransactionClient, entry: PreparedEntry): Pr
       : null);
 
   if (!row) {
-    await tx.vacancy.create({ data: { ...entry, ...firstStatus(new Date()) } });
+    await db.vacancy.create({ data: { ...entry, userId, ...firstStatus(new Date()) } });
     return true;
   }
   if (row.fullText === null && entry.fullText !== null) {
-    await tx.vacancy.update({ where: { id: row.id }, data: { fullText: entry.fullText } });
+    await db.vacancy.update({ where: { id: row.id }, data: { fullText: entry.fullText } });
   }
   return false;
 }

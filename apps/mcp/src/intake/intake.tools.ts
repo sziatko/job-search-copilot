@@ -17,7 +17,11 @@ const IntakeEntrySchema = z.object({
 });
 
 /** Registers the 2 intake tools on `server`, backed by `intake`. */
-export function registerIntakeTools(server: McpServer, intake: VacancyIntakeService): void {
+export function registerIntakeTools(
+  server: McpServer,
+  intake: VacancyIntakeService,
+  userId: string,
+): void {
   server.registerTool(
     'intake_vacancy',
     {
@@ -35,7 +39,7 @@ export function registerIntakeTools(server: McpServer, intake: VacancyIntakeServ
         'intake_vacancies_batch.',
       inputSchema: IntakeEntrySchema.shape,
     },
-    withDomainErrors(async (entry) => json(await intake.intake(entry))),
+    withDomainErrors(async (entry) => json(await intake.intake(userId, entry))),
   );
 
   server.registerTool(
@@ -50,6 +54,6 @@ export function registerIntakeTools(server: McpServer, intake: VacancyIntakeServ
         `every other entry is a duplicate. Max ${BATCH_MAX} per call.`,
       inputSchema: { entries: z.array(IntakeEntrySchema).min(1).max(BATCH_MAX) },
     },
-    withDomainErrors(async ({ entries }) => json(await intake.intakeMany(entries))),
+    withDomainErrors(async ({ entries }) => json(await intake.intakeMany(userId, entries))),
   );
 }

@@ -10,7 +10,7 @@ client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (Re
 - [`docs/architecture.md`](docs/architecture.md) — the system map. Start here.
 - [`docs/contracts.md`](docs/contracts.md) — surfaces other code depends on.
 - [`docs/domain-model.md`](docs/domain-model.md) — the two independent axes.
-- [`docs/decisions/`](docs/decisions/) — 32 ADRs, one per load-bearing decision.
+- [`docs/decisions/`](docs/decisions/) — 34 ADRs, one per load-bearing decision.
 - [`docs/design/`](docs/design/) — visual references (HTML mockups). Not prose; open
   in a browser rather than reading.
 - `skills/` — the user's Claude skills that drive the MCP server, uploaded to
@@ -42,6 +42,8 @@ Quote them from there if you change one; keep this list in step.
 9. **Every REST route is closed by default** — anonymous or machine access is explicit.
 10. **No real job-search data in the repo** — made-up companies, ids, rates and counts
     in code, tests, docs and commits, never ones from the dev DB.
+11. **Every domain query is scoped to its user** — through `forUser(db, userId)` in
+    `core`; another user's row is a 404 (phase 7, from step 3a).
 
 ## Commands
 

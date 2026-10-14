@@ -20,22 +20,36 @@ export async function createTestApp(): Promise<NestExpressApplication> {
 }
 
 /**
- * A signed-in user's session cookie: a `User` and a `Session` row in the test DB, and
+ * A signed-in user: a `User` and a `Session` row in the test DB, and the session cookie,
  * the token signed the way Better Auth signs its cookie (what its `testUtils` plugin
  * does, without putting a test plugin in `createAuth`). Delete users in `afterAll`.
  */
-export async function signIn(app: NestExpressApplication): Promise<string> {
+export async function signIn(
+  app: NestExpressApplication,
+): Promise<{ cookie: string; userId: string }> {
   const user = await getPrisma().user.create({
     data: { id: randomUUID(), name: 'Test User', email: `${randomUUID()}@example.com` },
   });
   const ctx = await app.get<AuthService<Auth>>(AuthService).instance.$context;
   const { token } = await ctx.internalAdapter.createSession(user.id);
-  return `${ctx.authCookies.sessionToken.name}=${token}.${await makeSignature(token, ctx.secret)}`;
+  const value = `${token}.${await makeSignature(token, ctx.secret)}`;
+  return { cookie: `${ctx.authCookies.sessionToken.name}=${value}`, userId: user.id };
 }
 
-/** supertest with the session cookie on every request. */
+/** supertest with the session cookie on every request; `userId` is whose data it sees. */
 export async function signedInAgent(app: NestExpressApplication) {
-  return request.agent(app.getHttpServer()).set('Cookie', await signIn(app));
+  const { cookie, userId } = await signIn(app);
+  return Object.assign(request.agent(app.getHttpServer()).set('Cookie', cookie), { userId });
 }
 
 export type Api = Awaited<ReturnType<typeof signedInAgent>>;
+
+/** What /profile's "Create" does: a key for a new user, shown once; `userId` its owner. */
+export async function createApiKey(app: NestExpressApplication) {
+  const user = await getPrisma().user.create({
+    data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
+  });
+  const auth = app.get<AuthService<Auth>>(AuthService);
+  const created = await auth.api.createApiKey({ body: { name: 'n8n', userId: user.id } });
+  return { key: created.key, id: created.id, userId: user.id };
+}

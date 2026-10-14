@@ -18,7 +18,7 @@ import { VacanciesModule } from './vacancies/vacancies.module';
     ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, validate: validateEnv }),
     PrismaModule,
     // Mounts /api/auth/* and a global guard: every route wants a session unless it is
-    // @AllowAnonymous() or behind MachineTokenGuard (ADR-0034, ADR-0036).
+    // @AllowAnonymous() or behind ApiKeyGuard (ADR-0034, ADR-0039).
     AuthModule.forRootAsync({
       inject: [PrismaService, ConfigService],
       useFactory: (prisma: PrismaService, config: ConfigService<Env, true>) => {

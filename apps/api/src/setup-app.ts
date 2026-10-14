@@ -34,7 +34,12 @@ export function configureApp(app: NestExpressApplication, config: ConfigService<
     app,
     SwaggerModule.createDocument(
       app,
-      new DocumentBuilder().setTitle('Job Search Copilot API').setVersion('1').build(),
+      new DocumentBuilder()
+        .setTitle('Job Search Copilot API')
+        .setVersion('1')
+        // An API key (`jsc_…`, from /profile) on the three machine routes (ADR-0039).
+        .addBearerAuth()
+        .build(),
     ),
     { useGlobalPrefix: true },
   );

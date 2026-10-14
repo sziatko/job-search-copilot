@@ -1,4 +1,5 @@
 import type { PrismaClient, VacancyStatus } from '@prisma/client';
+import { forUser } from './for-user';
 import { getPrisma } from './prisma-client';
 import {
   OPEN_PIPELINE_STATUSES,
@@ -62,10 +63,12 @@ export class StatsService {
    *   same rationale as VacancyService. Nest passes its managed client. */
   constructor(private readonly db: PrismaClient = getPrisma()) {}
 
-  /** @param now the timeout clock's "today"; a parameter so a test can pin it. */
-  async get(now = new Date()): Promise<Stats> {
+  /** One user's numbers (`forUser`, ADR-0038). @param now the timeout clock's "today"; a
+   * parameter so a test can pin it. */
+  async get(userId: string, now = new Date()): Promise<Stats> {
+    const db = forUser(this.db, userId);
     const everReached = (statuses: VacancyStatus[]) =>
-      this.db.vacancy.count({ where: { statusChanges: { some: { status: { in: statuses } } } } });
+      db.vacancy.count({ where: { statusChanges: { some: { status: { in: statuses } } } } });
 
     const [
       logged,
@@ -82,25 +85,25 @@ export class StatsService {
       timedOut,
       recent,
     ] = await Promise.all([
-      this.db.vacancy.count(),
-      this.db.vacancy.count({ where: { status: 'NEW' } }),
-      this.db.vacancy.count({ where: { status: 'NOT_REVIEWED' } }),
-      this.db.vacancy.count({ where: { recommendation: { in: ['APPLY', 'APPLY_WITH_CAVEATS'] } } }),
-      this.db.vacancy.count({
+      db.vacancy.count(),
+      db.vacancy.count({ where: { status: 'NEW' } }),
+      db.vacancy.count({ where: { status: 'NOT_REVIEWED' } }),
+      db.vacancy.count({ where: { recommendation: { in: ['APPLY', 'APPLY_WITH_CAVEATS'] } } }),
+      db.vacancy.count({
         where: { OR: [{ status: 'FILTERED_OUT' }, { recommendation: 'SKIP' }] },
       }),
       everReached(['APPLIED']),
-      this.db.vacancy.count({ where: { status: 'DECLINED' } }),
-      this.db.vacancy.count({ where: { status: 'UNAVAILABLE' } }),
+      db.vacancy.count({ where: { status: 'DECLINED' } }),
+      db.vacancy.count({ where: { status: 'UNAVAILABLE' } }),
       everReached(RESPONDED),
       everReached(INTERVIEWED),
-      this.db.vacancy.groupBy({
+      db.vacancy.groupBy({
         by: ['status'],
         where: { status: { in: [...PIPELINE_STATUSES] } },
         _count: { _all: true },
       }),
-      this.db.vacancy.count({ where: timedOutWhere(now) }),
-      this.db.statusChange.findMany({
+      db.vacancy.count({ where: timedOutWhere(now) }),
+      db.statusChange.findMany({
         where: { status: { in: [...PIPELINE_STATUSES] } },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: RECENT_SIZE,

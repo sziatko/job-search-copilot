@@ -23,6 +23,9 @@ describe('API docs (e2e)', () => {
     expect(Object.keys(res.body.paths)).toEqual(
       expect.arrayContaining(['/api/v1/vacancies/intake', '/api/v1/vacancies/{id}/analysis']),
     );
+    // The three machine routes take an API key; Swagger's Authorize button sends it.
+    expect(res.body.paths['/api/v1/vacancies/intake'].post.security).toEqual([{ bearer: [] }]);
+    expect(res.body.paths['/api/v1/vacancies'].get.security).toBeUndefined();
   });
 
   it('serves the Swagger UI', async () => {

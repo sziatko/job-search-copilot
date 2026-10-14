@@ -26,10 +26,18 @@ default is 100 KB) — intake carries posting text.
 **Auth** ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)) — every route wants
 a session cookie, else `401`; Better Auth serves `/api/auth/*`. Two exceptions:
 `/health` is anonymous; `POST /vacancies/intake`, `POST /vacancies/analysis` and
-`POST /vacancies/:id/analysis` also take `Authorization: Bearer <INTAKE_TOKEN>`
-([ADR-0036](decisions/0036-machine-token-for-n8n.md)) — n8n's credentials hold that
-header, so renaming it or its scheme breaks them. Swagger (`/api/docs`) is outside
+`POST /vacancies/:id/analysis` also take `Authorization: Bearer jsc_…`, an API key
+from `/profile` ([ADR-0039](decisions/0039-api-keys-per-user.md)) — n8n's credentials hold that
+header, so renaming it or its scheme breaks them. A key opens only those three: on any
+other route it is a `401`. Swagger (`/api/docs`) is outside
 Nest's router, so the guard does not see it: it stays open.
+
+**Every route acts as one user** ([ADR-0038](decisions/0038-multi-user-shared-schema.md),
+invariant 11) — the session's, or the key's owner. It reads and writes only that
+user's vacancies (their comments and status journal with them), `/stats` included;
+another user's id is a `404`, as an unknown one, never a `403`. An intake with a key
+lands in the key's owner; the duplicate check (`applyUrl`, else company + title) looks
+only at that user's rows, so two users can hold the same posting.
 
 Browse and try it: Swagger UI at `/api/docs`, the OpenAPI document at `/api/docs-json`
 (`@nestjs/swagger`; requests only, responses are untyped). The request fields come
@@ -52,7 +60,7 @@ the last item's `id` when more rows follow. `cursor` and `offset` together → `
 | `POST /api/v1/vacancies` | `SaveVacancyDto` (below) | `201` + `Location: /api/v1/vacancies/{id}` when created; `200` when `applyUrl` already exists — with this analysis attached (and `fullText`, when the row had none) if the row had no analysis (taken in by intake), else untouched ([ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)). Body = the full `Vacancy` row (incl. `fullText`) either way — without `estimationComment`, which is a `Comment` row now; `GET /:id` returns it. | `400` DTO validation; `422` `DomainError` (see below) |
 | `POST /api/v1/vacancies/:id/analysis` | `SubmitAnalysisDto`: `matchScore` (`@IsInt @Min(0) @Max(100)`), `recommendation` (`@IsIn(RECOMMENDATION_INPUT_VALUES)`), `estimationComment` (`@IsString @IsNotEmpty`; the `ANALYZER` comment) | `200` — the full `Vacancy` row, now analysed. From `NEW` the status moves by the rule (`SKIP` → `FILTERED_OUT`, else `NOT_REVIEWED`, journaled); any other status is untouched ([ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)). For sub-project 3's n8n flow | `409` `AlreadyAnalysedError` (nothing written); `404` `VacancyNotFoundError`; `400` DTO / non-integer id |
 | `POST /api/v1/vacancies/analysis` | `SubmitAnalysesDto`: `{ analyses: [{ id, matchScore, recommendation, estimationComment }] }` (1–10 — `ANALYSIS_BATCH_MAX`, `@ValidateNested`) | `200` — the `Vacancy` rows, in input order. **One transaction**: one failing item writes none of them | `409` / `404` as above, for any item (nothing written); `400` DTO (empty, more than 10) |
-| `POST /api/v1/vacancies/intake` | `IntakeVacanciesDto`: `{ entries: [...] }` (1–100, `@ValidateNested`), each `url` (`@IsUrl` — http(s), scheme required), `company`, `title` (`@IsString`, not blank), `source?` (free text: `linkedin`, `justjoin`, …), `fullText?` — raw, normalized in core; under 200 characters once trimmed it counts as none (a login wall, not a posting). A session or `Bearer <INTAKE_TOKEN>` (n8n) | **`200`** `{ new: string[] }` — the url of each new entry **exactly as sent**; each is now a vacancy in status `NEW`, unanalysed, with `source` and `fullText` when given. Every other entry was a duplicate (by url, else by company + title — [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)); a duplicate without posting text gets the entry's, and nothing else. **One transaction**, in order: a posting twice in one call is new once. n8n's way in | `400` DTO (empty / more than 100 / an entry without an http(s) url, a company or a title — the whole call) |
+| `POST /api/v1/vacancies/intake` | `IntakeVacanciesDto`: `{ entries: [...] }` (1–100, `@ValidateNested`), each `url` (`@IsUrl` — http(s), scheme required), `company`, `title` (`@IsString`, not blank), `source?` (free text: `linkedin`, `justjoin`, …), `fullText?` — raw, normalized in core; under 200 characters once trimmed it counts as none (a login wall, not a posting). A session or `Bearer <API key>` (n8n) | **`200`** `{ new: string[] }` — the url of each new entry **exactly as sent**; each is now a vacancy in status `NEW`, unanalysed, with `source` and `fullText` when given. Every other entry was a duplicate (by url, else by company + title — [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)); a duplicate without posting text gets the entry's, and nothing else. **One transaction**, in order: a posting twice in one call is new once. n8n's way in | `400` DTO (empty / more than 100 / an entry without an http(s) url, a company or a title — the whole call) |
 | `GET /api/v1/vacancies` | query: `recommendation?` (enum, EN), `status?` (`A,B` — any of them, each `@IsEnum(VacancyStatus)`), `company?` (string, ILIKE contains — `%`/`_`/`\` are literal), `sameCompanyAs?` (string — every spelling of the name's company: an equal `companyKey`, [ADR-0032](decisions/0032-same-company-normalised-name.md), never `FILTERED_OUT` — the rows `companyMatchCount` counts; ANDs with the rest), `hasText?` (`true` \| `false` — with / without posting text; anything else `400`), `search?` (string — `company` **OR** `title`, ILIKE, same escaping), `limit?` (1–100, default 20 in core), `offset?` (≥0), `cursor?` (int ≥1); `sort?` — `newest` (default, `createdAt desc, id desc`) or `recommended` (`recommendation asc, matchScore desc, id desc` — the unanalysed last) | `200 { items: VacancyListItem[], total: number }` — **items omit `fullText`** and carry the derived `companyMatchCount`, `hasAnalysis` (`recommendation !== null`) and `hasText` (`fullText !== null`); `matchScore` / `recommendation` are `null` on a vacancy not analysed yet ([ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)); plus `nextCursor` | `400` bad query (e.g. `limit=200`, `sort=oldest`); `cursor` with `offset` |
 | `GET /api/v1/vacancies/:id` | — | `200` full `Vacancy` (incl. `fullText` — `null` when there is no posting text — `matchScore` / `recommendation` — both `null` when not analysed — `status`, `statusChangedAt`, salary / CV, `companyKey` / `titleKey`, `source`) plus `comments` (every one, oldest first) and `estimationComment: string \| null`, the first `ANALYZER` comment, plus `timeline: { status, createdAt }[]` from `StatusChange`, oldest first | `404` unknown id; `400` non-integer id (`ParseIntPipe`) |
 | `PATCH /api/v1/vacancies/:id/status` | `{ status: VacancyStatus, comment?: string }` — any status; every call is journaled and moves `statusChangedAt`, a repeated pipeline status included. A non-blank `comment` becomes a new dated `USER` row in `comments`, in the same transaction (the web sends it from Save for later's dialog) | `200` as `GET /:id` — the web parses it with its list-item schema | `404` unknown id; `400` bad `status`; `422` `SameStatusError` — a triage status the vacancy already has; `422` `AnalysedNotNewError` — `NEW` for a vacancy that has an analysis (the `Vacancy_new_is_unanalysed` CHECK, [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)); nothing written either way |
@@ -174,14 +182,19 @@ server on stdio) — it shows what `tools/list` returns, so it is always the rea
 
 **Over HTTP** ([ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md)) —
 `apps/mcp/src/http.ts` (`npm run dev:mcp:http`, port `MCP_HTTP_PORT`, 3001) serves the
-same tools as Streamable HTTP at `MCP_PUBLIC_URL`'s path (`/mcp`); stdio is unchanged
-and has no auth.
+same tools as Streamable HTTP at `MCP_PUBLIC_URL`'s path (`/mcp`), to an OAuth token or
+an API key (`Bearer jsc_…`, [ADR-0039](decisions/0039-api-keys-per-user.md)); stdio acts
+as the owner of `JSC_API_KEY`, verified at boot (an invalid key → the process exits with
+an error). Either way the tools see only that user's data: another user's id is
+"not found", as over REST.
 
 - `GET /.well-known/oauth-protected-resource/mcp` (RFC 9728, path-inserted) →
   `{ resource: MCP_PUBLIC_URL, authorization_servers: ["${BETTER_AUTH_URL}/api/auth"],
   bearer_methods_supported: ["header"] }`. The authorization server's own metadata is
   the API's (`/.well-known/oauth-authorization-server/api/auth`).
-- `POST /mcp` wants `Authorization: Bearer <access token>`: a JWT the API's
+- `POST /mcp` wants `Authorization: Bearer <access token>`. A `jsc_…` bearer is an API
+  key, checked against the database (`verifyApiKey`); its owner is the user, and an
+  invalid or revoked key is a `401` as below. Anything else is a JWT the API's
   `oauthProvider` signed (`typ: at+jwt`), checked against the API's JWKS
   (`${AUTH_URL}/api/auth/jwks`, cached) for `iss` = `${BETTER_AUTH_URL}/api/auth`,
   `aud` ∋ `MCP_PUBLIC_URL`, `exp`. No token, or a bad one → `401` with

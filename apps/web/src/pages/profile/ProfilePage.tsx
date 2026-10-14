@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useId, useState } from 'react';
 import { toast } from 'sonner';
 import { IconPerson } from '@/components/icons';
 import { SoonPage } from '@/components/ui/SoonPage';
@@ -84,10 +85,131 @@ function PasskeysCard() {
   );
 }
 
+/**
+ * The signed-in user's API keys, for n8n and MCP (ADR-0039): each acts as this user.
+ * The API keeps only a hash, so a new key is shown once, here, to copy. Revoke deletes
+ * it; whatever still sends it gets a 401.
+ */
+function ApiKeysCard() {
+  const queryClient = useQueryClient();
+  const nameId = useId();
+  const [name, setName] = useState('');
+  const keys = useQuery({
+    queryKey: ['api-keys'],
+    queryFn: async () => orThrow(await authClient.apiKey.list()).apiKeys,
+  });
+  const onSettled = () => queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+  const onError = (error: Error) => toast.error(error.message);
+  const create = useMutation({
+    mutationFn: async (keyName: string) =>
+      orThrow(await authClient.apiKey.create({ name: keyName })).key,
+    onSuccess: () => setName(''),
+    onSettled,
+    onError,
+  });
+  const revoke = useMutation({
+    mutationFn: async (keyId: string) => orThrow(await authClient.apiKey.delete({ keyId })),
+    onSettled,
+    onError,
+  });
+  const copy = async (key: string) => {
+    try {
+      await navigator.clipboard.writeText(key);
+      toast.success('Key copied');
+    } catch {
+      toast.error('Could not copy: select the key and copy it by hand');
+    }
+  };
+
+  return (
+    <section className="view pb-0">
+      <div className="card">
+        <div className="card-head">
+          <h2>API keys</h2>
+        </div>
+        <div className="toolbar flex-col items-stretch">
+          <form
+            className="flex items-end gap-[12px]"
+            onSubmit={(e) => {
+              e.preventDefault();
+              create.mutate(name.trim());
+            }}
+          >
+            <div className="flex-1">
+              <label htmlFor={nameId} className="field-label">
+                Key name
+              </label>
+              <input
+                id={nameId}
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. n8n"
+                className="field-input"
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={create.isPending || !name.trim()}
+            >
+              Create a key
+            </button>
+          </form>
+          {create.data && (
+            <div className="flex flex-col gap-[8px]">
+              <p>Copy this key now: it will not be shown again.</p>
+              <div className="flex items-center gap-[12px]">
+                <code className="break-all">{create.data}</code>
+                <button type="button" className="btn" onClick={() => copy(create.data)}>
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
+          {keys.isPending && <p className="text-ink-muted">Loading…</p>}
+          {keys.isError && <p className="text-bad">Failed to load API keys</p>}
+          {keys.data?.length === 0 && (
+            <p className="text-ink-muted">No API keys yet. Create one for n8n or MCP.</p>
+          )}
+          {keys.data && keys.data.length > 0 && (
+            <ul className="flex flex-col gap-[8px]">
+              {keys.data.map((key) => (
+                <li key={key.id} className="flex items-center justify-between gap-[12px]">
+                  <span>
+                    {key.name || 'API key'}
+                    <span className="text-ink-muted">
+                      {' '}
+                      · {key.start}… · created {new Date(key.createdAt).toLocaleDateString()} ·{' '}
+                      {key.lastRequest
+                        ? `last used ${new Date(key.lastRequest).toLocaleDateString()}`
+                        : 'never used'}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={revoke.isPending}
+                    onClick={() => revoke.mutate(key.id)}
+                  >
+                    Revoke
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function ProfilePage() {
   return (
     <>
       <PasskeysCard />
+      <ApiKeysCard />
       <SoonPage
         icon={IconPerson}
         title="Profile & forms — coming soon"

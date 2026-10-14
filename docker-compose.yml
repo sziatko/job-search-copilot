@@ -73,7 +73,7 @@ services:
         condition: service_started
     # Prisma client regenerated on start — see `core`.
     command: sh -c "npm --prefix /repo run generate && exec npm run start:dev"
-    # The auth vars (BETTER_AUTH_*, WEB_ORIGIN, GOOGLE_*, LINKEDIN_*, INTAKE_TOKEN, …)
+    # The auth vars (BETTER_AUTH_*, WEB_ORIGIN, GOOGLE_*, LINKEDIN_*, …)
     # come from .env; `environment:` below overrides what must differ in a container.
     env_file: .env
     environment:

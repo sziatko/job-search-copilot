@@ -1,6 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { verifyApiKey } from '@job-search-copilot/core';
 import { env } from './db';
 import { expect, test } from './fixtures';
+import { e2eAuth, sessionCookie } from './session';
 
 const apiOrigin = env('BETTER_AUTH_URL');
 
@@ -59,6 +61,40 @@ test('a passkey: add, sign out, sign in with it, remove', async ({ page }) => {
   await page.getByRole('navigation').getByRole('link', { name: 'Profile & forms' }).click();
   await removeButtons.click();
   await expect(page.getByText('No passkeys yet.')).toBeVisible();
+});
+
+test('an API key: create, list, revoke', async ({ db, page }) => {
+  await page.goto('/profile');
+  await expect(page.getByText(/No API keys yet/)).toBeVisible();
+  await page.getByLabel('Key name').fill('Made-up n8n');
+  await page.getByRole('button', { name: 'Create a key' }).click();
+
+  const shown = page.locator('code');
+  await expect(shown).toHaveText(/^jsc_/);
+  const key = (await shown.textContent()) as string;
+  const owner = await db.user.findFirstOrThrow();
+  expect(await verifyApiKey(db, key)).toBe(owner.id);
+
+  const row = page.getByRole('listitem').filter({ hasText: 'Made-up n8n' });
+  await expect(row).toContainText(key.slice(0, 6));
+  await row.getByRole('button', { name: 'Revoke' }).click();
+  await expect(page.getByText(/No API keys yet/)).toBeVisible();
+  expect(await verifyApiKey(db, key)).toBeNull();
+});
+
+// Every row has an owner (ADR-0038): the seed is the first user's, none of it another's.
+test('a second account signs in to an empty dashboard', async ({ db, page }) => {
+  const id = randomUUID();
+  await db.user.create({ data: { id, name: 'Second User', email: `${id}@example.com` } });
+  await page.context().clearCookies();
+  await page.context().addCookies([await sessionCookie(e2eAuth(db), id)]);
+
+  await page.goto('/');
+  await expect(
+    page.locator('.kpi-tile').filter({ hasText: 'Logged' }).locator('.kpi-value'),
+  ).toHaveText('0');
+  await expect(page.getByText('Everything is triaged. Nice.')).toBeVisible();
+  await expect(page.getByText('No status changes yet.')).toBeVisible();
 });
 
 test.describe('consent for an MCP client', () => {

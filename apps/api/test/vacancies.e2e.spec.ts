@@ -25,8 +25,12 @@ describe('Vacancies (e2e)', () => {
 
   /** A vacancy intake took in (NEW, unanalysed, no text); returns its id. */
   async function queued(url: string): Promise<number> {
-    await new VacancyIntakeService(prisma).intake({ url, company: 'Queued Co', title: url });
-    return (await prisma.vacancy.findUniqueOrThrow({ where: { applyUrl: url } })).id;
+    await new VacancyIntakeService(prisma).intake(api.userId, {
+      url,
+      company: 'Queued Co',
+      title: url,
+    });
+    return (await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
   }
 
   beforeAll(async () => {
@@ -129,7 +133,7 @@ describe('Vacancies (e2e)', () => {
       const res = await intake([{ ...entry, source: 'justjoin', fullText }]).expect(200);
       expect(res.body).toEqual({ new: [] });
       expect(
-        await prisma.vacancy.findUniqueOrThrow({ where: { applyUrl: entry.url } }),
+        await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: entry.url } }),
       ).toMatchObject({ fullText, source: null, status: 'NEW' });
     });
 

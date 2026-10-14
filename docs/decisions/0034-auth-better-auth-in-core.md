@@ -46,16 +46,19 @@ issues tokens. Moving to an IdP later changes the backend only.
 - Better Auth is young and moves fast (its `mcp` plugin was deprecated within a minor
   release); upgrades need reading the changelog.
 - The NestJS integration is a community package, and it wants Nest's body parser off.
-- The allowlist is a stopgap for the missing `userId`.
+- The allowlist was a stopgap for the missing `userId`; since phase 7 every vacancy has
+  an owner ([ADR-0038](0038-multi-user-shared-schema.md)), and the allowlist stays as
+  the gate on sign-up: there is no open sign-up.
 
 ## What this constrains — breaks if you change it
 - Better Auth's queries run inside `core` on `core`'s client. Building a second
   `betterAuth` instance in `apps/api` with its own client breaks invariant 1 and the
   test DB's lifecycle.
 - A new REST route is closed unless marked `@AllowAnonymous()` or guarded by
-  `MachineTokenGuard` ([ADR-0036](0036-machine-token-for-n8n.md)). Marking one anonymous
-  exposes data: `Vacancy` has no owner.
-- Removing the allowlist before `userId` lands gives every new account all the data.
+  `ApiKeyGuard` ([ADR-0039](0039-api-keys-per-user.md)). Marking one anonymous
+  leaves it with no user to scope its queries to.
+- Removing the allowlist opens sign-up to anyone: each account sees only its own data
+  ([ADR-0038](0038-multi-user-shared-schema.md)), but anyone could store data here.
 - Account linking is left empty of `trustedProviders`: an account links to an existing
   user only when the provider says `email_verified`. Adding a trusted provider skips
   that check and lets an unverified address there take over the account.
@@ -67,4 +70,4 @@ issues tokens. Moving to an IdP later changes the backend only.
 ## Related
 [ADR-0002](0002-core-shared-domain-layer.md), [ADR-0007](0007-env-config-and-loading.md),
 [ADR-0035](0035-mcp-over-http-oauth-resource-server.md),
-[ADR-0036](0036-machine-token-for-n8n.md), [`../phases/phase-6.md`](../phases/phase-6.md).
+[ADR-0039](0039-api-keys-per-user.md), [`../phases/phase-6.md`](../phases/phase-6.md).

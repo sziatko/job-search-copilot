@@ -1,16 +1,20 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createServer } from './server';
+
+/** The user the server acts as (ADR-0038): a real row, its vacancies' owner. */
+const userId = randomUUID();
 
 // Connects a real MCP Client to createServer() over an in-memory transport pair
 // (the SDK's own recommended way to test a server) instead of spawning stdio —
 // exercises the actual registerTool handlers, input schemas, and error shapes.
-async function connectedClient() {
-  const server = createServer();
+async function connectedClient(as = userId) {
+  const server = createServer({ userId: as });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test-client', version: '0.0.0' });
   await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -23,8 +27,13 @@ function textOf(result: { content?: Array<{ type: string; text?: string }> }): s
 
 /** A vacancy intake took in (NEW, unanalysed); returns its id. */
 async function queued(url: string, fullText?: string): Promise<number> {
-  await new VacancyIntakeService().intake({ url, company: 'Queued Co', title: url, fullText });
-  return (await getPrisma().vacancy.findUniqueOrThrow({ where: { applyUrl: url } })).id;
+  await new VacancyIntakeService().intake(userId, {
+    url,
+    company: 'Queued Co',
+    title: url,
+    fullText,
+  });
+  return (await getPrisma().vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
 }
 
 const validArgs = {
@@ -40,11 +49,18 @@ const validArgs = {
 describe('job-search-copilot MCP server', () => {
   const prisma = getPrisma();
 
+  beforeAll(async () => {
+    await prisma.user.create({
+      data: { id: userId, name: 'Test User', email: `${userId}@example.com` },
+    });
+  });
+
   afterEach(async () => {
     await prisma.vacancy.deleteMany();
   });
 
   afterAll(async () => {
+    await prisma.user.delete({ where: { id: userId } });
     await prisma.$disconnect();
   });
 
@@ -975,5 +991,20 @@ describe('job-search-copilot MCP server', () => {
       },
     });
     expect(oversized.isError).toBe(true);
+  });
+
+  it("a server for another user does not see this user's vacancy", async () => {
+    const id = await queued('https://acme.com/jobs/mine');
+    const other = randomUUID();
+    await prisma.user.create({ data: { id: other, name: 'Other', email: `${other}@example.com` } });
+    try {
+      const client = await connectedClient(other);
+      const list = await client.callTool({ name: 'list_vacancies', arguments: {} });
+      expect(JSON.parse(textOf(list)).total).toBe(0);
+      const got = await client.callTool({ name: 'get_vacancy', arguments: { id } });
+      expect(got.isError).toBe(true);
+    } finally {
+      await prisma.user.delete({ where: { id: other } });
+    }
   });
 });

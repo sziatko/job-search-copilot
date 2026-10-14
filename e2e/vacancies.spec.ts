@@ -46,8 +46,10 @@ test('the Status select filters, and the URL keeps it', async ({ page }) => {
 test('infinite scroll past 100 rows, and a filter change scrolls back up', async ({ page, db }) => {
   // The seed's /vacancies context is under 100 rows: these push Not reviewed past it.
   const extra = 50;
+  const { id: userId } = await db.user.findFirstOrThrow(); // the one signed in
   await db.vacancy.createMany({
     data: Array.from({ length: extra }, (_, i) => ({
+      userId,
       company: 'Overflow Test Co',
       title: `Filler Engineer ${i + 1}`,
       applyUrl: `https://jobs.example.com/filler/${i + 1}`,

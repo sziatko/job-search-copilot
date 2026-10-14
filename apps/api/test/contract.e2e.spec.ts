@@ -41,13 +41,13 @@ describe('Web↔API contract (e2e)', () => {
   }
 
   async function intake(url: string, company: string, fullText?: string): Promise<number> {
-    await new VacancyIntakeService(prisma).intake({
+    await new VacancyIntakeService(prisma).intake(api.userId, {
       url,
       company,
       title: 'Frontend Engineer',
       fullText,
     });
-    return (await prisma.vacancy.findUniqueOrThrow({ where: { applyUrl: url } })).id;
+    return (await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
   }
 
   beforeAll(async () => {

@@ -11,10 +11,10 @@ subprocess and speaking stdio to it.
 ## Decision
 Split the two concerns:
 
-- `apps/mcp/src/server.ts` — `createServer(vacancies = new VacancyService(),
-  applications = new ApplicationService())` builds an `McpServer` and returns it,
-  *without* connecting a transport. The optional params let a test inject services
-  bound to their own client. The nine tools themselves are registered by two
+- `apps/mcp/src/server.ts` — `createServer({ userId, vacancies?, applications?,
+  intake? })` builds an `McpServer` for one user (phase 7, ADR-0039) and returns it,
+  *without* connecting a transport. The optional services default to ones on the shared
+  lazy client; a test can inject services bound to their own client. The nine tools themselves are registered by two
   per-feature functions this file composes — `registerVacancyTools(server,
   vacancies)` in `vacancies/vacancies.tools.ts` (5 tools) and
   `registerApplicationTools(server, applications)` in
@@ -22,7 +22,8 @@ Split the two concerns:
   `*.schemas.ts` for its zod input shapes. `server.ts` itself stays composition
   only; it does not know what a tool looks like.
 - `apps/mcp/src/index.ts` — the entrypoint: `import './env'` first, then
-  `createServer()`, then connect a `StdioServerTransport`, then `main().catch`.
+  `createServer({ userId })` for the owner of `JSC_API_KEY`, then connect a
+  `StdioServerTransport`, then `main().catch`.
 
 Tests (`apps/mcp/src/server.spec.ts`) connect a real MCP `Client` to
 `createServer()` over `InMemoryTransport.createLinkedPair()` — the SDK's own
@@ -45,7 +46,7 @@ recommended way — and call each tool by name, asserting on the real
 ## What this constrains — breaks if you change it
 - Moving tool registration back into `index.ts` → the in-memory-transport tests
   can't reach the handlers.
-- Removing the `vacancies` / `applications` parameters from `createServer()` →
+- Removing the optional services from `createServer()` →
   tests can't inject a service; they'd depend on the process-wide lazy client's
   env being set.
 - Renaming a tool or changing an input schema → `apps/mcp/src/server.spec.ts`

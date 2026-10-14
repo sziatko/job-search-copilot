@@ -1,5 +1,6 @@
 import type { CommentSource, Prisma, Recommendation, VacancyStatus } from '@prisma/client';
 import { AnalysedNotNewError, SameStatusError } from './errors';
+import type { UserTx } from './for-user';
 
 /** The statuses before the pipeline: the analysis queue (NEW), the user's triage, and
  * FILTERED_OUT. A repeat of one carries no event, so writeStatus refuses it (ADR-0029). */
@@ -95,17 +96,17 @@ export function firstStatus(at: Date) {
  * round is INTERVIEW again), so a caller writes once per real event. A triage status the
  * vacancy already has carries no event: it throws SameStatusError and writes nothing.
  * NEW on an analysed vacancy throws AnalysedNotNewError — the CHECK would refuse it as
- * a 500. An unknown id writes nothing. Two writes, so `tx` must be a transaction — the
- * caller's, which its other writes share.
+ * a 500. An unknown id — or another user's — writes nothing. Two writes, so `db` must be
+ * a transaction — the caller's, which its other writes share.
  */
 export async function writeStatus(
-  tx: Prisma.TransactionClient,
+  db: UserTx,
   vacancyId: number,
   status: VacancyStatus,
   at = new Date(),
 ): Promise<void> {
   const triage = (TRIAGE_STATUSES as readonly VacancyStatus[]).includes(status);
-  const { count } = await tx.vacancy.updateMany({
+  const { count } = await db.vacancy.updateMany({
     where: {
       id: vacancyId,
       ...(triage && { status: { not: status } }),
@@ -114,11 +115,11 @@ export async function writeStatus(
     data: { status, statusChangedAt: at },
   });
   if (count > 0) {
-    await tx.statusChange.create({ data: { vacancyId, status, createdAt: at } });
+    await db.statusChange.create({ data: { vacancyId, status, createdAt: at } });
     return;
   }
   if (!triage) return;
-  const row = await tx.vacancy.findUnique({ where: { id: vacancyId }, select: { status: true } });
+  const row = await db.vacancy.findUnique({ where: { id: vacancyId }, select: { status: true } });
   if (!row) return;
   if (row.status === status) throw new SameStatusError(`Vacancy ${vacancyId} is already ${status}`);
   // The one other triage miss: NEW on a row that has an analysis.

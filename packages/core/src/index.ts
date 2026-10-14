@@ -15,6 +15,7 @@ export type {
   VacancyResolution,
 } from './application.types';
 export { APPLICATION_STATES } from './application.types';
+export { verifyApiKey } from './auth/api-key';
 export type { Auth, AuthConfig } from './auth/create-auth';
 export { createAuth } from './auth/create-auth';
 export {

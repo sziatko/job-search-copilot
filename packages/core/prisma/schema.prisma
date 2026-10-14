@@ -14,9 +14,13 @@ model Vacancy {
   id                  Int             @id @default(autoincrement())
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @default(now()) @updatedAt
+  // The owner (ADR-0038): every query reaches this table through `forUser`, which adds it.
+  userId              String
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   company             String
   title               String
-  applyUrl            String          @unique
+  // Unique per user (`@@unique` below), not globally: two users may track one posting.
+  applyUrl            String
   // Intake's second match (ADR-0033): normalizeCompanyKey / normalizeTitleKey
   // (vacancy-intake.ts) — not vacancy.service's `companyKey()`, ADR-0032's company
   // identity. Null only when the name normalizes to nothing (`—`).
@@ -42,13 +46,14 @@ model Vacancy {
   usedTailoredResume  Boolean         @default(false)
 
   // Every note on the vacancy — the analyzer's reasoning, the user's, an agent's.
-  comments            Comment[]
+  comments      Comment[]
   // Every status the vacancy has been in, with its date.
-  statusChanges       StatusChange[]
+  statusChanges StatusChange[]
 
-  @@index([recommendation])
-  @@index([status, statusChangedAt])
-  @@index([companyKey, titleKey])
+  @@unique([userId, applyUrl])
+  @@index([userId, recommendation])
+  @@index([userId, status, statusChangedAt])
+  @@index([userId, companyKey, titleKey])
   @@index([company(ops: raw("gin_trgm_ops"))], type: Gin)
   // /applications searches company OR title as ILIKE '%term%' — same reason company has
   // a trigram GIN index, title needs one too.
@@ -133,6 +138,8 @@ model User {
   oauthrefreshtokens OauthRefreshToken[]
   oauthaccesstokens  OauthAccessToken[]
   oauthconsents      OauthConsent[]
+  apikeys            Apikey[]
+  vacancies          Vacancy[]
 
   @@unique([email])
 }
@@ -377,4 +384,38 @@ model OauthConsent {
 model OauthClientAssertion {
   id        String   @id
   expiresAt DateTime
+}
+
+// The api-key plugin (phase 7, ADR-0039), its fields as the plugin declares them.
+// `key` holds the hash; `start` the first characters, to tell keys apart in a list.
+// `referenceId` is the owner: the plugin leaves it a plain string (it may be an
+// organization's id); the relation is added here, so a user's keys go with the user.
+model Apikey {
+  id                  String    @id
+  configId            String    @default("default")
+  name                String?
+  start               String?
+  referenceId         String
+  user                User      @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  prefix              String?
+  key                 String
+  refillInterval      Int?
+  refillAmount        Int?
+  lastRefillAt        DateTime?
+  enabled             Boolean?  @default(true)
+  rateLimitEnabled    Boolean?  @default(true)
+  rateLimitTimeWindow Int?      @default(86400000)
+  rateLimitMax        Int?      @default(10)
+  requestCount        Int?      @default(0)
+  remaining           Int?
+  lastRequest         DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime
+  updatedAt           DateTime
+  permissions         String?
+  metadata            String?
+
+  @@index([configId])
+  @@index([referenceId])
+  @@index([key])
 }

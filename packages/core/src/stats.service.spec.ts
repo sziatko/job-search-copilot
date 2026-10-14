@@ -1,10 +1,18 @@
 import type { VacancyStatus } from '@prisma/client';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createUser } from '../tests/user';
+import { forUser } from './for-user';
 import { getPrisma } from './prisma-client';
 import { StatsService } from './stats.service';
 import { TIMEOUT_DAYS, writeStatus } from './status';
 import { VacancyService } from './vacancy.service';
 import { VacancyIntakeService } from './vacancy-intake.service';
+
+/** Every call acts as this test's user (ADR-0038). */
+let userId: string;
+beforeEach(async () => {
+  userId = await createUser();
+});
 
 // Integration tests against the real (test) Postgres — same rationale as
 // vacancy.service.spec.ts.
@@ -26,7 +34,7 @@ async function seed(
   }: { lastMoveAt?: Date; recommendation?: string } = {},
 ) {
   urlSeq += 1;
-  const { vacancy } = await vacancies.save({
+  const { vacancy } = await vacancies.save(userId, {
     company: `Company ${urlSeq}`,
     title: 'Engineer',
     applyUrl: `https://example.com/stats/${urlSeq}`,
@@ -35,11 +43,11 @@ async function seed(
     recommendation,
     estimationComment: 'Strong match.',
   });
-  await prisma.$transaction(async (tx) => {
+  await forUser(prisma, userId).$transaction(async (db) => {
     for (const [i, status] of statuses.entries()) {
       // Each earlier move a minute before the next, so the journal's order is fixed.
       const at = new Date(lastMoveAt.getTime() - (statuses.length - 1 - i) * MINUTE);
-      await writeStatus(tx, vacancy.id, status, at);
+      await writeStatus(db, vacancy.id, status, at);
     }
   });
   return vacancy.id;
@@ -47,7 +55,7 @@ async function seed(
 
 describe('StatsService.get', () => {
   it('is all zeros on an empty database', async () => {
-    expect(await stats.get(NOW)).toEqual({
+    expect(await stats.get(userId, NOW)).toEqual({
       logged: 0,
       awaitingAnalysis: 0,
       awaitingTriage: 0,
@@ -78,7 +86,7 @@ describe('StatsService.get', () => {
   });
 
   it('counts every vacancy as logged, analysed or not, then triage and the recommended', async () => {
-    await new VacancyIntakeService().intakeMany([
+    await new VacancyIntakeService().intakeMany(userId, [
       { url: 'https://a.com/1', company: 'A', title: 'Dev' },
       { url: 'https://a.com/2', company: 'B', title: 'Dev' },
     ]);
@@ -86,28 +94,28 @@ describe('StatsService.get', () => {
     await seed([], { recommendation: 'APPLY_WITH_CAVEATS' });
     await seed(['DECLINED'], { recommendation: 'SKIP' });
 
-    const result = await stats.get(NOW);
+    const result = await stats.get(userId, NOW);
 
     expect(result).toMatchObject({ logged: 5, awaitingTriage: 2, recommended: 2 });
   });
 
   it("counts the queue, and the analyzer's no once per vacancy: FILTERED_OUT or an analysed SKIP", async () => {
-    await new VacancyIntakeService().intakeMany([
+    await new VacancyIntakeService().intakeMany(userId, [
       { url: 'https://a.com/1', company: 'A', title: 'Dev' },
       { url: 'https://a.com/2', company: 'B', title: 'Dev', fullText: 'Text.' },
       { url: 'https://a.com/3', company: 'C', title: 'Dev' },
     ]);
     // Filtered out by the user, never analysed.
     const { id } = await prisma.vacancy.findUniqueOrThrow({
-      where: { applyUrl: 'https://a.com/3' },
+      where: { userId_applyUrl: { userId, applyUrl: 'https://a.com/3' } },
     });
-    await prisma.$transaction((tx) => writeStatus(tx, id, 'FILTERED_OUT'));
+    await forUser(prisma, userId).$transaction((db) => writeStatus(db, id, 'FILTERED_OUT'));
     await seed([], { recommendation: 'SKIP' }); // FILTERED_OUT by the rule: one, not two
     await seed(['NOT_REVIEWED'], { recommendation: 'SKIP' }); // taken back: still the analyzer's no
     await seed([], { recommendation: 'APPLY' });
     await seed(['DECLINED'], { recommendation: 'APPLY_WITH_CAVEATS' });
 
-    expect(await stats.get(NOW)).toMatchObject({
+    expect(await stats.get(userId, NOW)).toMatchObject({
       logged: 7,
       awaitingAnalysis: 2,
       notRecommended: 3,
@@ -121,7 +129,7 @@ describe('StatsService.get', () => {
     await seed(['APPLIED', 'REJECTED']); // the company's no, not the user's
     await seed(['SAVED_FOR_LATER']);
 
-    expect((await stats.get(NOW)).declined).toBe(1);
+    expect((await stats.get(userId, NOW)).declined).toBe(1);
   });
 
   it('counts unavailable by the current status only', async () => {
@@ -130,7 +138,7 @@ describe('StatsService.get', () => {
     await seed(['UNAVAILABLE', 'NOT_REVIEWED']); // set back: not unavailable now
     await seed(['DECLINED']);
 
-    expect(await stats.get(NOW)).toMatchObject({ unavailable: 2, declined: 1 });
+    expect(await stats.get(userId, NOW)).toMatchObject({ unavailable: 2, declined: 1 });
   });
 
   it('counts a funnel stage from the journal: a reply then a rejection still responded', async () => {
@@ -141,7 +149,7 @@ describe('StatsService.get', () => {
     await seed(['APPLIED']);
     await seed(['SAVED_FOR_LATER']);
 
-    const result = await stats.get(NOW);
+    const result = await stats.get(userId, NOW);
 
     expect(result).toMatchObject({ applied: 3, responded: 2, interview: 1 });
     expect(result.pipeline.byStatus).toMatchObject({ APPLIED: 1, REJECTED: 2, REPLIED: 0 });
@@ -150,14 +158,14 @@ describe('StatsService.get', () => {
   it('counts a vacancy once per stage, however many rounds it went through', async () => {
     await seed(['APPLIED', 'INTERVIEW', 'INTERVIEW', 'OFFER']);
 
-    expect(await stats.get(NOW)).toMatchObject({ applied: 1, responded: 1, interview: 1 });
+    expect(await stats.get(userId, NOW)).toMatchObject({ applied: 1, responded: 1, interview: 1 });
   });
 
   it('counts AWAITING as responded, not as an interview', async () => {
     await seed(['APPLIED', 'AWAITING']); // a test task sent, waiting on their feedback
     await seed(['APPLIED']);
 
-    const result = await stats.get(NOW);
+    const result = await stats.get(userId, NOW);
 
     expect(result).toMatchObject({ applied: 2, responded: 1, interview: 0 });
     expect(result.pipeline.byStatus.AWAITING).toBe(1);
@@ -172,7 +180,7 @@ describe('StatsService.get', () => {
     await seed(['APPLIED', 'REJECTED'], { lastMoveAt: new Date(cutoff - DAY) }); // closed
     await seed(['APPLIED', 'OFFER'], { lastMoveAt: new Date(cutoff - DAY) }); // closed
 
-    const { pipeline, recruiterScreen } = await stats.get(NOW);
+    const { pipeline, recruiterScreen } = await stats.get(userId, NOW);
 
     expect(pipeline).toMatchObject({ active: 1, timedOut: 3, total: 6 });
     // The partition: every pipeline row is active, timed out, rejected or an offer.
@@ -188,7 +196,7 @@ describe('StatsService.get', () => {
       await seed(['APPLIED'], { lastMoveAt: new Date(NOW.getTime() - i * DAY) });
     }
 
-    const { recent } = await stats.get(NOW);
+    const { recent } = await stats.get(userId, NOW);
 
     // Triage rows (every vacancy's first NOT_REVIEWED) are not activity.
     expect(recent.map((row) => row.status)).toEqual([
