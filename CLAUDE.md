@@ -58,7 +58,7 @@ run just the projects the change touches; the full `npm test` still gates the
 checkbox. A core edit touches api and mcp too — they read core's `dist/`, which the
 Docker `core` watcher rebuilds (without the stack up, `npm run build
 --workspace=@job-search-copilot/core` first). The full list, including the
-per-app dev servers, is in the root [`README.md` § Scripts](README.md#scripts-repo-root).
+per-app dev servers, is in [`docs/development.md` § Scripts](docs/development.md#scripts-repo-root).
 
 **End-to-end (`npm run test:e2e`, Playwright, [ADR-0037](docs/decisions/0037-e2e-playwright.md))
 is not part of `npm test` and does not gate a step's checkbox.** Run it only: the spec of

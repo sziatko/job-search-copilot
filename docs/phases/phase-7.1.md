@@ -72,4 +72,10 @@ and a status history), `/applications`, `/inbox`, each light and dark, viewport
   `.skeleton`: without the first wait vite dev's first load shot a blank page. The
   sidebar shows the seed user's name, "E2E User", and the seed's titles repeat ("Frontend
   Team Lead" down the review list) — a seed change moves every e2e count, so they stay.
-- [ ] **2 · README, `docs/development.md`, close-out.**
+- [x] **2 · README, `docs/development.md`, close-out.** — *2026-10-14.* Beyond the
+  plan: `architecture.md`'s opening (the README links to it as the map) still said
+  "single user" and named the old `vacancy-match-analyzer` prompt — rewritten for phase
+  7's users and the Claude-over-MCP flow. ADR-0004 and `contracts.md` keep the old name
+  as history. `development.md` gained one paragraph the old README lacked: sign-in needs
+  an OAuth client and an allowlisted email. Before going public, still: rotate the old
+  provider keys, `publish-guard.mjs --audit` over the history, then the visibility.

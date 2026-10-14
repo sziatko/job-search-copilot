@@ -5,6 +5,7 @@ history, not read when planning. Newest at the top.
 
 | Item | Kind | Outcome | From | Notes |
 | --- | --- | --- | --- | --- |
+| **Screenshots in the root README** | idea | done — phase 7.1 steps 1–2 | public-repo prep | `npm run screenshots` retakes them on the made-up e2e seed, light and dark, into `docs/screenshots/`; the README shows them through `<picture>`. |
 | **Multi-user** | idea | done — phase 7 steps 1–4 | 2026-10-03 | One DB, `userId` on `Vacancy` (`@@unique([userId, applyUrl])`), every core query through `forUser` (ADR-0038); another user's row is a 404. API keys per user (`jsc_…`, ADR-0039) for n8n and MCP; `INTAKE_TOKEN` and ADR-0036 gone. The existing data migrated to the owner's account; the sign-in allowlist stays. The company exclusion list does not exist yet — it is per user when built. Several search profiles per user were dropped (2026-10-10). |
 | **Auth and an HTTP MCP transport** | idea | done — phase 6 steps 1–5 | phase 3, 2026-09-29 | Google + LinkedIn + passkeys, every REST route closed, JSC as an OAuth 2.1 authorization server, MCP over Streamable HTTP. Archived 2026-10-11 when phase 7 was planned; Google One Tap stays open as its own row. |
 | **Playwright end-to-end tests** | fix | done — phase 6.3 steps 4–10 | 2026-09-21 | Queued after chrome-devtools was dropped. Needs its own phase doc first. |
