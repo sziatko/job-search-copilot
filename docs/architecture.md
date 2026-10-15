@@ -2,14 +2,17 @@
 
 ## What the system is
 
-A personal job-search tool. Vacancies are analysed **elsewhere** — by the
-`vacancy-match-analyzer` prompt, which is not part of this repo — producing a match
-score, a recommendation, and reasoning. This repo is the plumbing around that
-output: somewhere to store each analysed vacancy, and a UI to work through them
-from *not reviewed* to *applied* or *declined*.
+A personal job-search tool. Vacancies come in unscored (n8n workflows through
+`POST /vacancies/intake`, or Claude saving one) and are analysed **elsewhere** — by
+Claude over the MCP tools, driven by the owner's skills, which are not part of this
+repo — producing a match score, a recommendation, and reasoning. This repo is the
+plumbing around that output: somewhere to store each vacancy, and a UI to work
+through them from *new* to *applied* or *declined*, then through the pipeline.
 
-Single user, signed in with Google / LinkedIn / a passkey (phase 6); no
-multi-tenancy. Local-first: Docker Compose on a laptop, Postgres in a container.
+Several users in one database, each signed in with Google / LinkedIn / a passkey
+(phase 6) and seeing only their own vacancies (phase 7,
+[ADR-0038](decisions/0038-multi-user-shared-schema.md)); sign-up is limited to an
+allowlist. Local-first: Docker Compose on a laptop, Postgres in a container.
 
 ## The four packages
 
@@ -23,7 +26,7 @@ apps/api (NestJS REST)      apps/mcp (MCP server, stdio + HTTP)
       ▲                            ▲
       │ HTTP /api/v1               │ stdio (per Claude Desktop session), or
       │                            │ Streamable HTTP /mcp + an OAuth token from api
-apps/web (React SPA)        vacancy-match-analyzer
+apps/web (React SPA)        Claude (the owner's skills)
 ```
 
 | Package | Responsibility | Depends on |
@@ -43,7 +46,7 @@ transports over one service).
 **Analyzer saves a vacancy** (the write path):
 
 ```
-Claude runs vacancy-match-analyzer
+Claude analyses a vacancy (a skill, not in this repo)
   → calls MCP tool save_vacancy (apps/mcp/src/vacancies/vacancies.tools.ts)
   → VacancyService.save()  (packages/core)
       → findUnique by applyUrl

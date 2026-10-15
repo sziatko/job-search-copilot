@@ -1,118 +1,181 @@
 # Job Search Copilot
 
-A personal tool for running a job search: vacancies are analyzed against its owner's
-profile (match score + recommendation + reasoning), stored once, and then tracked
-through the states that matter — *not reviewed → ready to apply → applied / declined*.
+A personal tool for running a job search. Vacancies come in from job boards and
+recommendation emails, or straight from a chat with Claude. Claude scores each one
+against my profile (a match score, a recommendation and a short review), and this app
+keeps them: one place to triage what is worth applying to, and to follow each
+application from *applied* to an offer or a rejection.
 
-The analysis itself is produced elsewhere (the `vacancy-match-analyzer` prompt).
-This repo is the plumbing around it: somewhere to keep the results and a UI to work
-through them.
+**This is an early MVP, and it is still being written.** For now it covers what my own
+job search needs right away: keeping vacancies, triaging them and tracking
+applications. The analysis happens in Claude; the app organises, tracks and lets me
+review fast. New parts come as I need them — see the [roadmap](#roadmap).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png">
+  <img alt="The dashboard: counters, the pipeline funnel, and the vacancies that need a review" src="docs/screenshots/dashboard-light.png">
+</picture>
+
+<details>
+<summary>More screens</summary>
+
+**Analyzed vacancies** — score, recommendation and the review, with one-click triage.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/vacancies-dark.png">
+  <img alt="The vacancies table" src="docs/screenshots/vacancies-light.png">
+</picture>
+
+**One vacancy** — the status history, the posting, comments from me and from Claude.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/vacancy-dark.png">
+  <img alt="A vacancy page" src="docs/screenshots/vacancy-light.png">
+</picture>
+
+**Application tracker** — every application by pipeline stage, with the ones gone quiet
+for 30 days.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/applications-dark.png">
+  <img alt="The application tracker" src="docs/screenshots/applications-light.png">
+</picture>
+
+**Inbox** — new vacancies waiting for Claude to score them.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/inbox-dark.png">
+  <img alt="The inbox" src="docs/screenshots/inbox-light.png">
+</picture>
+
+</details>
+
+All the data in the screenshots is made up.
+
+## How it works
+
+Vacancies get in two ways:
+
+```
+ 1. Collected                              2. From a chat with Claude
+ job boards, recommendation emails         a link, a posting or a whole list
+          │ n8n workflows                           │ Claude scores it right in the chat
+          ▼                                         ▼
+ POST /api/v1/vacancies/intake             MCP: save_vacancy / save_vacancies_batch
+ with an API key; lands unscored (NEW)     lands already scored
+          │                                         │
+          ▼                                         │
+ Claude, over MCP: picks up the NEW ones,           │
+ scores them, submits the analyses                  │
+          │                                         │
+          └────────────────────┬────────────────────┘
+                               ▼
+              PostgreSQL, through packages/core only
+                               ▼
+              Web app: triage — apply, decline, save for later
+                               ▼
+              Application pipeline: applied → replied → recruiter screen → interview → offer
+              (Claude can move a status when a reply email comes in)
+```
+
+A vacancy has two independent fields: the **recommendation** is Claude's opinion and
+never changes after the analysis; the **status** is mine. A vacancy is analysed once.
+More in [`docs/domain-model.md`](docs/domain-model.md).
+
+Two parts live outside this repo, because they hold personal data and are set up by
+hand: the n8n workflows that collect vacancies, and the Claude skills that score them
+against my profile. Anything that can call the REST API with a key, or talk MCP, can
+feed the app instead.
+
+## Features
+
+- **Dashboard** — counters, a funnel from logged to interview, where the rest dropped
+  out, and the top recommended vacancies not yet reviewed.
+- **Vacancy tables** — infinite scroll, search, status filters, one-click triage, and
+  a company's other vacancies in a modal.
+- **Application tracker** — pipeline stages, salary and tailored-CV notes, comments,
+  and a 30-day timeout for applications nobody answered.
+- **MCP server** — 15 tools, so Claude can save vacancies scored in a chat, read the
+  queue, submit analyses, record applications and move statuses. Over stdio, or Streamable HTTP with OAuth 2.1.
+- **REST API** — documented with Swagger UI; every route closed unless marked
+  otherwise.
+- **Sign-in** — Google, LinkedIn or a passkey; sign-up limited to an allowlist.
+- **Several users** — each sees only their own vacancies; per-user API keys for n8n and
+  MCP.
+- Light and dark theme; works on a phone.
 
 ## Architecture
 
-npm-workspaces monorepo:
+An npm-workspaces monorepo:
 
 | Package | What it is |
 | --- | --- |
-| [`packages/core`](packages/core/README.md) | Domain layer — Prisma schema/client, `VacancyService`, recommendation normalization, domain errors. Framework-agnostic; shared by `api` and `mcp`. |
-| `apps/api` | NestJS REST API (`/api/v1`), the backend for the web app. |
-| `apps/mcp` | MCP server exposing the same operations as tools, so Claude can save/query analyzed vacancies directly. |
-| `apps/web` | React 19 + Vite + Tailwind dashboard. |
+| [`packages/core`](packages/core/README.md) | The domain layer and the only database client: Prisma schema and migrations, the services, the status rules, auth (Better Auth) and API keys. |
+| `apps/api` | NestJS REST API (`/api/v1`) for the web app and n8n. |
+| `apps/mcp` | The MCP server: the same services as tools, over stdio and Streamable HTTP. |
+| `apps/web` | React SPA: dashboard, tables, the vacancy page, the inbox, the profile. |
 
 ```
-vacancy-match-analyzer ──▶ apps/mcp (MCP tools) ─┐
-                                                 ├─▶ packages/core ─▶ PostgreSQL
-                          apps/web ──▶ apps/api ─┘
+n8n ─────────▶ apps/api ◀── apps/web
+                  │
+Claude ──▶ apps/mcp ─┴─▶ packages/core ──▶ PostgreSQL
 ```
 
-Stack: Node 24, PostgreSQL 17, Prisma 7, NestJS 12, React 19, Vitest, Biome.
+Stack: TypeScript, Node 24, PostgreSQL 17, Prisma 7, NestJS 12, React 19, Vite,
+Tailwind, TanStack Router and Query, zod, Better Auth, the MCP TypeScript SDK; Vitest
+and Playwright for tests; Biome; Docker Compose; GitHub Actions.
 
-## Getting started
+The system map is in [`docs/architecture.md`](docs/architecture.md).
 
-Prerequisites: Docker (with Compose) and — for running scripts on the host —
-Node 24.
+## Quick start
 
 ```bash
-cp .env.example .env
-npm install
-npm run generate                # the Prisma client; npm install does not make it
-docker compose up -d            # postgres + api + mcp + web + a core build watcher
-
-# First run only: create the schema and the separate test database
-npm run migrate:dev             # dev DB (job_search_copilot)
-docker compose exec postgres psql -U postgres -c "CREATE DATABASE job_search_copilot_test"
-npm run test:db:migrate         # test DB (job_search_copilot_test)
+cp .env.example .env            # then fill in the auth values
+npm install && npm run generate
+docker compose up -d
+npm run migrate:dev
 ```
 
-**The owner's fresh clone.** Git does not clone these, so after a new `git clone`:
+Then open http://localhost:5173. Signing in needs a Google or LinkedIn OAuth client and
+your email in `AUTH_ALLOWED_EMAILS`. The full guide — test databases, the MCP server,
+API keys, every script — is in [`docs/development.md`](docs/development.md).
 
-- the skills: `git clone https://github.com/sziatko/job-search-copilot-skills.git skills`
-  (private; without it the skill↔MCP sync test in `apps/mcp` skips), then an empty
-  `skills/.git/info/publish-guard-off` — that repo holds real data on purpose;
-- `git config user.name` / `user.email` in both repos, if git has no global identity
-  (the GitHub noreply address).
+## How it's built
 
-| Service | URL |
-| --- | --- |
-| Web | http://localhost:5173 |
-| API | http://localhost:3000/api/v1 · health at http://localhost:3000/health · docs (Swagger UI) at http://localhost:3000/api/docs |
-| MCP over HTTP | http://localhost:3001/mcp — OAuth: sign in on the web, then consent ([ADR-0035](docs/decisions/0035-mcp-over-http-oauth-resource-server.md)) |
-| Postgres | `localhost:5432` (`postgres` / `postgres`) |
+I build this with [Claude Code](https://claude.com/claude-code) as a pair programmer.
+The repo is set up so an AI agent can work on it for weeks without losing the thread:
 
-The `mcp` container idles (`sleep infinity`); a session connects by `docker exec`
-into it and running `npm run dev:mcp`. `mcp-http` serves the same tools over HTTP for
-remote clients: `claude mcp add --transport http jsc http://localhost:3001/mcp`, or the
-MCP Inspector with transport *Streamable HTTP* and that URL.
+- **Phases and steps.** Each phase has a plan in [`docs/phases/`](docs/phases/), split
+  into steps that can be finished and checked one at a time. One step per session; the
+  step brings its own tests and is ticked only after the full test suite passes in that
+  session.
+- **Decisions on record.** Every decision that other code depends on is an ADR in
+  [`docs/decisions/`](docs/decisions/), ending with *what breaks if you change it*.
+- **Invariants that break silently** are listed in
+  [`docs/architecture.md`](docs/architecture.md#system-invariants), with tests where a
+  test can guard one — for example, a test that fails if any vacancy query skips the
+  owner filter.
+- **Chained steps.** Several steps can run in a row, each in a fresh subagent, while
+  the main session reviews and commits.
+- **Real tests.** Integration tests against a real PostgreSQL, no Prisma mocks; a
+  contract test between the web and the API; Playwright over every screen.
+- **No personal data.** Tests, the seed and these screenshots use made-up companies, and
+  a git hook blocks a commit or a push that carries my real data.
 
-**API keys** ([ADR-0039](docs/decisions/0039-api-keys-per-user.md)) — create one on
-`/profile`; it is shown once. The stdio MCP acts as the key's owner and refuses to boot
-without a valid one: `JSC_API_KEY=jsc_…` in the repo-root `.env` (mounted into the `mcp`
-container; `apps/mcp/src/env.ts` loads it). The `env` of Claude Desktop's stdio server
-config alone does not reach it: that config runs `docker exec`, so its `env` is set on
-the host's `docker` process, not inside the container — to keep the key there, add
-`-e JSC_API_KEY` to the `docker exec` arguments, which passes it through. A client without OAuth reaches the HTTP MCP with
-`Authorization: Bearer jsc_…` (`mcp-remote --header`). n8n's credential, the same
-header on the intake and analysis routes, holds a key too: intake fails between the
-deploy that dropped `INTAKE_TOKEN` and the swap.
+The rules the agent follows are in [`CLAUDE.md`](CLAUDE.md).
 
-> After changing dependencies or `packages/core/prisma/schema.prisma`, the
-> containers' `node_modules` / generated client go stale — re-run
-> `docker compose exec <svc> npm install` / `npm run generate`, or
-> `docker compose up -d --build`. Each service has its own `node_modules`, so a new
-> dependency needs `npm install` in every service that uses it — one added to `core`
-> means `core`, `api`, `mcp`, `mcp-http` and `web` — then
-> `docker compose restart` of the same services.
+## Roadmap
 
-## Scripts (repo root)
+- **Deploy** to a small VPS with HTTPS, so claude.ai can reach the MCP server and the
+  n8n intake runs around the clock.
+- **A public demo** on the made-up seed, reset every night.
+- **A real profile page** — the candidate profile and master resumes in the app, then
+  tailoring a resume from a vacancy page.
+- **Collectors inside the app**, instead of hand-built n8n workflows.
+- **A company exclusion list** and company aliases.
+- A UI for the status journal, per-column filters, live updates.
 
-| Command | |
-| --- | --- |
-| `npm run dev:api` / `npm run dev:mcp` | run a service on the host instead of in Docker |
-| `npm run dev:mcp:http` | MCP over Streamable HTTP on the host (`MCP_HTTP_PORT`, behind OAuth; needs the API up) |
-| `npm run mcp:inspect` | the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) web UI over the MCP server (stdio, needs `.env`) — browse the tools and call them |
-| `npm test` / `npm run test:watch` | Vitest across all workspaces (needs the test DB) |
-| `npm run test:e2e` | Playwright end-to-end over its own api, web and `job_search_copilot_e2e` ([ADR-0037](docs/decisions/0037-e2e-playwright.md)); not part of `npm test` — from phase 6.3 step 4 |
-| `npm run seed` | reset the e2e database to the made-up seed (refuses any DB not named `*_e2e` / `*_test` / `*_demo`) — from phase 6.3 step 3 |
-| `npm run lint` / `npm run lint:fix` / `npm run format` | Biome |
-| `npm run typecheck` | `tsc --noEmit` across every workspace |
-| `npm run build` | build all workspaces |
-| `npm run generate` | regenerate the Prisma client |
-| `npm run migrate:dev` | create + apply a migration on the dev DB |
-| `npm run test:db:migrate` | apply committed migrations to the test DB |
-| `npm run studio` | Prisma Studio |
-
-CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
-Postgres service on every push and PR; on a PR a second job, `e2e`, runs
-`npm run test:e2e` ([ADR-0037](docs/decisions/0037-e2e-playwright.md)).
-
-## Design docs
-
-[`docs/`](docs/) holds the **why**: the architecture map, the domain model, the
-API/MCP contracts, and an ADR per load-bearing decision — each with a "what breaks
-if you change it" note. Start at [`docs/README.md`](docs/README.md);
-[`docs/phases/phase-1.md`](docs/phases/phase-1.md) is the Phase 1 ledger.
-
-Database and migration conventions: [`packages/core/prisma/README.md`](packages/core/prisma/README.md).
+The full list: [`docs/backlog.md`](docs/backlog.md).
 
 ## License
 

@@ -15,7 +15,6 @@ outcome, so this file holds only live work.
 
 | Item | Status | From | Notes |
 | --- | --- | --- | --- |
-| **Screenshots in the root README** | open | public-repo prep | The mockups in `docs/design/` show where the UI started; the README needs the live app, on made-up seed data (invariant 10). |
 | **`/profile` page** | open | phase 2 | Only the Passkeys card (phase 6 step 3) is real; the rest a `SoonPage` placeholder. Needs a candidate-profile store; the master resumes would live there (see the next row). |
 | **Tailor a resume from the vacancy page** | open | phase 3.1 | A button on the vacancy runs what the `resume-ats-tailor` skill does today, inside the app. The posting text is already in JSC (`fullText`); the master resumes are not — they live on the user's disk and would move into `/profile` first. |
 | **A UI for the status journal, and comment CRUD** | open | phase 3.1 | A separate page. The `StatusChange` journal and the `Comment` table exist; nothing shows the journal, and comments can only be appended. |

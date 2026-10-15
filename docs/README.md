@@ -1,6 +1,6 @@
 # Design docs
 
-The **why** behind this codebase. The root [`README.md`](../README.md) and the
+The **why** behind this codebase. [`development.md`](development.md) and the
 package READMEs cover *how to run it*; these cover *why it's shaped the way it is*
 and *what a change here breaks over there*.
 
@@ -11,6 +11,7 @@ and *what a change here breaks over there*.
 | [`architecture.md`](architecture.md) | The system map: the four packages, their boundaries, the request lifecycle, the dev stack. Start here. |
 | [`domain-model.md`](domain-model.md) | `Vacancy`, the two independent axes (analyzer `recommendation` vs the user's `status`), the `StatusChange` journal, the status lifecycle, analyze-once, the DB-level rules. |
 | [`contracts.md`](contracts.md) | The external-facing surfaces other code depends on: the REST API, the fifteen MCP tools, the web↔API schema contract. Each notes who breaks if it changes. |
+| [`development.md`](development.md) | How to run it locally: the Docker stack, the databases, the MCP server, API keys, every script. |
 | [`decisions/`](decisions/) | One Architecture Decision Record (ADR) per load-bearing choice — context, the decision, why not the alternatives, and what it constrains. |
 | [`backlog.md`](backlog.md) | What is not yet planned into a phase, in two lists: ideas (new capabilities) and improvements / fixes. Only open and planned rows; done and not-relevant ones move to [`backlog-archive.md`](backlog-archive.md). |
 | [`phases/phase-1.md`](phases/phase-1.md) | What Phase 1 delivered and its status. |
@@ -30,6 +31,7 @@ and *what a change here breaks over there*.
 | [`phases/phase-6.2.md`](phases/phase-6.2.md) | Small fixes from the backlog: the table's scroll reset on a filter change, the phone topbar title, `Modal` focus, a 401 redirect to `/login`, and two MCP tools (edit an application, add a comment). Its `## Status` is the live checklist. |
 | [`phases/phase-6.3.md`](phases/phase-6.3.md) | Tests: a web↔API contract test, a made-up seed (shared with the future demo), Playwright over every screen and action, the flaky full `npm test` fixed first. Its `## Status` is the live checklist. |
 | [`phases/phase-7.md`](phases/phase-7.md) | Multi-user: `userId` on every vacancy, isolation enforced in one place (`forUser`), API keys per user for n8n and MCP (HTTP and stdio), a keys card on `/profile`. Its `## Status` is the live checklist. |
+| [`phases/phase-7.1.md`](phases/phase-7.1.md) | The public README: a showcase in the root, the running part moved to `development.md`, screenshots taken by a script on the made-up seed. Its `## Status` is the live checklist. |
 | [`design/`](design/) | The HTML mockup the web UI was built against, and what it does *not* decide. An artifact rather than prose — open it in a browser, not in an editor. |
 
 ## Conventions
