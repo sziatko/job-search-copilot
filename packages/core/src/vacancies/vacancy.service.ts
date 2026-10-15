@@ -1,16 +1,16 @@
 import type { PrismaClient, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
-import { ALL_COMMENTS } from './comments';
-import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from './company';
-import { AlreadyAnalysedError, VacancyNotFoundError } from './errors';
-import { forUser, orNotFound, type UserDb, type UserTx } from './for-user';
-import { matchKeys } from './identity';
-import { textFilters } from './like';
-import { cursorArgs, toCursorPage } from './paging';
-import { getPrisma } from './prisma-client';
-import { normalizeRecommendation } from './recommendation';
-import { commentOn, firstStatus, statusAfterAnalysis, writeStatus } from './status';
-import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
+import { forUser, orNotFound, type UserDb, type UserTx } from '../db/for-user';
+import { textFilters } from '../db/like';
+import { cursorArgs, toCursorPage } from '../db/paging';
+import { getPrisma } from '../db/prisma-client';
+import { ALL_COMMENTS } from '../domain/comments';
+import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from '../domain/company';
+import { AlreadyAnalysedError, VacancyNotFoundError } from '../domain/errors';
+import { matchKeys } from '../domain/identity';
+import { normalizeRecommendation } from '../domain/recommendation';
+import { commentOn, firstStatus, statusAfterAnalysis, writeStatus } from '../domain/status';
+import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from '../domain/url';
 import type {
   ListVacanciesFilters,
   ListVacanciesResult,

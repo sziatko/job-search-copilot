@@ -23,7 +23,7 @@ Across the dev DB's company names (2026-10-02), the same rule also:
 
 ## Decision
 
-1. **`companyGroupKey(name)`** in `packages/core/src/identity.ts` (named `companyKey`
+1. **`companyGroupKey(name)`** in `packages/core/src/domain/identity.ts` (named `companyKey`
    in `company.ts` until 2026-10, when it was easy to take for the stored column of
    that name): the vacancy log's `normalizeCompanyKey` (case, punctuation, legal forms such as `Sp. z o.o.`,
    `Inc`, `B.V.`; intake's key since [ADR-0033](0033-unscored-vacancies-in-one-table.md)) applied after dropping `( … )`

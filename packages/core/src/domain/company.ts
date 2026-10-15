@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import type { UserDb } from './for-user';
+import type { UserDb } from '../db/for-user';
 import { companyGroupKey } from './identity';
 
 /**

@@ -63,7 +63,7 @@ Transport consequences:
 - Reverting `save()` to an upsert → stored analyses get clobbered; the API's
   `200`-on-existing branch and the MCP `created` flag lose meaning; the
   "second save leaves it untouched" tests in
-  `packages/core/src/vacancy.service.spec.ts` and
+  `packages/core/src/vacancies/vacancy.service.spec.ts` and
   `apps/mcp/src/server.spec.ts` fail.
 - Changing `save()`'s return to a bare vacancy again → the API controller can't
   choose 201 vs 200; the MCP analyzer can't detect a dropped analysis.
@@ -73,4 +73,4 @@ Transport consequences:
 ## Related
 [`../domain-model.md`](../domain-model.md) ("Analyze-once"),
 [`../contracts.md`](../contracts.md), [ADR-0004](0004-one-service-two-transports.md),
-`packages/core/src/vacancy.service.ts`.
+`packages/core/src/vacancies/vacancy.service.ts`.

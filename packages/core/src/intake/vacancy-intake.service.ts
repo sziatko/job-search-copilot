@@ -1,10 +1,10 @@
 import type { PrismaClient } from '@prisma/client';
-import { InvalidIntakeEntryError } from './errors';
-import { forUser, type UserTx } from './for-user';
-import { matchKeys } from './identity';
-import { getPrisma } from './prisma-client';
-import { firstStatus } from './status';
-import { normalizeApplyUrl } from './url';
+import { forUser, type UserTx } from '../db/for-user';
+import { getPrisma } from '../db/prisma-client';
+import { InvalidIntakeEntryError } from '../domain/errors';
+import { matchKeys } from '../domain/identity';
+import { firstStatus } from '../domain/status';
+import { normalizeApplyUrl } from '../domain/url';
 import type { VacancyIntakeInput } from './vacancy-intake';
 
 /** Shorter posting text, trimmed, is taken as none: a login wall or captcha page, not a

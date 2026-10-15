@@ -1,5 +1,29 @@
 import type { CommentSource, PrismaClient, Recommendation, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import { forUser, orNotFound, type UserDb, type UserTx } from '../db/for-user';
+import { textFilters } from '../db/like';
+import { cursorArgs, toCursorPage } from '../db/paging';
+import { getPrisma } from '../db/prisma-client';
+import { ALL_COMMENTS } from '../domain/comments';
+import { companyMatchCounts, sameCompanyNames } from '../domain/company';
+import {
+  AlreadyAppliedError,
+  AmbiguousVacancyMatchError,
+  InvalidApplicationInputError,
+  VacancyNotFoundError,
+} from '../domain/errors';
+import { matchKeys } from '../domain/identity';
+import { deriveRecommendationFromScore } from '../domain/recommendation';
+import {
+  activeWhere,
+  commentOn,
+  firstStatus,
+  isTimedOut,
+  PIPELINE_STATUSES,
+  timedOutWhere,
+  writeStatus,
+} from '../domain/status';
+import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from '../domain/url';
 import type {
   ApplicationListItem,
   ListApplicationsFilters,
@@ -11,30 +35,6 @@ import type {
   VacancyResolution,
 } from './application.types';
 import { isById } from './application.types';
-import { ALL_COMMENTS } from './comments';
-import { companyMatchCounts, sameCompanyNames } from './company';
-import {
-  AlreadyAppliedError,
-  AmbiguousVacancyMatchError,
-  InvalidApplicationInputError,
-  VacancyNotFoundError,
-} from './errors';
-import { forUser, orNotFound, type UserDb, type UserTx } from './for-user';
-import { matchKeys } from './identity';
-import { textFilters } from './like';
-import { cursorArgs, toCursorPage } from './paging';
-import { getPrisma } from './prisma-client';
-import { deriveRecommendationFromScore } from './recommendation';
-import {
-  activeWhere,
-  commentOn,
-  firstStatus,
-  isTimedOut,
-  PIPELINE_STATUSES,
-  timedOutWhere,
-  writeStatus,
-} from './status';
-import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
 
 /** The Vacancy fields the /applications page reads. */
 const APPLICATION_SELECT = {

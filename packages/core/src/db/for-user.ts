@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { VacancyNotFoundError } from './errors';
+import { VacancyNotFoundError } from '../domain/errors';
 
 /** The `Vacancy` operations `forUser` knows: each gets the owner added to its `where`. */
 const VACANCY_FILTERED = new Set([

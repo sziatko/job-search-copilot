@@ -1,15 +1,15 @@
 import type { VacancyStatus } from '@prisma/client';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createUser } from '../tests/user';
-import { ApplicationService } from './application.service';
+import { createUser } from '../../tests/user';
+import { getPrisma } from '../db/prisma-client';
 import {
   AlreadyAppliedError,
   AmbiguousVacancyMatchError,
   InvalidApplicationInputError,
   VacancyNotFoundError,
-} from './errors';
-import { getPrisma } from './prisma-client';
-import { VacancyService } from './vacancy.service';
+} from '../domain/errors';
+import { VacancyService } from '../vacancies/vacancy.service';
+import { ApplicationService } from './application.service';
 
 /** Every call acts as this test's user (ADR-0038). */
 let userId: string;

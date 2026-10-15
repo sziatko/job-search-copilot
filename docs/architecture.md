@@ -41,6 +41,31 @@ Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 shared domain layer), [ADR-0004](decisions/0004-one-service-two-transports.md) (two
 transports over one service).
 
+### Inside `packages/core/src`
+
+Folders by feature, as `apps/api` is laid out. One public surface: `src/index.ts`,
+which is all the apps import (`@job-search-copilot/core`); no folder has an index of
+its own.
+
+```
+src/
+  index.ts           the package's exports
+  db/                Prisma client, forUser scoping, paging, LIKE escaping
+  domain/            rules shared by more than one feature: errors, status (writeStatus,
+                     the timeout rule), recommendation, url, identity, company, comments
+  vacancies/         VacancyService and its types
+  applications/      ApplicationService and its types
+  intake/            VacancyIntakeService and its input
+  stats/             StatsService
+  auth/              Better Auth, API keys
+  seed/              the made-up seed and resetToSeed
+```
+
+A new file goes into the folder of the one feature that uses it; once a second feature
+needs it, into `domain/`; plumbing over Prisma with no domain meaning, into `db/`. A
+spec sits next to its file; `isolation.spec.ts`, across every service, stays at the
+root.
+
 ## Request lifecycles
 
 **Analyzer saves a vacancy** (the write path):

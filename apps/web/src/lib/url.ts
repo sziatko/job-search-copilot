@@ -6,7 +6,7 @@
  * `javascript:` URL in an anchor executes on click, in this page's own origin,
  * and the link text looks entirely ordinary while it does.
  *
- * Deliberately a second implementation of `packages/core/src/url.ts` rather than a
+ * Deliberately a second implementation of `packages/core/src/domain/url.ts` rather than a
  * shared import: ADR-0012 keeps `core` — and therefore Prisma and pg — out of the
  * browser bundle. The duplication is the architecture, not an oversight.
  *

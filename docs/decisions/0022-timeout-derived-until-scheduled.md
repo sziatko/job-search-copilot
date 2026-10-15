@@ -8,7 +8,7 @@
 > **Phase 4 update.** The rule below is unchanged — derived, 30 days,
 > `statusChangedAt`, REJECTED / OFFER closed — but it now lives in `core`:
 > `TIMEOUT_DAYS`, `timedOutWhere` / `activeWhere` / `isTimedOut` in
-> `packages/core/src/status.ts`, read by `StatsService` for `GET /stats`' `pipeline`
+> `packages/core/src/domain/status.ts`, read by `StatsService` for `GET /stats`' `pipeline`
 > and by `ApplicationService.list` for the `state=active|timedOut` filter and each
 > item's `timedOut`. Timed out means `statusChangedAt < now − 30 days`. The web's
 > mirror is gone (phase 4 step 4). The sections below are the phase-2 reasoning, kept

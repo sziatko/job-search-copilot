@@ -1,6 +1,6 @@
 import type { CommentSource, Prisma, Recommendation, VacancyStatus } from '@prisma/client';
+import type { UserTx } from '../db/for-user';
 import { AnalysedNotNewError, SameStatusError } from './errors';
-import type { UserTx } from './for-user';
 
 /** The statuses before the pipeline: the analysis queue (NEW), the user's triage, and
  * FILTERED_OUT. A repeat of one carries no event, so writeStatus refuses it (ADR-0029). */

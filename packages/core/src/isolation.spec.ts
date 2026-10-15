@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createUser } from '../tests/user';
-import { ApplicationService } from './application.service';
-import { VacancyNotFoundError } from './errors';
-import { getPrisma } from './prisma-client';
-import { StatsService } from './stats.service';
-import { VacancyService } from './vacancy.service';
-import type { SaveVacancyInput } from './vacancy.types';
-import { VacancyIntakeService } from './vacancy-intake.service';
+import { ApplicationService } from './applications/application.service';
+import { getPrisma } from './db/prisma-client';
+import { VacancyNotFoundError } from './domain/errors';
+import { VacancyIntakeService } from './intake/vacancy-intake.service';
+import { StatsService } from './stats/stats.service';
+import { VacancyService } from './vacancies/vacancy.service';
+import type { SaveVacancyInput } from './vacancies/vacancy.types';
 
 // Phase 7 (ADR-0038): user B, handed user A's ids and data, finds nothing of A's and
 // changes nothing of A's.

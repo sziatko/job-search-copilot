@@ -62,7 +62,7 @@ serves the three tables. Optimistic writes patch the `pages[]` shape.
 - No `skip: 1` (the trap phase 4 step 2's core test confirmed): it skips the cursor
   row on the premise that it is in the result, and a cursor row that no longer matches
   the filter (a vacancy triaged out of `NOT_REVIEWED` while `/vacancies` shows that
-  filter) is not — so the next real row was dropped. `core/src/paging.ts` fetches one
+  filter) is not — so the next real row was dropped. `core/src/db/paging.ts` fetches one
   row more and drops the cursor row itself when it is there.
 - Two paging styles live side by side in `core`'s list services.
 

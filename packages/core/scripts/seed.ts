@@ -4,7 +4,7 @@
  * when missing. resetToSeed refuses any database not named `*_e2e`, `*_test` or `*_demo`.
  */
 import { randomUUID } from 'node:crypto';
-import { getPrisma } from '../src/prisma-client';
+import { getPrisma } from '../src/db/prisma-client';
 import { SEED_VACANCIES } from '../src/seed/data';
 import { resetToSeed } from '../src/seed/reset-to-seed';
 

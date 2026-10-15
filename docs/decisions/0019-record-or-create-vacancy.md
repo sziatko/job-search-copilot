@@ -64,7 +64,7 @@ be applied to again.
 
 - Changing the placeholder values / the score→recommendation thresholds →
   `deriveRecommendationFromScore` in
-  [`packages/core/src/recommendation.ts`](../../packages/core/src/recommendation.ts)
+  [`packages/core/src/domain/recommendation.ts`](../../packages/core/src/domain/recommendation.ts)
   and its spec. The web colours the same score through
   [`ScorePill.tsx`](../../apps/web/src/components/ui/ScorePill.tsx) — the component
   that replaced `MatchScoreBadge` in the 2026-09 redesign (ADR-0024).

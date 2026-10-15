@@ -57,4 +57,4 @@ method, shape the response.
 ## Related
 [ADR-0001](0001-monorepo-npm-workspaces.md), [ADR-0004](0004-one-service-two-transports.md),
 [ADR-0006](0006-nest-di-prisma-lifecycle.md),
-`packages/core/src/vacancy.service.ts`, `packages/core/src/index.ts`.
+`packages/core/src/vacancies/vacancy.service.ts`, `packages/core/src/index.ts`.

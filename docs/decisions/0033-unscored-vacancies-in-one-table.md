@@ -113,5 +113,5 @@ only gets the text it lacked — never a status, a source or an analysis. Return
 
 [ADR-0005](0005-analyze-once.md),
 [ADR-0029](0029-one-vacancy-table.md), [ADR-0030](0030-cursor-paging.md),
-[`../phases/phase-5.md`](../phases/phase-5.md), `packages/core/src/vacancy-intake.service.ts`,
-`packages/core/src/status.ts`.
+[`../phases/phase-5.md`](../phases/phase-5.md), `packages/core/src/intake/vacancy-intake.service.ts`,
+`packages/core/src/domain/status.ts`.

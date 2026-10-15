@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Prisma } from '@prisma/client';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createUser } from '../tests/user';
+import { createUser } from '../../tests/user';
 import { forUser } from './for-user';
 import { getPrisma } from './prisma-client';
 
@@ -119,8 +119,11 @@ describe('forUser', () => {
   });
 });
 
+/** Every source file of core, from `src/` down — not only this spec's folder. */
+const SRC = path.resolve(import.meta.dirname, '..');
+
 /** Core's source files outside forUser, specs left out. */
-function sources(dir = import.meta.dirname): string[] {
+function sources(dir = SRC): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(dir, entry.name);
     if (entry.isDirectory()) return sources(file);
@@ -131,18 +134,15 @@ function sources(dir = import.meta.dirname): string[] {
 }
 
 describe('every domain query goes through forUser (ADR-0038)', () => {
-  it.each(sources().map((file) => [path.relative(import.meta.dirname, file), file]))(
-    '%s',
-    (_, file) => {
-      const code = readFileSync(file, 'utf8');
-      // The raw client never reaches a domain model: the services hold it as `this.db`,
-      // resetToSeed as `prisma`, and a raw transaction is called `tx`.
-      expect(code).not.toMatch(/\b(?:this\.db|tx|prisma)\??\.(?:vacancy|statusChange|comment)\b/);
-      expect(code).not.toMatch(/\bthis\.db\.\$transaction\b/);
-      // `this.db` appears only as forUser's argument.
-      expect(code.match(/\bthis\.db\b/g)?.length ?? 0).toBe(
-        code.match(/\bforUser\(this\.db, userId\)/g)?.length ?? 0,
-      );
-    },
-  );
+  it.each(sources().map((file) => [path.relative(SRC, file), file]))('%s', (_, file) => {
+    const code = readFileSync(file, 'utf8');
+    // The raw client never reaches a domain model: the services hold it as `this.db`,
+    // resetToSeed as `prisma`, and a raw transaction is called `tx`.
+    expect(code).not.toMatch(/\b(?:this\.db|tx|prisma)\??\.(?:vacancy|statusChange|comment)\b/);
+    expect(code).not.toMatch(/\bthis\.db\.\$transaction\b/);
+    // `this.db` appears only as forUser's argument.
+    expect(code.match(/\bthis\.db\b/g)?.length ?? 0).toBe(
+      code.match(/\bforUser\(this\.db, userId\)/g)?.length ?? 0,
+    );
+  });
 });

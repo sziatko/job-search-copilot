@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createUser } from '../tests/user';
-import { ApplicationService } from './application.service';
+import { createUser } from '../../tests/user';
+import { ApplicationService } from '../applications/application.service';
+import { getPrisma } from '../db/prisma-client';
 import {
   AlreadyAnalysedError,
   AnalysedNotNewError,
   InvalidRecommendationError,
   SameStatusError,
   VacancyNotFoundError,
-} from './errors';
-import { companyGroupKey } from './identity';
-import { getPrisma } from './prisma-client';
+} from '../domain/errors';
+import { companyGroupKey } from '../domain/identity';
+import { VacancyIntakeService } from '../intake/vacancy-intake.service';
 import { VacancyService } from './vacancy.service';
 import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
-import { VacancyIntakeService } from './vacancy-intake.service';
 
 /** Every call acts as this test's user (ADR-0038). */
 let userId: string;

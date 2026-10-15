@@ -1,9 +1,9 @@
 # Domain model
 
 Source of truth: [`packages/core/prisma/schema.prisma`](../packages/core/prisma/schema.prisma),
-[`vacancy.service.ts`](../packages/core/src/vacancy.service.ts),
-[`application.service.ts`](../packages/core/src/application.service.ts) and
-[`status.ts`](../packages/core/src/status.ts). The shape as a whole:
+[`vacancy.service.ts`](../packages/core/src/vacancies/vacancy.service.ts),
+[`application.service.ts`](../packages/core/src/applications/application.service.ts) and
+[`status.ts`](../packages/core/src/domain/status.ts). The shape as a whole:
 [ADR-0029](decisions/0029-one-vacancy-table.md).
 
 ## `Vacancy`
@@ -94,14 +94,14 @@ table:
 >   The two writers overlap only in the move out of `NEW`.
 > - Adding a `Recommendation` value → the Prisma enum (migration),
 >   `RECOMMENDATION_INPUT_VALUES` + `RECOMMENDATION_ALIASES` in
->   [`recommendation.ts`](../packages/core/src/recommendation.ts), the MCP `zod`
+>   [`recommendation.ts`](../packages/core/src/domain/recommendation.ts), the MCP `zod`
 >   enums in [`vacancies.schemas.ts`](../apps/mcp/src/vacancies/vacancies.schemas.ts),
 >   the `apps/api` DTOs, and the web `recommendationSchema`. Its place in the enum is
   `/vacancies`' `sort=recommended` order (ADR-0030) — `ADD VALUE … BEFORE`/`AFTER`.
 > - Adding a `VacancyStatus` value → the Prisma enum (migration, `ADD VALUE … AFTER`;
 >   on the dev stack, `docker compose restart api mcp core` after it),
 >   `TRIAGE_STATUSES` or `PIPELINE_STATUSES` in
->   [`status.ts`](../packages/core/src/status.ts), a `StatsService` count if the
+>   [`status.ts`](../packages/core/src/domain/status.ts), a `StatsService` count if the
 >   dashboard shows it, the MCP zod enums (`VacancyStatusEnum` follows the Prisma enum;
 >   `PipelineStatusEnum`) and the tool descriptions and `SERVER_INSTRUCTIONS` that list
 >   the statuses, the API DTOs (`@IsEnum(VacancyStatus)`, `@IsIn(PIPELINE_STATUSES)`),
@@ -148,7 +148,7 @@ move is more than 30 days old (`statusChangedAt < now − 30 days`) is a *timeou
 the remainder is *active*. So `total = active + timeout + rejected + offer`, with no
 overlap and no remainder. The window floats: from applying while `APPLIED`, from the
 interview after `INTERVIEW`. There is deliberately no column and no job for it — the
-rule lives in `core` (`TIMEOUT_DAYS`, `timedOutWhere` in `packages/core/src/status.ts`),
+rule lives in `core` (`TIMEOUT_DAYS`, `timedOutWhere` in `packages/core/src/domain/status.ts`),
 `GET /stats`' `pipeline` counts it, and the `/applications` list filters on it and
 flags each item `timedOut`
 ([ADR-0022](decisions/0022-timeout-derived-until-scheduled.md),

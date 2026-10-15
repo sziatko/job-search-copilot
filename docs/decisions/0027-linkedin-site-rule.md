@@ -24,7 +24,7 @@ Globex's `3900000001` is logged twice, once through `www` and once through `pl`.
 ## Decision
 
 A `SITE_RULES` entry for `linkedin.com` (`normalizeLinkedIn` in
-`packages/core/src/url.ts`). When the path matches `/(comm/)?jobs/view/(?:[^/]*-)?(\d+)`,
+`packages/core/src/domain/url.ts`). When the path matches `/(comm/)?jobs/view/(?:[^/]*-)?(\d+)`,
 the URL becomes `https://www.linkedin.com/jobs/view/<id>`, with no query. Any other
 LinkedIn path falls through to ADR-0023's usual query strip.
 

@@ -14,7 +14,7 @@ Separately, the e2e test set up its `ValidationPipe` by hand in `beforeAll`, so 
 could silently drift from what `main.ts` configured.
 
 ## Decision
-- **`DomainError`** base class in `packages/core/src/errors.ts` (with
+- **`DomainError`** base class in `packages/core/src/domain/errors.ts` (with
   `InvalidRecommendationError`). It marks *caller mistakes* — not bugs, not infra
   failures. `normalizeRecommendation()` throws `InvalidRecommendationError`.
 - **`apps/api`** — `DomainExceptionFilter` (`@Catch(DomainError)`) maps it to
@@ -54,5 +54,5 @@ pre-validated by a DTO.
 
 ## Related
 [ADR-0008](0008-api-prefix-and-versioning.md), [`../contracts.md`](../contracts.md),
-`packages/core/src/errors.ts`, `apps/api/src/common/domain-exception.filter.ts`,
+`packages/core/src/domain/errors.ts`, `apps/api/src/common/domain-exception.filter.ts`,
 `apps/api/src/setup-app.ts`.

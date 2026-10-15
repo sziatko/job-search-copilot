@@ -24,7 +24,7 @@ depending on which link you clicked cannot carry that.
 
 ## Decision
 
-`normalizeApplyUrl` (`packages/core/src/url.ts`) reduces an incoming URL to a
+`normalizeApplyUrl` (`packages/core/src/domain/url.ts`) reduces an incoming URL to a
 canonical form before it is ever used as a key. It does six things:
 
 1. **Scheme gate** — only `http:`/`https:` survives; anything else returns
@@ -42,7 +42,7 @@ canonical form before it is ever used as a key. It does six things:
    and percent-encodes what needs it.
 6. **Site rules** — *added 2026-09-21.* A short list of domains whose URLs
    *declare* which query param carries the vacancy id, each with a normalizer of
-   its own (`SITE_RULES` in `packages/core/src/url.ts`). A matching domain's
+   its own (`SITE_RULES` in `packages/core/src/domain/url.ts`). A matching domain's
    normalizer owns how the query is reduced, so rule 2 never runs on it; the
    fragment and trailing-slash rules still do. The list holds one entry: Indeed,
    keyed by `jk`.

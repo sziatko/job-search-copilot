@@ -1,12 +1,12 @@
 import type { PrismaClient, VacancyStatus } from '@prisma/client';
-import { forUser } from './for-user';
-import { getPrisma } from './prisma-client';
+import { forUser } from '../db/for-user';
+import { getPrisma } from '../db/prisma-client';
 import {
   OPEN_PIPELINE_STATUSES,
   PIPELINE_STATUSES,
   type PipelineStatus,
   timedOutWhere,
-} from './status';
+} from '../domain/status';
 
 /** How many journal rows `recent` carries — the dashboard's activity feed. */
 const RECENT_SIZE = 6;

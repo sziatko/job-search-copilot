@@ -1,9 +1,9 @@
 import { VacancyStatus } from '@prisma/client';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createUser } from '../../tests/user';
-import { ApplicationService } from '../application.service';
-import { createPrismaClient, getPrisma } from '../prisma-client';
-import { OPEN_PIPELINE_STATUSES } from '../status';
+import { ApplicationService } from '../applications/application.service';
+import { createPrismaClient, getPrisma } from '../db/prisma-client';
+import { OPEN_PIPELINE_STATUSES } from '../domain/status';
 import { SEED_VACANCIES } from './data';
 import { resetToSeed } from './reset-to-seed';
 

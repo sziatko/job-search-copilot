@@ -1,6 +1,6 @@
 import type { Recommendation, VacancyStatus } from '@prisma/client';
-import type { PipelineStatus } from './status';
-import type { VacancyComment } from './vacancy.types';
+import type { PipelineStatus } from '../domain/status';
+import type { VacancyComment } from '../vacancies/vacancy.types';
 
 /**
  * WEB path: the analyzed vacancy row already exists and the caller knows its id

@@ -1,12 +1,12 @@
 import type { VacancyStatus } from '@prisma/client';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createUser } from '../tests/user';
-import { forUser } from './for-user';
-import { getPrisma } from './prisma-client';
+import { createUser } from '../../tests/user';
+import { forUser } from '../db/for-user';
+import { getPrisma } from '../db/prisma-client';
+import { TIMEOUT_DAYS, writeStatus } from '../domain/status';
+import { VacancyIntakeService } from '../intake/vacancy-intake.service';
+import { VacancyService } from '../vacancies/vacancy.service';
 import { StatsService } from './stats.service';
-import { TIMEOUT_DAYS, writeStatus } from './status';
-import { VacancyService } from './vacancy.service';
-import { VacancyIntakeService } from './vacancy-intake.service';
 
 /** Every call acts as this test's user (ADR-0038). */
 let userId: string;
