@@ -28,7 +28,7 @@ export interface SubmitAnalysisInput {
 }
 
 /** Max analyses per submitAnalyses / get_vacancies_batch call: each posting is read and
- * scored by an agent, and ten keeps one step's context small (phase 5). Enforced by the
+ * scored by an agent, and ten keeps one step's context small. Enforced by the
  * transports. */
 export const ANALYSIS_BATCH_MAX = 10;
 

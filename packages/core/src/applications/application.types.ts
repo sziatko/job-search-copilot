@@ -100,9 +100,9 @@ export interface ListApplicationsFilters {
 export const APPLICATION_STATES = ['active', 'timedOut'] as const;
 export type ApplicationState = (typeof APPLICATION_STATES)[number];
 
-/** A list row: the item plus the derived duplicates count — every vacancy (any
- * status) whose company contains this one's, as on /vacancies (ADR-0025). Only
- * `list` derives it; the single-row reads and writes do not. */
+/** A list row: the item plus the derived duplicates count — the same company by an
+ * equal `companyGroupKey`, as on /vacancies (ADR-0032). Only `list` derives it; the
+ * single-row reads and writes do not. */
 export interface ApplicationListRow extends ApplicationListItem {
   companyMatchCount: number;
 }

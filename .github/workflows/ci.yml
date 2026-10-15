@@ -27,7 +27,7 @@ jobs:
     env:
       # vitest configs read process.env when no .env.test file is present (CI has none).
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/job_search_copilot_test
-      # Auth (phase 6) — fake values, as in .env.test.
+      # Auth — fake values, as in .env.test.example.
       BETTER_AUTH_SECRET: test-secret-at-least-32-characters-long
       BETTER_AUTH_URL: http://localhost:3000
       WEB_ORIGIN: http://localhost:5173

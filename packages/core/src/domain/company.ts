@@ -13,8 +13,8 @@ export const SAME_COMPANY_STATUSES: Prisma.VacancyWhereInput = {
   status: { not: 'FILTERED_OUT' },
 };
 
-// ponytail: both helpers below read every distinct company on each call — fine at a
-// few hundred names per user; past that, store `companyGroupKey` in an indexed column,
+// Limit: both helpers below read every distinct company on each call — fine at a few
+// hundred names per user. Past that, store `companyGroupKey` in an indexed column,
 // best together with company aliases (docs/backlog.md).
 
 /** Every stored spelling of `company`'s company — the `sameCompanyAs` filter. */

@@ -8,7 +8,7 @@ import { StatsService } from './stats/stats.service';
 import { VacancyService } from './vacancies/vacancy.service';
 import type { SaveVacancyInput } from './vacancies/vacancy.types';
 
-// Phase 7 (ADR-0038): user B, handed user A's ids and data, finds nothing of A's and
+// ADR-0038: user B, handed user A's ids and data, finds nothing of A's and
 // changes nothing of A's.
 const prisma = getPrisma();
 const vacancies = new VacancyService();

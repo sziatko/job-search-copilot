@@ -104,8 +104,8 @@ export const vacancyListItemSchema = z.object({
    * .../status response, which returns a plain record with no derived field —
    * requiring it here would fail every action change with "unexpected format". */
   companyMatchCount: z.number().optional(),
-  /** Whether the vacancy has an analysis (`recommendation` set) — also derived (same
-   * trap, same reason: phase 2.2, step 7). Read it as "can a score be shown": `false`
+  /** Whether the vacancy has an analysis (`recommendation` set) — also derived, so
+   * optional for the same reason. Read it as "can a score be shown": `false`
    * and `undefined` both mean no, so consumers must not treat `undefined` as analysed. */
   hasAnalysis: z.boolean().optional(),
   /** Whether the vacancy has posting text — derived too, so optional for the same reason;

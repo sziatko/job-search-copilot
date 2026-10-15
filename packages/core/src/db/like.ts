@@ -21,11 +21,10 @@ import type { Prisma } from '@prisma/client';
  * Callers still pass the result to `contains` — this escapes a *value*, it does
  * not build a pattern, so the surrounding `%` Prisma adds stays a wildcard.
  *
- * ponytail: an escaped pattern cannot be served by the `company`/`title` trigram
- * indexes (Prisma binds the value as a parameter, so the backslashes are not in
- * the index terms) — a leading-`%` scan either way, ~300 rows today. Do the
- * escaping in SQL with an `ESCAPE` clause if the table ever gets big enough for
- * the scan to hurt; Prisma's `contains` has no way to say it.
+ * Limit: an escaped pattern cannot be served by the `company`/`title` trigram indexes
+ * (Prisma binds the value as a parameter, so the backslashes are not in the index
+ * terms) — a leading-`%` scan either way, fine at a few thousand rows. Past that, do
+ * the escaping in SQL with an `ESCAPE` clause; Prisma's `contains` cannot say it.
  */
 export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, '\\$&');

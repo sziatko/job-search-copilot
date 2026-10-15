@@ -135,8 +135,8 @@ describe('job-search-copilot MCP server', () => {
     const { tools } = await client.listTools();
     const registered = new Set(tools.map((t) => t.name));
 
-    // ponytail: a tool is recognised by its noun (`<verb>_vacanc…/application…/analys…`);
-    // one named after another noun goes unchecked — widen the pattern when one appears.
+    // A tool is recognised by its noun (`<verb>_vacanc…/application…/analys…`); one
+    // named after another noun goes unchecked — widen the pattern when one appears.
     const referenced = readdirSync(skillsDir, { withFileTypes: true })
       // A skill is a folder with a SKILL.md — not the clone's own .git.
       .filter((entry) => existsSync(path.join(skillsDir, entry.name, 'SKILL.md')))

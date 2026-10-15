@@ -81,7 +81,7 @@ export class VacancyIntakeService {
         }
         return { new: fresh };
       },
-      // ponytail: fixed ceiling sized for BATCH_MAX entries over a remote DB.
+      // A fixed ceiling, sized for BATCH_MAX entries over a remote DB.
       { timeout: 60_000 },
     );
   }

@@ -38,7 +38,7 @@ export function CompanyHistoryModal({
   // This company's applications, every spelling (ADR-0032), for the ⏳ mark and the
   // CV column. Not under ['applications']: those entries are the tracker's paged
   // lists, and its optimistic writes patch every one of them as pages.
-  // ponytail: one page of 500; a company with more applications loses the oldest marks.
+  // One page of 500: a company with more applications loses the oldest marks.
   const applications = useQuery({
     queryKey: ['application-company', company],
     queryFn: () => listApplicationsPage({ sameCompanyAs: company, limit: 500 }),

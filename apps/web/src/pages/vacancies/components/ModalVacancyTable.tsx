@@ -70,10 +70,9 @@ export function ModalVacancyTable({
           {loading && <SkeletonRows rows={4} cols={6} />}
           {items.map((item) => {
             const application = applicationsByVacancy.get(item.id);
-            // Two independent questions, and they used to be one variable: can
-            // this be a link (`isSafeExternalUrl`), and can a score be shown
-            // (`hasAnalysis`). A row can be either without the other — which is
-            // why /vacancies and this table drew the same row differently.
+            // Two independent questions: can this be a link (`isSafeExternalUrl`), and
+            // can a score be shown (`hasAnalysis`). A row can be either without the
+            // other.
             const linkable = isSafeExternalUrl(item.applyUrl);
             const isCurrent = item.id === currentId;
             return (

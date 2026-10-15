@@ -237,7 +237,7 @@ describe('Applications (e2e)', () => {
         .expect(404);
     });
 
-    // REPLIED and RECRUITER_SCREEN left the enum in phase 7.2.
+    // Not statuses (any more): the enum refuses them.
     it.each(['MAYBE', 'REPLIED', 'RECRUITER_SCREEN'])('400s for the status %s', async (status) => {
       const vacancyId = await seedVacancy();
       const created = await api.post('/api/v1/applications').send({ vacancyId });

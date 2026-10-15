@@ -23,7 +23,7 @@ const rootRoute = createRootRoute();
  * answer from the API) → /login; the API refuses every route without one anyway
  * (invariant 9), this only spares the user a page of 401s.
  */
-// ponytail: one GET /api/auth/get-session per navigation; cache it if that ever shows.
+// One GET /api/auth/get-session per navigation; cache it if that ever shows.
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_app',

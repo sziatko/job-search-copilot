@@ -77,7 +77,7 @@ describe('OAuth authorization server (e2e)', () => {
     expect(body.keys[0]).not.toHaveProperty('d'); // no private part
   });
 
-  // The whole flow an MCP client runs, ending in what the MCP server will check (step 5).
+  // The whole flow an MCP client runs, ending in what the MCP server checks.
   it('issues a JWT for the MCP resource after sign-in and consent (code + PKCE)', async () => {
     const server = app.getHttpServer();
     const { client_id } = await register();

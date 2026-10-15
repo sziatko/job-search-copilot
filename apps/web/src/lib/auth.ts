@@ -5,7 +5,7 @@ import { createAuthClient } from 'better-auth/react';
 import { API_ORIGIN } from './api';
 
 /**
- * Better Auth's browser client, against the API's /api/auth/* (phase 6). Its types come
+ * Better Auth's browser client, against the API's /api/auth/*. Its types come
  * from the library's plugins, not from `core` (invariant 5). The session is an
  * `HttpOnly` cookie the API sets; this client never sees a token. It sends
  * `credentials: 'include'` on its own.

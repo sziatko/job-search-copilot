@@ -340,8 +340,8 @@ export class VacancyService {
         // finds nothing when that row has left the filter (triaged out of NOT_REVIEWED).
         // The cursor row is kept in the result so it is always found; toCursorPage drops
         // it (an empty `where` matches every row already — Prisma reads `{}` in an OR as
-        // false). ponytail: that in-memory path reads every row after the cursor, not
-        // one page — fine at a few thousand rows; past that, a hand-written keyset.
+        // false). Limit: that in-memory path reads every row after the cursor, not one
+        // page — fine at a few thousand rows; past that, a hand-written keyset.
         where:
           cursor === undefined || Object.keys(where).length === 0
             ? where

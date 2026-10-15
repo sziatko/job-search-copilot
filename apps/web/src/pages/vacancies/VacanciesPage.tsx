@@ -120,9 +120,9 @@ export function VacanciesPage() {
           company={pendingApply.company}
           title={pendingApply.title}
           onCancel={cancelApply}
-          // No toast here: the dialog unmounts on confirm, so a success announced
-          // from this line was announced before the server answered (phase 2.2,
-          // finding 1). The mutation's own `onSuccess` is what reports it.
+          // No toast here: the dialog unmounts on confirm, so a success announced from
+          // this line would come before the server answered. The mutation's
+          // `onSuccess` reports it.
           onConfirm={confirmApply}
         />
       )}

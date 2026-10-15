@@ -14,10 +14,10 @@ export function parseRecommendation(input: string): Recommendation {
 }
 
 /**
- * Score → verdict, using the same thresholds the web MatchScoreBadge paints with
- * (>=70 green, >=50 amber, else slate). Used when an application is recorded against
- * a vacancy that was never analyzed, so there's no analyzer verdict to store — see
- * ApplicationService.record / ADR-0019.
+ * Score → verdict: >= 70 APPLY, >= 50 APPLY_WITH_CAVEATS, else SKIP. Used when an
+ * application is recorded with a score but no verdict, on a vacancy never analysed —
+ * see ApplicationService.record / ADR-0019. The web's ScorePill colours at 70 / 55,
+ * not 50: the two are not kept in step (ADR-0019).
  */
 export function deriveRecommendationFromScore(score: number): Recommendation {
   if (score >= 70) return 'APPLY';

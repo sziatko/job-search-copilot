@@ -7,7 +7,7 @@ import { registerVacancyTools } from './vacancies/vacancies.tools';
 /**
  * Sent to every client on connect: the rules that span tools. A rule about one tool
  * belongs in its description; a rule about one user's workflow belongs in their skill.
- * Claude Desktop does not show these to the model (checked 2026-09-27) — so every rule
+ * Claude Desktop does not show these to the model — so every rule
  * here must also be said in a tool description; this is a summary, not the only copy.
  */
 export const SERVER_INSTRUCTIONS = [

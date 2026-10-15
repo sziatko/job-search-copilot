@@ -2,7 +2,7 @@ import path from 'node:path';
 import { expect, test } from './fixtures';
 
 /**
- * The README's screenshots (phase 7.1), on the made-up seed: `npm run screenshots`.
+ * The README's screenshots, on the made-up seed: `npm run screenshots`.
  * Not a test — it asserts nothing but that the page finished loading — and only the
  * `screenshots` project runs it (playwright.config.ts), so `npm run test:e2e` never does.
  */

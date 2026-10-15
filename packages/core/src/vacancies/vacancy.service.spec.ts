@@ -970,7 +970,7 @@ describe('VacancyService', () => {
       it('counts a company whose own name contains a backslash', async () => {
         // The count once fed each row's company back through `contains`; unescaped,
         // that pattern missed the row it came from, so the duplicates button hid on
-        // a company's own page (phase 2.2, finding 12).
+        // a company's own page.
         await service.save(
           userId,
           input({ applyUrl: 'https://example.com/jobs/bs', company: 'A\\B' }),

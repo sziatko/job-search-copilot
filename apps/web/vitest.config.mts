@@ -18,7 +18,7 @@ export default defineConfig({
     // Run web after core/api/mcp, never interleaved with their files. vitest 5.0.0's
     // jsdom teardown does not restore global `Request`; a second jsdom setup in the
     // same worker makes its compat `Request` extend itself, and `instanceof` recurses
-    // until the stack overflows — the full `npm test` hung on it (2026-10-04).
+    // until the stack overflows, and the full `npm test` hangs.
     sequence: { groupOrder: 1 },
     // Every page test boots the whole router in jsdom, which is CPU-bound: the
     // heaviest take 2–5 s on a quiet machine, and this machine has run the suite up

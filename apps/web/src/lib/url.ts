@@ -10,8 +10,8 @@
  * shared import: ADR-0012 keeps `core` — and therefore Prisma and pg — out of the
  * browser bundle. The duplication is the architecture, not an oversight.
  *
- * The tracker's `tracker://` synthetic URLs fail this test too, which is why the
- * tables no longer need a separate check for them.
+ * The synthetic `tracker://` URLs fail this test too, so the tables need no separate
+ * check for them.
  */
 export function isSafeExternalUrl(url: string): boolean {
   try {

@@ -60,9 +60,9 @@ never a status, a source or an analysis. It answers `{ new }`.
   is in [ADR-0030](0030-cursor-paging.md).
 - Filtered-out rows are record-or-link candidates too, so `record_application` by name
   meets more ambiguous matches (a backlog row).
-- A change to the key functions leaves stored keys in the old shape:
-  `npm run backfill:match-keys -w @job-search-copilot/core` (dry run by default,
-  `--commit` to write) recomputes them.
+- A change to the key functions leaves stored keys in the old shape, and needs a
+  backfill. `npm run backfill:match-keys -w @job-search-copilot/core` fills only null
+  keys (dry run by default, `--commit` to write); rewriting stored ones would extend it.
 
 ## What this constrains — breaks if you change it
 - An analysis written while the row is `NEW`, or one field without the other → the

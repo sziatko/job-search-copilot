@@ -45,6 +45,13 @@ Quote them from there if you change one; keep this list in step.
 11. **Every domain query is scoped to its user** — through `forUser(db, userId)` in
     `core`; another user's row is a 404 (phase 7, from step 3a).
 
+## Code comments
+
+A comment says *why*, for the spot it sits on. No phase, step or review-finding
+references and no history — git keeps that. A deliberate shortcut with a known ceiling
+is a plain comment, `Limit: … Past that: …`, never a `ponytail:` tag: that plugin
+convention does not apply in this repo.
+
 ## Commands
 
     npm test           # vitest; needs the test DB — see ADR-0015
