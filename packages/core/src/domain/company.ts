@@ -3,8 +3,8 @@ import type { UserDb } from '../db/for-user';
 import { companyGroupKey } from './identity';
 
 /**
- * "The same company" leaves `FILTERED_OUT` out — screened-out postings (most of them
- * the old log's, never analysed) are noise in "have I dealt with these people before?".
+ * "The same company" leaves `FILTERED_OUT` out — screened-out postings are noise in
+ * "have I dealt with these people before?".
  * Both the `sameCompanyAs` list and `companyMatchCounts` apply it; a FILTERED_OUT row
  * adds itself back to its own count (`withDerivedFields`), so the button's "others" is
  * exactly the rows the modal lists, from any row.

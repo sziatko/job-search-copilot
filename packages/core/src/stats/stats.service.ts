@@ -24,8 +24,8 @@ export interface Stats {
   awaitingAnalysis: number;
   awaitingTriage: number;
   recommended: number;
-  /** The analyzer's no, each vacancy once: currently `FILTERED_OUT` (by a `SKIP`, the
-   * user, or the migrated log) **or** analysed `SKIP`, whatever its status now. */
+  /** The analyzer's no, each vacancy once: currently `FILTERED_OUT` (by a `SKIP` or the
+   * user) **or** analysed `SKIP`, whatever its status now. */
   notRecommended: number;
   applied: number;
   /** Current `status = DECLINED` — the user said no. */

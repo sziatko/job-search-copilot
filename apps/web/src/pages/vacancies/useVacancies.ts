@@ -228,9 +228,9 @@ export function useVacancyRows(
         new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
       );
     },
-    // Here, not at the call site: the dialog is unmounted the moment it is
-    // confirmed, so a `toast.success` next to `mutate()` announced success before
-    // the server had answered — and kept announcing it when the answer was 422.
+    // Here, not at the call site: the dialog unmounts the moment it is confirmed, so a
+    // `toast.success` next to `mutate()` would announce success before the server
+    // answered — even when the answer is a 422.
     onSuccess: () => toast.success('Application submitted!'),
     onSettled: (_data, _err, { id }) => {
       setSavingIds((prev) => {

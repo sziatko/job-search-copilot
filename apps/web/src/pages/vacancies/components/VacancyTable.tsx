@@ -176,10 +176,8 @@ export function VacancyTable({
                     )}
                   </div>
                 </td>
-                {/* A placeholder (imported, never analysed) has no score to show:
-                    its `matchScore` is the tracker's own number, and rendering it as
-                    `0%` would claim an analysis that never happened. Same rule as the
-                    modal's cell — one field decides, so the two cannot disagree. */}
+                {/* No analysis, no score. Same rule as the modal's cell — one field
+                    decides, so the two cannot disagree. */}
                 <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
                 <td>
                   <RecommendationTag recommendation={item.recommendation} />

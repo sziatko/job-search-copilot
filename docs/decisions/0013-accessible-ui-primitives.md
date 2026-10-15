@@ -17,7 +17,7 @@ leaves keyboard, touch and screen-reader users out, and Biome's a11y rules flag 
 - locks the body's scroll while open.
 
 **`ExpandableText`** (`apps/web/src/components/ui/ExpandableText.tsx`) for long text
-in a cell: clamped to 3 lines; a `ResizeObserver` measures whether it overflows. If it
+in a cell: clamped to 2 lines; a `ResizeObserver` measures whether it overflows. If it
 fits, a plain `<p>` with no tab stop; if not, one `<button aria-expanded>` that toggles
 "Show more / Show less", and re-clamps on blur and `Escape`.
 

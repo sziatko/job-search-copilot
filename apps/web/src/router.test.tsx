@@ -38,7 +38,6 @@ describe('router', () => {
     expect(screen.getByRole('link', { name: /application tracker/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^dashboard$/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^inbox$/i })).toHaveAttribute('href', '/inbox');
-    expect(screen.queryByRole('link', { name: /vacancy log/i })).not.toBeInTheDocument();
   });
 
   it('shows the brand logo in the sidebar', async () => {
@@ -50,10 +49,9 @@ describe('router', () => {
     ).toBeInTheDocument();
   });
 
-  it('has no /log page any more', async () => {
-    renderAt('/log');
+  it('renders not found for an unknown path', async () => {
+    renderAt('/no-such-page');
     expect(await screen.findByText(/not found/i)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /vacancy log/i })).not.toBeInTheDocument();
   });
 
   it('renders the dashboard at the index route', async () => {

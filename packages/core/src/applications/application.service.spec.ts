@@ -382,8 +382,7 @@ describe('ApplicationService', () => {
     });
 
     it('orders rows that share one statusChangedAt, so two pages do not overlap', async () => {
-      // A migrated batch shares one date, so a tie is the normal case, not an exotic
-      // one. Read as windows, an unstable order serves one row twice and skips
+      // Rows can share one date (a batch written at once), so a tie is a normal case. Read as windows, an unstable order serves one row twice and skips
       // another; `id desc` is what makes them disjoint.
       const stamp = new Date('2099-01-01');
       for (const company of ['Tie One', 'Tie Two', 'Tie Three']) {

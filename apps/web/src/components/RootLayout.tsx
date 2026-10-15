@@ -22,8 +22,8 @@ export function RootLayout() {
 
   const collapsed = override?.path === pathname ? override.value : (meta.rail ?? false);
 
-  // The mockup resets scroll on every view switch. These are real routes now, so
-  // a scrolled table would otherwise carry its offset into the next page.
+  // Scroll resets on every route change: a scrolled table would otherwise carry its
+  // offset into the next page.
   // Not the scroll-restoration option: this router version has none.
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the trigger for the reset, not a value the body reads
   useEffect(() => {

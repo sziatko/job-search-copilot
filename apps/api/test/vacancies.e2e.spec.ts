@@ -490,12 +490,4 @@ describe('Vacancies (e2e)', () => {
         .expect(400);
     });
   });
-
-  it('has no /log any more: GET /log and POST /log/check are 404s', async () => {
-    await api.get('/api/v1/log').expect(404);
-    await api
-      .post('/api/v1/log/check')
-      .send({ entries: [{ url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' }] })
-      .expect(404);
-  });
 });

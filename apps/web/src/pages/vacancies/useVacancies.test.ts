@@ -26,7 +26,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
 /**
  * Page-level, not `renderHook`: the status filter lives in the route's search
  * params, so `useVacancies` calls `useSearch` and throws without a router above
- * it. Same shape as `renderApplications` in the tracker's test.
+ * it. Same shape as `renderApplications` in /applications' test.
  */
 function renderVacancies(path = '/vacancies') {
   const router = createRouter({
@@ -347,7 +347,7 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Backend Engineer');
 
     // Scoped by title, since both rows share a company and `rowOf` matches any text
-    // in the row. Before this step the placeholder rendered a real-looking `0%`.
+    // in the row.
     const imported = rowOf('Imported Role');
     expect(imported.queryByText('0%')).not.toBeInTheDocument();
     // Three dashes: the score, the verdict, and the Comment column, which has no
@@ -1005,7 +1005,7 @@ describe('VacanciesPage / useVacancies', () => {
       // `limit=100`), and jsdom paints all of them in two tables to get there.
     });
 
-    it('marks a stale application with the tracker’s hourglass', async () => {
+    it('marks a stale application with /applications’ hourglass', async () => {
       mswServer.use(
         ...buildHandlers([
           vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
@@ -1033,7 +1033,7 @@ describe('VacanciesPage / useVacancies', () => {
     });
 
     it('shows — instead of a score for a vacancy with no usable applyURL', async () => {
-      // An importer placeholder: the score belongs to a posting the app never saw.
+      // A placeholder `record()` created: no posting, no analysis.
       mswServer.use(
         ...buildHandlers([
           vacancy({ id: 1, company: 'Acme' }),
@@ -1060,7 +1060,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.queryByText('80%')).toBeInTheDocument(); // the safe row keeps its pill
       expect(modal.getByText('Imported Role')).toBeInTheDocument();
       expect(modal.queryByRole('link', { name: 'Imported Role' })).not.toBeInTheDocument();
-      // The importer row's score cell — not a page-wide count of dashes: the CV
+      // The placeholder row's score cell — not a page-wide count of dashes: the CV
       // column draws one on both rows, neither of them applied to.
       const imported = modal.getByText('Imported Role').closest('tr') as HTMLTableRowElement;
       expect(imported.cells[2]).toHaveTextContent('—');

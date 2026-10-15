@@ -53,7 +53,7 @@ to `AUTH_ALLOWED_EMAILS`.
   a moved folder can silently shrink what it scans — check its count after a move.
 - A raw SQL query (`$queryRaw`) is outside `forUser`: it must filter by `userId` itself.
 - `applyUrl` is unique per user, not globally: a lookup by `applyUrl` alone
-  (`findUnique({ where: { applyUrl } })`) no longer compiles, and must not come back.
+  (`findUnique({ where: { applyUrl } })`) does not compile, and must not be worked around.
 - The allowlist is checked on sign-up only (`user.create.before` in `create-auth.ts`).
   Removing an email does not lock out an existing account; deleting the user does.
 - Answering 403 or 409 on another user's id leaks that the id exists.

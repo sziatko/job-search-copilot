@@ -116,10 +116,10 @@ export type VacancyListItem = {
   status: VacancyStatus;
   statusChangedAt: Date;
   /**
-   * How many vacancies have a `company` containing this row's `company` —
-   * case-insensitive substring, the same semantics as the `company` filter, and
-   * counting this row itself. Derived on every list call, not a column, so it is
-   * absent from the single-record endpoints (`getById`, PATCH) — see ADR-0025.
+   * How many vacancies are this row's company (an equal `companyGroupKey`, ADR-0032),
+   * counting this row itself — the rows `sameCompanyAs` lists. Derived on every list
+   * call, not a column, so it is absent from the single-record endpoints (`getById`,
+   * PATCH) — see ADR-0025.
    */
   companyMatchCount: number;
   /**

@@ -15,16 +15,16 @@ it: [`development.md`](development.md).
 
 ## Conventions
 
-- **These docs describe the code as it is now.** No history: git keeps it. When the
-  code changes, the doc changes in the same commit.
+- **How to write them** — as the code is now, one fact in one place, no history:
+  [`CLAUDE.md` § Writing docs and comments](../CLAUDE.md#writing-docs-and-comments).
 - **ADRs are numbered** (`0001`, …), never renumbered, a number never reused. A
   replaced ADR is deleted; the new one's `Replaces:` line names it, and the index lists
   the gap.
 - **"What this constrains — breaks if you change it"** ends every ADR, and the
   sections of the overview docs where a boundary is at stake. It names real files:
   read it before touching the area.
-- **A phase's plan** (`docs/phases/phase-N.md`) is a working file for the agent: not
-  committed, deleted when the phase ends. What it defers goes to the backlog.
+- **A phase's plan** (`docs/phases/`) is the agent's working file, not part of these
+  docs: [`CLAUDE.md` § Phase workflow](../CLAUDE.md#phase-workflow).
 
 ## Secrets
 

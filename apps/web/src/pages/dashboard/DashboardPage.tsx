@@ -129,7 +129,7 @@ function RecentActivity({ items }: { items: RecentMove[] }) {
   );
 }
 
-/** The page while it loads: its six KPI tiles and its three cards, as bars. */
+/** The page while it loads: its KPI tiles and its cards, as bars. */
 function DashboardSkeleton() {
   return (
     <section className="view" aria-busy="true">

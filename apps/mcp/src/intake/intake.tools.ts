@@ -16,7 +16,7 @@ const IntakeEntrySchema = z.object({
     .describe('Where the posting was found: linkedin, justjoin, indeed, email, …'),
 });
 
-/** Registers the 2 intake tools on `server`, backed by `intake`. */
+/** Registers the intake tools on `server`, backed by `intake`. */
 export function registerIntakeTools(
   server: McpServer,
   intake: VacancyIntakeService,

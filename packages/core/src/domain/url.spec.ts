@@ -116,8 +116,8 @@ describe('normalizeApplyUrl', () => {
     });
 
     it('falls back to the generic rules when there is no id to key on', () => {
-      // A search page or an expired link, not a vacancy. Rule 2 applies exactly
-      // as it did before this rule existed, so nothing that works today changes.
+      // A search page or an expired link, not a vacancy: rule 2 applies, as on any
+      // other host.
       expect(normalizeApplyUrl('https://pl.indeed.com/viewjob?from=serp')).toBe(
         'https://pl.indeed.com/viewjob',
       );

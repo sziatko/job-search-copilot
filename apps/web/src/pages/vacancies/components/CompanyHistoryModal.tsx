@@ -36,7 +36,7 @@ export function CompanyHistoryModal({
   });
 
   // This company's applications, every spelling (ADR-0032), for the ⏳ mark and the
-  // CV column. Not under ['applications']: those entries are the tracker's paged
+  // CV column. Not under ['applications']: those entries are /applications' paged
   // lists, and its optimistic writes patch every one of them as pages.
   // One page of 500: a company with more applications loses the oldest marks.
   const applications = useQuery({

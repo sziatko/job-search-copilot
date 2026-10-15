@@ -150,9 +150,8 @@ async function writeAnalysis(
  *
  * - `companyMatchCount`: see `companyMatchCounts`.
  * - `hasAnalysis`: whether the vacancy has an analysis — `recommendation` is set
- *   (ADR-0033; the CHECK keeps `matchScore` in step). One place decides this: before
- *   it, the modal inferred it from the applyUrl's scheme, /vacancies rendered a `0%`
- *   for the same row, and the dashboard counted it as analysed.
+ *   (ADR-0033; the CHECK keeps `matchScore` in step). This is the one place that
+ *   decides it, so the tables, the modals and the page cannot disagree.
  * - `hasText`: `fullText IS NOT NULL`, asked of the page's ids — the list never
  *   selects the text itself, which can be large (TOAST).
  */

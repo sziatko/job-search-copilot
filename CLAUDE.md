@@ -43,20 +43,39 @@ Quote them from there if you change one; keep this list in step.
 10. **No real job-search data in the repo** — made-up companies, ids, rates and counts
     in code, tests, docs and commits, never ones from the dev DB.
 11. **Every domain query is scoped to its user** — through `forUser(db, userId)` in
-    `core`; another user's row is a 404 (phase 7, from step 3a).
+    `core`; another user's row is a 404.
 
-## Code comments
+## Writing docs and comments
 
-A comment says *why*, for the spot it sits on. No phase, step or review-finding
-references and no history — git keeps that. A deliberate shortcut with a known ceiling
-is a plain comment, `Limit: … Past that: …`, never a `ponytail:` tag: that plugin
-convention does not apply in this repo.
+Docs and comments describe the code as it is now, for a reader who has only the repo.
+Each rule here closes a way they went stale before.
+
+- **One fact, one home.** A rule, a command or a value lives in one place; everywhere
+  else links to it. A comment never restates a value from another file (a threshold,
+  a limit) — it names the file.
+- **No counts that change** in prose: not "34 ADRs", "15 tools", "~300 rows today". The
+  number lives in the code or a test.
+- **Rewrite, never append.** When a decision or a behaviour changes, edit the text so it
+  reads as if it had always been so. No "Amended in …", "Until …", "was renamed from",
+  "used to"; git keeps the history.
+- **No process in the product.** No phase, step or review-finding references in code,
+  docs or ADRs.
+- **Evidence from the dev DB is told without its data.** "One board serves a posting
+  with and without the slash", not names or row counts (invariant 10).
+- **A comment says *why*, for the spot it sits on.** A deliberate shortcut with a known
+  ceiling is a plain `Limit: … Past that: …` comment, never a `ponytail:` tag — that
+  plugin convention does not apply in this repo.
+- **One sentence per table cell.** More is a section of its own.
+- **Code that deletes data checks its target first** (the database name), as
+  `vitest.test-db.ts`, `resetToSeed` and `e2e/db.ts` do; never trust an env fallback.
+- **When code changes, its docs change in the same commit.** Grep the old name across
+  `docs/`, comments and tests before calling a rename done.
 
 ## Commands
 
     npm test           # vitest; needs the test DB — see ADR-0015
     npm run lint       # biome check .
-    npm run typecheck  # builds core first, then tsc --noEmit on the three apps
+    npm run typecheck  # builds core first, then tsc --noEmit on the apps and e2e
     npm run migrate:dev
 
 All four are root-only — no workspace defines them. One project only:

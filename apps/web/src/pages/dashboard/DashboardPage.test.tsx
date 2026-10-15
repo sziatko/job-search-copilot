@@ -236,7 +236,7 @@ describe('timeAgo', () => {
     // `Intl.RelativeTimeFormat.format(NaN, …)` throws `RangeError`, and NaN passes
     // every `<` comparison, so without the guard this reaches format() — and with no
     // `errorComponent` in the router, one bad stamp would take the whole dashboard
-    // render with it. The tracker's `daysSinceLastMove` fails open the same way.
+    // render with it. /applications' `daysSinceLastMove` fails open the same way.
     expect(timeAgo('garbage')).toBe('unknown');
     expect(timeAgo('')).toBe('unknown');
   });

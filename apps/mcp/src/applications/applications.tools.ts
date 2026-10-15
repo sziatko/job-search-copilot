@@ -12,7 +12,7 @@ import {
 
 const APPLICATION_LIST_MAX = 500;
 
-/** Registers the 6 application-tracking tools on `server`, backed by `applications` —
+/** Registers the application-tracking tools on `server`, backed by `applications` —
  * update_vacancy_status among them: it moves any vacancy, and carries a comment. */
 export function registerApplicationTools(
   server: McpServer,

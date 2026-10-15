@@ -11,7 +11,7 @@ export class DomainError extends Error {
   }
 }
 
-/** The `recommendation` input isn't one of the accepted spellings — see recommendation.ts. */
+/** The `recommendation` input isn't one of the enum's values — see recommendation.ts. */
 export class InvalidRecommendationError extends DomainError {}
 
 /** company/title blank, or a blank comment body. */

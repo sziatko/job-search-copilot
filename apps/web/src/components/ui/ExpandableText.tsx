@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from 'react';
  * Text that clamps to two lines, with a "Show more" toggle that appears only
  * when the text actually overflows — a comment that already fits would
  * otherwise get a button that does nothing. Same `.comment-cell` styling as the
- * tracker's merged comment, over a single source.
+ * applications table's merged comment, over a single source.
  */
 export function ExpandableText({ text }: { text: string }) {
   const [clampable, setClampable] = useState(false);

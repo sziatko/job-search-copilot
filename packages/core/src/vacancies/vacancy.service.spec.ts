@@ -68,28 +68,29 @@ function countsByCompany(items: VacancyListItem[]): Record<string, number> {
   return Object.fromEntries(items.map((item) => [item.company, item.companyMatchCount]));
 }
 
-// Pairs and near-misses from the dev DB's company names (2026-10-02).
+// Made-up names, one per rule: a country or region, a note, a legal form, case and
+// punctuation join; a substring, a prefix or a shared first word do not.
 describe('companyGroupKey', () => {
   it.each([
-    ['contoso', 'contoso Polska'],
-    ['Vexa Polska', 'Vexa Poland'],
-    ['BRANDT', 'BRANDT Spain'],
-    ['QXT', 'QXT España & Latam'],
-    ['Fabrikam', 'Fabrikam (partner company, anonymized)'],
-    ['9Q', '9Q Sp. z o. o.'],
-    ['Lumora', 'Lumora Inc'],
-    ['Optivo', 'Optivo_'],
-    ['iPlanly', 'Iplanly'],
+    ['Contoso', 'Contoso Polska'],
+    ['Globex Polska', 'Globex Poland'],
+    ['Initech', 'Initech Spain'],
+    ['Umbrella', 'Umbrella España & Latam'],
+    ['Fabrikam', 'Fabrikam (partner company)'],
+    ['Q7', 'Q7 Sp. z o. o.'],
+    ['Hooli', 'Hooli Inc'],
+    ['Vandelay', 'Vandelay_'],
+    ['iAcme', 'Iacme'],
   ])('%j and %j are one company', (a, b) => {
     expect(companyGroupKey(a)).toBe(companyGroupKey(b));
   });
 
   it.each([
-    ['iO', 'Apollo.io'],
-    ['Ark', 'Parkway'],
-    ['Nord', 'Nordstar People'],
+    ['iO', 'Globex.io'],
+    ['Ark', 'Starkline'],
+    ['Nord', 'Nordwind People'],
     ['Tailspin', 'Tenth Tailspinion Group'],
-    ['Software Grove', 'Software Garden'],
+    ['Acme Grove', 'Acme Garden'],
   ])('%j and %j are not', (a, b) => {
     expect(companyGroupKey(a)).not.toBe(companyGroupKey(b));
   });
@@ -831,7 +832,7 @@ describe('VacancyService', () => {
       });
 
       it('is false for a placeholder, whatever its other fields say', async () => {
-        // What the importer path creates (ADR-0019) — via the service that writes it,
+        // What `record()` creates (ADR-0019) — via the service that writes it,
         // so the write and the derivation are tested against each other rather than
         // against a literal this file happens to share.
         const applications = new ApplicationService();

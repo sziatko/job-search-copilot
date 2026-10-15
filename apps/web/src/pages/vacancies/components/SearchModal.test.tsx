@@ -25,7 +25,7 @@ function recordRequests() {
   return requests;
 }
 
-/** The modal's own list requests: the page tables never send a `search` any more. */
+/** The modal's own list requests: the page tables never send a `search`. */
 const searches = (requests: URL[]) =>
   requests.filter((url) => url.pathname.endsWith('/vacancies') && url.searchParams.has('search'));
 

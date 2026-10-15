@@ -79,8 +79,8 @@ describe('useTheme', () => {
   });
 
   it('a click repaints every consumer, not only the one clicked', async () => {
-    // The header's toggle and the toaster each call useTheme; with a copy each, the
-    // toaster kept the old theme until a reload.
+    // The header's toggle and the toaster each call useTheme: one shared store, or
+    // the toaster would keep the old theme until a reload.
     mockOs('light');
     const useTheme = await loadUseTheme();
     const toggle = renderHook(() => useTheme());

@@ -21,7 +21,7 @@ const KPI_VARIANTS: Partial<Record<ApplicationStatus, 'good' | 'bad'>> = {
 const ALWAYS: ApplicationStatus[] = ['APPLIED', 'REJECTED'];
 
 /**
- * The summary tiles above the tracker table, each one a quick filter that writes
+ * The summary tiles above the /applications table, each one a quick filter that writes
  * the same URL search param the dropdown does.
  *
  * Total / Active / Timeout are ours — the mockup has only the status counts. The

@@ -167,8 +167,8 @@ export class ApplicationService {
       db.vacancy.findMany({
         where,
         // The last move first — a fresh application tops the list; a comment or an
-        // edit does not reorder. `statusChangedAt` alone is not a total order (a
-        // migrated batch shares one date), and offset paging over a tie has no defined
+        // edit does not reorder. `statusChangedAt` alone is not a total order (rows
+        // can share one date), and offset paging over a tie has no defined
         // window, so `id` breaks it — and Prisma's cursor needs a total order (ADR-0030).
         orderBy: [{ statusChangedAt: 'desc' }, { id: 'desc' }],
         ...(filters.offset && { skip: filters.offset }),

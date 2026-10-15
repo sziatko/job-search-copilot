@@ -1,8 +1,8 @@
 /**
  * Only http(s) belongs in an `href`.
  *
- * `applyUrl` arrives from scraped job postings — untrusted input — and nothing
- * rejects a bad scheme on the way in, so this is the last line of defence. A
+ * `applyUrl` arrives from scraped job postings — untrusted input — and a stored value
+ * is not guaranteed to be http(s), so this is the last line of defence. A
  * `javascript:` URL in an anchor executes on click, in this page's own origin,
  * and the link text looks entirely ordinary while it does.
  *

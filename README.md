@@ -95,7 +95,7 @@ feed the app instead.
   a company's other vacancies in a modal.
 - **Application tracker** — pipeline stages, salary and tailored-CV notes, comments,
   and a 30-day timeout for applications nobody answered.
-- **MCP server** — 15 tools, so Claude can save vacancies scored in a chat, read the
+- **MCP server** — tools so Claude can save vacancies scored in a chat, read the
   queue, submit analyses, record applications and move statuses. Over stdio, or Streamable HTTP with OAuth 2.1.
 - **REST API** — documented with Swagger UI; every route closed unless marked
   otherwise.

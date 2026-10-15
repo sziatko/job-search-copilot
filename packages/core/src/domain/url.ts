@@ -14,9 +14,8 @@ function slug(value: string): string {
   );
 }
 
-/** Stand-in applyUrl for a vacancy that has no usable listing URL. Not a real URL —
- * the web app renders these as plain text, not a link. Exported so the tracker
- * importer can detect two rows that would resolve to the same synthetic URL. */
+/** Stand-in applyUrl for a vacancy that has no usable listing URL (`save()`, `record()`).
+ * Not a real URL — the web app renders these as plain text, not a link. */
 export function buildSyntheticApplyUrl(company: string, title: string, date: Date): string {
   return `tracker://${slug(company)}/${slug(title)}/${date.toISOString().slice(0, 10)}`;
 }
@@ -114,9 +113,8 @@ function normalizeIndeed(parsed: URL): void {
  * server *may* serve different documents at those two paths, and when it does,
  * the second vacancy's analysis is discarded silently against the first. It is
  * taken because the opposite failure is the one that actually happens — scraper
- * A hands back the slash and scraper B does not, for one and the same posting
- * (46 of this repo's LinkedIn rows carried the slash), and a duplicate row is
- * what the unique key exists to prevent. See ADR-0023.
+ * A hands back the slash and scraper B does not, for one and the same posting, and a
+ * duplicate row is what the unique key exists to prevent. See ADR-0023.
  */
 export function normalizeApplyUrl(url: string | null | undefined): string | null {
   const trimmed = url?.trim();

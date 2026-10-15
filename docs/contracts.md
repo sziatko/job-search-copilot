@@ -83,7 +83,7 @@ query that finds nothing (`getById`) answers `null` and the controller sends Nes
 
 ## MCP tools
 
-Fifteen tools in `createServer()` ([ADR-0010](decisions/0010-mcp-server-factory.md));
+The tools are registered in `createServer()` ([ADR-0010](decisions/0010-mcp-server-factory.md));
 each feature owns its `*.tools.ts` and `*.schemas.ts`. Inputs are zod schemas; outputs
 are `JSON.stringify(result, null, 2)` in one text block; a `DomainError` is
 `{ isError: true }` with its message. The write tools answer with a short confirmation

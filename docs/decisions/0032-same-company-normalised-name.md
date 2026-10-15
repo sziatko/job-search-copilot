@@ -7,7 +7,7 @@ There is no `Company` entity: a vacancy stores the name the posting gave, so one
 company arrives under several spellings. "Same company" — for the company button's
 count and the company-history modal — cannot be a substring match: it works in one
 direction only (`Acme` is inside `Acme Polska`, not the other way round, so the two
-spellings see different rows), joins unrelated names (`Ark` inside `Parkway`), and
+spellings see different rows), joins unrelated names (`Ark` inside `Starkline`), and
 misses spellings where neither contains the other (`Acme Polska` / `Acme Poland`).
 
 ## Decision
