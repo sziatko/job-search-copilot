@@ -46,18 +46,19 @@ Add to the brief when it applies:
 
 **C. Green → commit without asking** — the user's chain request is the approval.
 Message `Phase N.K: <what changed, in words>`, ending with the Co-Authored-By line.
+Stage the step's files only — the phase doc stays out of every commit.
 Push and PR only when asked.
 
 ## When the chain stops
 
 - Red tests. Exception: a known load flake (`apps/web` `useVacancies.test.ts` timeouts,
-  api e2e timeouts — see `docs/backlog.md`) gets one rerun of the failed project; green →
+  api e2e timeouts) gets one rerun of the failed project; green →
   go on and name the flake in the report; red again → stop.
 - The subagent returned a question the plan cannot answer.
 - The subagent diverged from the plan in a way that changes later steps.
 - A dev-DB migration is needed — it waits for the user's go-ahead (the analyzer writes
   to the dev DB live; back it up with `pg_dump` first, then
-  `docker compose restart api mcp core`).
+  `docker compose restart core api mcp mcp-http`).
 
 At a stop: commit nothing for that step, say what happened, wait. A stopped subagent
 (a question, a rate limit) is resumed with `SendMessage` — not restarted, it keeps its

@@ -145,10 +145,9 @@ API keys, every script — is in [`docs/development.md`](docs/development.md).
 I build this with [Claude Code](https://claude.com/claude-code) as a pair programmer.
 The repo is set up so an AI agent can work on it for weeks without losing the thread:
 
-- **Phases and steps.** Each phase has a plan in [`docs/phases/`](docs/phases/), split
-  into steps that can be finished and checked one at a time. One step per session; the
-  step brings its own tests and is ticked only after the full test suite passes in that
-  session.
+- **Phases and steps.** Each phase is planned as steps that can be finished and checked
+  one at a time. One step per session; the step brings its own tests and is ticked only
+  after the full test suite passes in that session.
 - **Decisions on record.** Every decision that other code depends on is an ADR in
   [`docs/decisions/`](docs/decisions/), ending with *what breaks if you change it*.
 - **Invariants that break silently** are listed in

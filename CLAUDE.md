@@ -2,7 +2,7 @@
 
 An analyzer scores vacancies, you triage them, then track what happened to each
 application. Four npm workspaces: `packages/core` (domain layer, and the only DB
-client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (React).
+client), `apps/api` (NestJS REST), `apps/mcp` (MCP server, stdio and HTTP), `apps/web` (React).
 
 ## Read first
 
@@ -10,7 +10,7 @@ client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (Re
 - [`docs/architecture.md`](docs/architecture.md) — the system map. Start here.
 - [`docs/contracts.md`](docs/contracts.md) — surfaces other code depends on.
 - [`docs/domain-model.md`](docs/domain-model.md) — the two independent axes.
-- [`docs/decisions/`](docs/decisions/) — 34 ADRs, one per load-bearing decision.
+- [`docs/decisions/`](docs/decisions/) — one ADR per load-bearing decision.
 - [`docs/design/`](docs/design/) — visual references (HTML mockups). Not prose; open
   in a browser rather than reading.
 - `skills/` — the user's Claude skills that drive the MCP server, uploaded to
@@ -78,6 +78,9 @@ worked in **steps**.
   finished and verified without the next one existing. Two pieces that cannot be
   separated are one step, not two.
 - Give the doc a `## Status` section listing every step as a checkbox, in order.
+- **The phase doc is never committed.** A step's commit leaves it out; it is deleted
+  when the phase ends. Before that, a gotcha that outlives the phase moves to
+  [`docs/development.md`](docs/development.md), `prisma/README.md` or a code comment.
 
 **When working a phase:**
 

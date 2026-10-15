@@ -6,6 +6,22 @@ Source of truth: [`packages/core/prisma/schema.prisma`](../packages/core/prisma/
 [`status.ts`](../packages/core/src/domain/status.ts). The shape as a whole:
 [ADR-0029](decisions/0029-one-vacancy-table.md).
 
+## Terms
+
+| Term | Meaning |
+| --- | --- |
+| **analyzer** | Claude, scoring a vacancy through the MCP tools, driven by the owner's skills (not in this repo). |
+| **analysis** | What the analyzer writes once: `matchScore`, `recommendation`, and its reasoning as an `ANALYZER` comment (read back as `estimationComment`). |
+| **intake** | Taking a posting in before any analysis: n8n's `POST /vacancies/intake` or the MCP `intake_*` tools. The posting lands in `NEW`. |
+| **triage** | The user's first decision on an analysed vacancy: apply, decline, save for later. The statuses before the pipeline. |
+| **pipeline** | The statuses after applying, `APPLIED` … `REJECTED`. An *application* is a vacancy in the pipeline, not a row of its own. |
+| **journal** | `StatusChange`: one row per status move. `status` on the vacancy is its cache. |
+| **event** | A pipeline status written again — a second interview round. Journaled; a triage repeat is refused. |
+| **timeout** | An open pipeline status with no move for 30 days. Derived, never stored. |
+| **placeholder** | A vacancy `record_application` created because no match existed: no posting text, an analysis only if a score was passed. |
+| **context** | The statuses one web page lists (`STATUS_CONTEXT`); `ALL` in its filter means those, not the whole table. |
+| **owner** | The user a vacancy belongs to (`userId`). Every query is scoped to one. |
+
 ## `Vacancy`
 
 One table. One row per vacancy, keyed for the outside world by `applyUrl` — the
@@ -25,12 +41,12 @@ pipeline.
 | `title` | `String` | |
 | `applyUrl` | `String`, `@@unique([userId, applyUrl])` | **The natural key, per user** — two users may track one posting. The unique constraint is what enforces analyze-once at the DB level. Stored **canonicalized** — `normalizeApplyUrl()` drops the query string, the fragment and a trailing slash, so the spellings one posting arrives in share one row. Exception: a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept. → [ADR-0023](decisions/0023-canonical-applyurl.md) |
 | `companyKey` / `titleKey` | `String?` | The posting's match by name — intake's second match, and `record()` / `updateStatusByVacancy`'s lookup: `normalizeCompanyKey` / `normalizeTitleKey` (`identity.ts` — lowercase, punctuation collapsed, company legal suffixes stripped). `@@index([userId, companyKey, titleKey])`. Written on every create (intake, `save()`, `record()` — `matchKeys`); `null` only when the name normalizes to nothing (`—`), and such a row is matched by url only. Not `companyGroupKey()` — ADR-0032's company identity, which also drops places and notes, and is not stored (`identity.ts` says why the two differ). |
-| `source` | `String?` | Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source needs no migration; `null` on rows from `save()`, `record()` and the migrated log. |
+| `source` | `String?` | Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source needs no migration; `null` on rows from `save()` and `record()`. |
 | `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet (intake without text, a placeholder). A list item carries `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
 | `matchScore` | `Int?` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. `null` = not analysed yet. |
 | `recommendation` | `Recommendation?` enum | **The analyzer's call.** `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`; `null` = not analysed yet — with `matchScore`, both or neither (a CHECK). |
 | `comments` | `Comment[]` | Every note on the vacancy — see [`Comment`](#comment) below. The analyzer's reasoning is its `ANALYZER` row: reads still return it as `estimationComment` (`string \| null`), derived from the first one. |
-| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (one exception — the analysis moves it out of `NEW`, below). Triage, `TRIAGE_STATUSES` — `NEW` \| `NOT_REVIEWED` \| `SAVED_FOR_LATER` \| `DECLINED` \| `UNAVAILABLE` \| `FILTERED_OUT` — then the pipeline, `PIPELINE_STATUSES`: `APPLIED` \| `ACTION_NEEDED` \| `INTERVIEW` \| `AWAITING` \| `OFFER` \| `REJECTED`, each saying whose move it is. A cache of the latest [`StatusChange`](#statuschange). `NEW` = waiting for an analysis (never on an analysed row — a CHECK); `FILTERED_OUT` = screened out before triage, by the analyzer's `SKIP` or the user; `ACTION_NEEDED` = the company wrote and the user must act — a question, a call to book, a test task; `AWAITING` = the user answered or did what was asked (a reply, a test task, an interview) and waits on the company (both open, so they time out; `GET /stats` counts both as *responded*, not *interview*). Until phase 7.2 the first was `RECRUITER_SCREEN`, and a `REPLIED` (the user's own reply) sat beside `AWAITING` — merged into it; `REJECTED` = the company said no; `DECLINED` = "I read the analysis and chose not to apply"; `UNAVAILABLE` = the posting no longer takes applications (triage only — never on `/applications`). |
+| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (one exception: the analysis moves it out of `NEW`, below). A cache of the latest [`StatusChange`](#statuschange). The values are in the table below. |
 | `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. Timeout and the `/applications` sort read it. |
 | `salaryInApplication` | `String?` | Free text ("130 PLN/h"), entered when applying. |
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
@@ -39,6 +55,26 @@ pipeline.
 Indexes: `@@index([userId, recommendation])`, `@@index([userId, status, statusChangedAt])`,
 `@@index([userId, companyKey, titleKey])`, and GIN `gin_trgm_ops` indexes on `company` and
 `title` (see "pg_trgm index" below).
+
+The statuses — triage (`TRIAGE_STATUSES` in `status.ts`), then the pipeline
+(`PIPELINE_STATUSES`), each pipeline one saying whose move it is:
+
+| Status | Means |
+| --- | --- |
+| `NEW` | Waiting for an analysis. Never on an analysed row (a CHECK). |
+| `FILTERED_OUT` | Screened out before triage: the analyzer's `SKIP`, or the user. |
+| `NOT_REVIEWED` | Analysed, waiting for the user's triage. |
+| `SAVED_FOR_LATER` | A bookmark: maybe later. |
+| `DECLINED` | The user read the analysis and chose not to apply. |
+| `UNAVAILABLE` | The posting no longer takes applications. Triage only. |
+| `APPLIED` | Applied, waiting for a first answer. |
+| `ACTION_NEEDED` | The company wrote; the user must act (a question, a call to book, a test task). |
+| `INTERVIEW` | An interview is set or done. |
+| `AWAITING` | The user answered or did what was asked; waiting on the company. |
+| `OFFER` | An offer. Closed. |
+| `REJECTED` | The company said no. Closed. |
+
+`GET /stats` counts `ACTION_NEEDED` and `AWAITING` as *responded*, not *interview*.
 
 ## Two independent axes: `recommendation` vs `status`
 
@@ -92,26 +128,24 @@ table:
 > - Making the analysis move a status from anything but `NEW`, or a status write touch
 >   analysis fields → the analyzer would clobber the user's progress (or vice-versa).
 >   The two writers overlap only in the move out of `NEW`.
-> - Adding a `Recommendation` value → the Prisma enum (migration) — which
->   `parseRecommendation` in
->   [`recommendation.ts`](../packages/core/src/domain/recommendation.ts), the MCP `zod`
->   enum in [`vacancies.schemas.ts`](../apps/mcp/src/vacancies/vacancies.schemas.ts),
->   the `apps/api` DTOs, and the web `recommendationSchema`. Its place in the enum is
-  `/vacancies`' `sort=recommended` order (ADR-0030) — `ADD VALUE … BEFORE`/`AFTER`.
-> - Adding a `VacancyStatus` value → the Prisma enum (migration, `ADD VALUE … AFTER`;
->   on the dev stack, `docker compose restart api mcp core` after it),
->   `TRIAGE_STATUSES` or `PIPELINE_STATUSES` in
->   [`status.ts`](../packages/core/src/domain/status.ts), a `StatsService` count if the
->   dashboard shows it, the MCP zod enums (`VacancyStatusEnum` follows the Prisma enum;
->   `PipelineStatusEnum`) and the tool descriptions and `SERVER_INSTRUCTIONS` that list
->   the statuses, the API DTOs (`@IsEnum(VacancyStatus)`, `@IsIn(PIPELINE_STATUSES)`),
->   and on the web `vacancyStatusSchema` (+ the page it belongs to in `STATUS_CONTEXT`,
->   and the `extract` lists for the row actions — `VacancyAction`, `RowAction`),
->   `STATUS_LABELS` / `STATUS_TAGS`, `VacancyTable`'s `ROW_BUTTONS` and `actionsFor` and
->   `StatusFilterSelect`'s labels for a `/vacancies` one, `InboxPage`'s `TABS` for one
->   the inbox lists, `VacancyPage`'s `CLOSED_BAD` if it ends a vacancy, and the
->   `APPLICATION_STATUS_*` maps for a pipeline one. There is no single source — see
->   [ADR-0012](decisions/0012-web-hand-written-contract.md).
+> - Adding a `Recommendation` value → a migration (`ADD VALUE … BEFORE`/`AFTER`: the
+>   enum's order is `sort=recommended`'s order, ADR-0030). Core, the MCP enum and the
+>   API DTOs follow the Prisma enum; the web does not — `recommendationSchema`
+>   (`vacancies/types.ts`), `constants.ts` and `RecommendationTag`.
+> - Adding a `VacancyStatus` value → there is no single source
+>   ([ADR-0012](decisions/0012-web-hand-written-contract.md)). Touch:
+>   - core: a migration (`ADD VALUE … AFTER`), `TRIAGE_STATUSES` or `PIPELINE_STATUSES`
+>     in [`status.ts`](../packages/core/src/domain/status.ts), a `StatsService` count if
+>     the dashboard shows it;
+>   - MCP: `PipelineStatusEnum` for a pipeline one (`VacancyStatusEnum` follows Prisma),
+>     and the tool descriptions and `SERVER_INSTRUCTIONS` that list statuses;
+>   - API: `@IsIn(PIPELINE_STATUSES)` follows; `@IsEnum(VacancyStatus)` too;
+>   - web: `vacancyStatusSchema` and the page's `STATUS_CONTEXT`, the `extract` lists
+>     (`VacancyAction`, `RowAction`), `STATUS_LABELS` / `STATUS_TAGS`, `VacancyTable`'s
+>     `ROW_BUTTONS` / `actionsFor` and `StatusFilterSelect` for a `/vacancies` one,
+>     `InboxPage`'s `TABS` for an inbox one, `VacancyPage`'s `CLOSED_BAD` if it ends a
+>     vacancy, the `APPLICATION_STATUS_*` maps for a pipeline one;
+>   - the skills that list statuses (re-upload them).
 
 ## `StatusChange`
 
@@ -133,14 +167,12 @@ skips reminders). **A triage repeat is refused:** a `TRIAGE_STATUSES` status the
 already has carries no event, so `writeStatus` throws `SameStatusError` (API 422, MCP
 `isError`) and writes nothing; so does `NEW` on an analysed vacancy
 (`AnalysedNotNewError`), which the CHECK would otherwise refuse as a 500; the web does not offer a row's current status
-([ADR-0029](decisions/0029-one-vacancy-table.md), amended). Every vacancy's journal
-starts with a `NEW` row dated the day it came in (`firstStatus`, on every create path;
-the migration gave every older vacancy one, before its first row). `save()` journals
-`NEW`, then the rule's status, both dated now.
+([ADR-0029](decisions/0029-one-vacancy-table.md)). Every vacancy's journal
+starts with a `NEW` row dated the day it came in (`firstStatus`, on every create path).
+`save()` journals `NEW`, then the rule's status, both dated now.
 
 **The applied date** is the `createdAt` of the latest `APPLIED` row — `appliedAt` on an
 `/applications` item. A vacancy set straight past `APPLIED` has none (`null`).
-Migrated rows were backfilled from `userAction`, `appliedAt` and `statusUpdatedAt`.
 
 **Active / Timeout are derived, not stored.** The pipeline splits on
 `statusChangedAt`: `REJECTED` and `OFFER` are *closed*; of the rest, anything whose last
@@ -206,8 +238,8 @@ One note on a `Vacancy`, whoever wrote it — [ADR-0029](decisions/0029-one-vaca
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `id` | `Int` autoincrement | Primary key; the tie-break for notes that share a `createdAt` (some migrated ones do). |
-| `createdAt` | `DateTime @default(now())` | When the note was written. Migrated notes carry the only date there was: a status note its application's then status date, the user's note its applied date, the analyzer's the vacancy's `createdAt`. |
+| `id` | `Int` autoincrement | Primary key; the tie-break for notes that share a `createdAt`. |
+| `createdAt` | `DateTime @default(now())` | When the note was written. |
 | `body` | `String @db.Text` | Trimmed; a blank note is never stored. |
 | `source` | `CommentSource` enum | Who wrote it: `ANALYZER` \| `USER` \| `AGENT`. |
 | `vacancyId` | `Int` | FK to `Vacancy`, `onDelete: Cascade`. `@@index([vacancyId, createdAt])`. |
@@ -228,9 +260,6 @@ The writers, by source:
 
 How a posting enters `Vacancy` before any analysis — `VacancyIntakeService`
 (`vacancy-intake.service.ts`), [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md).
-The vacancy log (`VacancyLogEntry`, ADR-0026) merged into `Vacancy` in phase 5: every
-log row became a vacancy, the ones never analysed in `FILTERED_OUT`, so a posting the
-agent screened out once is not analysed again.
 
 - An entry needs an http(s) `url`, a `company` and a `title`; `source` and `fullText`
   are optional. Without the three it is skipped (batch) or an
@@ -242,8 +271,8 @@ agent screened out once is not analysed again.
 
 ## Analyze-once
 
-Since ADR-0033 a vacancy can exist before its analysis, so the rule is "the analysis
-is written once". One function writes it, `writeAnalysis` (`vacancy.service.ts`), in
+A vacancy can exist before its analysis, so the rule is "the analysis is written
+once". One function writes it, `writeAnalysis` (`vacancy.service.ts`), in
 the caller's transaction: first a conditional write (`WHERE recommendation IS NULL`,
 which takes the row lock — a concurrent analysis waits, then finds the row analysed),
 then from `NEW` the rule's status through `writeStatus`, then the analysis and its
@@ -258,7 +287,7 @@ then from `NEW` the rule's status through `writeStatus`, then the analysis and i
 - `submitAnalysis({ id, … })` / `submitAnalyses([...])` (≤ `ANALYSIS_BATCH_MAX` = 10,
   one transaction — one failure writes none): a vacancy that has an analysis →
   `AlreadyAnalysedError` (REST `409`, MCP `isError`), an unknown id →
-  `VacancyNotFoundError` (`404`). `recommendation` takes EN or UA, as `save()`.
+  `VacancyNotFoundError` (`404`).
 
 Rationale and the HTTP consequences (POST → `201 + Location` / `200`):
 [ADR-0005](decisions/0005-analyze-once.md).
@@ -273,9 +302,7 @@ Rationale and the HTTP consequences (POST → `201 + Location` / `200`):
 English only, exact: `APPLY`, `APPLY_WITH_CAVEATS`, `SKIP` — the Prisma enum, on input
 and in every filter. MCP checks it with `z.enum(Recommendation)`, REST with
 `@IsEnum(Recommendation)`; `parseRecommendation()` in core is the last guard and throws
-`InvalidRecommendationError` (a `DomainError`) on anything else. Until phase 7.2 the
-Ukrainian wording an older analyzer emitted (`ПОДАВАТИСЯ`, …) was accepted and mapped;
-the skills now send English, so the aliases went.
+`InvalidRecommendationError` (a `DomainError`) on anything else.
 
 > **Breaks if you change it:** accepting another spelling means mapping it on the way
 > in — storing it raw is impossible (the DB enum can't hold it), and every filter
@@ -294,15 +321,15 @@ Added by hand in `--create-only` migrations — see
   > or one field of it, is rejected — `save()` and `record()` create the row unanalysed,
   > move it out of `NEW`, then write the analysis.
 - **`matchScore` CHECK** (`20260909224918_add_match_score_check`):
-  `CHECK ("matchScore" >= 0 AND "matchScore" <= 100)`. The app also validates
-  0–100 (DTO, MCP zod), but the DB no longer trusts it to.
+  `CHECK ("matchScore" >= 0 AND "matchScore" <= 100)`. The app validates 0–100 too
+  (DTO, MCP zod); the DB does not rely on it.
   > Breaks if you change it: widening the app-level bound without dropping the
   > constraint → inserts silently rejected by Postgres with a constraint error.
 - **`pg_trgm` GIN index on `company`** (`20260909225003_company_trigram_index`):
   `list({ company })` filters with `contains` + `mode: 'insensitive'`, i.e.
   `ILIKE '%term%'`, which a b-tree can't serve. The extension is declared in
   `datasource.extensions = [pg_trgm]` (needs `previewFeatures =
-  ["postgresqlExtensions"]`); the plain b-tree `@@index([company])` was dropped.
+  ["postgresqlExtensions"]`). `title` has the same index.
   > Breaks if you change it: removing `previewFeatures`/`extensions` from the
   > schema → `prisma migrate` wants to drop the extension and the GIN index;
   > company search falls back to a full scan.
