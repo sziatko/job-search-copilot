@@ -1,54 +1,48 @@
 # 0012 — Web keeps a hand-written zod API contract (no `core` import)
 
-- Status: Accepted
-- Phase: 1 · Date: 2026-09
+- Status: Accepted · Date: 2026-09
 
 ## Context
-`apps/web` needs the TypeScript shape of what the API returns. `packages/core`
-already has `VacancyListItem` and the enums. The obvious move is to
-import them.
+`apps/web` needs the shape of what the API returns. `packages/core` already has
+`VacancyListItem`, `ApplicationListItem` and the enums; the obvious move is to import
+them.
 
 ## Decision
-Don't. `apps/web/src/pages/vacancies/types.ts` defines `zod` schemas
-(`recommendationSchema`, `vacancyStatusSchema`, `vacancyListItemSchema`,
-`listResponseSchema`) by hand; the TS types are `z.infer`'d from them.
-`apps/web/src/pages/vacancies/api.ts` parses **every** response through them
-(`parseResponse()` — logs the detail, throws a short message). The file carries a
-comment saying exactly this and why.
+Don't. `apps/web/src/pages/*/types.ts` define zod schemas of the API's JSON by hand;
+the TypeScript types are `z.infer`red from them, and every response is parsed through
+them (`parseResponse()` in `apps/web/src/lib/api.ts`: it logs the detail and throws a
+short message).
 
 ## Why this and not the alternatives
-- **`import { VacancyListItem } from '@job-search-copilot/core'`** —
-  `core`'s entrypoint pulls in `@prisma/client` and `pg`. Even a type-only import
-  risks a bundler following the module graph; and it couples the browser build to
-  a Node/DB package. Not worth it.
-- **Generate the client from an OpenAPI spec** — no OpenAPI spec exists;
-  generating one from Nest + wiring codegen is more machinery than a
-  ~25-line schema file needs at this size.
-- **Trust `res.json()` as the typed shape (the original code)** — no runtime
-  check; a backend shape change surfaces as `undefined` deep in the UI.
+- **Import core's types and enums.** A type-only import is erased at build time, so it
+  would not bundle Prisma by itself. But it would not do the job either:
+  - the enums (`Recommendation`, `VacancyStatus`) are runtime values from
+    `@prisma/client`; importing those does pull Prisma toward the browser bundle;
+  - core's types describe Prisma rows, not the JSON: dates arrive as strings, and the
+    derived fields are absent from some responses (the `PATCH …/status` answer), which
+    the web schema must say with `.optional()`;
+  - a type checks nothing at runtime; the schema catches a drifted response with a
+    readable error instead of an `undefined` deep in the UI;
+  - the web's typecheck would depend on core's build and a generated Prisma client.
+- **Generate a client from the OpenAPI document** (`/api/docs-json`) — the document
+  covers requests only (responses are untyped), and codegen is more machinery than a
+  few schema files need.
 
 ## Consequences
-- **Accepted parallel maintenance:** a field added to the API list-item shape must
-  be added to `VacancyListItem` + `LIST_SELECT` in `core` **and** to
-  `vacancyListItemSchema` here. This is the one place the repo tolerates
-  hand-kept duplication.
-- The web build never sees Prisma/pg.
-- Since phase 5.1 an OpenAPI document exists (`/api/docs-json`, from `@nestjs/swagger`),
-  built for browsing the API, not for codegen. The web still does not generate from it;
-  the "no OpenAPI spec" argument above is out of date, the rest stands.
-- Runtime validation: a contract drift fails loudly (`parseResponse` throws) with
-  a user-readable message, and the mismatch is logged in full.
+- **Accepted parallel maintenance:** a field added to an API response goes into
+  core's type and select **and** the web schema. The one place the repo keeps
+  hand-written duplication.
+- `apps/api/test/contract.e2e.spec.ts` parses the real API's responses with the web's
+  schemas, so a drift fails a test, not only the app.
+- The web build never sees Prisma or `pg`.
 
 ## What this constrains — breaks if you change it
-- Importing from `@job-search-copilot/core` in `apps/web` → Prisma/pg enter the
-  browser bundle (or the build fails); the boundary this ADR draws is gone.
-- Changing the API response shape without updating this schema → `parseResponse`
-  throws "the server returned data in an unexpected format" (intended failure
-  mode — fix the schema).
-- Adding an enum value in `core` without adding it here → `recommendationSchema` /
-  `vacancyStatusSchema` reject the new value; the row fails to parse.
+- Importing `@job-search-copilot/core` in `apps/web` → Prisma enters the browser
+  bundle, or the build fails.
+- An API shape changed without the schema → the contract test fails; in the app,
+  `parseResponse` throws "unexpected format". Fix the schema.
+- An enum value added in core but not here → the web rejects the row.
 
 ## Related
-[ADR-0011](0011-web-tanstack-query.md), [`../contracts.md`](../contracts.md)
-("Web ↔ API contract"), [`../domain-model.md`](../domain-model.md) (enum-change
-checklist), `apps/web/src/pages/vacancies/types.ts`.
+[`../contracts.md`](../contracts.md) § Web ↔ API contract, the "Adding a value"
+checklists in [`../domain-model.md`](../domain-model.md).

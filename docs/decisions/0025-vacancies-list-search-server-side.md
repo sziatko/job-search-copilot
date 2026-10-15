@@ -1,113 +1,57 @@
 # 0025 — The vacancies list: server-side search, a derived company count, and what stays out of the list item
 
-- Status: Accepted
-- Phase: 2.1   ·   Date: 2026-09
+- Status: Accepted · Date: 2026-09
 
 ## Context
-
-`/vacancies` was built in Phase 1 and reworked in Phase 2 against a UI mockup. In
-Phase 2.1 it gains a search box, a "this company appeared before" button and a
-row-actions cell. Two of those reach past the web app into `packages/core`'s
-`list()`, whose result shape is consumed by **three** transports at once:
-`apps/api`, `apps/mcp`, and `apps/web`. That shape is hand-maintained in parallel
-in `core` and in the web's zod contract ([ADR-0012](0012-web-hand-written-contract.md)),
-so a field added there is paid for twice — and a *derived* field has a third cost:
-it exists in the list response and not in the `PATCH .../status` response for
-the same resource, while the web parses both with one schema.
-
-The page's filtering also stops being uniform. `/applications` filters entirely
-client-side over one `limit=500` fetch, which its own deferred-items list already
-flags as a ceiling; the mockup's filter is client-side too. `/vacancies` loads
-`limit=100` of ~290 rows.
+The vacancy tables load a page at a time ([ADR-0030](0030-cursor-paging.md)), so a
+search over what the page holds would miss everything not loaded yet. Each row also
+shows whether its company appeared before. Both reach into `core`'s `list()`, whose
+item shape feeds the API, MCP and the web at once, and is kept by hand in `core` and
+in the web's schema ([ADR-0012](0012-web-hand-written-contract.md)).
 
 ## Decision
-
-1. **Search is server-side, on `/vacancies` only, as one `search` param** matching
-   `company` OR `title` (ILIKE `%term%`), ANDing with the existing filters. The
-   status filter stays client-side; the two pages now differ deliberately. (Phase 4
-   step 2 moved the status filter to the server too — [ADR-0030](0030-cursor-paging.md).)
-2. **`companyMatchCount` is a derived field on the list item**: the number of
-   vacancies whose `company` contains this row's company, case-insensitively —
-   i.e. exactly the semantics of the existing `company` filter, because there is
-   no `Company` entity to key on. It is computed inside `core` `list()` with one
-   extra query scoped to the page's distinct companies, and counted exactly in JS.
-   It is **optional** in the web zod schema: that schema also parses the `PATCH`
-   response, which carries no derived field. *(Phase 4.3: the count is by an equal
-   normalised name now, not a substring, and the modal lists by `sameCompanyAs` —
-   [ADR-0032](0032-same-company-normalised-name.md).)*
-3. **Application data does not enter the list item.** The company-history modal
-   fetches, when it opens, the company's vacancies and the applications list in
-   parallel, and joins them client-side on `vacancyId`.
+1. **Search is server-side**, one `search` param: `company` OR `title`, ILIKE
+   `%term%` with `%` / `_` / `\` escaped (`escapeLikePattern`), ANDed with the other
+   filters. Over REST only `company` and `search` exist; core and MCP also take
+   `title`.
+2. **`companyMatchCount` is derived on the list item**: how many of the user's
+   vacancies are the same company by [ADR-0032](0032-same-company-normalised-name.md)'s
+   key — the same rows `sameCompanyAs` lists in the company-history modal. Computed in
+   `core` (`companyMatchCounts` in `domain/company.ts`), for `/applications`' list too.
+   With `hasAnalysis` and `hasText` it goes through one `withDerivedFields`.
+3. **A derived field is `.optional()` in the web schema**, because the same schema
+   parses the `PATCH …/status` response, which carries none.
+4. **Application data stays out of the vacancy list item.** The company modal reads
+   the company's vacancies and its applications (`sameCompanyAs` on both, its own
+   query keys) and joins them on the vacancy id.
 
 ## Why this and not the alternatives
-
-- **Client-side search, exactly as `/applications` does it.** The cheapest option, and
-  the mockup's own pattern — but the page holds the newest 100 of ~290 rows, so a
-  title or company older than that would return nothing and say nothing.
-  `/applications`'s equivalent truncation is a recorded deferral, not a design.
-- **Exposing `title?` beside the existing `company?`** (`core` already supports
-  both; only MCP exposes `title`). Two params means the client ORs them itself and
-  the contract grows a field to express one search box.
-- **A single `search` param that also spans `estimationComment`.** The analyzer's
-  reasoning is long free text with no trigram index; the ask was title and company.
-- **A `Company` table, or a materialized company→count column, or a stats
-  endpoint.** Real, and the honest answer at scale — but the count is a *substring*
-  match, which `groupBy` cannot express, and one scoped query per list is cheap
-  while the table is measured in hundreds of rows. Revisit if it stops being so.
-- **Putting the application's dates (`appliedAt`, then `statusUpdatedAt`) on the list item so the
-  modal needs one request.** Those fields would ride in every row of the main
-  table, in the dashboard's four count calls, and in both MCP list tools — for a
-  modal that may never be opened.
-- **A dedicated company-history endpoint.** A new surface for a read that two
-  existing endpoints already answer.
+- **Client-side search** — searches only the loaded page, and says nothing about the
+  rest.
+- **Separate `company` and `title` params for one search box** — the client ORs them
+  itself, and the contract grows a field to say one thing.
+- **Search over the analyzer's comment too** — long free text, no trigram index; the
+  ask was company and title.
+- **Application dates on every vacancy row** — they would ride in every row of every
+  table and both MCP list tools, for a modal that may never open.
+- **A company-history endpoint** — a new surface for a read two endpoints answer.
 
 ## Consequences
-
-- Search finds vacancies the page never loaded, and the header count stays honest:
-  `total` still means "rows matching the filter".
-- The two tables now filter differently, on purpose; the reason lives here rather
-  than in a reader's guess.
-- The company button is free of extra requests: the count arrives with the list.
-  Cost: one more query per `list()` call — including the dashboard's four.
-- The modal costs two requests on open, one of them usually already cached under
-  `['applications']` (shared with `/applications` and the dashboard).
-- One field in the hand-maintained contract pair is optional, which is the single
-  place invariant #5 is softened: a server that stops sending it degrades to "no
-  company button" instead of failing loudly.
+- Search finds what was never loaded; `total` stays "rows matching the filter".
+- The company button costs no request: the count comes with the list. The cost: one
+  more query per `list()` call.
+- One place the hand-written contract is softened: a server that stops sending a
+  derived field degrades (no company button) instead of failing loudly.
 
 ## What this constrains — breaks if you change it
-
-- **`search` must stay an OR of `company` and `title`.** Making it an AND means a
-  term that names a company and a term that names a role stop matching anything —
-  silently, since a miss is an empty list.
-- **`companyMatchCount` must count exactly the rows the modal lists.** The button's
-  visibility rule (`>= 2`) and its badge (`count - 1`) both read it. Since phase 4.3
-  both are "the same company" by [ADR-0032](0032-same-company-normalised-name.md)'s
-  key; changing one rule without the other brings the mismatch back.
-- **The web field must stay `.optional()`** in
-  `apps/web/src/pages/vacancies/types.ts`. `pages/vacancies/api.ts` parses the
-  `PATCH /:id/status` response with `vacancyListItemSchema`, and that
-  response is the raw `Vacancy` with no derived field. Make it required
-  and every action change fails with "the server returned data in an unexpected
-  format".
-- **Moving `search` back to the client** silently restores "searches the newest 100
-  rows only" — with no error to notice.
-- **The modal's join key is `vacancyId`**, carried by the applications
-  items and matched against the vacancies items' `id`. Renaming either side leaves
-  every row reading "Not applied", because a failed join looks exactly like a
-  company nobody applied to.
-- **`total` must keep meaning "rows matching the filter"** — the four dashboard
-  numbers read it directly ([ADR-0024](0024-web-shell-and-theme.md)); adding
-  `search` to those calls would change what they count.
+- `search` as an AND → a term naming a company or a role stops matching, silently.
+- `companyMatchCount` and `sameCompanyAs` counting different rows → the button's
+  number disagrees with the modal it opens. Both use `companyGroupKey`.
+- A derived field made required in the web → every status change fails to parse
+  ("unexpected format").
+- The modal's join key (the vacancy id on both sides) renamed → every row reads "not
+  applied": a failed join looks like a company nobody applied to.
 
 ## Related
-
-- [ADR-0012](0012-web-hand-written-contract.md) — the hand-written pair being
-  extended here, and why the web cannot import `core`.
-- [ADR-0011](0011-web-tanstack-query.md) — the query key / cache shape the modal's
-  two reads ride on.
-- [ADR-0022](0022-timeout-derived-until-scheduled.md) — owns `statusChangedAt`,
-  which the modal's ⏳ is derived from.
-- [`../phases/phase-2.1.md`](../phases/phase-2.1.md) — the work this records.
-- [`../contracts.md`](../contracts.md) — the REST and MCP rows for `search` and
-  `companyMatchCount`.
+[ADR-0030](0030-cursor-paging.md), [ADR-0032](0032-same-company-normalised-name.md),
+[`../contracts.md`](../contracts.md).

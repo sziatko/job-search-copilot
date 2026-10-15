@@ -1,16 +1,12 @@
 # 0038 — Multi-user: one schema, `userId` on `Vacancy`, every query through `forUser`
 
-- Status: Accepted
-- Phase: 7   ·   Date: 2026-10
+- Status: Accepted · Date: 2026-10
 
 ## Context
-The schema was built for one user. Phase 6 added sign-in, but `Vacancy` has no owner,
-so every allowlisted account sees all the data ([ADR-0034](0034-auth-better-auth-in-core.md)).
-A second user — a QA, say, with nothing in common with a frontend dev — must see only
-their own vacancies, comments, status journal and stats. The data already in the dev
-DB is the owner's. Core holds about 30 Prisma calls, and several write before they
-check (`writeStatus` in `updateStatus`, `updateRow`), so a forgotten filter would let
-one user change another's row and then answer 404.
+Several users sign in ([ADR-0034](0034-auth-better-auth-in-core.md)), and each must see
+only their own vacancies, comments, status journal and stats. Core holds a few dozen
+Prisma calls, and several write before they check (`writeStatus` in `updateStatus`), so
+one forgotten filter would let a user change another's row and then answer 404.
 
 ## Decision
 One database and one schema; `Vacancy.userId` → `User` (`onDelete: Cascade`),
@@ -20,9 +16,8 @@ as the first argument; inside core every query goes through `forUser(db, userId)
 Prisma `$extends` client that adds `userId` to `Vacancy` reads, updates and deletes,
 `vacancy: { userId }` to `StatusChange` and `Comment` queries, requires `userId` on a
 create, and throws on an operation it does not know. Another user's row answers like a
-missing one: `null` in core, 404 over REST, not-found over MCP. The migration moves the
-existing rows to the one existing user and refuses to run if there is not exactly one.
-Sign-up stays limited to `AUTH_ALLOWED_EMAILS`.
+missing one: `null` in core, 404 over REST, not-found over MCP. Sign-up stays limited
+to `AUTH_ALLOWED_EMAILS`.
 
 ## Why this and not the alternatives
 - **`userId` threaded by hand into every `where`** — the plainest code, but a missed
@@ -42,16 +37,20 @@ Sign-up stays limited to `AUTH_ALLOWED_EMAILS`.
 - **403 for another user's row** — tells the caller the id exists.
 
 ## Consequences
-- A forgotten filter is not possible inside core, short of bypassing `forUser`; a grep
-  test keeps `this.db.vacancy` / `tx.vacancy` out of the services.
-- Every public method changes its signature once; the callers change mechanically.
+- A forgotten filter is not possible inside core, short of bypassing `forUser`. A test
+  scans `src/` and keeps `this.db.vacancy` / `tx.vacancy` out of the services
+  (`for-user.spec.ts`); `isolation.spec.ts` runs every public method as another user and
+  checks the owner's rows are untouched.
+- `forUser` covers `Vacancy`, `Comment` and `StatusChange` only. A nested relation from
+  another model (`user.findUnique({ include: { vacancies } })`) is outside it.
 - Ids stay sequential integers, so they hint at the total row count across users.
   Acceptable for allowlisted accounts.
 - Deleting a user deletes their vacancies, comments and journal.
 
 ## What this constrains — breaks if you change it
-- A query on `Vacancy`, `Comment` or `StatusChange` written on the raw client (not
-  `forUser`) reads every user's rows. The grep test is the guard; do not loosen it.
+- A query on `Vacancy`, `Comment` or `StatusChange` on the raw client (not `forUser`)
+  reads every user's rows. The scanning test is the guard: it reads files from disk, so
+  a moved folder can silently shrink what it scans — check its count after a move.
 - A raw SQL query (`$queryRaw`) is outside `forUser`: it must filter by `userId` itself.
 - `applyUrl` is unique per user, not globally: a lookup by `applyUrl` alone
   (`findUnique({ where: { applyUrl } })`) no longer compiles, and must not come back.
@@ -61,4 +60,4 @@ Sign-up stays limited to `AUTH_ALLOWED_EMAILS`.
 
 ## Related
 [ADR-0002](0002-core-shared-domain-layer.md), [ADR-0034](0034-auth-better-auth-in-core.md),
-[ADR-0039](0039-api-keys-per-user.md), [`../phases/phase-7.md`](../phases/phase-7.md).
+[ADR-0039](0039-api-keys-per-user.md).

@@ -1,57 +1,47 @@
-# 0011 — Web data layer: TanStack Query + optimistic mutation
+# 0011 — Web data layer: TanStack Query + optimistic mutations
 
-- Status: Accepted
-- Phase: 1 · Date: 2026-09
+- Status: Accepted · Date: 2026-09
 
 ## Context
-`useVacancies` was hand-rolled: `useEffect` + `useState` for `items` / `loading` /
-`loadError`, plus manual `Set`/`Map` bookkeeping for per-row saving state and
-errors, plus a manual optimistic `setItems`. No refetch, no revalidation, a failed
-load never retried.
+The web reads lists and single records and changes statuses from row buttons. Doing
+that by hand — `useEffect` + `useState`, manual refetch, manual optimistic updates —
+makes caching, retry, staleness and rollback our own bug surface.
 
 ## Decision
-Adopt `@tanstack/react-query`:
+`@tanstack/react-query`:
 
-- `QueryClientProvider` in `main.tsx` with one `queryClient`
-  (`apps/web/src/lib/queryClient.ts`, `staleTime: 30s`, `retry: 1`).
-- `useVacancies` uses `useQuery({ queryKey: ['vacancies'], queryFn:
-  listVacancies })` for the list, and `useMutation` for
-  `updateVacancyStatus` with the canonical optimistic pattern: `onMutate` cancels
-  in-flight queries, snapshots, and writes the optimistic cache update; `onError`
-  rolls back from the snapshot and records a per-row error; `onSettled` clears the
-  row's saving flag and invalidates the list.
-- Local `useState` still holds the genuinely-UI-only bits: the two confirm-dialog
-  targets, the status filter, and the per-row `savingIds` / `rowErrors` (a single
-  `useMutation` collapses to one `isPending`, so per-row needs its own map).
-- The sort/filter (`visibleItems`) stays a `useMemo` over `data ?? []`.
+- one `QueryClient` (`apps/web/src/lib/queryClient.ts`: `staleTime` 30 s, one retry)
+  in `main.tsx`;
+- the lists are infinite queries over cursor pages (`useInfiniteList`,
+  [ADR-0030](0030-cursor-paging.md)), keyed by a prefix plus the filters
+  (`['vacancies', …filters]`, `['applications', …]`);
+- a status move is a `useMutation` with the standard optimistic pattern: `onMutate`
+  cancels in-flight queries, snapshots every cached page under the prefix and writes
+  the new value; `onError` restores the snapshot and records the row's error;
+  `onSettled` invalidates the list, the single-vacancy query and `['stats']`.
+- `useState` keeps what is only UI: the dialogs' targets and the per-row saving state
+  and errors.
 
 ## Why this and not the alternatives
-- **Keep hand-rolling** — every one of caching, refetch, retry, staleness, and
-  optimistic-with-rollback is a bug surface we'd own; TanStack Query is the
-  standard tool and removes ~half of `useVacancies`.
-- **SWR** — comparable, but TanStack's mutation API (`onMutate`/`onError`/
-  `onSettled` with context) is a better fit for the optimistic-update flow here.
-- **Redux Toolkit Query** — a whole state-management framework for one list and
-  one mutation; overkill.
+- **By hand** — every one of caching, refetch, retry and rollback is code we would own.
+- **SWR** — comparable, but TanStack's `onMutate` / `onError` / `onSettled` with a
+  context fits the optimistic flow better.
+- **RTK Query** — a state-management framework for a few lists.
 
 ## Consequences
-- A failed load now retries once and can be refetched; the list revalidates after
-  a mutation.
-- Tests must wrap the hook in a `QueryClientProvider` with `retry: false` (see
-  `apps/web/src/pages/vacancies/useVacancies.test.ts`).
-- The per-row `Set`/`Map` bookkeeping is smaller but still present, now driven by
-  mutation callbacks rather than being the core mechanism.
+- A failed load retries once; a list revalidates after a write.
+- Writes go through the key **prefix**, so they reach the cached page whatever filter
+  is on screen. While a new filter's first page loads, `keepPreviousData` shows the
+  old page frozen: a write lands in the cache but not on screen until the new page
+  arrives.
+- Hook tests wrap in a `QueryClientProvider` with `retry: false`.
 
 ## What this constrains — breaks if you change it
-- Rendering `useVacancies` (or anything calling `useQuery`/`useMutation`) outside
-  a `QueryClientProvider` → runtime error. `main.tsx` provides it for the app;
-  every hook test must provide its own.
-- Changing `queryKey` `['vacancies']` in one place but not the mutation's
-  `invalidateQueries` / `setQueryData` → optimistic updates and refetches target
-  different cache entries; stale UI.
-- Removing `retry: false` from the test wrapper → a mocked failure takes seconds
-  of backoff before the assertion can see it.
+- A hook using `useQuery` / `useMutation` outside a `QueryClientProvider` → a runtime
+  error; every test supplies its own.
+- A query key changed in one place but not in the mutations' `setQueriesData` /
+  `invalidateQueries` → writes and refetches miss the cached entries; a stale UI.
+- `retry: false` dropped from the test wrapper → a mocked failure waits out the backoff.
 
 ## Related
-[ADR-0012](0012-web-hand-written-contract.md), [ADR-0013](0013-accessible-ui-primitives.md),
-`apps/web/src/pages/vacancies/useVacancies.ts`, `apps/web/src/lib/queryClient.ts`.
+[ADR-0012](0012-web-hand-written-contract.md), `apps/web/src/pages/vacancies/useVacancies.ts`.

@@ -1,94 +1,48 @@
-# 0022 — Timeout is derived until a scheduled job owns it
+# 0022 — Timeout is derived in `core`, not stored
 
-- Status: Accepted
-- Phase: 2   ·   Date: 2026-09 (updated in phase 3.1: the clock is `statusChangedAt` —
-  [ADR-0029](0029-one-vacancy-table.md); updated in phase 4: the rule lives in `core` —
-  [ADR-0031](0031-stats-endpoint.md))
-
-> **Phase 4 update.** The rule below is unchanged — derived, 30 days,
-> `statusChangedAt`, REJECTED / OFFER closed — but it now lives in `core`:
-> `TIMEOUT_DAYS`, `timedOutWhere` / `activeWhere` / `isTimedOut` in
-> `packages/core/src/domain/status.ts`, read by `StatsService` for `GET /stats`' `pipeline`
-> and by `ApplicationService.list` for the `state=active|timedOut` filter and each
-> item's `timedOut`. Timed out means `statusChangedAt < now − 30 days`. The web's
-> mirror is gone (phase 4 step 4). The sections below are the phase-2 reasoning, kept
-> as written.
+- Status: Accepted · Date: 2026-09
 
 ## Context
-
-`/applications` needs to surface applications that have gone quiet. Two facts forced a
-choice: `Vacancy.statusChangedAt` — the date of the last status move, the latest
-`StatusChange` row — is always populated, and the stack has no scheduler — nothing runs on a clock in `apps/api` or `packages/core`.
-
-The old `NO_RESPONSE` enum value was meant for this and was never used: 0 rows out
-of 219. It required remembering to set it by hand, which is the kind of step that
-does not survive contact with a real backlog.
+`/applications` and the dashboard must show the applications that went quiet. Two
+facts shape the choice: `Vacancy.statusChangedAt`, the date of the last move, is
+always set; and nothing in the stack runs on a clock. A status the user sets by hand
+("no response") is the step nobody does on a real backlog.
 
 ## Decision
+**Timeout is derived, never stored.**
 
-**Timeout is a derived, client-side view for now.**
-
-- `REJECTED` and `OFFER` are *closed* — they are outcomes, not stalls.
-- Of the rest, one whose `statusChangedAt` is older than `TIMEOUT_DAYS` (30) is a
-  *timeout*; the remainder is *active*. The window floats: it counts from applying
-  while `APPLIED`, and from the interview after `INTERVIEW`.
-- Because the two categories partition every non-closed application,
-  `total = active + timeout + rejected + offer` — the strip's numbers add up, so a
-  broken rule is visible at a glance.
-- The rule lives in exactly one place:
-  `apps/web/src/pages/applications/constants.ts` (`TIMEOUT_DAYS`, `CLOSED_STATUSES`,
-  `isTimedOut`, `isActive`, `matchesFilter`). The stats tile, the quick filters, and
-  the ⏳ in `ApplicationsTable` all read it.
-- `NO_RESPONSE` is dropped from the enum (migration `20260917181545`). The importer
-  maps both `Без відповіді` and a blank status cell to `APPLIED` — those rows age
-  into Timeout on their own.
-
-**Stage 2 will replace this**: a daily, user-configurable sweep writes a real
-`TIMEOUT` status. When it lands, add the value back and delete the client rule *in
-the same change* — never both at once.
+- `REJECTED` and `OFFER` are *closed*: outcomes, not stalls.
+- Of the rest, one whose `statusChangedAt` is more than `TIMEOUT_DAYS` (30) ago is a
+  *timeout*; the remainder is *active*. The window floats: from applying while
+  `APPLIED`, from the interview after `INTERVIEW`.
+- So `total = active + timeout + rejected + offer`, no overlap, no remainder: a broken
+  rule shows in numbers that stop adding up.
+- The rule lives once, in `packages/core/src/domain/status.ts`: `TIMEOUT_DAYS`,
+  `timedOutWhere` / `activeWhere` (a Prisma `where`) and `isTimedOut` (a predicate).
+  `StatsService` counts with it (`GET /stats`' `pipeline`); `ApplicationService.list`
+  filters with it (`state=active|timedOut`) and flags each item `timedOut`.
 
 ## Why this and not the alternatives
-
-- **Keep `NO_RESPONSE`, let the user set it by hand.** It was unused across the
-  entire log. The dates were already there; the manual step was the part nobody did.
-- **Add a `TIMEOUT` enum value now, before anything writes it.** A stored status with
-  no writer competes with the derived rule for the same fact: one row could be
-  `status = TIMEOUT` while also "moved two days ago". That is two sources of truth
-  for one fact. And the cost
-  is asymmetric: *adding* an enum value is a one-line `ALTER TYPE … ADD VALUE`;
-  *removing* one took a full type rebuild. Pay the cheap one later.
-- **A server-side filter or endpoint now.** The client already loads the whole log
-  (`?limit=500`); a DTO param plus a SQL predicate is strictly more code than
-  `items.filter()`.
+- **A status set by hand** — the dates were already there; the manual step was the
+  part nobody did.
+- **A stored `TIMEOUT` status with no writer yet** — two sources of truth for one fact:
+  a row could be `TIMEOUT` and "moved two days ago".
+- **A scheduled sweep** — needs a scheduler the stack does not have. Adding an enum
+  value later is one `ALTER TYPE … ADD VALUE`.
 
 ## Consequences
-
-- The threshold is a client constant today. Stage 2 turns it into a user setting,
-  and that is the moment it must also exist server-side.
-- `apps/web` cannot import `core` ([ADR-0012](0012-web-hand-written-contract.md)), so
-  a rule needed on both sides will be duplicated — the server copy canonical, the web
-  copy a mirror. The status enum already works this way; the web file says so at the
-  top.
-- Every derived count is capped by the tracker's 500-row page limit, `Total`
-  included. Pre-existing, not introduced here.
+- No column, no job. The web reads `timedOut` and the counts; it has no copy of the
+  rule.
+- The threshold is a constant. A per-user setting would be the moment to revisit.
 
 ## What this constrains — breaks if you change it
-
-- **Writing `status = TIMEOUT` while the client rule still exists** → the tile counts
-  the row twice, or the two disagree about it. Add the value back and remove the rule
-  together.
-- **A scheduled sweep writing `TIMEOUT` through `writeStatus`** → that is a real move:
-  it stamps `statusChangedAt` and journals the row. That is right for a stored
-  `TIMEOUT` (it is the date the row timed out), but the client rule must be gone by
-  then, or it reads the fresh stamp as "moved today".
-- **Changing `TIMEOUT_DAYS` without it being the single source** → the strip's tile
-  and the table's ⏳ share it on purpose; they must never diverge.
-- **Making timeout depend on `updatedAt` instead of `statusChangedAt`** → `updatedAt`
-  is Prisma's `@updatedAt` and moves on a salary / CV edit, so an edit would silently
+- A stored `TIMEOUT` written while this rule exists → the row counted twice, or the
+  two disagree. Add the value and remove the rule in one change.
+- A sweep writing `TIMEOUT` through `writeStatus` stamps `statusChangedAt`: right for a
+  stored status, but this rule would then read the row as "moved today".
+- Timeout on `updatedAt` instead of `statusChangedAt` → a salary or CV edit would
   un-stale a row. A comment or an edit never moves `statusChangedAt`.
 
 ## Related
-
-[ADR-0012](0012-web-hand-written-contract.md),
-[ADR-0029](0029-one-vacancy-table.md),
-[`../domain-model.md`](../domain-model.md) (Active/Timeout section).
+[ADR-0029](0029-one-vacancy-table.md), [ADR-0031](0031-stats-endpoint.md),
+[`../domain-model.md`](../domain-model.md) § StatusChange.

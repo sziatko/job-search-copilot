@@ -1,26 +1,21 @@
 # 0014 — Biome + the `apps/api` `useImportType` override
 
-- Status: Accepted
-- Phase: 1 · Date: 2026-09
+- Status: Accepted · Date: 2026-09
 
 ## Context
-No linter or formatter at first — style was consistent only because it was one
-author. "Generally accepted standards" wants a shared linter in CI.
+The repo needs one linter and formatter, run in CI. And NestJS reads the types of
+constructor parameters and DTO fields at **runtime** (`emitDecoratorMetadata`), which
+a type-only import erases.
 
 ## Decision
-**Biome** (`biome.json` at the repo root) for lint + format + import sorting, one
-tool, one config:
-- Formatter: 2-space, width 100, single quotes, trailing commas, semicolons.
-- Linter: `preset: "recommended"`.
-- `assist.actions.source.organizeImports: "on"`.
-- `javascript.parser.unsafeParameterDecoratorsEnabled: true` — so Biome can parse
-  NestJS parameter decorators (`@Body()`, `@Param()`, `@Query()`).
-- `files.includes` excludes `dist`, `node_modules`, `*.d.ts`, the Prisma
-  migrations, and `apps/web/dist`.
-- `.gitignore` also ignores stray `*.config.mjs` / `.mjs.map` / `.config.d.ts`
-  that `tsc` can emit next to `*.mts` config files.
+**Biome** (`biome.json`) does lint, format and import sorting:
+- 2-space indent, width 100; `preset: "recommended"`; `organizeImports` on;
+- `javascript.parser.unsafeParameterDecoratorsEnabled: true`, so it parses NestJS's
+  parameter decorators (`@Body()`, `@Param()`);
+- `files.includes` leaves out `dist`, `node_modules`, `*.d.ts`, the Prisma migrations,
+  `docs/design`.
 
-**The override:**
+**The override** — in `apps/api` only, `style.useImportType` is `off`:
 
 ```jsonc
 "overrides": [
@@ -29,37 +24,28 @@ tool, one config:
 ]
 ```
 
+Within a file, `ConfigService`, a service or a DTO class is often referenced only in a
+type position, so the rule's autofix rewrites it to `import type`. Nest then cannot
+resolve the dependency at boot (`Nest can't resolve dependencies of …`). `apps/mcp`,
+`apps/web` and `packages/core` keep the rule.
+
 ## Why this and not the alternatives
-- **ESLint + Prettier** — two tools, two configs, plugin management, slower. Biome
-  is a single dependency and does lint + format + import-sort together.
-- **No override, `useImportType` on everywhere** — **this actively broke the app.**
-  Biome's autofix converted `import { ConfigService }` /
-  `import { VacancyService }` / the DTO imports to `import type {...}` in
-  `apps/api`, because within each file they're only referenced in type position.
-  But NestJS DI and `class-validator` read those types as **runtime** metadata
-  (`design:paramtypes` via `emitDecoratorMetadata`) — a `type`-only import is
-  erased, so DI resolution fails at boot (`Nest can't resolve dependencies of ...`).
-  The e2e suite caught it. `useImportType` cannot know about decorator metadata,
-  so it's disabled for `apps/api` (and only there — `apps/mcp` / `apps/web` /
-  `packages/core` keep it).
+- **ESLint + Prettier** — two tools, two configs, plugins, slower.
+- **The rule on everywhere** — breaks DI, as above; the rule cannot know about
+  decorator metadata.
 
 ## Consequences
 - `npm run lint` / `lint:fix` / `format` at the root; CI runs `lint`.
-- `apps/api` imports of DI/DTO classes must stay **value** imports; the linter
-  won't rewrite them, but nothing enforces it either — it's a convention backed
-  by the e2e boot.
-- Biome doesn't lint Markdown, so `docs/` isn't checked by `npm run lint`.
+- In `apps/api`, DI and DTO classes stay value imports. Nothing enforces it but the
+  e2e suite booting the app.
+- Biome does not lint Markdown.
+- `.gitignore` covers the stray `*.config.mjs` / `*.config.d.mts` that `tsc` can emit
+  next to `*.mts` configs.
 
 ## What this constrains — breaks if you change it
-- Turning `useImportType` back on for `apps/api` (removing the override) → the
-  autofix silently `type`-ifies runtime-needed imports; DI breaks at boot. Caught
-  only by running the app or the e2e suite.
-- Removing `unsafeParameterDecoratorsEnabled` → Biome can't parse the NestJS
-  controllers; `npm run lint` errors on parameter decorators.
-- Removing the `*.config.mjs` `.gitignore` lines → stray `tsc` output next to
-  `vitest.config.mts` gets committed (it did once, in commit `cf38caa`, and was
-  amended out).
+- The override removed → the autofix type-ifies runtime imports; DI breaks at boot,
+  caught only by running the app or the e2e suite.
+- `unsafeParameterDecoratorsEnabled` removed → Biome cannot parse the controllers.
 
 ## Related
-[ADR-0006](0006-nest-di-prisma-lifecycle.md), [ADR-0015](0015-testing-strategy.md),
-`biome.json`, `.gitignore`.
+[ADR-0006](0006-nest-di-prisma-lifecycle.md), `biome.json`.

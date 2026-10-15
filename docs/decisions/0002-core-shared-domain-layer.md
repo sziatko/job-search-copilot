@@ -1,62 +1,46 @@
 # 0002 — `packages/core` as a framework-agnostic shared domain layer
 
-- Status: Accepted
-- Phase: 1 · Date: 2026-09
+- Status: Accepted · Date: 2026-09
 
 ## Context
-The REST API and the MCP server need the same operations: save an analysed
-vacancy, fetch one, list/filter, update the user's action. Those operations
-involve the DB schema, Prisma queries, recommendation normalization, and a small
-set of domain errors. Duplicating that across two transports would drift.
+The REST API and the MCP server need the same operations on vacancies: the schema,
+the queries, the status rules, the domain errors. Two copies would drift.
 
 ## Decision
-All of it lives in `packages/core`, which is **framework-agnostic** — no
-`@nestjs/*`, no MCP SDK, no HTTP. Its public surface (`src/index.ts`):
+All of it lives in `packages/core`, with no `@nestjs/*`, no MCP SDK, no HTTP. Its one
+public surface is `src/index.ts`:
 
-- `VacancyService` — a plain class; every DB query goes through it.
-  Constructor takes a `PrismaClient` (defaulting to a lazy process-wide one) so
-  Nest can inject its lifecycle-managed client and tests can pass their own.
-- `createPrismaClient(url)` / `getPrisma()` — client construction + a lazy
-  singleton for DI-less callers.
-- `normalizeRecommendation` + `RECOMMENDATION_INPUT_VALUES` — the EN/UA mapping.
-  *Amended in phase 7.2:* English only now — `parseRecommendation` checks the
-  `Recommendation` enum; the Ukrainian aliases and the list are gone.
-- `DomainError` / `InvalidRecommendationError` — the caller-mistake error type.
-- Re-exported Prisma types/enums (`Vacancy`, `Recommendation`,
-  `VacancyStatus`, `PrismaClient`) so consumers don't depend on `@prisma/client`
-  directly.
+- the services (`VacancyService`, `ApplicationService`, `VacancyIntakeService`,
+  `StatsService`) — plain classes, every query goes through them. Each takes a
+  `PrismaClient` (default: a lazy process-wide one), so Nest can inject its own and a
+  test can pass one;
+- `createPrismaClient(url)` / `getPrisma()`;
+- the domain rules and errors (`parseRecommendation`, `PIPELINE_STATUSES`,
+  `DomainError` and its subclasses);
+- auth (`createAuth`, `verifyApiKey`);
+- the Prisma types and enums the apps need, re-exported, so they do not depend on
+  `@prisma/client` directly.
 
-`apps/api` and `apps/mcp` are then thin adapters: validate input, call a service
-method, shape the response.
+`apps/api` and `apps/mcp` are thin adapters: validate the input, call a service,
+shape the response.
 
 ## Why this and not the alternatives
-- **Logic in each app** — two copies of the query layer, the normalization, and
-  the error handling; they would diverge the first time one transport got a fix.
-- **A "core" NestJS module reused by both** — would drag `@nestjs/*` into the MCP
-  server (and a browser-incompatible dependency tree into anything that touched
-  it). Keeping `core` framework-free means the MCP server stays tiny and the web
-  app *could* (though doesn't — [ADR-0012](0012-web-hand-written-contract.md))
-  import types from it.
-- **An ORM-model-per-transport** — same duplication problem, plus schema drift.
+- **Logic in each app** — two query layers that diverge the first time one gets a fix.
+- **A shared NestJS module** — drags `@nestjs/*` into the MCP server.
 
 ## Consequences
-- One place to reason about "what the app can do to a vacancy". Both transports
-  are provably thin (see [`../architecture.md`](../architecture.md) lifecycles).
-- `core` has import-time purity: no side effects, no env loading
-  ([ADR-0007](0007-env-config-and-loading.md)), so importing it can't throw.
-- Consumed as compiled `dist/` → [ADR-0003](0003-core-consumed-as-dist.md).
+- One place answers "what can the app do to a vacancy".
+- Importing `core` has no side effects and loads no env
+  ([ADR-0007](0007-env-config-and-loading.md)), so it cannot throw.
+- It is consumed as compiled `dist/` ([ADR-0003](0003-core-consumed-as-dist.md)).
 
 ## What this constrains — breaks if you change it
-- Adding `@nestjs/*` or any HTTP/transport dependency to `packages/core` → the MCP
-  server's dependency tree balloons; the "framework-agnostic" invariant is gone
-  and future transports inherit the coupling.
-- Writing a Prisma query in `apps/api` (a controller) or `apps/mcp` (a tool
-  handler) → bypasses the one place that's tested against the real DB; the
-  "core is the only DB client" invariant breaks.
-- Changing an `VacancyService` method signature → both transports and the
-  `packages/core` + `apps/mcp` specs.
+- A framework or transport dependency in `core` → the MCP server inherits it, and so
+  does every future transport.
+- A Prisma query in a controller or a tool handler → it bypasses the code tested
+  against the real DB and the user scoping (invariants 1 and 11).
+- A service method's signature → both transports and their specs.
 
 ## Related
-[ADR-0001](0001-monorepo-npm-workspaces.md), [ADR-0004](0004-one-service-two-transports.md),
-[ADR-0006](0006-nest-di-prisma-lifecycle.md),
-`packages/core/src/vacancies/vacancy.service.ts`, `packages/core/src/index.ts`.
+[ADR-0004](0004-one-service-two-transports.md), [ADR-0006](0006-nest-di-prisma-lifecycle.md),
+`packages/core/src/index.ts`.
