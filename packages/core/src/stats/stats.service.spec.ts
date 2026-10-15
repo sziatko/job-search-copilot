@@ -66,12 +66,11 @@ describe('StatsService.get', () => {
       unavailable: 0,
       responded: 0,
       interview: 0,
-      recruiterScreen: 0,
+      actionNeeded: 0,
       pipeline: {
         byStatus: {
           APPLIED: 0,
-          RECRUITER_SCREEN: 0,
-          REPLIED: 0,
+          ACTION_NEEDED: 0,
           INTERVIEW: 0,
           AWAITING: 0,
           OFFER: 0,
@@ -141,10 +140,10 @@ describe('StatsService.get', () => {
     expect(await stats.get(userId, NOW)).toMatchObject({ unavailable: 2, declined: 1 });
   });
 
-  it('counts a funnel stage from the journal: a reply then a rejection still responded', async () => {
+  it('counts a funnel stage from the journal: a question then a rejection still responded', async () => {
     // ADR-0031's guard: counted from the current status, this vacancy would drop out
     // of "responded" the moment the company said no.
-    await seed(['APPLIED', 'REPLIED', 'REJECTED']);
+    await seed(['APPLIED', 'ACTION_NEEDED', 'REJECTED']);
     await seed(['APPLIED', 'INTERVIEW', 'REJECTED']);
     await seed(['APPLIED']);
     await seed(['SAVED_FOR_LATER']);
@@ -152,7 +151,7 @@ describe('StatsService.get', () => {
     const result = await stats.get(userId, NOW);
 
     expect(result).toMatchObject({ applied: 3, responded: 2, interview: 1 });
-    expect(result.pipeline.byStatus).toMatchObject({ APPLIED: 1, REJECTED: 2, REPLIED: 0 });
+    expect(result.pipeline.byStatus).toMatchObject({ APPLIED: 1, REJECTED: 2, ACTION_NEEDED: 0 });
   });
 
   it('counts a vacancy once per stage, however many rounds it went through', async () => {
@@ -175,23 +174,23 @@ describe('StatsService.get', () => {
     const cutoff = NOW.getTime() - TIMEOUT_DAYS * DAY;
     await seed(['APPLIED'], { lastMoveAt: new Date(cutoff + MINUTE) }); // active
     await seed(['APPLIED'], { lastMoveAt: new Date(cutoff - MINUTE) }); // timed out
-    await seed(['APPLIED', 'RECRUITER_SCREEN'], { lastMoveAt: new Date(cutoff - DAY) }); // timed out
+    await seed(['APPLIED', 'ACTION_NEEDED'], { lastMoveAt: new Date(cutoff - DAY) }); // timed out
     await seed(['APPLIED', 'AWAITING'], { lastMoveAt: new Date(cutoff - DAY) }); // open: timed out
     await seed(['APPLIED', 'REJECTED'], { lastMoveAt: new Date(cutoff - DAY) }); // closed
     await seed(['APPLIED', 'OFFER'], { lastMoveAt: new Date(cutoff - DAY) }); // closed
 
-    const { pipeline, recruiterScreen } = await stats.get(userId, NOW);
+    const { pipeline, actionNeeded } = await stats.get(userId, NOW);
 
     expect(pipeline).toMatchObject({ active: 1, timedOut: 3, total: 6 });
     // The partition: every pipeline row is active, timed out, rejected or an offer.
     expect(pipeline.total).toBe(
       pipeline.active + pipeline.timedOut + pipeline.byStatus.REJECTED + pipeline.byStatus.OFFER,
     );
-    expect(recruiterScreen).toBe(1);
+    expect(actionNeeded).toBe(1);
   });
 
   it('lists the six latest pipeline moves, newest first, with company and title', async () => {
-    const id = await seed(['APPLIED', 'REPLIED', 'INTERVIEW'], { lastMoveAt: NOW });
+    const id = await seed(['APPLIED', 'ACTION_NEEDED', 'INTERVIEW'], { lastMoveAt: NOW });
     for (let i = 1; i <= 4; i += 1) {
       await seed(['APPLIED'], { lastMoveAt: new Date(NOW.getTime() - i * DAY) });
     }
@@ -201,7 +200,7 @@ describe('StatsService.get', () => {
     // Triage rows (every vacancy's first NOT_REVIEWED) are not activity.
     expect(recent.map((row) => row.status)).toEqual([
       'INTERVIEW',
-      'REPLIED',
+      'ACTION_NEEDED',
       'APPLIED',
       'APPLIED',
       'APPLIED',

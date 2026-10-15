@@ -74,7 +74,7 @@ Vacancies get in two ways:
                                ▼
               Web app: triage — apply, decline, save for later
                                ▼
-              Application pipeline: applied → replied → recruiter screen → interview → offer
+              Application pipeline: applied → action needed ⇄ awaiting → interview → offer
               (Claude can move a status when a reply email comes in)
 ```
 

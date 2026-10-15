@@ -172,7 +172,7 @@ describe('ApplicationsPage / useApplications', () => {
     const olderRow = screen.getAllByRole('row').find((r) => r.textContent?.includes('Older Co'));
     await user.selectOptions(
       within(olderRow as HTMLElement).getByRole('combobox', { name: 'Status' }),
-      'REPLIED',
+      'ACTION_NEEDED',
     );
 
     await waitFor(() => expect(companyOrder()).toEqual(['Older Co', 'Newer Co']));

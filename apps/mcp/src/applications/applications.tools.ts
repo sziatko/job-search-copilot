@@ -111,9 +111,10 @@ export function registerApplicationTools(
         "Move a vacancy to a new status — the user's triage (NOT_REVIEWED, SAVED_FOR_LATER, " +
         'DECLINED, UNAVAILABLE — the posting no longer takes applications, FILTERED_OUT — ' +
         'screened out before triage, NEW — back to the analysis queue, only for a vacancy ' +
-        'without an analysis) or a pipeline stage (APPLIED … REJECTED; AWAITING — a test ' +
-        "task sent or an interview done, waiting on the company's feedback); separate from the " +
-        "analyzer's recommendation — writing an analysis moves NEW by itself " +
+        'without an analysis) or a pipeline stage (APPLIED … REJECTED; ACTION_NEEDED — the ' +
+        'company wrote and the user must act: a question, a call to book, a test task; ' +
+        'AWAITING — the user answered or did what was asked and waits on the company); ' +
+        "separate from the analyzer's recommendation — writing an analysis moves NEW by itself " +
         '(submit_analysis). To record applying, prefer record_application. ' +
         'Identify the vacancy either by `id` (from list_vacancies / list_applications), ' +
         'or by `company` + `title` — the latter is for a caller that only knows the ' +

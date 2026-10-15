@@ -725,7 +725,7 @@ describe('job-search-copilot MCP server', () => {
       name: 'update_vacancy_status',
       arguments: {
         id: application.id,
-        status: 'RECRUITER_SCREEN',
+        status: 'ACTION_NEEDED',
         comment: 'Recruiter called.',
       },
     });

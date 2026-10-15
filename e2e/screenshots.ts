@@ -31,6 +31,15 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator('#root')).not.toBeEmpty();
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.skeleton')).toHaveCount(0);
+      if (name === 'applications') {
+        // Picture only: nine tiles wrap at 1440 px, so the least telling one, Applied,
+        // is hidden to keep the strip on one row. The app itself shows it.
+        await page
+          .locator('.kpi-tile', { has: page.locator('.kpi-label', { hasText: /^Applied$/ }) })
+          .evaluate((tile) => {
+            (tile as HTMLElement).style.display = 'none';
+          });
+      }
       await page.screenshot({ path: path.join(out, `${name}-${theme}.png`) });
     }
   });

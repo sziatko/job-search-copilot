@@ -21,6 +21,16 @@ async function main() {
   } finally {
     await client.end();
   }
+  // The last run's snapshot copies every table, so its columns use the schema's enum
+  // types: a migration that rebuilds one could not drop the old type. Global setup takes
+  // a fresh snapshot anyway.
+  const e2e = new pg.Client({ connectionString: env('DATABASE_URL') });
+  await e2e.connect();
+  try {
+    await e2e.query('DROP SCHEMA IF EXISTS e2e_snapshot CASCADE');
+  } finally {
+    await e2e.end();
+  }
   // Its `dotenv -e .env` never overrides the DATABASE_URL already set.
   execSync('npm run migrate:deploy --workspace=@job-search-copilot/core', { stdio: 'inherit' });
 }

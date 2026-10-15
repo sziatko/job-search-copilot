@@ -84,8 +84,7 @@ test('Apply through the dialog turns the select into the pipeline one', async ({
   await expect(statusSelect(page)).toHaveValue('APPLIED');
   await expect(statusSelect(page).locator('option')).toHaveText([
     'Applied',
-    'Recruiter screen',
-    'Replied',
+    'Action needed',
     'Interview',
     'Awaiting',
     'Offer',
@@ -99,10 +98,10 @@ test("an application's pipeline select moves it on", async ({ page, db }) => {
   await page.goto(`/vacancies/${id}`);
   await expect(statusSelect(page)).toHaveValue('APPLIED');
 
-  await statusSelect(page).selectOption({ label: 'Recruiter screen' });
-  await expect(page.getByText('Moved to Recruiter screen')).toBeVisible();
-  await expect(statusSelect(page)).toHaveValue('RECRUITER_SCREEN');
-  await expect(timeline(page).last()).toHaveText('Recruiter screen');
+  await statusSelect(page).selectOption({ label: 'Action needed' });
+  await expect(page.getByText('Moved to Action needed')).toBeVisible();
+  await expect(statusSelect(page)).toHaveValue('ACTION_NEEDED');
+  await expect(timeline(page).last()).toHaveText('Action needed');
 });
 
 test('Show full description / Show less', async ({ page, db }) => {

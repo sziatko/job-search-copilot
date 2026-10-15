@@ -121,9 +121,9 @@ describe('DashboardPage', () => {
   });
 
   it('rounds the response rate to one decimal', async () => {
-    renderDashboard(fakeStats({ applied: 3, responded: 1, recruiterScreen: 1 }));
+    renderDashboard(fakeStats({ applied: 3, responded: 1, actionNeeded: 1 }));
     expect(await screen.findByText('33.3% response rate')).toBeInTheDocument();
-    expect(screen.getByText('1 in recruiter screen')).toBeInTheDocument();
+    expect(screen.getByText('1 need your reply')).toBeInTheDocument();
   });
 
   it('asks the server for the top ten untriaged, recommended first, and keeps its order', async () => {

@@ -592,7 +592,7 @@ describe('ApplicationService', () => {
       const first = await applications.updateStatus(
         userId,
         vacancy.id,
-        'RECRUITER_SCREEN',
+        'ACTION_NEEDED',
         'Recruiter called.',
         'AGENT',
       );

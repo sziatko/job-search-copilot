@@ -20,11 +20,11 @@ export function statusAfterAnalysis(recommendation: Recommendation): VacancyStat
 }
 
 /** The statuses /applications shows: the vacancy has been applied to. Everything before
- * is triage. */
+ * is triage. Each says whose move it is: APPLIED and AWAITING wait on the company,
+ * ACTION_NEEDED on the user (a question, a call to book, a test task). */
 export const PIPELINE_STATUSES = [
   'APPLIED',
-  'RECRUITER_SCREEN',
-  'REPLIED',
+  'ACTION_NEEDED',
   'INTERVIEW',
   'AWAITING',
   'OFFER',

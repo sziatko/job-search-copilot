@@ -1,6 +1,6 @@
 # 0031 — One stats endpoint; the funnel counts the journal, and timeout moves to core
 
-- Status: Accepted
+- Status: Accepted (amended in phase 7.2: `recruiterScreen` → `actionNeeded`, `REPLIED` gone)
 - Phase: 4   ·   Date: 2026-09
 
 ## Context
@@ -38,9 +38,9 @@ dashboard and the `/applications` KPI strip read it; neither loads a list to cou
 | `applied` | vacancies with an `APPLIED` journal row, ever |
 | `declined` | … currently `DECLINED` (the user's no) |
 | `unavailable` | … currently `UNAVAILABLE` (the posting stopped taking applications) |
-| `responded` | … with a `REPLIED`, `RECRUITER_SCREEN`, `INTERVIEW`, `AWAITING` (phase 6.1) or `OFFER` row, ever |
+| `responded` | … with an `ACTION_NEEDED`, `INTERVIEW`, `AWAITING` (phase 6.1) or `OFFER` row, ever (`REPLIED` and `RECRUITER_SCREEN` until phase 7.2) |
 | `interview` | … with an `INTERVIEW` or `OFFER` row, ever |
-| `recruiterScreen` | … currently in `RECRUITER_SCREEN` |
+| `actionNeeded` | … currently in `ACTION_NEEDED` — the user's move (`recruiterScreen` until phase 7.2) |
 | `pipeline` | the `/applications` strip: `byStatus` (current), `active`, `timedOut`, `total` |
 | `recent` | the latest `StatusChange` rows, with company and title |
 

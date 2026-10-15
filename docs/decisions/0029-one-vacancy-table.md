@@ -31,7 +31,8 @@ The web showed two places to write a note. And once comments and dates move out,
 - **One status enum, `VacancyStatus`:** `NOT_REVIEWED`, `SAVED_FOR_LATER` (was
   `READY_TO_APPLY`), `DECLINED`, then the pipeline: `APPLIED`, `RECRUITER_SCREEN`,
   `REPLIED`, `INTERVIEW`, `OFFER`, `REJECTED`. `/applications` is the vacancies whose
-  status is in the pipeline.
+  status is in the pipeline. *(Phase 7.2: `RECRUITER_SCREEN` is `ACTION_NEEDED`, and
+  `REPLIED` merged into `AWAITING` — see `domain-model.md`.)*
 - **`StatusChange`** `(vacancyId, status, createdAt)` is the journal. Every change of
   status is one row, and its `createdAt` is the only date of that change. The "applied
   date" is the date of the latest `APPLIED` row. `Vacancy.status` / `statusChangedAt` are

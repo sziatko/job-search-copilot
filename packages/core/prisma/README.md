@@ -23,8 +23,10 @@ Run from the repo root (they proxy into `@job-search-copilot/core`):
    - **backfill** — a `--create-only` migration with the `UPDATE ... ` / `INSERT ... SELECT` that copies old data across; deploy.
    - **contract** — drop the old column/table once nothing reads it; deploy.
    A rename is the same shape: add new, backfill, drop old — not a bare `RENAME`, which is instant data loss if any reader still expects the old name.
+   **From the first deploy on.** The split exists for a deployed database that old code still reads while a release rolls out. Until then there is only the dev DB, migrated and restarted together with its code, and the test / e2e / CI databases built from scratch — so one migration is enough, written as rule 6 says (phase 7.2's status rename is one).
 4. **One logical change per migration.** Don't fold an index tweak into a column rename — it makes a partial rollback impossible.
 5. **Migrations are append-only once merged.** To undo a shipped migration, write a new one that reverses it.
+6. **A hand-written migration of several steps is `BEGIN; … COMMIT;`.** Prisma does not wrap a migration in a transaction: one that fails part way stays half applied (seen in phase 7.2 — an enum half rebuilt, recorded as failed). Run it through Prisma on a scratch copy, the failure path too. Editing a migration a database has already applied changes its checksum, and `migrate dev` then asks to reset that database.
 
 ## Things the schema DSL can't express (added by hand in `--create-only` migrations)
 

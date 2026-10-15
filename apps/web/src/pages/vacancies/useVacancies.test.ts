@@ -1016,7 +1016,7 @@ describe('VacanciesPage / useVacancies', () => {
             id: 2,
             company: 'Acme',
             title: 'Data Engineer',
-            status: 'REPLIED',
+            status: 'AWAITING',
             statusChangedAt: daysAgo(45),
           }),
         ]),

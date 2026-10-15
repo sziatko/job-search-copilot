@@ -43,7 +43,7 @@ describe('Stats (e2e)', () => {
       .expect(201);
     const id = created.body.id;
     await api.post('/api/v1/applications').send({ vacancyId: id }).expect(201);
-    for (const status of ['REPLIED', 'REJECTED']) {
+    for (const status of ['ACTION_NEEDED', 'REJECTED']) {
       await api.patch(`/api/v1/applications/${id}/status`).send({ status }).expect(200);
     }
 
@@ -62,12 +62,12 @@ describe('Stats (e2e)', () => {
       unavailable: 0,
       responded: 1,
       interview: 0,
-      recruiterScreen: 0,
+      actionNeeded: 0,
       pipeline: { byStatus: { REJECTED: 1, APPLIED: 0 }, active: 0, timedOut: 0, total: 1 },
     });
     expect(res.body.recent).toEqual([
       expect.objectContaining({ vacancyId: id, status: 'REJECTED', company: 'Acme' }),
-      expect.objectContaining({ status: 'REPLIED' }),
+      expect.objectContaining({ status: 'ACTION_NEEDED' }),
       expect.objectContaining({ status: 'APPLIED', title: 'Backend Engineer' }),
     ]);
     expect(typeof res.body.recent[0].createdAt).toBe('string');

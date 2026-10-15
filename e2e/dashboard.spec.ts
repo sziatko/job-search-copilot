@@ -9,9 +9,7 @@ test.beforeEach(async ({ page }) => {
 test('the tiles and the funnel count the seed', async ({ page }) => {
   const recommended = seedCount((v) => !!v.analysis && v.analysis.recommendation !== 'SKIP');
   const applied = seedCount((v) => reached(v, 'APPLIED'));
-  const responded = seedCount((v) =>
-    reached(v, 'REPLIED', 'RECRUITER_SCREEN', 'INTERVIEW', 'AWAITING', 'OFFER'),
-  );
+  const responded = seedCount((v) => reached(v, 'ACTION_NEEDED', 'INTERVIEW', 'AWAITING', 'OFFER'));
   const interview = seedCount((v) => reached(v, 'INTERVIEW', 'OFFER'));
 
   const tile = (label: string) =>

@@ -25,9 +25,11 @@ export const SERVER_INSTRUCTIONS = [
   'Status, one per vacancy: NEW (waiting for an analysis); triage NOT_REVIEWED, ' +
     'SAVED_FOR_LATER, DECLINED (the applicant chose not to apply), UNAVAILABLE (the ' +
     'posting no longer takes applications), FILTERED_OUT (screened out before triage, ' +
-    "by the analysis' SKIP or the applicant); then the pipeline APPLIED, RECRUITER_SCREEN, " +
-    'REPLIED, INTERVIEW, AWAITING (waiting on their feedback after a test task or an ' +
-    'interview), OFFER, REJECTED (the company said no). `recommendation` is the ' +
+    "by the analysis' SKIP or the applicant); then the pipeline, each status saying whose " +
+    'move it is: APPLIED (waiting for their first answer), ACTION_NEEDED (they wrote and ' +
+    'the applicant must act: a question, a call to book, a test task), INTERVIEW, AWAITING ' +
+    '(the applicant answered or did what was asked — a reply, a test task, an interview — ' +
+    'and waits on the company), OFFER, REJECTED (the company said no). `recommendation` is the ' +
     "analyzer's verdict — never derive one from the other; the one link is the server's: " +
     'writing an analysis moves a NEW vacancy to FILTERED_OUT on SKIP, else to ' +
     'NOT_REVIEWED, and moves no other status. Record applying with ' +

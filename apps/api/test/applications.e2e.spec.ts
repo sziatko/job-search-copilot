@@ -208,7 +208,7 @@ describe('Applications (e2e)', () => {
 
       const first = await api
         .patch(`/api/v1/applications/${id}/status`)
-        .send({ status: 'RECRUITER_SCREEN', comment: 'Recruiter called.' })
+        .send({ status: 'ACTION_NEEDED', comment: 'Recruiter called.' })
         .expect(200);
       expect(notes(first.body)).toEqual([ANALYZED, ['USER', 'Recruiter called.']]);
       expect(typeof first.body.comments[1].createdAt).toBe('string');
@@ -237,12 +237,13 @@ describe('Applications (e2e)', () => {
         .expect(404);
     });
 
-    it('400s for a bad status', async () => {
+    // REPLIED and RECRUITER_SCREEN left the enum in phase 7.2.
+    it.each(['MAYBE', 'REPLIED', 'RECRUITER_SCREEN'])('400s for the status %s', async (status) => {
       const vacancyId = await seedVacancy();
       const created = await api.post('/api/v1/applications').send({ vacancyId });
       await api
         .patch(`/api/v1/applications/${created.body.application.id}/status`)
-        .send({ status: 'MAYBE' })
+        .send({ status })
         .expect(400);
     });
   });

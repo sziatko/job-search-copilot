@@ -12,13 +12,7 @@ import {
 const RECENT_SIZE = 6;
 
 /** Past a reply: the company has answered. */
-const RESPONDED: VacancyStatus[] = [
-  'REPLIED',
-  'RECRUITER_SCREEN',
-  'INTERVIEW',
-  'AWAITING',
-  'OFFER',
-];
+const RESPONDED: VacancyStatus[] = ['ACTION_NEEDED', 'INTERVIEW', 'AWAITING', 'OFFER'];
 const INTERVIEWED: VacancyStatus[] = ['INTERVIEW', 'OFFER'];
 
 /** `GET /stats` (ADR-0031). The funnel stages count the journal ("ever reached"),
@@ -40,7 +34,8 @@ export interface Stats {
   unavailable: number;
   responded: number;
   interview: number;
-  recruiterScreen: number;
+  /** Current `status = ACTION_NEEDED` — the user's move. */
+  actionNeeded: number;
   pipeline: {
     byStatus: Record<PipelineStatus, number>;
     active: number;
@@ -135,7 +130,7 @@ export class StatsService {
       unavailable,
       responded,
       interview,
-      recruiterScreen: byStatus.RECRUITER_SCREEN,
+      actionNeeded: byStatus.ACTION_NEEDED,
       pipeline: {
         byStatus,
         active: open - timedOut,

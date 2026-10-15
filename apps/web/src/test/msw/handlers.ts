@@ -334,12 +334,11 @@ export function fakeStats(overrides: Partial<Stats> = {}): Stats {
     unavailable: 0,
     responded: 0,
     interview: 0,
-    recruiterScreen: 0,
+    actionNeeded: 0,
     pipeline: {
       byStatus: {
         APPLIED: 0,
-        RECRUITER_SCREEN: 0,
-        REPLIED: 0,
+        ACTION_NEEDED: 0,
         INTERVIEW: 0,
         AWAITING: 0,
         OFFER: 0,

@@ -10,10 +10,9 @@ import { useDashboard } from './useDashboard';
 /** What each status change reads as in the activity feed, and its dot colour. */
 const ACTIVITY: Record<ApplicationStatus, { verb: string; dot: 'good' | 'warn' | 'accent' }> = {
   APPLIED: { verb: 'Applied', dot: 'accent' },
-  RECRUITER_SCREEN: { verb: 'Recruiter screen booked', dot: 'good' },
-  REPLIED: { verb: 'Got a reply', dot: 'accent' },
+  ACTION_NEEDED: { verb: 'Action needed', dot: 'good' },
   INTERVIEW: { verb: 'Interview scheduled', dot: 'good' },
-  AWAITING: { verb: 'Awaiting feedback', dot: 'accent' },
+  AWAITING: { verb: 'Awaiting their reply', dot: 'accent' },
   OFFER: { verb: 'Offer received', dot: 'good' },
   REJECTED: { verb: 'Rejected', dot: 'warn' },
 };
@@ -215,7 +214,7 @@ export function DashboardPage() {
           label="Interviews"
           value={stats.interview}
           variant="good"
-          note={`${stats.recruiterScreen} in recruiter screen`}
+          note={`${stats.actionNeeded} need your reply`}
         />
       </div>
 
