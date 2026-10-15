@@ -37,7 +37,7 @@ async function queued(n: number): Promise<number> {
   ).id;
 }
 
-const analysis = { matchScore: 70, recommendation: 'ПОДАВАТИСЯ', estimationComment: 'Good.' };
+const analysis = { matchScore: 70, recommendation: 'APPLY', estimationComment: 'Good.' };
 
 /** The vacancy's status journal, oldest first. */
 async function journal(vacancyId: number) {
@@ -102,11 +102,8 @@ describe('companyGroupKey', () => {
 
 describe('VacancyService', () => {
   describe('save', () => {
-    it('creates a new vacancy with the recommendation normalized to English', async () => {
-      const { created, vacancy } = await service.save(
-        userId,
-        input({ recommendation: 'ПОДАВАТИСЯ' }),
-      );
+    it('creates a new vacancy with its recommendation', async () => {
+      const { created, vacancy } = await service.save(userId, input({ recommendation: 'APPLY' }));
       expect(created).toBe(true);
       expect(vacancy.recommendation).toBe('APPLY');
       expect(vacancy.status).toBe('NOT_REVIEWED');
@@ -125,7 +122,7 @@ describe('VacancyService', () => {
     });
 
     it('moves a SKIP out of NEW to FILTERED_OUT (ADR-0033)', async () => {
-      const { vacancy } = await service.save(userId, input({ recommendation: 'ПРОПУСТИТИ' }));
+      const { vacancy } = await service.save(userId, input({ recommendation: 'SKIP' }));
       expect(vacancy).toMatchObject({ status: 'FILTERED_OUT', recommendation: 'SKIP' });
       expect(await journal(vacancy.id)).toEqual(['NEW', 'FILTERED_OUT']);
     });
@@ -442,7 +439,7 @@ describe('VacancyService', () => {
       const [a, b] = [await queued(1), await queued(2)];
       const rows = await service.submitAnalyses(userId, [
         { id: a, ...analysis },
-        { id: b, ...analysis, recommendation: 'ПРОПУСТИТИ' },
+        { id: b, ...analysis, recommendation: 'SKIP' },
       ]);
       expect(rows.map((row) => [row.id, row.status])).toEqual([
         [a, 'NOT_REVIEWED'],

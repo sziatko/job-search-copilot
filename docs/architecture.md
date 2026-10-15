@@ -205,9 +205,9 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    → [`domain-model.md`](domain-model.md),
    [ADR-0029](decisions/0029-one-vacancy-table.md),
    [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)
-4. **`recommendation` is stored canonical-English.** Ukrainian input is normalized
-   on the way in (`normalizeRecommendation`). Every filter/enum downstream assumes
-   English. → [`domain-model.md`](domain-model.md)
+4. **`recommendation` is stored canonical-English.** Only the English enum is
+   accepted on the way in (`parseRecommendation`, the MCP and REST validators). Every
+   filter/enum downstream assumes English. → [`domain-model.md`](domain-model.md)
 5. **The web app's API contract is a hand-written zod schema**, not a `core`
    import. `core` pulls in Prisma/pg and must never enter the browser bundle.
    → [ADR-0012](decisions/0012-web-hand-written-contract.md)

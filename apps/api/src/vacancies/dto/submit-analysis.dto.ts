@@ -1,10 +1,10 @@
-import { ANALYSIS_BATCH_MAX, RECOMMENDATION_INPUT_VALUES } from '@job-search-copilot/core';
+import { ANALYSIS_BATCH_MAX, Recommendation } from '@job-search-copilot/core';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
-  IsIn,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsString,
@@ -20,9 +20,8 @@ export class SubmitAnalysisDto {
   @Max(100)
   matchScore!: number;
 
-  /** EN or Ukrainian — normalized in core, as on `POST /vacancies`. */
-  @IsIn(RECOMMENDATION_INPUT_VALUES)
-  recommendation!: string;
+  @IsEnum(Recommendation)
+  recommendation!: Recommendation;
 
   /** Stored as the ANALYZER comment. */
   @IsString()

@@ -35,7 +35,7 @@ could silently drift from what `main.ts` configured.
   bug this ADR's `configureApp()` half prevents.
 
 Note: the 422 path is currently **unreachable over HTTP** — the `save` DTO's
-`@IsIn(RECOMMENDATION_INPUT_VALUES)` rejects a bad recommendation with a `400`
+`@IsEnum(Recommendation)` (`@IsIn(RECOMMENDATION_INPUT_VALUES)` until phase 7.2) rejects a bad recommendation with a `400`
 first. The filter is defence-in-depth for any future `DomainError` that isn't
 pre-validated by a DTO.
 

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { BATCH_MAX, pagination } from '../common/schemas';
 import { json, ref, toolError, withDomainErrors } from '../common/tool-result';
 import {
-  RecommendationFilterEnum,
+  RecommendationEnum,
   SaveVacancyItemSchema,
   SubmitAnalysisItemSchema,
   VacancyStatusEnum,
@@ -166,7 +166,7 @@ export function registerVacancyTools(
         'recommendation are null until analysed. Does not include fullText — use ' +
         'get_vacancy / get_vacancies_batch for that.',
       inputSchema: {
-        recommendation: RecommendationFilterEnum.optional(),
+        recommendation: RecommendationEnum.optional(),
         status: z.array(VacancyStatusEnum).optional(),
         hasText: z.boolean().optional(),
         company: z.string().optional(),

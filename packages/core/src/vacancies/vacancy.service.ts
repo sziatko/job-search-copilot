@@ -8,7 +8,7 @@ import { ALL_COMMENTS } from '../domain/comments';
 import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from '../domain/company';
 import { AlreadyAnalysedError, VacancyNotFoundError } from '../domain/errors';
 import { matchKeys } from '../domain/identity';
-import { normalizeRecommendation } from '../domain/recommendation';
+import { parseRecommendation } from '../domain/recommendation';
 import { commentOn, firstStatus, statusAfterAnalysis, writeStatus } from '../domain/status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from '../domain/url';
 import type {
@@ -93,7 +93,7 @@ interface Analysis {
 function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
   return {
     matchScore: input.matchScore,
-    recommendation: normalizeRecommendation(input.recommendation),
+    recommendation: parseRecommendation(input.recommendation),
     estimationComment: input.estimationComment,
   };
 }

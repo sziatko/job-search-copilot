@@ -19,6 +19,8 @@ All of it lives in `packages/core`, which is **framework-agnostic** — no
 - `createPrismaClient(url)` / `getPrisma()` — client construction + a lazy
   singleton for DI-less callers.
 - `normalizeRecommendation` + `RECOMMENDATION_INPUT_VALUES` — the EN/UA mapping.
+  *Amended in phase 7.2:* English only now — `parseRecommendation` checks the
+  `Recommendation` enum; the Ukrainian aliases and the list are gone.
 - `DomainError` / `InvalidRecommendationError` — the caller-mistake error type.
 - Re-exported Prisma types/enums (`Vacancy`, `Recommendation`,
   `VacancyStatus`, `PrismaClient`) so consumers don't depend on `@prisma/client`

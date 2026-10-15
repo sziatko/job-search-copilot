@@ -19,7 +19,7 @@ describe('Vacancies (e2e)', () => {
     applyUrl: 'https://example.com/jobs/1',
     fullText: 'Full vacancy text goes here.',
     matchScore: 80,
-    recommendation: 'ПОДАВАТИСЯ',
+    recommendation: 'APPLY',
     estimationComment: 'Strong match.',
   };
 
@@ -49,7 +49,7 @@ describe('Vacancies (e2e)', () => {
   });
 
   describe('POST /api/v1/vacancies', () => {
-    it('creates a vacancy (201 + Location) and normalizes the Ukrainian recommendation', async () => {
+    it('creates a vacancy (201 + Location)', async () => {
       const res = await api.post('/api/v1/vacancies').send(validPayload).expect(201);
       expect(res.body.recommendation).toBe('APPLY');
       expect(res.body.status).toBe('NOT_REVIEWED');
@@ -72,12 +72,15 @@ describe('Vacancies (e2e)', () => {
       expect(second.headers.location).toBeUndefined();
     });
 
-    it('rejects an unknown recommendation with 400', async () => {
-      await api
-        .post('/api/v1/vacancies')
-        .send({ ...validPayload, recommendation: 'MAYBE' })
-        .expect(400);
-    });
+    it.each(['MAYBE', 'ПОДАВАТИСЯ', 'apply'])(
+      'rejects the recommendation %j with 400',
+      async (recommendation) => {
+        await api
+          .post('/api/v1/vacancies')
+          .send({ ...validPayload, recommendation })
+          .expect(400);
+      },
+    );
 
     it('rejects a payload missing required fields with 400', async () => {
       await api.post('/api/v1/vacancies').send({}).expect(400);

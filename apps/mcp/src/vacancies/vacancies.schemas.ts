@@ -1,18 +1,9 @@
-import {
-  RECOMMENDATION_INPUT_VALUES,
-  Recommendation,
-  VacancyStatus,
-} from '@job-search-copilot/core';
+import { Recommendation, VacancyStatus } from '@job-search-copilot/core';
 import { z } from 'zod';
 import { matchScore } from '../common/schemas';
 
-// Accepts both the canonical English value and its Ukrainian equivalent (what
-// the analyzer used to output) — normalized in VacancyService.save().
-// Intentionally wider than the Recommendation enum, so it is not derived from it.
-const RecommendationInputEnum = z.enum(RECOMMENDATION_INPUT_VALUES);
-
-// Filtering only makes sense against the canonical value already stored in the DB.
-export const RecommendationFilterEnum = z.enum(Recommendation);
+// English only, input and filter alike (invariant 4).
+export const RecommendationEnum = z.enum(Recommendation);
 
 export const VacancyStatusEnum = z.enum(VacancyStatus);
 
@@ -30,13 +21,13 @@ export const SaveVacancyItemSchema = z.object({
   applyUrl: z.url(),
   fullText: z.string().describe('The whole posting text that was analysed, not shortened.'),
   matchScore,
-  recommendation: RecommendationInputEnum,
+  recommendation: RecommendationEnum,
   estimationComment,
 });
 
 export const SubmitAnalysisItemSchema = z.object({
   id: z.number().int().describe("The vacancy's id, from list_vacancies."),
   matchScore,
-  recommendation: RecommendationInputEnum,
+  recommendation: RecommendationEnum,
   estimationComment,
 });

@@ -21,7 +21,7 @@ export interface SaveVacancyResult {
 export interface SubmitAnalysisInput {
   id: number;
   matchScore: number;
-  /** Accepts the canonical English value or its Ukrainian equivalent — see recommendation.ts. */
+  /** `APPLY` | `APPLY_WITH_CAVEATS` | `SKIP`, exact — checked by `parseRecommendation`. */
   recommendation: string;
   /** Written as the vacancy's `ANALYZER` comment; a blank one writes none. */
   estimationComment: string;
@@ -51,7 +51,7 @@ export interface SaveVacancyInput {
   applyUrl: string;
   fullText: string;
   matchScore: number;
-  /** Accepts the canonical English value or its Ukrainian equivalent — see recommendation.ts. */
+  /** `APPLY` | `APPLY_WITH_CAVEATS` | `SKIP`, exact — checked by `parseRecommendation`. */
   recommendation: string;
   /** Written as the vacancy's `ANALYZER` comment; a blank one writes none. */
   estimationComment: string;

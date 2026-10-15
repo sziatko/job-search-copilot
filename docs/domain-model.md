@@ -92,10 +92,10 @@ table:
 > - Making the analysis move a status from anything but `NEW`, or a status write touch
 >   analysis fields → the analyzer would clobber the user's progress (or vice-versa).
 >   The two writers overlap only in the move out of `NEW`.
-> - Adding a `Recommendation` value → the Prisma enum (migration),
->   `RECOMMENDATION_INPUT_VALUES` + `RECOMMENDATION_ALIASES` in
+> - Adding a `Recommendation` value → the Prisma enum (migration) — which
+>   `parseRecommendation` in
 >   [`recommendation.ts`](../packages/core/src/domain/recommendation.ts), the MCP `zod`
->   enums in [`vacancies.schemas.ts`](../apps/mcp/src/vacancies/vacancies.schemas.ts),
+>   enum in [`vacancies.schemas.ts`](../apps/mcp/src/vacancies/vacancies.schemas.ts),
 >   the `apps/api` DTOs, and the web `recommendationSchema`. Its place in the enum is
   `/vacancies`' `sort=recommended` order (ADR-0030) — `ADD VALUE … BEFORE`/`AFTER`.
 > - Adding a `VacancyStatus` value → the Prisma enum (migration, `ADD VALUE … AFTER`;
@@ -268,22 +268,18 @@ Rationale and the HTTP consequences (POST → `201 + Location` / `200`):
 > `200`-on-existing branch and the MCP `created` flag become meaningless; the
 > "second save leaves it untouched" tests fail.
 
-## `recommendation` normalization
+## `recommendation` input
 
-The analyzer emits Ukrainian wording (`ПОДАВАТИСЯ`, `ПОДАВАТИСЯ З ЗАСТЕРЕЖЕННЯМИ`,
-`ПРОПУСТИТИ`). `normalizeRecommendation()` maps both the Ukrainian and the
-canonical English spellings (case-insensitive, trimmed) to the English enum, and
-throws `InvalidRecommendationError` (a `DomainError`) on anything else. **Storage
-is always English.**
+English only, exact: `APPLY`, `APPLY_WITH_CAVEATS`, `SKIP` — the Prisma enum, on input
+and in every filter. MCP checks it with `z.enum(Recommendation)`, REST with
+`@IsEnum(Recommendation)`; `parseRecommendation()` in core is the last guard and throws
+`InvalidRecommendationError` (a `DomainError`) on anything else. Until phase 7.2 the
+Ukrainian wording an older analyzer emitted (`ПОДАВАТИСЯ`, …) was accepted and mapped;
+the skills now send English, so the aliases went.
 
-- MCP: accepts `RECOMMENDATION_INPUT_VALUES` (EN + UA) on `save`, but only English
-  for the `list` filter.
-- API: the `save` DTO uses `@IsIn(RECOMMENDATION_INPUT_VALUES)`; the `list` query
-  DTO uses `@IsEnum(Recommendation)` (English only).
-
-> **Breaks if you change it:** storing the raw UA string → every downstream filter
-> (`@IsEnum`, the zod enums) stops matching; the
-> DB enum can't even hold it.
+> **Breaks if you change it:** accepting another spelling means mapping it on the way
+> in — storing it raw is impossible (the DB enum can't hold it), and every filter
+> (`@IsEnum`, the zod enum) compares against the English value.
 
 ## DB-level rules (not expressible in the Prisma schema DSL)
 
