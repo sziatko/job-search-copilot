@@ -1,4 +1,5 @@
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
+import { VacancyNotFoundError } from './errors';
 
 /** The `Vacancy` operations `forUser` knows: each gets the owner added to its `where`. */
 const VACANCY_FILTERED = new Set([
@@ -91,3 +92,17 @@ export type UserDb = ReturnType<typeof forUser>;
 
 /** The `tx` of a `UserDb`'s interactive transaction — scoped too. */
 export type UserTx = Parameters<Parameters<UserDb['$transaction']>[0]>[0];
+
+/** An update through `forUser` on a missing id, or another user's, fails with P2025: that
+ * is "not found" — a command's `VacancyNotFoundError` (a query answers null instead). Let
+ * the UPDATE fail rather than check first. */
+export async function orNotFound<T>(update: Promise<T>, id: number): Promise<T> {
+  try {
+    return await update;
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new VacancyNotFoundError(`Vacancy ${id} not found`);
+    }
+    throw err;
+  }
+}

@@ -84,8 +84,8 @@ describe('Applications (e2e)', () => {
       await api.post('/api/v1/applications').send({ vacancyId }).expect(422);
     });
 
-    it('422s for an unknown vacancy id', async () => {
-      await api.post('/api/v1/applications').send({ vacancyId: 999_999 }).expect(422);
+    it('404s for an unknown vacancy id', async () => {
+      await api.post('/api/v1/applications').send({ vacancyId: 999_999 }).expect(404);
     });
 
     it('400s for a missing vacancyId', async () => {

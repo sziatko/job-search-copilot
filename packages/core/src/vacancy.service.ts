@@ -1,8 +1,11 @@
 import type { PrismaClient, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import { ALL_COMMENTS } from './comments';
+import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from './company';
 import { AlreadyAnalysedError, VacancyNotFoundError } from './errors';
-import { forUser, type UserDb, type UserTx } from './for-user';
-import { escapeLikePattern } from './like';
+import { forUser, orNotFound, type UserDb, type UserTx } from './for-user';
+import { matchKeys } from './identity';
+import { textFilters } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
 import { normalizeRecommendation } from './recommendation';
@@ -19,7 +22,6 @@ import type {
   VacancyListItem,
   VacancySort,
 } from './vacancy.types';
-import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 
 /** The analyzer's comment: the first `ANALYZER` row. A relation read, so every
  * reader selects it through here and flattens it with `withEstimation`. */
@@ -36,13 +38,6 @@ function withEstimation<T extends { comments: { body: string }[] }>(
   const { comments, ...rest } = row;
   return { ...rest, estimationComment: comments[0]?.body ?? null };
 }
-
-/** Every comment, every source, oldest first; `id` breaks the tie between notes migrated
- * with one shared date. */
-export const ALL_COMMENTS = {
-  select: { id: true, createdAt: true, body: true, source: true },
-  orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-} satisfies Prisma.Vacancy$commentsArgs;
 
 const DETAIL_INCLUDE = {
   comments: ALL_COMMENTS,
@@ -86,71 +81,6 @@ const LIST_SELECT = {
   status: true,
   statusChangedAt: true,
 } satisfies Prisma.VacancySelect;
-
-// Matched after normalizeCompanyKey's collapse, the way it matches legal forms: a
-// trailing country or region names an office, not another company.
-const PLACE_SUFFIX =
-  / (?:polska|poland|spain|españa|espana|latam|germany|deutschland|uk|usa|ukraine|netherlands|emea|europe)$/;
-
-/**
- * Same company ⇔ equal keys (ADR-0032), so every spelling of a company sees the same
- * rows and the same count. The log's key (case, punctuation, legal forms), with a note
- * in parentheses (`Fabrikam (partner company)`) and a trailing country
- * (`contoso Polska`) dropped too. A name that is nothing but those keeps itself.
- */
-export function companyKey(company: string): string {
-  let key = normalizeCompanyKey(company.replace(/\([^)]*\)/g, ' ')) ?? '';
-  // `Acme Polska Sp. z o.o.` carries both, in either order.
-  for (let prev = ''; prev !== key; ) {
-    prev = key;
-    key = normalizeCompanyKey(key.replace(PLACE_SUFFIX, '')) ?? '';
-  }
-  return key || company.trim().toLowerCase();
-}
-
-/**
- * "The same company" leaves `FILTERED_OUT` out — screened-out postings (most of them
- * the old log's, never analysed) are noise in "have I dealt with these people before?".
- * Both the `sameCompanyAs` list and `companyMatchCounts` apply it; a FILTERED_OUT row
- * adds itself back to its own count (`withDerivedFields`), so the button's "others" is
- * exactly the rows the modal lists, from any row.
- */
-const SAME_COMPANY_STATUSES: Prisma.VacancyWhereInput = { status: { not: 'FILTERED_OUT' } };
-
-// ponytail: both helpers below read every distinct company on each call — fine at a
-// few hundred names; past that, store `companyKey` in an indexed column.
-
-/** Every stored spelling of `company`'s company — the `sameCompanyAs` filter. */
-export async function sameCompanyNames(db: UserDb, company: string): Promise<string[]> {
-  const key = companyKey(company);
-  const rows = await db.vacancy.findMany({ distinct: ['company'], select: { company: true } });
-  return rows.map((row) => row.company).filter((name) => companyKey(name) === key);
-}
-
-/**
- * For each name, how many vacancies are the same company (`companyKey`) — the
- * duplicates button's count, on /vacancies and /applications alike, and exactly the
- * rows `sameCompanyAs` lists: every status but `FILTERED_OUT` (`SAME_COMPANY_STATUSES`).
- */
-export async function companyMatchCounts(
-  db: UserDb,
-  companies: string[],
-): Promise<Map<string, number>> {
-  if (companies.length === 0) {
-    return new Map();
-  }
-  const groups = await db.vacancy.groupBy({
-    by: ['company'],
-    where: SAME_COMPANY_STATUSES,
-    _count: { _all: true },
-  });
-  const perKey = new Map<string, number>();
-  for (const group of groups) {
-    const key = companyKey(group.company);
-    perKey.set(key, (perKey.get(key) ?? 0) + group._count._all);
-  }
-  return new Map(companies.map((name) => [name, perKey.get(companyKey(name)) ?? 0]));
-}
 
 interface Analysis {
   matchScore: number;
@@ -307,8 +237,7 @@ export class VacancyService {
             company: input.company,
             title: input.title,
             applyUrl,
-            companyKey: normalizeCompanyKey(input.company),
-            titleKey: normalizeTitleKey(input.title),
+            ...matchKeys(input.company, input.title),
             fullText: input.fullText,
             ...firstStatus(at),
           },
@@ -381,39 +310,25 @@ export class VacancyService {
   /** List/search — omits fullText to keep results compact. Use getById for the full record. */
   async list(userId: string, filters: ListVacanciesFilters = {}): Promise<ListVacanciesResult> {
     const db = forUser(this.db, userId);
-    // Every term below reaches the pattern unescaped by the caller, so it is
-    // escaped here: `%`/`_` are the user's literal characters, not wildcards
-    // (escapeLikePattern). It happens per clause rather than once up front because
-    // each clause escapes a *different* value.
+    // Under one AND, so `sameCompanyAs` narrows a `company` term rather than replacing it.
+    const and = [
+      ...textFilters(filters),
+      ...(filters.sameCompanyAs
+        ? [
+            { company: { in: await sameCompanyNames(db, filters.sameCompanyAs) } },
+            SAME_COMPANY_STATUSES,
+          ]
+        : []),
+    ];
     const where: Prisma.VacancyWhereInput = {
       ...(filters.recommendation && { recommendation: filters.recommendation }),
       ...(filters.status?.length && { status: { in: filters.status } }),
       ...(filters.applyUrl !== undefined && { applyUrl: applyUrlKey(filters.applyUrl) }),
-      // One clause, not two: `search` is the /vacancies free-text box and widens
-      // (company OR title), where company/title each narrow. Being separate `where`
-      // keys they AND together, so passing both still means "must satisfy both".
-      ...(filters.search && {
-        OR: [
-          { company: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
-          { title: { contains: escapeLikePattern(filters.search), mode: 'insensitive' } },
-        ],
-      }),
-      ...(filters.company && {
-        company: { contains: escapeLikePattern(filters.company), mode: 'insensitive' },
-      }),
-      ...(filters.title && {
-        title: { contains: escapeLikePattern(filters.title), mode: 'insensitive' },
-      }),
       ...(filters.hasText !== undefined && {
         fullText: filters.hasText ? { not: null } : null,
       }),
-      // Under AND, so it narrows `company` rather than replacing it.
-      ...(filters.sameCompanyAs && {
-        AND: [
-          { company: { in: await sameCompanyNames(db, filters.sameCompanyAs) } },
-          SAME_COMPANY_STATUSES,
-        ],
-      }),
+      // Only when non-empty: the cursor below treats an empty `where` as its own case.
+      ...(and.length > 0 && { AND: and }),
     };
 
     const limit = filters.limit ?? 20;
@@ -445,20 +360,20 @@ export class VacancyService {
 
   /** Moves the vacancy to `status` through writeStatus — a repeated pipeline status is
    * an event, a repeated triage one throws SameStatusError. `comment`, when not blank,
-   * becomes a USER comment in the same transaction (Save for later's note). Returns null
-   * when no vacancy has this id. */
+   * becomes a USER comment in the same transaction (Save for later's note). Throws
+   * VacancyNotFoundError when no vacancy has this id. */
   updateStatus(
     userId: string,
     id: number,
     status: VacancyStatus,
     comment?: string,
-  ): Promise<VacancyDetail | null> {
+  ): Promise<VacancyDetail> {
     return forUser(this.db, userId).$transaction(async (db) => {
       await writeStatus(db, id, status);
-      const row = await db.vacancy.findUnique({ where: { id }, include: DETAIL_INCLUDE });
       const data = commentOn(comment, 'USER');
-      if (!row || !data.comments) return row && toDetail(row);
-      return toDetail(await db.vacancy.update({ where: { id }, data, include: DETAIL_INCLUDE }));
+      return toDetail(
+        await orNotFound(db.vacancy.update({ where: { id }, data, include: DETAIL_INCLUDE }), id),
+      );
     });
   }
 }

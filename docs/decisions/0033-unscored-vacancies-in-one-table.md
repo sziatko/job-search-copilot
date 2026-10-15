@@ -22,7 +22,8 @@ analysis lands.
 
 **One table.** `Vacancy.fullText`, `matchScore` and `recommendation` are nullable; both
 analysis fields `null` = not analysed yet. New columns: `companyKey` / `titleKey`
-(intake's second match, from `normalizeCompanyKey` / `normalizeTitleKey`; null only
+(intake's second match, from `normalizeCompanyKey` / `normalizeTitleKey` in
+`identity.ts`; `record()`'s lookup by name too since 2026-10, ADR-0019; null only
 when the name normalizes to nothing, e.g. `—`) and `source` (free text, `null` on rows
 not taken in by intake). `VacancyLogEntry` is dropped: every log row became a vacancy
 (migration `20261003130100`).
@@ -99,7 +100,8 @@ only gets the text it lacked — never a status, a source or an analysis. Return
   the CHECKs reject the statement. `save()` and `record()` create the row unanalysed,
   move it out of `NEW`, then write the analysis.
 - Writing a vacancy without `companyKey` / `titleKey` (outside intake, `save()`,
-  `record()`) → intake never matches it by name. Changing `normalizeCompanyKey` /
+  `record()` — all three take them from `matchKeys`) → neither intake nor `record()`
+  matches it by name. Changing `normalizeCompanyKey` /
   `normalizeTitleKey` leaves every stored key in the old shape — it needs a backfill.
 - Moving a status on analysis from anything but `NEW` → the analyzer clobbers the
   user's progress.

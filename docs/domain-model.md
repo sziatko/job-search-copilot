@@ -24,7 +24,7 @@ pipeline.
 | `company` | `String` | |
 | `title` | `String` | |
 | `applyUrl` | `String`, `@@unique([userId, applyUrl])` | **The natural key, per user** — two users may track one posting. The unique constraint is what enforces analyze-once at the DB level. Stored **canonicalized** — `normalizeApplyUrl()` drops the query string, the fragment and a trailing slash, so the spellings one posting arrives in share one row. Exception: a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept. → [ADR-0023](decisions/0023-canonical-applyurl.md) |
-| `companyKey` / `titleKey` | `String?` | Intake's second match: `normalizeCompanyKey` / `normalizeTitleKey` (`vacancy-intake.ts` — lowercase, punctuation collapsed, company legal suffixes stripped). `@@index([userId, companyKey, titleKey])`. Written on every create (intake, `save()`, `record()`); `null` only when the name normalizes to nothing (`—`), and such a row is matched by url only. Not `companyKey()` in `vacancy.service.ts` — ADR-0032's company identity, which also drops places and notes. |
+| `companyKey` / `titleKey` | `String?` | The posting's match by name — intake's second match, and `record()` / `updateStatusByVacancy`'s lookup: `normalizeCompanyKey` / `normalizeTitleKey` (`identity.ts` — lowercase, punctuation collapsed, company legal suffixes stripped). `@@index([userId, companyKey, titleKey])`. Written on every create (intake, `save()`, `record()` — `matchKeys`); `null` only when the name normalizes to nothing (`—`), and such a row is matched by url only. Not `companyGroupKey()` — ADR-0032's company identity, which also drops places and notes, and is not stored (`identity.ts` says why the two differ). |
 | `source` | `String?` | Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source needs no migration; `null` on rows from `save()`, `record()` and the migrated log. |
 | `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet (intake without text, a placeholder). A list item carries `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
 | `matchScore` | `Int?` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. `null` = not analysed yet. |
@@ -172,8 +172,9 @@ zone: its `id` is the vacancy's, and applying moves the vacancy's own `status`.
 - **`list` / `getById`** see only the pipeline. `list` orders by
   `statusChangedAt desc, id desc` — a fresh application tops the list; a comment or
   an edit does not reorder.
-- **Record-or-link** (`record`, one transaction): link by `vacancyId` (web), or by a
-  unique case-insensitive `(company, title)` match (MCP); zero matches → **create** a
+- **Record-or-link** (`record`, one transaction): link by `vacancyId` (web), or (MCP) to
+  the vacancy with the passed `applyUrl`, else a unique `(companyKey, titleKey)` match —
+  intake's match, an unknown url falling through to the name; zero matches → **create** a
   placeholder `Vacancy` (`fullText` `null`; no analysis unless the caller passed a
   `matchScore` — then `recommendation` is the caller's or derived from it, written once
   the row has left `NEW`; an `ANALYZER` comment only when one was passed); more than
@@ -185,7 +186,7 @@ zone: its `id` is the vacancy's, and applying moves the vacancy's own `status`.
   [ADR-0019](decisions/0019-record-or-create-vacancy.md).
 - **`updateStatus` / `updateStatusByVacancy`** move a vacancy to any status (the MCP
   `update_vacancy_status`). `updateStatus` takes any vacancy by id;
-  `updateStatusByVacancy` matches `(company, title)` case-insensitively **among the
+  `updateStatusByVacancy` matches `(companyKey, titleKey)`, as `record` does, **among the
   vacancies already in the pipeline only** — an email about a vacancy never applied to
   is "not found" and goes to need-attention — and **never creates** anything.
 - **`list` (both services)** also takes `applyUrl`, compared exactly after the

@@ -21,9 +21,9 @@ model Vacancy {
   title               String
   // Unique per user (`@@unique` below), not globally: two users may track one posting.
   applyUrl            String
-  // Intake's second match (ADR-0033): normalizeCompanyKey / normalizeTitleKey
-  // (vacancy-intake.ts) — not vacancy.service's `companyKey()`, ADR-0032's company
-  // identity. Null only when the name normalizes to nothing (`—`).
+  // The posting's match by name, intake's and record()'s (ADR-0033, ADR-0019):
+  // normalizeCompanyKey / normalizeTitleKey (identity.ts) — not `companyGroupKey()`,
+  // ADR-0032's company identity. Null only when the name normalizes to nothing (`—`).
   companyKey          String?
   titleKey            String?
   // Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source

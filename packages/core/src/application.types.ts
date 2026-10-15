@@ -80,7 +80,7 @@ export interface ListApplicationsFilters {
   company?: string;
   /** Matches Vacancy.title, ILIKE '%term%', case-insensitive. See `company`. */
   title?: string;
-  /** Every application at this name's company, whatever its spelling (`companyKey`,
+  /** Every application at this name's company, whatever its spelling (`companyGroupKey`,
    * ADR-0032). ANDs with the rest. */
   sameCompanyAs?: string;
   /** Exact, after the same normalization `save` applies — see `applyUrlKey`. */

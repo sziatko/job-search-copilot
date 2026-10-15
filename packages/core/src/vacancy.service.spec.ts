@@ -8,8 +8,9 @@ import {
   SameStatusError,
   VacancyNotFoundError,
 } from './errors';
+import { companyGroupKey } from './identity';
 import { getPrisma } from './prisma-client';
-import { companyKey, VacancyService } from './vacancy.service';
+import { VacancyService } from './vacancy.service';
 import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
 import { VacancyIntakeService } from './vacancy-intake.service';
 
@@ -68,7 +69,7 @@ function countsByCompany(items: VacancyListItem[]): Record<string, number> {
 }
 
 // Pairs and near-misses from the dev DB's company names (2026-10-02).
-describe('companyKey', () => {
+describe('companyGroupKey', () => {
   it.each([
     ['contoso', 'contoso Polska'],
     ['Vexa Polska', 'Vexa Poland'],
@@ -80,7 +81,7 @@ describe('companyKey', () => {
     ['Optivo', 'Optivo_'],
     ['iPlanly', 'Iplanly'],
   ])('%j and %j are one company', (a, b) => {
-    expect(companyKey(a)).toBe(companyKey(b));
+    expect(companyGroupKey(a)).toBe(companyGroupKey(b));
   });
 
   it.each([
@@ -90,12 +91,12 @@ describe('companyKey', () => {
     ['Tailspin', 'Tenth Tailspinion Group'],
     ['Software Grove', 'Software Garden'],
   ])('%j and %j are not', (a, b) => {
-    expect(companyKey(a)).not.toBe(companyKey(b));
+    expect(companyGroupKey(a)).not.toBe(companyGroupKey(b));
   });
 
   it('keeps a name that is nothing but a country or a note', () => {
-    expect(companyKey('Polska')).toBe('polska');
-    expect(companyKey('(stealth)')).toBe('(stealth)');
+    expect(companyGroupKey('Polska')).toBe('polska');
+    expect(companyGroupKey('(stealth)')).toBe('(stealth)');
   });
 });
 
@@ -1012,8 +1013,10 @@ describe('VacancyService', () => {
   });
 
   describe('updateStatus', () => {
-    it('returns null when the id does not exist', async () => {
-      expect(await service.updateStatus(userId, 999_999, 'DECLINED')).toBeNull();
+    it('throws VacancyNotFoundError when the id does not exist', async () => {
+      await expect(service.updateStatus(userId, 999_999, 'DECLINED')).rejects.toBeInstanceOf(
+        VacancyNotFoundError,
+      );
     });
 
     it('writes one journal row and keeps the cache in step', async () => {
@@ -1137,8 +1140,10 @@ describe('VacancyService', () => {
       expect(await getPrisma().comment.count({ where: { vacancyId: vacancy.id } })).toBe(1);
     });
 
-    it('returns null for an unknown id with a comment, and writes nothing', async () => {
-      expect(await service.updateStatus(userId, 999_999, 'SAVED_FOR_LATER', 'note')).toBeNull();
+    it('throws VacancyNotFoundError for an unknown id with a comment, and writes nothing', async () => {
+      await expect(
+        service.updateStatus(userId, 999_999, 'SAVED_FOR_LATER', 'note'),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError);
       expect(await getPrisma().comment.count()).toBe(0);
     });
 

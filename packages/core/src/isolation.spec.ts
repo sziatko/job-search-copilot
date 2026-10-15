@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createUser } from '../tests/user';
 import { ApplicationService } from './application.service';
-import { InvalidApplicationInputError, VacancyNotFoundError } from './errors';
+import { VacancyNotFoundError } from './errors';
 import { getPrisma } from './prisma-client';
 import { StatsService } from './stats.service';
 import { VacancyService } from './vacancy.service';
@@ -60,7 +60,10 @@ const cases: [string, () => Promise<unknown>][] = [
   ],
   [
     'VacancyService.updateStatus',
-    async () => expect(await vacancies.updateStatus(b, ids.analysed, 'DECLINED', 'No.')).toBeNull(),
+    () =>
+      expect(vacancies.updateStatus(b, ids.analysed, 'DECLINED', 'No.')).rejects.toBeInstanceOf(
+        VacancyNotFoundError,
+      ),
   ],
   [
     'VacancyService.submitAnalysis — a NEW row of A',
@@ -111,7 +114,7 @@ const cases: [string, () => Promise<unknown>][] = [
     'ApplicationService.record — by id',
     () =>
       expect(applications.record(b, { vacancyId: ids.analysed })).rejects.toBeInstanceOf(
-        InvalidApplicationInputError,
+        VacancyNotFoundError,
       ),
   ],
   [
@@ -125,7 +128,7 @@ const cases: [string, () => Promise<unknown>][] = [
     'ApplicationService.recordMany',
     () =>
       expect(applications.recordMany(b, [{ vacancyId: ids.queued }])).rejects.toBeInstanceOf(
-        InvalidApplicationInputError,
+        VacancyNotFoundError,
       ),
   ],
   [
@@ -138,35 +141,38 @@ const cases: [string, () => Promise<unknown>][] = [
   ],
   [
     'ApplicationService.updateStatus',
-    async () =>
+    () =>
       expect(
-        await applications.updateStatus(b, ids.applied, 'INTERVIEW', 'Call.', 'AGENT'),
-      ).toBeNull(),
+        applications.updateStatus(b, ids.applied, 'INTERVIEW', 'Call.', 'AGENT'),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError),
   ],
   [
     'ApplicationService.updateStatus — a triage status',
-    async () =>
+    () =>
       expect(
-        await applications.updateStatus(b, ids.analysed, 'DECLINED', 'No.', 'USER'),
-      ).toBeNull(),
+        applications.updateStatus(b, ids.analysed, 'DECLINED', 'No.', 'USER'),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError),
   ],
   [
     'ApplicationService.update',
-    async () =>
+    () =>
       expect(
-        await applications.update(b, ids.applied, { salaryInApplication: '1', comment: 'Hi.' }),
-      ).toBeNull(),
+        applications.update(b, ids.applied, { salaryInApplication: '1', comment: 'Hi.' }),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError),
   ],
   [
     'ApplicationService.addComment',
-    async () => expect(await applications.addComment(b, ids.analysed, 'Hi.', 'AGENT')).toBeNull(),
+    () =>
+      expect(applications.addComment(b, ids.analysed, 'Hi.', 'AGENT')).rejects.toBeInstanceOf(
+        VacancyNotFoundError,
+      ),
   ],
   [
     'ApplicationService.updateStatusByVacancy',
-    async () =>
+    () =>
       expect(
-        await applications.updateStatusByVacancy(b, 'Acme', 'QA Lead', 'REJECTED', 'No.', 'AGENT'),
-      ).toBeNull(),
+        applications.updateStatusByVacancy(b, 'Acme', 'QA Lead', 'REJECTED', 'No.', 'AGENT'),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError),
   ],
   [
     "VacancyIntakeService.intake — A's url is new to B",

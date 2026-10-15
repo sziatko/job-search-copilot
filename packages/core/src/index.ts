@@ -30,6 +30,7 @@ export {
   SameStatusError,
   VacancyNotFoundError,
 } from './errors';
+export { companyGroupKey, normalizeCompanyKey, normalizeTitleKey } from './identity';
 export { escapeLikePattern } from './like';
 export { createPrismaClient, getPrisma } from './prisma-client';
 export {
@@ -43,7 +44,7 @@ export type { Stats } from './stats.service';
 export { StatsService } from './stats.service';
 export type { PipelineStatus } from './status';
 export { PIPELINE_STATUSES } from './status';
-export { companyKey, VacancyService } from './vacancy.service';
+export { VacancyService } from './vacancy.service';
 export type {
   ListVacanciesFilters,
   ListVacanciesResult,
@@ -58,5 +59,4 @@ export type {
 } from './vacancy.types';
 export { ANALYSIS_BATCH_MAX, VACANCY_SORTS } from './vacancy.types';
 export type { VacancyIntakeInput } from './vacancy-intake';
-export { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 export { VacancyIntakeService } from './vacancy-intake.service';
