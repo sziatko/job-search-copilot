@@ -25,14 +25,18 @@ export function registerApplicationTools(
       title: 'Record a job application',
       description:
         'Log that the user applied to a role. Identify the vacancy by `vacancyId`, or by ' +
-        '`company` + `title`, looked up (case-insensitive) in the vacancies table: a ' +
+        '`company` + `title` (and `applyUrl` when you have one), looked up in the vacancies ' +
+        'table: first the vacancy with that `applyUrl` (raw is fine), else by name, ignoring ' +
+        'case, punctuation and legal forms (`Acme` finds `Acme Sp. z o.o.`) — an unknown ' +
+        'link (a company ATS link for a LinkedIn vacancy) still falls back to the name. A ' +
         'unique match moves that vacancy to APPLIED; no match creates a minimal vacancy ' +
         'row (no posting text; a score and verdict only when you pass `matchScore`, ' +
         'otherwise it has no analysis), also APPLIED; more than one match is an error ' +
         'listing the candidate ids — retry with ' +
         'the right one as `vacancyId`. A vacancy already in the pipeline (APPLIED … ' +
-        'REJECTED) is an error too. `applyUrl` / `matchScore` / `estimationComment` only ' +
-        'shape a vacancy this call creates. `status` records it further along — APPLIED is ' +
+        'REJECTED) is an error too. `matchScore` / `estimationComment` only shape a ' +
+        'vacancy this call creates, and so does an `applyUrl` that matched nothing (as ' +
+        'its link). `status` records it further along — APPLIED is ' +
         "still journaled first, as the applied date. `comment` is the user's own note: it " +
         'is added to the vacancy as a USER comment. `estimationComment` becomes the ' +
         'ANALYZER comment of a vacancy this call creates, and is ignored when it links to ' +
@@ -113,8 +117,9 @@ export function registerApplicationTools(
         '(submit_analysis). To record applying, prefer record_application. ' +
         'Identify the vacancy either by `id` (from list_vacancies / list_applications), ' +
         'or by `company` + `title` — the latter is for a caller that only knows the ' +
-        'company/role (e.g. an agent reading a rejection/offer email) and matches ' +
-        'case-insensitively, among the vacancies already applied to only — a vacancy ' +
+        'company/role (e.g. an agent reading a rejection/offer email) and matches by name ' +
+        'as record_application does (case, punctuation and legal forms aside), among the ' +
+        'vacancies already applied to only — a vacancy ' +
         'never applied to is "not found". Exactly one of the two must be given. A ' +
         '(company, title) match with more than one candidate is an error listing the ids to disambiguate ' +
         'with `id`; an unknown id or an unmatched (company, title) reports "not found" — ' +

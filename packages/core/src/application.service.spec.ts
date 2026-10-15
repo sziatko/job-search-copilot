@@ -157,6 +157,47 @@ describe('ApplicationService', () => {
       expect((await vacancies.getById(userId, vacancy.id))?.status).toBe('APPLIED');
     });
 
+    it('matches by name the way intake does: legal forms and punctuation aside', async () => {
+      const vacancy = await seedVacancy({
+        company: 'Acme Sp. z o.o.',
+        title: 'Senior Front-End Developer',
+      });
+
+      const result = await applications.record(userId, {
+        company: 'Acme',
+        title: 'Senior Front End Developer',
+      });
+
+      expect(result.resolution).toBe('linked-existing');
+      expect(result.application.id).toBe(vacancy.id);
+    });
+
+    it('links by applyUrl first, whatever the name says', async () => {
+      const vacancy = await seedVacancy({ company: 'Acme', title: 'Backend Engineer' });
+
+      const result = await applications.record(userId, {
+        company: 'Acme Labs Consulting',
+        title: 'Platform Engineer',
+        applyUrl: `https://example.com/jobs/${urlSeq}`,
+      });
+
+      expect(result.resolution).toBe('linked-existing');
+      expect(result.application.id).toBe(vacancy.id);
+    });
+
+    it('falls back to the name when the applyUrl is unknown', async () => {
+      const vacancy = await seedVacancy({ company: 'Acme', title: 'Backend Engineer' });
+
+      const result = await applications.record(userId, {
+        company: 'Acme',
+        title: 'Backend Engineer',
+        applyUrl: 'https://ats.example.com/acme/backend-engineer',
+      });
+
+      expect(result.resolution).toBe('linked-existing');
+      expect(result.application.id).toBe(vacancy.id);
+    });
+
     it('creates a placeholder vacancy when nothing matches', async () => {
       const result = await applications.record(userId, {
         company: 'Never Analyzed Co',
@@ -689,6 +730,21 @@ describe('ApplicationService', () => {
       expect(updated?.id).toBe(vacancy.id);
       expect(updated?.status).toBe('REJECTED');
       expect(notes(updated)).toEqual([ANALYZED, ['AGENT', 'Rejection email received.']]);
+    });
+
+    it('matches across a legal form, as record does', async () => {
+      const vacancy = await seedVacancy({ company: 'Echo GmbH', title: 'Dev' });
+      await applications.record(userId, { vacancyId: vacancy.id });
+
+      const updated = await applications.updateStatusByVacancy(
+        userId,
+        'Echo',
+        'Dev',
+        'INTERVIEW',
+        undefined,
+        'AGENT',
+      );
+      expect(updated.id).toBe(vacancy.id);
     });
 
     it('throws VacancyNotFoundError for a vacancy never applied to, and writes nothing', async () => {

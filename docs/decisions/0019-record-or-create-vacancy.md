@@ -2,7 +2,8 @@
 
 - Status: Accepted
 - Phase: 2   ·   Date: 2026-09 (updated in phase 3.1: an application is a vacancy in the
-  pipeline — [ADR-0029](0029-one-vacancy-table.md))
+  pipeline — [ADR-0029](0029-one-vacancy-table.md); amended 2026-10, `core-refactor`:
+  the lookup by name is intake's match)
 
 ## Context
 
@@ -18,7 +19,14 @@ fields are `NOT NULL`.
 
 - **by id** (the web path) — link to the given `vacancyId`; unknown id →
   `VacancyNotFoundError` (REST `404`).
-- **by (company, title)** (MCP) — case-insensitive exact match:
+- **by (company, title)** (MCP) — the same posting as intake finds it
+  ([ADR-0033](0033-unscored-vacancies-in-one-table.md), `identity.ts`): the vacancy with
+  the passed `applyUrl` (normalized) when there is one, else equal
+  `(companyKey, titleKey)` — case, punctuation and legal forms aside, so `Acme` finds
+  `Acme Sp. z o.o.`. An `applyUrl` that matches nothing (the company's ATS link for a
+  vacancy stored under its LinkedIn link) falls through to the name. *Amended
+  2026-10:* it was a case-insensitive exact `(company, title)` match, which missed
+  every legal-form spelling and refused a known url under another name.
   - exactly one → link to it.
   - zero → **create** a `Vacancy` with placeholder analyzer fields:
     `fullText = 'N/A'`; `matchScore` = the value passed or `0`; `recommendation` =
@@ -68,7 +76,9 @@ be applied to again.
   (the latest `APPLIED` journal row) goes missing, and the cache drifts from the
   journal.
 - Loosening the (company, title) match to fuzzy → `AmbiguousVacancyMatchError`
-  fires far more often.
+  fires far more often. Matching on `companyGroupKey` (ADR-0032) instead of
+  `companyKey` is that: one wrong match links the application to another posting
+  silently.
 
 ## Related
 

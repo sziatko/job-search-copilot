@@ -1,6 +1,7 @@
 # 0032 — Same company = an equal normalised name
 
-- Status: Accepted (amends 0025, decision 2)
+- Status: Accepted (amends 0025, decision 2; amended 2026-10, `core-refactor`: the
+  function is `companyGroupKey`, in `identity.ts`)
 - Phase: 4.3   ·   Date: 2026-10
 
 ## Context
@@ -22,8 +23,9 @@ Across the dev DB's company names (2026-10-02), the same rule also:
 
 ## Decision
 
-1. **`companyKey(name)`** in `packages/core/src/company.ts`: the vacancy
-   log's `normalizeCompanyKey` (case, punctuation, legal forms such as `Sp. z o.o.`,
+1. **`companyGroupKey(name)`** in `packages/core/src/identity.ts` (named `companyKey`
+   in `company.ts` until 2026-10, when it was easy to take for the stored column of
+   that name): the vacancy log's `normalizeCompanyKey` (case, punctuation, legal forms such as `Sp. z o.o.`,
    `Inc`, `B.V.`; intake's key since [ADR-0033](0033-unscored-vacancies-in-one-table.md)) applied after dropping `( … )`
    notes, then a trailing country or region word (`Polska`, `Poland`, `Spain`,
    `Latam`, …) is dropped as well. A name that is nothing but those words keeps
@@ -72,8 +74,10 @@ Across the dev DB's company names (2026-10-02), the same rule also:
 - **The button's count and the modal's list must use the same rule.** The badge is
   `count - 1` of what the modal lists. Changing one without the other brings back
   the 11-vs-4 disagreement.
-- **`normalizeCompanyKey` is the log's stored key.** Changing it to suit this rule
-  needs a backfill of `VacancyLogEntry.companyKey`. Add to `companyKey` instead.
+- **`normalizeCompanyKey` is the stored `Vacancy.companyKey`**, intake's and
+  `record()`'s match by name. Changing it to suit this rule needs a backfill and
+  makes the posting match coarser (`identity.ts` says why the two keys differ). Add to
+  `companyGroupKey` instead.
 - **The web's MSW fake** (`apps/web/src/test/msw/handlers.ts`) mirrors the rule only
   as lowercased equality. Core's tests own the rule itself.
 

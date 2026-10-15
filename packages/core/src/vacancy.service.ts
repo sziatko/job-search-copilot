@@ -4,6 +4,7 @@ import { ALL_COMMENTS } from './comments';
 import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from './company';
 import { AlreadyAnalysedError, VacancyNotFoundError } from './errors';
 import { forUser, orNotFound, type UserDb, type UserTx } from './for-user';
+import { matchKeys } from './identity';
 import { textFilters } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
@@ -21,7 +22,6 @@ import type {
   VacancyListItem,
   VacancySort,
 } from './vacancy.types';
-import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 
 /** The analyzer's comment: the first `ANALYZER` row. A relation read, so every
  * reader selects it through here and flattens it with `withEstimation`. */
@@ -237,8 +237,7 @@ export class VacancyService {
             company: input.company,
             title: input.title,
             applyUrl,
-            companyKey: normalizeCompanyKey(input.company),
-            titleKey: normalizeTitleKey(input.title),
+            ...matchKeys(input.company, input.title),
             fullText: input.fullText,
             ...firstStatus(at),
           },

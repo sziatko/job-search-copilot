@@ -1,11 +1,11 @@
 import type { PrismaClient } from '@prisma/client';
 import { InvalidIntakeEntryError } from './errors';
 import { forUser, type UserTx } from './for-user';
+import { matchKeys } from './identity';
 import { getPrisma } from './prisma-client';
 import { firstStatus } from './status';
 import { normalizeApplyUrl } from './url';
 import type { VacancyIntakeInput } from './vacancy-intake';
-import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 
 /** Shorter posting text, trimmed, is taken as none: a login wall or captcha page, not a
  * posting. Text is never overwritten, so storing it would block the real one. */
@@ -32,8 +32,7 @@ function prepare(entry: VacancyIntakeInput): PreparedEntry | null {
     applyUrl,
     company,
     title,
-    companyKey: normalizeCompanyKey(company),
-    titleKey: normalizeTitleKey(title),
+    ...matchKeys(company, title),
     source: entry.source?.trim() || null,
     fullText:
       entry.fullText && entry.fullText.trim().length >= MIN_TEXT_LENGTH ? entry.fullText : null,
@@ -90,7 +89,7 @@ export class VacancyIntakeService {
 
 /**
  * Match by url, else by (companyKey, titleKey), oldest row — the same posting
- * re-published under a new link. A miss creates the vacancy in NEW. A hit only gets the
+ * re-published under a new link (`identity.ts`). A miss creates the vacancy in NEW. A hit only gets the
  * posting text it lacked: never a status, a source or an analysis. Returns true when
  * the entry was new.
  */

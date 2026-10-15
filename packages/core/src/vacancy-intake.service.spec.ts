@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createUser } from '../tests/user';
 import { InvalidIntakeEntryError } from './errors';
+import { normalizeCompanyKey, normalizeTitleKey } from './identity';
 import { getPrisma } from './prisma-client';
 import { VacancyService } from './vacancy.service';
-import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 import { VacancyIntakeService } from './vacancy-intake.service';
 
 /** Every call acts as this test's user (ADR-0038). */

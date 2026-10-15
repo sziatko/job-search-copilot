@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createUser } from '../tests/user';
 import { ApplicationService } from './application.service';
-import { companyKey } from './company';
 import {
   AlreadyAnalysedError,
   AnalysedNotNewError,
@@ -9,6 +8,7 @@ import {
   SameStatusError,
   VacancyNotFoundError,
 } from './errors';
+import { companyGroupKey } from './identity';
 import { getPrisma } from './prisma-client';
 import { VacancyService } from './vacancy.service';
 import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
@@ -69,7 +69,7 @@ function countsByCompany(items: VacancyListItem[]): Record<string, number> {
 }
 
 // Pairs and near-misses from the dev DB's company names (2026-10-02).
-describe('companyKey', () => {
+describe('companyGroupKey', () => {
   it.each([
     ['contoso', 'contoso Polska'],
     ['Vexa Polska', 'Vexa Poland'],
@@ -81,7 +81,7 @@ describe('companyKey', () => {
     ['Optivo', 'Optivo_'],
     ['iPlanly', 'Iplanly'],
   ])('%j and %j are one company', (a, b) => {
-    expect(companyKey(a)).toBe(companyKey(b));
+    expect(companyGroupKey(a)).toBe(companyGroupKey(b));
   });
 
   it.each([
@@ -91,12 +91,12 @@ describe('companyKey', () => {
     ['Tailspin', 'Tenth Tailspinion Group'],
     ['Software Grove', 'Software Garden'],
   ])('%j and %j are not', (a, b) => {
-    expect(companyKey(a)).not.toBe(companyKey(b));
+    expect(companyGroupKey(a)).not.toBe(companyGroupKey(b));
   });
 
   it('keeps a name that is nothing but a country or a note', () => {
-    expect(companyKey('Polska')).toBe('polska');
-    expect(companyKey('(stealth)')).toBe('(stealth)');
+    expect(companyGroupKey('Polska')).toBe('polska');
+    expect(companyGroupKey('(stealth)')).toBe('(stealth)');
   });
 });
 

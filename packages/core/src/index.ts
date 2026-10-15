@@ -18,7 +18,6 @@ export { APPLICATION_STATES } from './application.types';
 export { verifyApiKey } from './auth/api-key';
 export type { Auth, AuthConfig } from './auth/create-auth';
 export { createAuth } from './auth/create-auth';
-export { companyKey } from './company';
 export {
   AlreadyAnalysedError,
   AlreadyAppliedError,
@@ -31,6 +30,7 @@ export {
   SameStatusError,
   VacancyNotFoundError,
 } from './errors';
+export { companyGroupKey, normalizeCompanyKey, normalizeTitleKey } from './identity';
 export { escapeLikePattern } from './like';
 export { createPrismaClient, getPrisma } from './prisma-client';
 export {
@@ -59,5 +59,4 @@ export type {
 } from './vacancy.types';
 export { ANALYSIS_BATCH_MAX, VACANCY_SORTS } from './vacancy.types';
 export type { VacancyIntakeInput } from './vacancy-intake';
-export { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 export { VacancyIntakeService } from './vacancy-intake.service';

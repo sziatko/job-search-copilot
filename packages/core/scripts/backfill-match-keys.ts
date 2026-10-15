@@ -11,8 +11,9 @@
  * one is never rewritten. A name that normalizes to nothing (`—`) keeps a null key —
  * it is matched by url only. Safe to re-run: a second run finds nothing to do.
  */
+
+import { normalizeCompanyKey, normalizeTitleKey } from '../src/identity';
 import { getPrisma } from '../src/prisma-client';
-import { normalizeCompanyKey, normalizeTitleKey } from '../src/vacancy-intake';
 
 async function main() {
   const commit = process.argv.includes('--commit');

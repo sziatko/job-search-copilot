@@ -20,6 +20,7 @@ import {
   VacancyNotFoundError,
 } from './errors';
 import { forUser, orNotFound, type UserDb, type UserTx } from './for-user';
+import { matchKeys } from './identity';
 import { textFilters } from './like';
 import { cursorArgs, toCursorPage } from './paging';
 import { getPrisma } from './prisma-client';
@@ -34,7 +35,6 @@ import {
   writeStatus,
 } from './status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from './url';
-import { normalizeCompanyKey, normalizeTitleKey } from './vacancy-intake';
 
 /** The Vacancy fields the /applications page reads. */
 const APPLICATION_SELECT = {
@@ -248,8 +248,8 @@ export class ApplicationService {
   /**
    * Same as updateStatus, but for a caller that only knows (company, title) — the
    * natural shape for an agent reading e.g. a rejection/offer email, which has no
-   * id. A unique case-insensitive (company, title) match among the vacancies already
-   * applied to (PIPELINE_STATUSES) — an email about a vacancy never applied to is not
+   * id. A unique (company, title) match by name (`findVacancyMatches`) among the
+   * vacancies already applied to (PIPELINE_STATUSES) — an email about a vacancy never applied to is not
    * a status move, so it is not found and the agent routes the email to need-attention.
    * Throws VacancyNotFoundError when nothing matches — it never creates anything — and
    * AmbiguousVacancyMatchError for 2+ matches.
@@ -285,18 +285,21 @@ export class ApplicationService {
   }
 }
 
-/** Case-insensitive (company, title) match against Vacancy — shared by the
- * record-or-create path and updateStatusByVacancy. */
-function findVacancyMatches(
+/** The same posting by name — equal (companyKey, titleKey), as intake matches it
+ * (`identity.ts`): case, punctuation and legal forms aside. A name that normalizes to
+ * nothing matches nothing. Shared by the record-or-create path and
+ * updateStatusByVacancy. */
+async function findVacancyMatches(
   db: Db,
   company: string,
   title: string,
 ): Promise<{ id: number; status: VacancyStatus }[]> {
+  const { companyKey, titleKey } = matchKeys(company, title);
+  if (!companyKey || !titleKey) {
+    return [];
+  }
   return db.vacancy.findMany({
-    where: {
-      company: { equals: company, mode: 'insensitive' },
-      title: { equals: title, mode: 'insensitive' },
-    },
+    where: { companyKey, titleKey },
     select: { id: true, status: true },
   });
 }
@@ -333,6 +336,21 @@ async function resolveVacancy(
     throw new InvalidApplicationInputError('company and title are required');
   }
 
+  // The url first, as intake matches: a known link is the vacancy whatever its name's
+  // spelling. A miss (the email's link is the company's ATS, the vacancy's is LinkedIn)
+  // falls through to the name. Neutralized, not stored raw: a non-http(s) scheme here
+  // would be rendered as a clickable link by the web app.
+  const url = normalizeApplyUrl(input.applyUrl);
+  const byUrl =
+    url &&
+    (await db.vacancy.findUnique({
+      where: { userId_applyUrl: { userId, applyUrl: url } },
+      select: { id: true, status: true },
+    }));
+  if (byUrl) {
+    return { vacancy: byUrl, resolution: 'linked-existing', vacancyCreated: false };
+  }
+
   const matches = await findVacancyMatches(db, company, title);
 
   if (matches.length === 1) {
@@ -353,10 +371,9 @@ async function resolveVacancy(
           matchScore: input.matchScore,
           recommendation: input.recommendation ?? deriveRecommendationFromScore(input.matchScore),
         };
-  // Neutralized, not stored raw: a non-http(s) scheme here would be rendered as a
-  // clickable link by the web app. The record is kept either way — losing a whole
-  // application over a bad URL would be worse than an unlinked one.
-  const applyUrl = normalizeApplyUrl(input.applyUrl) ?? buildSyntheticApplyUrl(company, title, at);
+  // The record is kept without a usable url — losing a whole application over a bad
+  // URL would be worse than an unlinked one.
+  const applyUrl = url ?? buildSyntheticApplyUrl(company, title, at);
   const estimationComment = input.estimationComment?.trim();
   try {
     const created = await db.vacancy.create({
@@ -365,8 +382,7 @@ async function resolveVacancy(
         company,
         title,
         applyUrl,
-        companyKey: normalizeCompanyKey(company),
-        titleKey: normalizeTitleKey(title),
+        ...matchKeys(company, title),
         fullText: input.fullText?.trim() ? input.fullText : null,
         ...(estimationComment && {
           comments: { create: { body: estimationComment, source: 'ANALYZER' } },
@@ -377,6 +393,7 @@ async function resolveVacancy(
     });
     return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true, analysis };
   } catch (err) {
+    // The url was looked up above, so only a concurrent write gets here.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       throw new InvalidApplicationInputError(
         `Could not create a vacancy for "${company}" / "${title}": its applyUrl ` +
