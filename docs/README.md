@@ -54,8 +54,8 @@ and *what a change here breaks over there*.
 
 - **Credentials live in untracked files, never in tracked ones.** The apps read config
   from env vars loaded at boot ([ADR-0007](decisions/0007-env-config-and-loading.md));
-  the values sit in `.env` / `.env.test`, which `.gitignore` covers — only
-  `.env.example` is tracked. Claude Code's own config (`.claude/settings*.json`) is
+  the values sit in `.env` / `.env.test` / `.env.e2e`, which `.gitignore` covers — only
+  their `*.example` templates (fake values) are tracked. Claude Code's own config (`.claude/settings*.json`) is
   machine-specific and gitignored too.
 - **If a key does reach a commit, rotating it is the fix.** Rewriting history is the
   cleanup, not the remedy: by the time you notice, the key has been through clones,

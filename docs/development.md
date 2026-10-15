@@ -11,6 +11,8 @@ Node 24.
 
 ```bash
 cp .env.example .env
+cp .env.test.example .env.test  # npm test; it refuses any database but *_test
+cp .env.e2e.example .env.e2e    # npm run test:e2e
 npm install
 npm run generate                # the Prisma client; npm install does not make it
 docker compose up -d            # postgres + api + mcp + web + a core build watcher
@@ -20,6 +22,8 @@ npm run migrate:dev             # dev DB (job_search_copilot)
 docker compose exec postgres psql -U postgres -c "CREATE DATABASE job_search_copilot_test"
 npm run test:db:migrate         # test DB (job_search_copilot_test)
 ```
+
+`npm test -- --project web` needs no database.
 
 Signing in needs a Google or LinkedIn OAuth client (redirect URIs in `.env.example`)
 and your email in `AUTH_ALLOWED_EMAILS`; a passkey can be added on `/profile` after

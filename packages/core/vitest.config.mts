@@ -12,7 +12,7 @@ export default defineConfig({
     environment: 'node',
     env: loadEnv('test', rootDir, ''),
     include: ['src/**/*.spec.ts'],
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: [path.join(rootDir, 'vitest.test-db.ts'), './tests/setup.ts'],
     isolate: false, // see the root vitest.config.mts
   },
 });
