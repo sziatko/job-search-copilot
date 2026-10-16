@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isSafeExternalUrl } from './url';
 
-// The scheme table mirrors the one in packages/core/src/url.spec.ts. The two
+// The scheme table mirrors the one in packages/core/src/domain/url.spec.ts. The two
 // implementations are kept in step by hand — ADR-0012 keeps `core` and its
 // Prisma/pg dependencies out of the browser bundle — so this file is where the
 // web copy holds up its half of that bargain.

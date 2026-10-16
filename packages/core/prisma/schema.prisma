@@ -111,8 +111,7 @@ enum VacancyStatus {
   UNAVAILABLE
   FILTERED_OUT
   APPLIED
-  RECRUITER_SCREEN
-  REPLIED
+  ACTION_NEEDED
   INTERVIEW
   AWAITING
   OFFER
@@ -210,8 +209,7 @@ model Passkey {
   @@index([credentialID])
 }
 
-// The jwt + oauthProvider plugins (step 6.4, ADR-0035), from the same CLI, the same
-// review. Jwks holds JSC's signing key: rotating it voids every MCP token out there.
+// The jwt + oauthProvider plugins (ADR-0035), from the same CLI, the same review. Jwks holds JSC's signing key: rotating it voids every MCP token out there.
 model Jwks {
   id         String    @id
   publicKey  String
@@ -386,7 +384,7 @@ model OauthClientAssertion {
   expiresAt DateTime
 }
 
-// The api-key plugin (phase 7, ADR-0039), its fields as the plugin declares them.
+// The api-key plugin (ADR-0039), its fields as the plugin declares them.
 // `key` holds the hash; `start` the first characters, to tell keys apart in a list.
 // `referenceId` is the owner: the plugin leaves it a plain string (it may be an
 // organization's id); the relation is added here, so a user's keys go with the user.

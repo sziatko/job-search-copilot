@@ -2,7 +2,7 @@
 
 An analyzer scores vacancies, you triage them, then track what happened to each
 application. Four npm workspaces: `packages/core` (domain layer, and the only DB
-client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (React).
+client), `apps/api` (NestJS REST), `apps/mcp` (MCP server, stdio and HTTP), `apps/web` (React).
 
 ## Read first
 
@@ -10,7 +10,7 @@ client), `apps/api` (NestJS REST), `apps/mcp` (stdio MCP server), `apps/web` (Re
 - [`docs/architecture.md`](docs/architecture.md) — the system map. Start here.
 - [`docs/contracts.md`](docs/contracts.md) — surfaces other code depends on.
 - [`docs/domain-model.md`](docs/domain-model.md) — the two independent axes.
-- [`docs/decisions/`](docs/decisions/) — 34 ADRs, one per load-bearing decision.
+- [`docs/decisions/`](docs/decisions/) — one ADR per load-bearing decision.
 - [`docs/design/`](docs/design/) — visual references (HTML mockups). Not prose; open
   in a browser rather than reading.
 - `skills/` — the user's Claude skills that drive the MCP server, uploaded to
@@ -43,13 +43,39 @@ Quote them from there if you change one; keep this list in step.
 10. **No real job-search data in the repo** — made-up companies, ids, rates and counts
     in code, tests, docs and commits, never ones from the dev DB.
 11. **Every domain query is scoped to its user** — through `forUser(db, userId)` in
-    `core`; another user's row is a 404 (phase 7, from step 3a).
+    `core`; another user's row is a 404.
+
+## Writing docs and comments
+
+Docs and comments describe the code as it is now, for a reader who has only the repo.
+Each rule here closes a way they went stale before.
+
+- **One fact, one home.** A rule, a command or a value lives in one place; everywhere
+  else links to it. A comment never restates a value from another file (a threshold,
+  a limit) — it names the file.
+- **No counts that change** in prose: not "34 ADRs", "15 tools", "~300 rows today". The
+  number lives in the code or a test.
+- **Rewrite, never append.** When a decision or a behaviour changes, edit the text so it
+  reads as if it had always been so. No "Amended in …", "Until …", "was renamed from",
+  "used to"; git keeps the history.
+- **No process in the product.** No phase, step or review-finding references in code,
+  docs or ADRs.
+- **Evidence from the dev DB is told without its data.** "One board serves a posting
+  with and without the slash", not names or row counts (invariant 10).
+- **A comment says *why*, for the spot it sits on.** A deliberate shortcut with a known
+  ceiling is a plain `Limit: … Past that: …` comment, never a `ponytail:` tag — that
+  plugin convention does not apply in this repo.
+- **One sentence per table cell.** More is a section of its own.
+- **Code that deletes data checks its target first** (the database name), as
+  `vitest.test-db.ts`, `resetToSeed` and `e2e/db.ts` do; never trust an env fallback.
+- **When code changes, its docs change in the same commit.** Grep the old name across
+  `docs/`, comments and tests before calling a rename done.
 
 ## Commands
 
     npm test           # vitest; needs the test DB — see ADR-0015
     npm run lint       # biome check .
-    npm run typecheck  # builds core first, then tsc --noEmit on the three apps
+    npm run typecheck  # builds core first, then tsc --noEmit on the apps and e2e
     npm run migrate:dev
 
 All four are root-only — no workspace defines them. One project only:
@@ -78,6 +104,9 @@ worked in **steps**.
   finished and verified without the next one existing. Two pieces that cannot be
   separated are one step, not two.
 - Give the doc a `## Status` section listing every step as a checkbox, in order.
+- **The phase doc is never committed.** A step's commit leaves it out; it is deleted
+  when the phase ends. Before that, a gotcha that outlives the phase moves to
+  [`docs/development.md`](docs/development.md), `prisma/README.md` or a code comment.
 
 **When working a phase:**
 

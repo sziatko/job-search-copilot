@@ -92,9 +92,7 @@ test("a move to Awaiting, then Offer: the tiles and the dashboard's counts follo
   db,
 }) => {
   const { id } = await pickActiveApplied(db);
-  const responded = seedCount((v) =>
-    reached(v, 'REPLIED', 'RECRUITER_SCREEN', 'INTERVIEW', 'AWAITING', 'OFFER'),
-  );
+  const responded = seedCount((v) => reached(v, 'ACTION_NEEDED', 'INTERVIEW', 'AWAITING', 'OFFER'));
   const interview = seedCount((v) => reached(v, 'INTERVIEW', 'OFFER'));
 
   await page.goto('/applications');

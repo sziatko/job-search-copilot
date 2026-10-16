@@ -42,7 +42,7 @@ const validArgs = {
   applyUrl: 'https://example.com/jobs/1',
   fullText: 'Full vacancy text goes here.',
   matchScore: 80,
-  recommendation: 'ПОДАВАТИСЯ',
+  recommendation: 'APPLY',
   estimationComment: 'Strong match.',
 };
 
@@ -64,7 +64,7 @@ describe('job-search-copilot MCP server', () => {
     await prisma.$disconnect();
   });
 
-  it('save_vacancy normalizes the Ukrainian recommendation and persists it', async () => {
+  it('save_vacancy persists the vacancy and its analysis', async () => {
     const client = await connectedClient();
     const saveResult = await client.callTool({
       name: 'save_vacancy',
@@ -84,6 +84,16 @@ describe('job-search-copilot MCP server', () => {
     expect(full.recommendation).toBe('APPLY');
     expect(full.status).toBe('NOT_REVIEWED');
     expect(full.comments).toMatchObject([{ source: 'ANALYZER', body: 'Strong match.' }]);
+  });
+
+  it('save_vacancy takes the English recommendation only', async () => {
+    const client = await connectedClient();
+    const result = await client.callTool({
+      name: 'save_vacancy',
+      arguments: { ...validArgs, recommendation: 'ПОДАВАТИСЯ' },
+    });
+    expect(result.isError).toBe(true);
+    expect(await prisma.vacancy.count()).toBe(0);
   });
 
   it('sends the cross-tool rules as its instructions', async () => {
@@ -125,8 +135,8 @@ describe('job-search-copilot MCP server', () => {
     const { tools } = await client.listTools();
     const registered = new Set(tools.map((t) => t.name));
 
-    // ponytail: a tool is recognised by its noun (`<verb>_vacanc…/application…/analys…`);
-    // one named after another noun goes unchecked — widen the pattern when one appears.
+    // A tool is recognised by its noun (`<verb>_vacanc…/application…/analys…`); one
+    // named after another noun goes unchecked — widen the pattern when one appears.
     const referenced = readdirSync(skillsDir, { withFileTypes: true })
       // A skill is a folder with a SKILL.md — not the clone's own .git.
       .filter((entry) => existsSync(path.join(skillsDir, entry.name, 'SKILL.md')))
@@ -192,7 +202,7 @@ describe('job-search-copilot MCP server', () => {
       name: 'submit_analyses_batch',
       arguments: {
         analyses: [
-          { id: ids[0], matchScore: 80, recommendation: 'ПОДАВАТИСЯ', estimationComment: 'Fits.' },
+          { id: ids[0], matchScore: 80, recommendation: 'APPLY', estimationComment: 'Fits.' },
           { id: ids[1], matchScore: 20, recommendation: 'SKIP', estimationComment: 'Backend.' },
         ],
       },
@@ -715,7 +725,7 @@ describe('job-search-copilot MCP server', () => {
       name: 'update_vacancy_status',
       arguments: {
         id: application.id,
-        status: 'RECRUITER_SCREEN',
+        status: 'ACTION_NEEDED',
         comment: 'Recruiter called.',
       },
     });

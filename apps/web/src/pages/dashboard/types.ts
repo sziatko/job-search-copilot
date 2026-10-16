@@ -19,8 +19,8 @@ export const statsSchema = z.object({
   unavailable: z.number(),
   responded: z.number(),
   interview: z.number(),
-  /** Currently in RECRUITER_SCREEN. */
-  recruiterScreen: z.number(),
+  /** Currently ACTION_NEEDED — the user's move. */
+  actionNeeded: z.number(),
   pipeline: z.object({
     byStatus: z.record(applicationStatusSchema, z.number()),
     active: z.number(),

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { BATCH_MAX, pagination } from '../common/schemas';
 import { json, ref, toolError, withDomainErrors } from '../common/tool-result';
 import {
-  RecommendationFilterEnum,
+  RecommendationEnum,
   SaveVacancyItemSchema,
   SubmitAnalysisItemSchema,
   VacancyStatusEnum,
@@ -18,7 +18,7 @@ const ANALYSIS_RULE =
   'The analysis moves the status itself, never the caller: from NEW, SKIP → FILTERED_OUT, ' +
   'anything else → NOT_REVIEWED (both journaled); from any other status it moves nothing.';
 
-/** Registers the 7 vacancy tools on `server`, backed by `vacancies`. A vacancy's status
+/** Registers the vacancy tools on `server`, backed by `vacancies`. A vacancy's status
  * is set through update_vacancy_status, with the application tools. */
 export function registerVacancyTools(
   server: McpServer,
@@ -166,7 +166,7 @@ export function registerVacancyTools(
         'recommendation are null until analysed. Does not include fullText — use ' +
         'get_vacancy / get_vacancies_batch for that.',
       inputSchema: {
-        recommendation: RecommendationFilterEnum.optional(),
+        recommendation: RecommendationEnum.optional(),
         status: z.array(VacancyStatusEnum).optional(),
         hasText: z.boolean().optional(),
         company: z.string().optional(),

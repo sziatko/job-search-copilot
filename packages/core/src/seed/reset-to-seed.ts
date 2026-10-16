@@ -1,10 +1,10 @@
 import type { PrismaClient, VacancyStatus } from '@prisma/client';
-import { ApplicationService } from '../application.service';
-import { forUser } from '../for-user';
-import { PIPELINE_STATUSES, statusAfterAnalysis } from '../status';
-import { VacancyService } from '../vacancy.service';
-import { ANALYSIS_BATCH_MAX } from '../vacancy.types';
-import { VacancyIntakeService } from '../vacancy-intake.service';
+import { ApplicationService } from '../applications/application.service';
+import { forUser } from '../db/for-user';
+import { PIPELINE_STATUSES, statusAfterAnalysis } from '../domain/status';
+import { VacancyIntakeService } from '../intake/vacancy-intake.service';
+import { VacancyService } from '../vacancies/vacancy.service';
+import { ANALYSIS_BATCH_MAX } from '../vacancies/vacancy.types';
 import { SEED_VACANCIES } from './data';
 
 const DAY = 86_400_000;

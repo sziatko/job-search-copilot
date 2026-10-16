@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 
 /** An http(s) link with its scheme, the only kind core stores (`normalizeApplyUrl`).
- * ponytail: validator's 2083-char cap applies; `validate_length: false` if a
+ * Limit: validator's 2083-character cap applies; set `validate_length: false` if a
  * collector's tracking links ever outgrow it. */
 export const HTTP_URL = { protocols: ['http', 'https'], require_protocol: true };
 

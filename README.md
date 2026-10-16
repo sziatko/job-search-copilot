@@ -74,7 +74,7 @@ Vacancies get in two ways:
                                ▼
               Web app: triage — apply, decline, save for later
                                ▼
-              Application pipeline: applied → replied → recruiter screen → interview → offer
+              Application pipeline: applied → action needed ⇄ awaiting → interview → offer
               (Claude can move a status when a reply email comes in)
 ```
 
@@ -95,7 +95,7 @@ feed the app instead.
   a company's other vacancies in a modal.
 - **Application tracker** — pipeline stages, salary and tailored-CV notes, comments,
   and a 30-day timeout for applications nobody answered.
-- **MCP server** — 15 tools, so Claude can save vacancies scored in a chat, read the
+- **MCP server** — tools so Claude can save vacancies scored in a chat, read the
   queue, submit analyses, record applications and move statuses. Over stdio, or Streamable HTTP with OAuth 2.1.
 - **REST API** — documented with Swagger UI; every route closed unless marked
   otherwise.
@@ -145,10 +145,9 @@ API keys, every script — is in [`docs/development.md`](docs/development.md).
 I build this with [Claude Code](https://claude.com/claude-code) as a pair programmer.
 The repo is set up so an AI agent can work on it for weeks without losing the thread:
 
-- **Phases and steps.** Each phase has a plan in [`docs/phases/`](docs/phases/), split
-  into steps that can be finished and checked one at a time. One step per session; the
-  step brings its own tests and is ticked only after the full test suite passes in that
-  session.
+- **Phases and steps.** Each phase is planned as steps that can be finished and checked
+  one at a time. One step per session; the step brings its own tests and is ticked only
+  after the full test suite passes in that session.
 - **Decisions on record.** Every decision that other code depends on is an ADR in
   [`docs/decisions/`](docs/decisions/), ending with *what breaks if you change it*.
 - **Invariants that break silently** are listed in

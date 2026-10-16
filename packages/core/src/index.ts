@@ -1,6 +1,6 @@
 export type { PrismaClient, Vacancy } from '@prisma/client';
 export { CommentSource, Recommendation, VacancyStatus } from '@prisma/client';
-export { ApplicationService } from './application.service';
+export { ApplicationService } from './applications/application.service';
 export type {
   ApplicationListItem,
   ApplicationState,
@@ -13,11 +13,13 @@ export type {
   RecordManyApplicationsResult,
   UpdateApplicationInput,
   VacancyResolution,
-} from './application.types';
-export { APPLICATION_STATES } from './application.types';
+} from './applications/application.types';
+export { APPLICATION_STATES } from './applications/application.types';
 export { verifyApiKey } from './auth/api-key';
 export type { Auth, AuthConfig } from './auth/create-auth';
 export { createAuth } from './auth/create-auth';
+export { escapeLikePattern } from './db/like';
+export { createPrismaClient, getPrisma } from './db/prisma-client';
 export {
   AlreadyAnalysedError,
   AlreadyAppliedError,
@@ -29,22 +31,18 @@ export {
   InvalidRecommendationError,
   SameStatusError,
   VacancyNotFoundError,
-} from './errors';
-export { companyGroupKey, normalizeCompanyKey, normalizeTitleKey } from './identity';
-export { escapeLikePattern } from './like';
-export { createPrismaClient, getPrisma } from './prisma-client';
-export {
-  deriveRecommendationFromScore,
-  normalizeRecommendation,
-  RECOMMENDATION_INPUT_VALUES,
-} from './recommendation';
+} from './domain/errors';
+export { companyGroupKey, normalizeCompanyKey, normalizeTitleKey } from './domain/identity';
+export { deriveRecommendationFromScore, parseRecommendation } from './domain/recommendation';
+export type { PipelineStatus } from './domain/status';
+export { PIPELINE_STATUSES } from './domain/status';
+export type { VacancyIntakeInput } from './intake/vacancy-intake';
+export { VacancyIntakeService } from './intake/vacancy-intake.service';
 export { SEED_VACANCIES } from './seed/data';
 export { resetToSeed } from './seed/reset-to-seed';
-export type { Stats } from './stats.service';
-export { StatsService } from './stats.service';
-export type { PipelineStatus } from './status';
-export { PIPELINE_STATUSES } from './status';
-export { VacancyService } from './vacancy.service';
+export type { Stats } from './stats/stats.service';
+export { StatsService } from './stats/stats.service';
+export { VacancyService } from './vacancies/vacancy.service';
 export type {
   ListVacanciesFilters,
   ListVacanciesResult,
@@ -56,7 +54,5 @@ export type {
   VacancyDetail,
   VacancyListItem,
   VacancySort,
-} from './vacancy.types';
-export { ANALYSIS_BATCH_MAX, VACANCY_SORTS } from './vacancy.types';
-export type { VacancyIntakeInput } from './vacancy-intake';
-export { VacancyIntakeService } from './vacancy-intake.service';
+} from './vacancies/vacancy.types';
+export { ANALYSIS_BATCH_MAX, VACANCY_SORTS } from './vacancies/vacancy.types';

@@ -35,10 +35,9 @@ function osTheme(): Theme {
 }
 
 /**
- * One copy for the whole app, read once at load. Each `useTheme` used to hold its
- * own `useState`, so the toaster kept the old theme after a click on the toggle
- * until a reload. Kept in memory, not re-read from storage, so a click still
- * works for the session when storage is disabled.
+ * One copy for the whole app, read once at load, so every `useTheme` — the toggle and
+ * the toaster — sees the same click. Kept in memory, not re-read from storage, so a
+ * click still works for the session when storage is disabled.
  */
 let stored: Theme | null = getStoredTheme();
 const listeners = new Set<() => void>();

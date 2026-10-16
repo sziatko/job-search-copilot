@@ -11,6 +11,8 @@ Node 24.
 
 ```bash
 cp .env.example .env
+cp .env.test.example .env.test  # npm test; it refuses any database but *_test
+cp .env.e2e.example .env.e2e    # npm run test:e2e
 npm install
 npm run generate                # the Prisma client; npm install does not make it
 docker compose up -d            # postgres + api + mcp + web + a core build watcher
@@ -20,6 +22,8 @@ npm run migrate:dev             # dev DB (job_search_copilot)
 docker compose exec postgres psql -U postgres -c "CREATE DATABASE job_search_copilot_test"
 npm run test:db:migrate         # test DB (job_search_copilot_test)
 ```
+
+`npm test -- --project web` needs no database.
 
 Signing in needs a Google or LinkedIn OAuth client (redirect URIs in `.env.example`)
 and your email in `AUTH_ALLOWED_EMAILS`; a passkey can be added on `/profile` after
@@ -56,13 +60,8 @@ without OAuth reaches the HTTP MCP with `Authorization: Bearer jsc_…`
 (`mcp-remote --header`). n8n's credential, the same header on the intake and analysis
 routes, holds a key too.
 
-> After changing dependencies or `packages/core/prisma/schema.prisma`, the
-> containers' `node_modules` / generated client go stale — re-run
-> `docker compose exec <svc> npm install` / `npm run generate`, or
-> `docker compose up -d --build`. Each service has its own `node_modules`, so a new
-> dependency needs `npm install` in every service that uses it — one added to `core`
-> means `core`, `api`, `mcp`, `mcp-http` and `web` — then
-> `docker compose restart` of the same services.
+After a change to `core` or its schema, or a new dependency, the containers need a
+restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack-docker-compose).
 
 ## Scripts (repo root)
 
@@ -89,3 +88,26 @@ Postgres service on every push and PR; on a PR a second job, `e2e`, runs
 
 Database and migration conventions:
 [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
+
+## Gotchas
+
+- **`npm test` can pass while `core` does not build.** Vitest strips types without
+  checking them; `npm run typecheck` is the one thing that typechecks `core`. Read a
+  build's exit code, not its output files: `tsc` emits JS even when it fails.
+- **`npm install -w <workspace> <pkg>` crashes** here (arborist, `reading 'location'`).
+  Add the dependency to the workspace's `package.json`, then run `npm install` at the
+  root.
+- **A migration needs the `-w` form**: `npm run migrate:dev -w @job-search-copilot/core
+  -- --name <name>`. Through the root script npm eats `--name`, and Prisma then waits
+  on its prompt holding the advisory lock. More in
+  [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
+- **CSS is invisible to the web tests.** `index.css` never loads in jsdom, so layout,
+  hover and placement need a browser (Playwright, `npm run test:e2e`).
+- **MSW in the web tests:** a later `server.use()` wins, but inside one call the first
+  handler wins; `passthrough()` sends the *real* request (to the dev API on :3000), it
+  is not "try the next handler".
+- **The MCP Inspector over HTTP:** `mcp-inspector --web --transport http --server-url
+  http://localhost:3001/mcp`. Claude Desktop cannot reach `localhost` over HTTP (its
+  connectors call from Anthropic's servers), so it stays on stdio until a deploy.
+- **Better Auth logs an `ERROR` for every rejected API key**, and a "Base URL is not
+  set" `WARN` once. Noise, not failures.

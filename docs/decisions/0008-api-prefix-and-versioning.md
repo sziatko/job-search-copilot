@@ -1,52 +1,39 @@
 # 0008 — API surface: `/api/v1` prefix, URI versioning, version-neutral `/health`
 
-- Status: Accepted
-- Phase: 1 · Date: 2026-09
+- Status: Accepted · Date: 2026-09
 
 ## Context
-The initial API mounted routes at the root (`/vacancies`). Before any
-deployment it needs a namespace (so it can share a host with other things) and a
-versioning story (so a breaking change doesn't break the web app mid-deploy).
+The API needs a namespace, to share a host with other things, and a way to change a
+shape without breaking the web app mid-deploy.
 
 ## Decision
 In `apps/api/src/setup-app.ts`:
 
 - `app.setGlobalPrefix('api', { exclude: ['health'] })` — everything under `/api`
-  except the health check.
-- `app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' })` —
-  routes become `/api/v1/...`. A future breaking shape gets a `v2` controller
-  rather than mutating `v1`.
-- `HealthController` is `@Controller({ path: 'health', version: VERSION_NEUTRAL })`
-  — stays at exactly `/health`, no prefix, no version, so infra (the
-  `docker-compose.yml` healthcheck, load balancers) has a stable probe.
+  but the health check;
+- `app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' })` — routes
+  are `/api/v1/...`; a breaking shape gets a `v2` controller, `v1` stays;
+- `HealthController` is `VERSION_NEUTRAL`: exactly `/health`, a stable probe for the
+  Compose healthcheck and any load balancer.
 
 ## Why this and not the alternatives
-- **No prefix / no versioning** — fine for a toy, but the first breaking change
-  forces a coordinated web+api deploy with a downtime window.
-- **Header or media-type versioning** — more "correct" to some, but harder to hit
-  with `curl` / a browser and needs client cooperation. URI versioning is
-  obvious and greppable.
-- **`/health` under `/api/v1`** — an infra probe shouldn't depend on the API
-  version; and the `docker-compose` healthcheck would have to know the version.
+- **No prefix, no version** — the first breaking change forces a coordinated
+  web + API deploy.
+- **Header or media-type versioning** — harder to hit with `curl` or a browser, and
+  needs the client's cooperation. A URI version is obvious and greppable.
+- **`/health` under `/api/v1`** — an infra probe should not depend on the API version.
 
 ## Consequences
-- All client URLs carry `/api/v1`. `apps/web`'s `API_BASE` bakes it in; the MSW
-  handlers and e2e tests use the full path.
-- Adding `v2`: a new controller with `@Controller({ version: '2' })`, `v1` stays.
-- `configureApp()` is where prefix + versioning + pipes + filters + CORS +
-  shutdown hooks are wired, shared by `main.ts` and the e2e boot
+- Every client URL carries `/api/v1`; the web's `API_BASE` bakes it in.
+- `configureApp()` wires the prefix, versioning, pipes, filters, CORS and shutdown
+  hooks for both the entrypoint and the e2e suite
   ([ADR-0009](0009-domain-errors-and-configure-app.md)).
 
 ## What this constrains — breaks if you change it
-- Changing the prefix or default version → `apps/web/src/pages/vacancies/api.ts`
-  (`API_BASE`), `apps/web/src/test/msw/handlers.ts`, and every URL in
-  `apps/api/test/vacancies.e2e.spec.ts`.
-- Removing `VERSION_NEUTRAL` from `HealthController` (or the `exclude: ['health']`)
-  → `/health` moves to `/api/v1/health`; the `docker-compose.yml` `api`
-  healthcheck (`wget .../health`) fails and the container reports unhealthy.
-- Dropping `configureApp()` and wiring things inline in `main.ts` → the e2e suite
-  no longer exercises the same pipes/filters/routing as production; they drift.
+- The prefix or the default version → `apps/web/src/lib/api.ts` (`API_BASE`), the MSW
+  handlers, every URL in `apps/api/test/*.e2e.spec.ts`.
+- `/health` under the prefix → the Compose `api` healthcheck fails; the container
+  reports unhealthy and `web` never starts.
 
 ## Related
-[ADR-0009](0009-domain-errors-and-configure-app.md), [`../contracts.md`](../contracts.md),
-`apps/api/src/setup-app.ts`, `apps/api/src/health/`.
+[`../contracts.md`](../contracts.md), `apps/api/src/health/`.

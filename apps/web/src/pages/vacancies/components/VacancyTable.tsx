@@ -29,7 +29,7 @@ import { RecommendationTag } from './RecommendationTag';
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
 /** One button per action, in the order they render. Total over `RowAction`, so a
- * new action cannot ship without a control (phase 2.2, finding 14). A status's *tag*
+ * new action cannot ship without a control. A status's *tag*
  * text ("Applied") is a state, not an instruction — hence separate verbs. Which ones
  * confirm first is `useVacancies`' call, not this map's. */
 const ROW_BUTTONS: Record<RowAction, { verb: string; Icon: typeof IconCheck; danger?: boolean }> = {
@@ -176,10 +176,8 @@ export function VacancyTable({
                     )}
                   </div>
                 </td>
-                {/* A placeholder (imported, never analysed) has no score to show:
-                    its `matchScore` is the tracker's own number, and rendering it as
-                    `0%` would claim an analysis that never happened. Same rule as the
-                    modal's cell — one field decides, so the two cannot disagree. */}
+                {/* No analysis, no score. Same rule as the modal's cell — one field
+                    decides, so the two cannot disagree. */}
                 <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
                 <td>
                   <RecommendationTag recommendation={item.recommendation} />

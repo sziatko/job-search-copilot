@@ -15,10 +15,9 @@ export default defineConfig({
     fileParallelism: false,
     // Each project also sets `isolate: false` in its own config (file-based
     // projects don't inherit it from here): one environment and module cache per
-    // project instead of a fresh jsdom/import per file. Measured 2026-09-27: web
-    // 161s → 98s, core/api/mcp 76s → 46s. The cost: state leaks between files, so
-    // a test that fails in the full run but passes alone is the first thing to
-    // suspect. (Running web in parallel instead was slower on a 2-core machine,
-    // with timeouts: 248s.)
+    // project instead of a fresh jsdom/import per file — about 40% faster. The cost:
+    // state leaks between files, so a test that fails in the full run but passes
+    // alone is the first thing to suspect. (Running web in parallel instead is slower
+    // on a 2-core machine, with timeouts.)
   },
 });

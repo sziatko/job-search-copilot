@@ -1,60 +1,49 @@
 # 0010 — MCP `createServer()` factory for in-memory-transport tests
 
-- Status: Accepted
-- Phase: 1 · Date: 2026-09
+- Status: Accepted · Date: 2026-09
 
 ## Context
-The MCP server originally built and connected its `McpServer` inline in `index.ts`,
-wired straight to `StdioServerTransport`. That's untestable without spawning a
-subprocess and speaking stdio to it.
+An MCP server built and connected inline in its entrypoint is testable only by
+spawning a process and speaking stdio to it. And two entrypoints (stdio and HTTP) need
+the same tools.
 
 ## Decision
-Split the two concerns:
-
 - `apps/mcp/src/server.ts` — `createServer({ userId, vacancies?, applications?,
-  intake? })` builds an `McpServer` for one user (phase 7, ADR-0039) and returns it,
-  *without* connecting a transport. The optional services default to ones on the shared
-  lazy client; a test can inject services bound to their own client. The nine tools themselves are registered by two
-  per-feature functions this file composes — `registerVacancyTools(server,
-  vacancies)` in `vacancies/vacancies.tools.ts` (5 tools) and
-  `registerApplicationTools(server, applications)` in
-  `applications/applications.tools.ts` (4 tools) — each with a sibling
-  `*.schemas.ts` for its zod input shapes. `server.ts` itself stays composition
-  only; it does not know what a tool looks like.
-- `apps/mcp/src/index.ts` — the entrypoint: `import './env'` first, then
-  `createServer({ userId })` for the owner of `JSC_API_KEY`, then connect a
-  `StdioServerTransport`, then `main().catch`.
+  intake? })` builds an `McpServer` for one user and returns it **without** a
+  transport. The services default to ones on the shared lazy client; a test injects
+  its own. The file only composes: each feature registers its tools —
+  `registerVacancyTools`, `registerApplicationTools`, `registerIntakeTools`, in
+  `<feature>/<feature>.tools.ts`, with a sibling `*.schemas.ts` for the zod inputs.
+- `apps/mcp/src/index.ts` (stdio) — loads env, resolves the owner of `JSC_API_KEY`,
+  `createServer({ userId })`, connects a `StdioServerTransport`.
+- `apps/mcp/src/http.ts` (HTTP), over the testable `http-app.ts` — a fresh
+  `createServer` per request, for the token's user
+  ([ADR-0035](0035-mcp-over-http-oauth-resource-server.md)).
 
-Tests (`apps/mcp/src/server.spec.ts`) connect a real MCP `Client` to
-`createServer()` over `InMemoryTransport.createLinkedPair()` — the SDK's own
-recommended way — and call each tool by name, asserting on the real
-`registerTool` handlers, input schemas, and `isError` shapes.
+`apps/mcp/src/server.spec.ts` connects a real MCP `Client` to `createServer()` over
+`InMemoryTransport.createLinkedPair()` and calls each tool by name, against the real
+test DB.
 
 ## Why this and not the alternatives
-- **Test by spawning the stdio process** — slow, flaky, and hard to assert on
-  structured results; you're testing the transport, not the handlers.
-- **Unit-test the handler functions directly** — would require exporting each
-  handler and re-implementing the SDK's input parsing in the test; the in-memory
-  transport exercises the schema validation and result envelope for free.
-- **Mock the MCP SDK** — re-asserts our own calls; breaks on SDK updates.
+- **Spawning the stdio process in tests** — slow, flaky, and it tests the transport,
+  not the handlers.
+- **Unit-testing exported handlers** — would re-implement the SDK's input parsing;
+  the in-memory transport covers the schemas and the result envelope for free.
+- **Mocking the SDK** — re-asserts our own calls and breaks on SDK updates.
 
 ## Consequences
-- The tool handlers, their `zod` input schemas, and the error envelopes are all
-  covered by fast in-process tests against the real test DB.
-- `index.ts` stays a ~15-line entrypoint.
+- Every tool's handler, schema and error envelope is covered by fast in-process tests.
+- The entrypoints are a few lines each.
 
 ## What this constrains — breaks if you change it
-- Moving tool registration back into `index.ts` → the in-memory-transport tests
-  can't reach the handlers.
-- Removing the optional services from `createServer()` →
-  tests can't inject a service; they'd depend on the process-wide lazy client's
-  env being set.
-- Renaming a tool or changing an input schema → `apps/mcp/src/server.spec.ts`
-  (it calls tools by string name with literal argument objects).
-- Adding a third domain should get its own `<feature>/` folder and
-  `register<Feature>Tools(server, service)` function, composed into
-  `createServer()` the same way — not appended into an existing feature's file.
+- Tool registration back in an entrypoint → the tests cannot reach it, and the other
+  entrypoint loses it.
+- Dropping the injectable services → tests depend on the process-wide client's env.
+- A tool's name or input → `server.spec.ts` (it calls tools by name with literal
+  arguments) and the skills that call it.
+- A new feature → its own `<feature>/` folder and `register<Feature>Tools`, composed in
+  `createServer()`.
 
 ## Related
 [ADR-0004](0004-one-service-two-transports.md), [ADR-0015](0015-testing-strategy.md),
-[`../contracts.md`](../contracts.md), `apps/mcp/src/server.ts`, `apps/mcp/src/index.ts`.
+[`../contracts.md`](../contracts.md).

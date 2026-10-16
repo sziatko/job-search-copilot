@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { handleOAuthUserInfo } from 'better-auth/oauth2';
 import { describe, expect, it } from 'vitest';
-import { getPrisma } from '../prisma-client';
+import { getPrisma } from '../db/prisma-client';
 import { verifyApiKey } from './api-key';
 import { createAuth } from './create-auth';
 
@@ -98,7 +98,7 @@ describe('API keys', () => {
   it('boots with NODE_ENV=production and no auth env', () => {
     const script = `
       const { verifyApiKey } = await import('./src/auth/api-key.ts');
-      const { createPrismaClient } = await import('./src/prisma-client.ts');
+      const { createPrismaClient } = await import('./src/db/prisma-client.ts');
       const db = createPrismaClient(process.env.DATABASE_URL);
       process.stdout.write(String(await verifyApiKey(db, 'jsc_not-a-key')));
       await db.$disconnect();`;

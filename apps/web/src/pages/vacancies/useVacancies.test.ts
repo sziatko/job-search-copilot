@@ -26,7 +26,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
 /**
  * Page-level, not `renderHook`: the status filter lives in the route's search
  * params, so `useVacancies` calls `useSearch` and throws without a router above
- * it. Same shape as `renderApplications` in the tracker's test.
+ * it. Same shape as `renderApplications` in /applications' test.
  */
 function renderVacancies(path = '/vacancies') {
   const router = createRouter({
@@ -307,7 +307,7 @@ describe('VacanciesPage / useVacancies', () => {
     renderVacancies();
     await screen.findByText('Backend Engineer');
 
-    // The title belongs to the shell's <h1>; the card used to repeat it as an <h2>.
+    // The title belongs to the shell's <h1>; the card does not repeat it.
     expect(
       screen.queryByRole('heading', { level: 2, name: 'Analyzed vacancies' }),
     ).not.toBeInTheDocument();
@@ -347,7 +347,7 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Backend Engineer');
 
     // Scoped by title, since both rows share a company and `rowOf` matches any text
-    // in the row. Before this step the placeholder rendered a real-looking `0%`.
+    // in the row.
     const imported = rowOf('Imported Role');
     expect(imported.queryByText('0%')).not.toBeInTheDocument();
     // Three dashes: the score, the verdict, and the Comment column, which has no
@@ -669,8 +669,8 @@ describe('VacanciesPage / useVacancies', () => {
       }),
     );
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
-    // The other half of finding 1: a successful apply still says so. Against the
-    // spy, because the Toaster lives in main.tsx, outside the route tree.
+    // The other half: a successful apply still says so. Against the spy, because
+    // the Toaster lives in main.tsx, outside the route tree.
     expect(success).toHaveBeenCalledWith('Application submitted!');
   });
 
@@ -713,10 +713,8 @@ describe('VacanciesPage / useVacancies', () => {
 
   /**
    * Holds the list request for one `status` open until the test releases it, so a
-   * test can act inside the window finding 3 lives in: `keepPreviousData` is showing
-   * the *older* filter's page, and the filter just picked has no cache entry yet.
-   * (Phase 2.2 found it with the toolbar's search box; the status filter is the key
-   * that changes since phase 5 step 7 moved search into a modal.)
+   * test can act inside the window where `keepPreviousData` is showing the *older*
+   * filter's page, and the filter just picked has no cache entry yet.
    *
    * The handler answers the held request itself rather than delegating — MSW's
    * `passthrough()` is not "try the next handler", it is "make the **real** request",
@@ -752,8 +750,8 @@ describe('VacanciesPage / useVacancies', () => {
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
     await waitFor(() => expect(gate.state.started).toBe(1));
-    // The window finding 3 lives in: the filter just picked has no cache entry, and
-    // the rows on screen are the *older* filter's page, held by `keepPreviousData`.
+    // Inside the window: the filter just picked has no cache entry, and the rows on
+    // screen are the *older* filter's page, held by `keepPreviousData`.
     expect(client.getQueryData(['vacancies', 'ALL'])).toBeUndefined();
 
     await saveForLater(user, 'Acme');
@@ -873,8 +871,8 @@ describe('VacanciesPage / useVacancies', () => {
         screen.queryByRole('button', { name: /other vacancies? at Beta Corp/i }),
       ).not.toBeInTheDocument();
 
-      // The sentence is a `.tip` bubble like the Action column's, not the native
-      // `title` it used to be — the count alone is what the button shows.
+      // The sentence is a `.tip` bubble like the Action column's, not a native
+      // `title` — the count alone is what the button shows.
       expect(buttons[0].querySelector('.tip')).toHaveTextContent('1 other vacancy at Acme');
       expect(buttons[0]).not.toHaveAttribute('title');
       // Exact, so it fails if the count stops being hidden: that name would then
@@ -1007,7 +1005,7 @@ describe('VacanciesPage / useVacancies', () => {
       // `limit=100`), and jsdom paints all of them in two tables to get there.
     });
 
-    it('marks a stale application with the tracker’s hourglass', async () => {
+    it('marks a stale application with /applications’ hourglass', async () => {
       mswServer.use(
         ...buildHandlers([
           vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
@@ -1016,7 +1014,7 @@ describe('VacanciesPage / useVacancies', () => {
             id: 2,
             company: 'Acme',
             title: 'Data Engineer',
-            status: 'REPLIED',
+            status: 'AWAITING',
             statusChangedAt: daysAgo(45),
           }),
         ]),
@@ -1029,14 +1027,13 @@ describe('VacanciesPage / useVacancies', () => {
 
       const modal = within(await screen.findByRole('dialog'));
       const mark = await modal.findByText('⏳');
-      // The same `.tip` bubble the action buttons wear, not the native `title` it
-      // used to carry.
+      // The same `.tip` bubble the action buttons wear, not a native `title`.
       expect(mark.querySelector('.tip')).toHaveTextContent('45 days since last update');
       expect(mark).not.toHaveAttribute('title');
     });
 
     it('shows — instead of a score for a vacancy with no usable applyURL', async () => {
-      // An importer placeholder: the score belongs to a posting the app never saw.
+      // A placeholder `record()` created: no posting, no analysis.
       mswServer.use(
         ...buildHandlers([
           vacancy({ id: 1, company: 'Acme' }),
@@ -1045,10 +1042,8 @@ describe('VacanciesPage / useVacancies', () => {
             company: 'Acme',
             title: 'Imported Role',
             applyUrl: 'tracker://import/2',
-            // A row `ApplicationService` had to create has no analysis. Without that
-            // this fixture claimed a real analysis while carrying a `tracker://` URL
-            // — the dash below passed for the wrong reason (the URL scheme), which is
-            // what step 7 separates.
+            // A row `ApplicationService` had to create has no analysis — so the dash
+            // below comes from the missing analysis, not from the `tracker://` URL.
             matchScore: null,
             recommendation: null,
             estimationComment: null,
@@ -1065,7 +1060,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.queryByText('80%')).toBeInTheDocument(); // the safe row keeps its pill
       expect(modal.getByText('Imported Role')).toBeInTheDocument();
       expect(modal.queryByRole('link', { name: 'Imported Role' })).not.toBeInTheDocument();
-      // The importer row's score cell — not a page-wide count of dashes: the CV
+      // The placeholder row's score cell — not a page-wide count of dashes: the CV
       // column draws one on both rows, neither of them applied to.
       const imported = modal.getByText('Imported Role').closest('tr') as HTMLTableRowElement;
       expect(imported.cells[2]).toHaveTextContent('—');
@@ -1243,8 +1238,8 @@ describe('VacanciesPage / useVacancies', () => {
       const user = userEvent.setup();
       await user.click(rowOf('Acme').getByRole('button', { name: /^Copy / }));
 
-      // Same bubble, the other half of the pair: the old flag was always
-      // "Copied" and only its opacity changed, so it proves nothing on its own.
+      // Same bubble, the other half of the pair: "Copied" alone would pass even if
+      // only the bubble's opacity changed.
       expect(rowOf('Acme').getByText('Copied', { selector: '.tip' })).toBeInTheDocument();
       expect(rowOf('Acme').queryByText('Copy', { selector: '.tip' })).not.toBeInTheDocument();
     });

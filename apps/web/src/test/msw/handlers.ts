@@ -119,7 +119,7 @@ function addComment(row: FakeVacancy, body: string | null | undefined) {
 
 /**
  * The list endpoint's behaviour, as a resolver — exported so a test can *wrap* it
- * (holding one filter's request open, phase 2.2 step 6) instead of re-implementing
+ * (holding one filter's request open) instead of re-implementing
  * the filter, which is how a fake starts disagreeing with the thing it fakes.
  */
 export function vacanciesResolver(rows: FakeVacancy[]) {
@@ -170,7 +170,7 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
     const page = matching.slice(0, limit).map((row) => ({
       ...row,
       companyMatchCount: companyMatchCount(rows, row),
-      // Derived the same way the endpoint derives it (phase 2.2, step 7) rather than
+      // Derived the same way the endpoint derives it rather than
       // hand-set per fixture: a fixture is unanalysed by having no recommendation,
       // which is what `ApplicationService` writes for a placeholder.
       hasAnalysis: row.recommendation !== null,
@@ -334,12 +334,11 @@ export function fakeStats(overrides: Partial<Stats> = {}): Stats {
     unavailable: 0,
     responded: 0,
     interview: 0,
-    recruiterScreen: 0,
+    actionNeeded: 0,
     pipeline: {
       byStatus: {
         APPLIED: 0,
-        RECRUITER_SCREEN: 0,
-        REPLIED: 0,
+        ACTION_NEEDED: 0,
         INTERVIEW: 0,
         AWAITING: 0,
         OFFER: 0,

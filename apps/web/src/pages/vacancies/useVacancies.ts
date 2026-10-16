@@ -79,27 +79,14 @@ export function useVacancyRows(
 ) {
   const queryClient = useQueryClient();
 
-  // The filters are part of the key, not just the request: a different
-  // filter is a different list, which starts again from its first page (ADR-0030).
-  // Every write below therefore goes through the *prefix* (`{ queryKey:
-  // VACANCIES_KEY }`), never one exact key — `findAll` is a partial match, so it
-  // reaches /vacancies' and /inbox's entries alike.
-  // Each entry is an infinite query's `{ pages, pageParams }`, and the write patches
-  // every page.
+  // The filters are part of the key: a different filter is a different list. So every
+  // write below goes through the key *prefix*, never one exact key — while a new
+  // filter's first page loads, its exact entry does not exist yet, and a write to it
+  // would be a no-op with nothing to roll back. The prefix reaches /vacancies' and
+  // /inbox's entries alike; each is an infinite query, and the write patches every page.
   //
-  // The exact-key write this replaced was a silent no-op in both directions (phase
-  // 2.2, finding 3): while a new filter is in flight its entry does not exist yet, so
-  // `setQueryData` returned early and the rollback had no snapshot to restore.
-  //
-  // It is **not** visible, and the prefix write does not make it visible: while the
-  // new query is pending, the rows on screen come from `keepPreviousData`, which
-  // freezes the placeholder to the *result* it first produced
-  // (`queryObserver.js` — `prevResult.isPlaceholderData` ⇒ `placeholderData =
-  // prevResult.data`), so an updated live entry is never re-read. What the prefix
-  // write buys is that the optimistic value lands on the entry that exists and the
-  // rollback has something to put back — measured, not assumed. Doing it "properly"
-  // would mean dropping keepPreviousData, which costs the blank table on every filter
-  // change that phase 2.1, step 2 added it for (then for the toolbar's search box).
+  // Not visible while that page loads: `keepPreviousData` shows the old result frozen,
+  // so a write lands in the cache, not on screen, until the new page arrives.
   const queryKey = [...VACANCIES_KEY, ...filters];
 
   // The server filters and sorts; `useInfiniteList` keeps the previous rows on screen
@@ -241,9 +228,9 @@ export function useVacancyRows(
         new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
       );
     },
-    // Here, not at the call site: the dialog is unmounted the moment it is
-    // confirmed, so a `toast.success` next to `mutate()` announced success before
-    // the server had answered — and kept announcing it when the answer was 422.
+    // Here, not at the call site: the dialog unmounts the moment it is confirmed, so a
+    // `toast.success` next to `mutate()` would announce success before the server
+    // answered — even when the answer is a 422.
     onSuccess: () => toast.success('Application submitted!'),
     onSettled: (_data, _err, { id }) => {
       setSavingIds((prev) => {

@@ -55,7 +55,7 @@ export function SearchModal({
   // The ⏳ mark and the CV column: both endpoints' `search` is company OR title, so the
   // pipeline rows among the results are these applications. Only asked when a pipeline
   // row can be among them.
-  // ponytail: one page of 500; a term matching more applications loses the oldest marks.
+  // One page of 500: a term matching more applications loses the oldest marks.
   const applications = useQuery({
     queryKey: ['application-search', term],
     queryFn: () => listApplicationsPage({ search: term, limit: 500 }),

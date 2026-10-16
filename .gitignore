@@ -69,6 +69,8 @@ web_modules/
 .env
 .env.*
 !.env.example
+!.env.test.example
+!.env.e2e.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -159,3 +161,6 @@ e2e/.auth/
 
 # The user's job-search skills: a separate private repo, cloned here (CLAUDE.md).
 skills/
+
+# A phase's plan is the agent's working file, never committed (docs/README.md).
+docs/phases/

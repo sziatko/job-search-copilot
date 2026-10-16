@@ -156,7 +156,7 @@ const GROUPS: [number, (k: number) => Shape][] = [
     4,
     (k) => ({
       analysis: apply(k),
-      moves: applied(k, { to: 'RECRUITER_SCREEN', note: 'A recruiter call is booked.' }),
+      moves: applied(k, { to: 'ACTION_NEEDED', note: 'They asked for availability.' }),
       salary: salary(k),
       daysAgo: k === 3 ? timedOutDays(k) : 2 + k,
     }),
@@ -165,7 +165,11 @@ const GROUPS: [number, (k: number) => Shape][] = [
     4,
     (k) => ({
       analysis: apply(k),
-      moves: applied(k, { to: 'REPLIED', note: 'They asked for availability.' }),
+      moves: applied(
+        k,
+        { to: 'ACTION_NEEDED', note: 'They asked for availability.' },
+        { to: 'AWAITING', note: 'Sent my availability.' },
+      ),
       daysAgo: k === 3 ? timedOutDays(k) : 1 + k,
     }),
   ],
@@ -176,7 +180,7 @@ const GROUPS: [number, (k: number) => Shape][] = [
       analysis: apply(k),
       moves: applied(
         k,
-        { to: 'RECRUITER_SCREEN' },
+        { to: 'ACTION_NEEDED' },
         { to: 'INTERVIEW', note: 'Technical interview, round one.' },
         { to: 'INTERVIEW', note: 'Round two with the team lead.' },
       ),

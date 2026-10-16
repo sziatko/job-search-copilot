@@ -23,7 +23,7 @@ const rootRoute = createRootRoute();
  * answer from the API) → /login; the API refuses every route without one anyway
  * (invariant 9), this only spares the user a page of 401s.
  */
-// ponytail: one GET /api/auth/get-session per navigation; cache it if that ever shows.
+// One GET /api/auth/get-session per navigation; cache it if that ever shows.
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_app',
@@ -100,14 +100,13 @@ const indexRoute = createRoute({
 // **JSON-parsed** by the router, and a value `validateSearch` throws on replaces the
 // whole page with "Something went wrong!" (there is no `errorComponent` anywhere in the
 // tree) — for a URL a user can trivially type. So junk falls back to "no filter", the
-// same state an absent value means. An unknown key is dropped by `z.object`: an old
-// `?q=` bookmark, from when the toolbar had a search box, is ignored (search is a modal
-// now, with no URL state).
+// same state an absent value means. An unknown key (a stale `?q=`) is dropped by
+// `z.object`.
 const statusFilterSchema = applicationStatusFilterSchema.optional().catch(undefined);
 
 // /vacancies: the status filter goes to the API (ADR-0030). An absent `status` is the
-// NOT_REVIEWED default — and so is a bookmarked `?status=APPLIED`, from when the filter
-// still listed the pipeline.
+// NOT_REVIEWED default — and so is a status outside the page's context
+// (`?status=APPLIED`).
 const vacanciesSearchSchema = z.object({
   status: vacancyStatusFilterSchema.optional().catch(undefined),
 });

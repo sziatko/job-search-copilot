@@ -1,5 +1,5 @@
-import { RECOMMENDATION_INPUT_VALUES } from '@job-search-copilot/core';
-import { IsIn, IsInt, IsNotEmpty, IsString, IsUrl, Max, Min } from 'class-validator';
+import { Recommendation } from '@job-search-copilot/core';
+import { IsEnum, IsInt, IsNotEmpty, IsString, IsUrl, Max, Min } from 'class-validator';
 import { HTTP_URL } from './intake-vacancies.dto';
 
 export class SaveVacancyDto {
@@ -24,9 +24,8 @@ export class SaveVacancyDto {
   @Max(100)
   matchScore!: number;
 
-  /** Accepts the canonical English value or its Ukrainian equivalent — normalized in VacancyService.save(). */
-  @IsIn(RECOMMENDATION_INPUT_VALUES)
-  recommendation!: string;
+  @IsEnum(Recommendation)
+  recommendation!: Recommendation;
 
   @IsString()
   @IsNotEmpty()

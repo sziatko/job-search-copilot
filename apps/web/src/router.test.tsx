@@ -22,8 +22,8 @@ function renderAt(path: string) {
 // `/` renders the dashboard, and the dashboard fires two queries (`/stats` and
 // `/vacancies`). Every test that starts there registers handlers for both: with `onUnhandledRequest: 'error'`
 // an unhandled request drops the page into its error branch, and the shell renders
-// around it either way — which is exactly how this file used to stay green while
-// asserting nothing about the route it was named after.
+// around it either way — so a test would stay green while asserting nothing about
+// its route.
 function renderIndex() {
   mswServer.use(...buildHandlers([]), statsHandler());
   return renderAt('/');
@@ -37,9 +37,7 @@ describe('router', () => {
     expect(await screen.findByRole('link', { name: /analyzed vacancies/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /application tracker/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^dashboard$/i })).toBeInTheDocument();
-    // The log's place, now the inbox's (phase 5).
     expect(screen.getByRole('link', { name: /^inbox$/i })).toHaveAttribute('href', '/inbox');
-    expect(screen.queryByRole('link', { name: /vacancy log/i })).not.toBeInTheDocument();
   });
 
   it('shows the brand logo in the sidebar', async () => {
@@ -51,10 +49,9 @@ describe('router', () => {
     ).toBeInTheDocument();
   });
 
-  it('has no /log page any more', async () => {
-    renderAt('/log');
+  it('renders not found for an unknown path', async () => {
+    renderAt('/no-such-page');
     expect(await screen.findByText(/not found/i)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /vacancy log/i })).not.toBeInTheDocument();
   });
 
   it('renders the dashboard at the index route', async () => {

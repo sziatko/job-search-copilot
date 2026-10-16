@@ -172,7 +172,7 @@ describe('ApplicationsPage / useApplications', () => {
     const olderRow = screen.getAllByRole('row').find((r) => r.textContent?.includes('Older Co'));
     await user.selectOptions(
       within(olderRow as HTMLElement).getByRole('combobox', { name: 'Status' }),
-      'REPLIED',
+      'ACTION_NEEDED',
     );
 
     await waitFor(() => expect(companyOrder()).toEqual(['Older Co', 'Newer Co']));
@@ -357,10 +357,9 @@ describe('ApplicationsPage / useApplications', () => {
   });
 
   it('renders an applyUrl that fails the scheme gate as text, not a link', async () => {
-    // `applyUrl` is scraped, so it is untrusted input that reaches an href. The
-    // table used to test only for `tracker://`; it now runs every value through
-    // the scheme gate, and this is what that widening is supposed to mean in the
-    // DOM: a real link stays a link, everything else becomes plain text.
+    // `applyUrl` is scraped, so it is untrusted input that reaches an href. The table
+    // runs every value through the scheme gate: a real link stays a link, everything
+    // else becomes plain text.
     serve([
       application({ id: 1, title: 'Ordinary Role', applyUrl: 'https://acme.com/jobs/1' }),
       application({

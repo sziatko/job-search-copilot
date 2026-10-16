@@ -4,7 +4,8 @@ import type { PrismaClient } from '@job-search-copilot/core';
  * the job's env in CI. */
 export function env(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`${name} is not set: copy .env.e2e, or set it in the env`);
+  if (!value)
+    throw new Error(`${name} is not set: copy .env.e2e.example to .env.e2e, or set it in the env`);
   return value;
 }
 

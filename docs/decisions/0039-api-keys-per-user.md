@@ -1,24 +1,21 @@
 # 0039 — API keys per user, for n8n and MCP
 
-- Status: Accepted
-- Phase: 7   ·   Date: 2026-10
-- Replaces: 0036 (deleted in phase 7 step 2, with `MachineTokenGuard`)
+- Status: Accepted · Date: 2026-10
+- Replaces: 0036
 
 ## Context
 Once every vacancy has an owner ([ADR-0038](0038-multi-user-shared-schema.md)), every
 writer must say whose rows it touches. The browser has a session; an MCP-over-HTTP
 client has an OAuth token issued to an account ([ADR-0035](0035-mcp-over-http-oauth-resource-server.md)).
-Two writers have no user: n8n, with one static `INTAKE_TOKEN`, and the stdio MCP, with
-no auth at all. A client that cannot do OAuth — Claude Desktop through `mcp-remote`, a
-script — needs a credential too.
+Two writers have no user of their own: n8n and the stdio MCP. A client that cannot do
+OAuth — Claude Desktop through `mcp-remote`, a script — needs a credential too.
 
 ## Decision
 Better Auth's `@better-auth/api-key` plugin in `createAuth`: keys owned by a user
 (`referenceId`), stored hashed, prefix `jsc_`, shown once, managed on `/profile`
 (create, list, revoke). No expiry, no per-key scopes, rate limit off. A key is accepted:
 - on the three machine REST routes (`POST /vacancies/intake`, `/vacancies/analysis`,
-  `/vacancies/:id/analysis`), by `ApiKeyGuard`, as `Authorization: Bearer jsc_…` — the
-  header n8n already sends;
+  `/vacancies/:id/analysis`), by `ApiKeyGuard`, as `Authorization: Bearer jsc_…`;
 - by the HTTP MCP, as a bearer next to the OAuth JWT (a `jsc_` prefix picks the path);
 - by the stdio MCP, from `JSC_API_KEY`, verified once at boot.
 
@@ -29,8 +26,8 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
 - **A hand-rolled key table** (prefix, SHA-256 hash, last used) — small, but Better
   Auth already owns auth here, and the plugin brings the create / list / revoke
   endpoints with ownership checks.
-- **Keep `INTAKE_TOKEN` and add a user id next to it** — still one secret for every
-  user and every workflow.
+- **One shared machine token** — one secret for every user and every workflow, and no
+  owner for what it writes.
 - **OAuth client credentials for n8n** — standard, but n8n would fetch and refresh a
   token before each run, for the same trust.
 - **Per-key scopes** — one more choice in the UI and in every guard, for two kinds of
@@ -42,7 +39,6 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
   second way to reach the DB's data.
 
 ## Consequences
-- n8n swaps the token's value for a key; the header and scheme stay.
 - One leaked key is one user's data, and it is revoked on its own.
 - `verifyApiKey` writes `lastRequest` on every call: a DB write per MCP request.
 - A key checked at boot stays valid in a running stdio process until it restarts.
@@ -64,4 +60,4 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
 
 ## Related
 [ADR-0034](0034-auth-better-auth-in-core.md), [ADR-0035](0035-mcp-over-http-oauth-resource-server.md),
-[ADR-0038](0038-multi-user-shared-schema.md), [`../phases/phase-7.md`](../phases/phase-7.md).
+[ADR-0038](0038-multi-user-shared-schema.md).

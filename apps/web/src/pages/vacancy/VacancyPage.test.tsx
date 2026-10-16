@@ -317,7 +317,7 @@ describe('VacancyPage', () => {
     await waitFor(() => expect(rows[0].status).toBe('APPLIED'));
     expect(writes).toEqual(['POST /api/v1/applications']);
     // Now in the pipeline: the select offers the pipeline's statuses.
-    expect(await screen.findByRole('option', { name: 'Recruiter screen' })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: 'Action needed' })).toBeInTheDocument();
   });
 
   it('moves a pipeline status through the applications endpoint', async () => {

@@ -19,11 +19,12 @@ export default defineConfig({
     environment: 'node',
     env: loadEnv('test', rootDir, ''),
     include: ['src/**/*.spec.ts', 'test/**/*.spec.ts'],
+    setupFiles: [path.join(rootDir, 'vitest.test-db.ts')],
     isolate: false, // see the root vitest.config.mts
-    // A raised limit, not a fix: no cause found (2026-10-10, docs/backlog.md). The
-    // first file's beforeAll pays the cold start — Nest loading express, Prisma's
-    // first query compile, the first connections — ~1 s quiet, 3 s at worst measured,
-    // nothing hanging; yet one full run under load went past Vitest's 10 s.
+    // A raised limit, not a fix (a backlog row): the first file's beforeAll pays the
+    // cold start — Nest loading express, Prisma's first query compile, the first
+    // connections — ~1 s quiet, 3 s at worst, nothing hanging; yet a full run under
+    // load can pass Vitest's 10 s.
     hookTimeout: 30_000,
   },
 });

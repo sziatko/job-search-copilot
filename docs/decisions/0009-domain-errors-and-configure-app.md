@@ -1,58 +1,45 @@
-# 0009 — Domain errors → 422 filter; shared `configureApp()`
+# 0009 — Domain errors → a 422 filter; one shared `configureApp()`
 
-- Status: Accepted
-- Phase: 1 · Date: 2026-09
+- Status: Accepted · Date: 2026-09
 
 ## Context
-`normalizeRecommendation()` threw a plain `Error`. If it ever reached the HTTP
-layer unmapped, Nest would turn it into a `500` — wrong, it's a caller mistake.
-The MCP server, meanwhile, handled not-found gracefully (`isError` result) but let
-a bad recommendation throw. Inconsistent handling of "the caller sent something
-invalid" across the two transports.
-
-Separately, the e2e test set up its `ValidationPipe` by hand in `beforeAll`, so it
-could silently drift from what `main.ts` configured.
+A caller's mistake (an unknown status, a repeat, a vacancy already applied to) must
+not reach a client as a `500`, and must look the same over REST and MCP. And an e2e
+suite that wires its own pipes drifts from production.
 
 ## Decision
-- **`DomainError`** base class in `packages/core/src/errors.ts` (with
-  `InvalidRecommendationError`). It marks *caller mistakes* — not bugs, not infra
-  failures. `normalizeRecommendation()` throws `InvalidRecommendationError`.
-- **`apps/api`** — `DomainExceptionFilter` (`@Catch(DomainError)`) maps it to
-  `422 { statusCode, error: exception.name, message }`, registered globally.
-- **`apps/mcp`** — the `save` tool catches `DomainError` and returns an `isError`
-  result (consistent with the not-found tools); anything else re-throws.
-- **`configureApp(app, config)`** (`apps/api/src/setup-app.ts`) — the single place
-  that wires CORS, the global prefix + versioning, the `ValidationPipe`, the
-  `DomainExceptionFilter`, and `enableShutdownHooks()`. `main.ts` and the e2e
-  `beforeAll` both call it.
+- **`DomainError`** (`packages/core/src/domain/errors.ts`) is the base of every
+  caller-mistake error core throws: `InvalidRecommendationError`, `SameStatusError`,
+  `AnalysedNotNewError`, `AlreadyAnalysedError`, `AlreadyAppliedError`,
+  `AmbiguousVacancyMatchError`, `VacancyNotFoundError`, … Not bugs, not infra failures.
+- **REST** — `DomainExceptionFilter` (`@Catch(DomainError)`) answers
+  `{ statusCode, error: <name>, message }`: `422`, unless its `STATUS_OF` map says
+  otherwise (`AlreadyAnalysedError` → `409`, `VacancyNotFoundError` → `404`).
+- **MCP** — a tool catches a `DomainError` and returns an `isError` result; anything
+  else re-throws.
+- **Not found** — a query (`getById`) answers `null` and the caller decides; a command
+  (a status move, an edit, a comment) throws `VacancyNotFoundError`.
+- **`configureApp(app, config)`** (`apps/api/src/setup-app.ts`) is the one place that
+  wires CORS, the prefix and versioning, the `ValidationPipe`, the filter, Swagger and
+  the shutdown hooks. The entrypoint and the e2e `createTestApp()` both call it.
 
 ## Why this and not the alternatives
-- **Let it 500** — a caller mistake reported as a server error is misleading and
-  un-actionable.
-- **Per-transport ad-hoc handling** — the inconsistency this ADR removes; a new
-  domain error would need remembering in two places.
-- **Duplicate the pipe/filter setup in the e2e test** — guaranteed drift; the
-  bug this ADR's `configureApp()` half prevents.
-
-Note: the 422 path is currently **unreachable over HTTP** — the `save` DTO's
-`@IsIn(RECOMMENDATION_INPUT_VALUES)` rejects a bad recommendation with a `400`
-first. The filter is defence-in-depth for any future `DomainError` that isn't
-pre-validated by a DTO.
+- **Let it 500** — misleading and not actionable for the caller.
+- **Handling per transport** — a new error has to be remembered in two places.
+- **Pipes set up by hand in the tests** — guaranteed drift from production.
 
 ## Consequences
-- A new domain rule = a new `DomainError` subclass; both transports map it
-  correctly for free.
-- The e2e suite runs against byte-for-byte the same app wiring as production.
+- A new rule is a new `DomainError` subclass; both transports map it for free.
+- A DTO often refuses bad input first with a `400` (e.g. `@IsEnum(Recommendation)`);
+  the filter covers what only core can know.
+- The e2e suite runs the production wiring.
 
 ## What this constrains — breaks if you change it
-- Throwing a non-`DomainError` for a caller mistake in `core` → the filter won't
-  catch it; it becomes a `500` (API) or an unhandled throw (MCP).
-- Removing `configureApp()` from the e2e `beforeAll` → the tests stop exercising
-  the real pipes/filters/routing.
-- Adding a new global pipe/filter/interceptor only in `main.ts` and not in
-  `configureApp()` → the e2e suite doesn't see it.
+- A caller mistake thrown as a plain `Error` in core → a `500` over REST, an unhandled
+  throw over MCP.
+- A global pipe, filter or interceptor added only in `main.ts` → the e2e suite does
+  not see it.
 
 ## Related
 [ADR-0008](0008-api-prefix-and-versioning.md), [`../contracts.md`](../contracts.md),
-`packages/core/src/errors.ts`, `apps/api/src/common/domain-exception.filter.ts`,
-`apps/api/src/setup-app.ts`.
+`apps/api/src/common/domain-exception.filter.ts`.

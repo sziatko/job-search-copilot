@@ -1,8 +1,7 @@
 /**
- * One-off backfill (phase 5, ADR-0033): fill `Vacancy.companyKey` / `titleKey` where
- * migration 20261003130100 left them null — the rows with no log row to copy them
- * from. The keys are computed by the same TypeScript normalizers intake uses, which is
- * why this is a script and not SQL.
+ * Backfill (ADR-0033): fill `Vacancy.companyKey` / `titleKey` where they are null. The
+ * keys are computed by the same TypeScript normalizers intake uses, which is why this
+ * is a script and not SQL.
  *
  *   npm run backfill:match-keys -w @job-search-copilot/core [-- --commit]
  *
@@ -12,8 +11,8 @@
  * it is matched by url only. Safe to re-run: a second run finds nothing to do.
  */
 
-import { normalizeCompanyKey, normalizeTitleKey } from '../src/identity';
-import { getPrisma } from '../src/prisma-client';
+import { getPrisma } from '../src/db/prisma-client';
+import { normalizeCompanyKey, normalizeTitleKey } from '../src/domain/identity';
 
 async function main() {
   const commit = process.argv.includes('--commit');

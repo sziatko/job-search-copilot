@@ -9,16 +9,16 @@ repo — producing a match score, a recommendation, and reasoning. This repo is 
 plumbing around that output: somewhere to store each vacancy, and a UI to work
 through them from *new* to *applied* or *declined*, then through the pipeline.
 
-Several users in one database, each signed in with Google / LinkedIn / a passkey
-(phase 6) and seeing only their own vacancies (phase 7,
-[ADR-0038](decisions/0038-multi-user-shared-schema.md)); sign-up is limited to an
-allowlist. Local-first: Docker Compose on a laptop, Postgres in a container.
+Several users in one database, each signed in with Google / LinkedIn / a passkey and
+seeing only their own vacancies ([ADR-0038](decisions/0038-multi-user-shared-schema.md));
+sign-up is limited to an allowlist. Local-first: Docker Compose on a laptop, Postgres
+in a container.
 
 ## The four packages
 
 ```
-packages/core   ── domain layer: Prisma schema/client, VacancyService,
-                   recommendation normalization, DomainError types.
+packages/core   ── domain layer: Prisma schema/client, the services,
+                   the status rules, auth, DomainError types.
                    Framework-agnostic — no @nestjs/*, no MCP SDK.
       ▲     ▲
       │     └───────────────┐
@@ -31,15 +31,40 @@ apps/web (React SPA)        Claude (the owner's skills)
 
 | Package | Responsibility | Depends on |
 | --- | --- | --- |
-| [`packages/core`](../packages/core/README.md) | The only place that talks to the database. Owns the schema (`Vacancy` with its `StatusChange` journal and `Comment`s) + migrations, the `VacancyService`, `ApplicationService`, `VacancyIntakeService` and `StatsService` (all queries), `writeStatus` (the only writer of status), the timeout rule (`TIMEOUT_DAYS`, `timedOutWhere` in `status.ts`), recommendation normalization, and the `DomainError` hierarchy. | `@prisma/client`, `pg` |
-| `apps/api` | Thin HTTP transport over the core services for the web app. NestJS: DI, DTO validation, versioned routes (`vacancies`, `applications`), a health check. | `core`, `@nestjs/*`, `class-validator`, `zod` |
-| `apps/mcp` | Thin transport over the *same* services, exposing fifteen tools (7 for vacancies, 6 for applications incl. `update_vacancy_status`, `update_application`, `add_comment`, 2 for the vacancy log — see [ADR-0010](decisions/0010-mcp-server-factory.md)) so Claude can save/query analysed vacancies and record/query applications directly. Two entrypoints over one `createServer()`: `src/index.ts` (stdio, as the owner of `JSC_API_KEY`) and `src/http.ts` (Streamable HTTP, an OAuth 2.1 resource server checking the API's JWTs — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md) — or an API key, [ADR-0039](decisions/0039-api-keys-per-user.md)). | `core`, `@modelcontextprotocol/sdk`, `express`, `jose`, `zod` |
-| `apps/web` | React 19 + Vite + Tailwind SPA in an app shell (`RootLayout` + sidebar/topbar), routed by `@tanstack/react-router` — `/` dashboard, `/vacancies`, `/applications`, `/inbox`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` over HTTP. Keeps its **own** hand-written contract for the API shape — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
+| [`packages/core`](../packages/core/README.md) | The only database client. The schema and migrations; `VacancyService`, `ApplicationService`, `VacancyIntakeService`, `StatsService`; `writeStatus`, the only writer of status; the timeout rule; the `DomainError`s; Better Auth and API keys. | `@prisma/client`, `pg`, `better-auth` |
+| `apps/api` | Thin NestJS transport over the core services, for the web app and n8n: DTO validation, versioned routes, a health check. | `core`, `@nestjs/*`, `class-validator` |
+| `apps/mcp` | Thin transport over the *same* services, as tools for Claude ([ADR-0010](decisions/0010-mcp-server-factory.md)). One `createServer()`, two entrypoints: `src/index.ts` (stdio, as the owner of `JSC_API_KEY`) and `src/http.ts` (Streamable HTTP, an OAuth 2.1 resource server or an API key — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md), [ADR-0039](decisions/0039-api-keys-per-user.md)). | `core`, `@modelcontextprotocol/sdk`, `express`, `jose`, `zod` |
+| `apps/web` | React SPA in an app shell, routed by `@tanstack/react-router`: `/` dashboard, `/vacancies`, `/applications`, `/inbox`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` only, through its **own** hand-written schema of the API — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 (monorepo), [ADR-0002](decisions/0002-core-shared-domain-layer.md) (core as the
 shared domain layer), [ADR-0004](decisions/0004-one-service-two-transports.md) (two
 transports over one service).
+
+### Inside `packages/core/src`
+
+Folders by feature, as `apps/api` is laid out. One public surface: `src/index.ts`,
+which is all the apps import (`@job-search-copilot/core`); no folder has an index of
+its own.
+
+```
+src/
+  index.ts           the package's exports
+  db/                Prisma client, forUser scoping, paging, LIKE escaping
+  domain/            rules shared by more than one feature: errors, status (writeStatus,
+                     the timeout rule), recommendation, url, identity, company, comments
+  vacancies/         VacancyService and its types
+  applications/      ApplicationService and its types
+  intake/            VacancyIntakeService and its input
+  stats/             StatsService
+  auth/              Better Auth, API keys
+  seed/              the made-up seed and resetToSeed
+```
+
+A new file goes into the folder of the one feature that uses it; once a second feature
+needs it, into `domain/`; plumbing over Prisma with no domain meaning, into `db/`. A
+spec sits next to its file; `isolation.spec.ts`, across every service, stays at the
+root.
 
 ## Request lifecycles
 
@@ -55,7 +80,7 @@ Claude analyses a vacancy (a skill, not in this repo)
           → new?         create (NEW) → writeAnalysis() → { created: true, attached: false, vacancy }
   → tool returns { success: created || attached, vacancy: { id, company, title } } as JSON text
 
-The analysis queue (phase 5): list_vacancies({ status: ['NEW'], hasText: true })
+The analysis queue: list_vacancies({ status: ['NEW'], hasText: true })
   → get_vacancies_batch → submit_analyses_batch → VacancyService.submitAnalyses()
       → writeAnalysis() per item, one transaction
 ```
@@ -69,15 +94,14 @@ apps/web  useVacancies()  (TanStack Query)
         (optimistic cache update in the hook; rollback on error; invalidate on settle)
 ```
 
-**User records an application** (Phase 2):
+**User records an application**:
 
 ```
 apps/web  ApplyDialog "mark as applied"  →  POST /api/v1/applications { vacancyId, ... }
 apps/mcp  record_application { company, title, ... }
   → ApplicationService.record()   (packages/core, one transaction)
       → resolve the vacancy: link by id / link to a unique (company,title) match /
-        create a placeholder Vacancy (fullText 'N/A', score 0 / derived; an ANALYZER
-        comment only if one was passed)
+        create a placeholder Vacancy (no text; an analysis only if a score was passed)
       → already in the pipeline? AlreadyAppliedError
       → writeStatus(APPLIED), then writeStatus(status) if recorded further along
         (each a StatusChange row + the status / statusChangedAt cache)
@@ -89,13 +113,11 @@ Both transports call the same core service methods; there is no business logic i
 `apps/api` or `apps/mcp` beyond input validation and shaping the response. See
 [`contracts.md`](contracts.md) for the exact surfaces.
 
-`apps/web` keeps one shared HTTP helper — `src/lib/api.ts` (`API_BASE`,
-`parseResponse`, `cursorPageSchema`), `src/lib/useInfiniteList.ts` (a cursor-paged
-table's query, [ADR-0030](decisions/0030-cursor-paging.md)) — plus `src/lib/routeMeta.ts` (each route's title / subtitle /
-`rail` metadata, read by `RootLayout`) and the presentational pieces both features
-draw on under `src/components/ui/` (`ScorePill`, `KpiTile`, `Modal`, `Select`,
-`ExpandableText`, `SoonPage`). The shell is `src/components/RootLayout.tsx` +
-`src/components/shell/`.
+In `apps/web`, `src/lib/` holds what every page shares: the HTTP helper (`api.ts`:
+`apiFetch`, `parseResponse`, `cursorPageSchema`), the cursor-paged query
+(`useInfiniteList.ts`, [ADR-0030](decisions/0030-cursor-paging.md)) and each route's
+title (`routeMeta.ts`). Presentational pieces are in `src/components/ui/`, the shell in
+`src/components/RootLayout.tsx` + `src/components/shell/`.
 
 ## Dev stack (Docker Compose)
 
@@ -118,42 +140,31 @@ draw on under `src/components/ui/` (`ScorePill`, `KpiTile`, `Modal`, `Select`,
   own so a crash there never touches stdio. It fetches the API's JWKS at
   `AUTH_URL=http://api:3000` — inside a container `localhost` is the container — while
   the tokens' issuer stays `${BETTER_AUTH_URL}/api/auth`, the public URL.
-- **`api`/`mcp` don't watch `core`'s `dist/`.** They consume the *compiled* output
-  of `packages/core`, and their watchers don't react to it changing. After editing
-  `packages/core`, run `docker compose restart api mcp mcp-http` if the change doesn't
-  show up (`mcp-http` runs `tsx` without a watcher: its own source edits want a
-  restart too). This is the friction tracked in
-  [ADR-0003](decisions/0003-core-consumed-as-dist.md).
-- **Healthchecks gate startup.** `postgres` has a `pg_isready` healthcheck; `api`
-  and `mcp` `depends_on: postgres: condition: service_healthy`; `api` has its own
-  `/health` healthcheck and `web` waits on `api` being healthy. See
-  [ADR-0016](decisions/0016-docker-dev-stack-and-ci.md).
+- **The apps don't watch `core`'s `dist/`.** They run `core`'s compiled output, and
+  their watchers don't see it change ([ADR-0003](decisions/0003-core-consumed-as-dist.md)).
+- **Healthchecks gate startup.** `api` and `mcp` wait for `postgres`'s `pg_isready`;
+  `web` waits for `api`'s `/health` ([ADR-0016](decisions/0016-docker-dev-stack-and-ci.md)).
+- **Each service has its own `node_modules` volume**, not shared, and `core`, `api`,
+  `mcp` and `mcp-http` regenerate the Prisma client into theirs on start.
 
-After changing dependencies or `schema.prisma`, a container's `node_modules` /
-generated Prisma client go stale — **each service has its own anonymous
-`node_modules` volume; they are not shared**. Run the fix inside *every* consuming
-container, not just `core`:
+So, after a change to:
 
-- new dependency → `docker compose exec <svc> npm install` in each service that
-  imports it (e.g. `web` for a new web dep).
-- `schema.prisma` change → `docker compose restart api mcp mcp-http core`. Each of them
-  runs `prisma generate` into its own volume before it starts (its `command` in
-  `docker-compose.yml`). By hand: `docker compose exec <svc> npm --prefix /repo run
-  generate`. Symptoms of a missed
-  regen: an `@IsEnum(<NewEnum>)` DTO crashes on boot (`core`'s re-export resolves to
-  `undefined`); a new enum *value* fails quieter — 400 from `@IsEnum`, 500 from a
-  query that names it (phase 4.2, `UNAVAILABLE`).
-- or just `docker compose up -d --build`.
+- `packages/core` code or `schema.prisma` (a migration included) →
+  `docker compose restart core api mcp mcp-http`. A missed regeneration shows as an
+  `@IsEnum(<NewEnum>)` DTO crashing on boot, or a 400 / 500 on a new enum value.
+- a dependency → `docker compose up -d --build`, then `docker compose up -d -V`: a
+  recreated container keeps its old anonymous `node_modules` volume unless `-V`
+  renews it.
 
 ## System invariants
 
 The load-bearing assumptions. Each links to the section or ADR that owns it.
 
 1. **`packages/core` is the only database client.** `apps/api` and `apps/mcp`
-   reach the DB *only* through `VacancyService` / `ApplicationService`. A
+   reach the DB *only* through `core`'s services. A
    query written in a controller or a tool handler is a bug. Auth is the one other
-   door: the Better Auth instance built by `createAuth` in `core` on `core`'s client
-   (phase 6, once step 1 lands); the apps mount it, never build their own.
+   door: the Better Auth instance `createAuth` builds in `core` on `core`'s client; the
+   apps mount it, never build their own.
    → [ADR-0002](decisions/0002-core-shared-domain-layer.md),
    [ADR-0034](decisions/0034-auth-better-auth-in-core.md)
 2. **A vacancy is analysed once.** A vacancy can exist before its analysis (status
@@ -180,9 +191,9 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    → [`domain-model.md`](domain-model.md),
    [ADR-0029](decisions/0029-one-vacancy-table.md),
    [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)
-4. **`recommendation` is stored canonical-English.** Ukrainian input is normalized
-   on the way in (`normalizeRecommendation`). Every filter/enum downstream assumes
-   English. → [`domain-model.md`](domain-model.md)
+4. **`recommendation` is stored canonical-English.** Only the English enum is
+   accepted on the way in (`parseRecommendation`, the MCP and REST validators). Every
+   filter/enum downstream assumes English. → [`domain-model.md`](domain-model.md)
 5. **The web app's API contract is a hand-written zod schema**, not a `core`
    import. `core` pulls in Prisma/pg and must never enter the browser bundle.
    → [ADR-0012](decisions/0012-web-hand-written-contract.md)
@@ -195,7 +206,7 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 8. **Env is loaded by the app entrypoint, validated at boot.** `packages/core`
    does not load `.env`; a missing/invalid var fails startup with a readable
    message. → [ADR-0007](decisions/0007-env-config-and-loading.md)
-9. **Every REST route is closed by default** (phase 6, from step 2). A global guard
+9. **Every REST route is closed by default.** A global guard
    wants a session; anonymous access is explicit (`@AllowAnonymous()`, `/health` only),
    machine access is explicit (`ApiKeyGuard`, the three n8n routes only).
    An anonymous route has no user to scope its queries to (invariant 11).
@@ -207,7 +218,7 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
     copied from the dev DB, a log or a mailbox. Git keeps what was ever committed, so a
     leak means rewriting history. The owner's personal skills, which do hold real data,
     live in a separate private repo cloned into the gitignored `skills/`.
-11. **Every domain query is scoped to its user** (phase 7, from step 3a). `Vacancy`
+11. **Every domain query is scoped to its user.** `Vacancy`
     has a `userId`; core's services take it as their first argument and query only
     through `forUser(db, userId)`, which adds the owner to every `Vacancy`, `Comment`
     and `StatusChange` query. A query on the raw client reads every user's rows; another

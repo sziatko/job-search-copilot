@@ -21,7 +21,7 @@ export function countLine(shown: number, total: number) {
 
 /**
  * The vacancy rows of a modal — the company modal's and the search modal's: date (with
- * the tracker's ⏳), vacancy, score, status, CV, Copy / Details (in a new tab: a modal's
+ * /applications' ⏳), vacancy, score, status, CV, Copy / Details (in a new tab: a modal's
  * context would be lost to an in-place navigation).
  */
 export function ModalVacancyTable({
@@ -70,10 +70,9 @@ export function ModalVacancyTable({
           {loading && <SkeletonRows rows={4} cols={6} />}
           {items.map((item) => {
             const application = applicationsByVacancy.get(item.id);
-            // Two independent questions, and they used to be one variable: can
-            // this be a link (`isSafeExternalUrl`), and can a score be shown
-            // (`hasAnalysis`). A row can be either without the other — which is
-            // why /vacancies and this table drew the same row differently.
+            // Two independent questions: can this be a link (`isSafeExternalUrl`), and
+            // can a score be shown (`hasAnalysis`). A row can be either without the
+            // other.
             const linkable = isSafeExternalUrl(item.applyUrl);
             const isCurrent = item.id === currentId;
             return (
@@ -113,7 +112,7 @@ export function ModalVacancyTable({
                     {item.company} <span className="id">#{item.id}</span>
                   </div>
                 </td>
-                {/* A placeholder has no analysis behind its score number. */}
+                {/* No analysis, no score — as on /vacancies. */}
                 <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
                 <td>
                   <span className={`tag ${STATUS_TAGS[item.status].variant}`}>
