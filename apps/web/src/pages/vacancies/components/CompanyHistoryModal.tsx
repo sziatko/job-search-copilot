@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useId } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { queryKeys } from '@/lib/queryKeys';
 import { listApplicationsPage } from '@/pages/applications/api';
 import { listVacanciesPage } from '../api';
 import { countLine, ModalVacancyTable } from './ModalVacancyTable';
@@ -12,8 +13,9 @@ import { countLine, ModalVacancyTable } from './ModalVacancyTable';
  * Fetched when it opens, not with the table: the list only needs
  * `companyMatchCount` to draw the button, and the modal's rows are a different
  * query (a different scope, and up to 100 of them). `staleTime: 0` on both
- * queries, so every open refetches: neither key is invalidated by the tables'
- * writes, and the app's default 30s kept a status changed a moment ago stale.
+ * queries, so every open refetches: the app's own status writes mark them stale
+ * (`staleAfter` in `lib/queryKeys.ts`), but a write from elsewhere — the MCP server,
+ * another tab — would wait out the app's default staleness.
  */
 export function CompanyHistoryModal({
   company,
@@ -28,19 +30,15 @@ export function CompanyHistoryModal({
   const titleId = useId();
 
   const { data, isPending, error } = useQuery({
-    // Deliberately NOT under ['vacancies']: useVacancies invalidates that prefix
-    // after every action change, which would refetch this for nothing.
-    queryKey: ['vacancy-company', company],
+    queryKey: queryKeys.vacancyCompany(company),
     queryFn: () => listVacanciesPage({ sameCompanyAs: company, limit: 100 }),
     staleTime: 0,
   });
 
   // This company's applications, every spelling (ADR-0032), for the ⏳ mark and the
-  // CV column. Not under ['applications']: those entries are /applications' paged
-  // lists, and its optimistic writes patch every one of them as pages.
-  // One page of 500: a company with more applications loses the oldest marks.
+  // CV column. One page of 500: a company with more applications loses the oldest marks.
   const applications = useQuery({
-    queryKey: ['application-company', company],
+    queryKey: queryKeys.applicationCompany(company),
     queryFn: () => listApplicationsPage({ sameCompanyAs: company, limit: 500 }),
     staleTime: 0,
   });

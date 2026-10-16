@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { IconPerson } from '@/components/icons';
 import { SoonPage } from '@/components/ui/SoonPage';
 import { authClient } from '@/lib/auth';
+import { queryKeys } from '@/lib/queryKeys';
 
 /** Better Auth's client answers `{ data, error }` rather than throwing; React Query
  * wants a throw. */
@@ -20,10 +21,10 @@ function orThrow<T>({ data, error }: { data: T | null; error: { message?: string
 function PasskeysCard() {
   const queryClient = useQueryClient();
   const passkeys = useQuery({
-    queryKey: ['passkeys'],
+    queryKey: queryKeys.passkeys(),
     queryFn: async () => orThrow(await authClient.passkey.listUserPasskeys()),
   });
-  const onSettled = () => queryClient.invalidateQueries({ queryKey: ['passkeys'] });
+  const onSettled = () => queryClient.invalidateQueries({ queryKey: queryKeys.passkeys() });
   const onError = (error: Error) => toast.error(error.message);
   const add = useMutation({
     mutationFn: async () => orThrow(await authClient.passkey.addPasskey()),
@@ -95,10 +96,10 @@ function ApiKeysCard() {
   const nameId = useId();
   const [name, setName] = useState('');
   const keys = useQuery({
-    queryKey: ['api-keys'],
+    queryKey: queryKeys.apiKeys(),
     queryFn: async () => orThrow(await authClient.apiKey.list()).apiKeys,
   });
-  const onSettled = () => queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+  const onSettled = () => queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys() });
   const onError = (error: Error) => toast.error(error.message);
   const create = useMutation({
     mutationFn: async (keyName: string) =>

@@ -3,6 +3,7 @@ import { useLocation } from '@tanstack/react-router';
 import { useState } from 'react';
 import { JscLogo } from '@/components/icons';
 import { authClient } from '@/lib/auth';
+import { queryKeys } from '@/lib/queryKeys';
 
 /**
  * "Allow this app to use JSC?" — where the API sends a signed-in user when an MCP client
@@ -20,7 +21,7 @@ export function ConsentPage() {
 
   // A client registers itself (RFC 7591) and names itself; the name is its own claim.
   const client = useQuery({
-    queryKey: ['oauth-client', clientId],
+    queryKey: queryKeys.oauthClient(clientId),
     queryFn: async () =>
       (await authClient.oauth2.publicClient({ query: { client_id: clientId } })).data,
   });

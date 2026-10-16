@@ -1,13 +1,10 @@
-import {
-  type InfiniteData,
-  type QueryKey,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { queryKeys, staleAfter } from '@/lib/queryKeys';
 import { useInfiniteList } from '@/lib/useInfiniteList';
+import { useRowMutation } from '@/lib/useRowMutation';
 import { recordApplication } from '../applications/api';
 import { isPipelineStatus } from '../applications/types';
 import { listVacanciesPage, updateVacancyStatus, type VacancyPage } from './api';
@@ -19,10 +16,9 @@ import {
   STATUS_FILTER_ALL,
   type StatusFilterValue,
   VACANCY_ACTION,
+  type VacancyListItem,
   type VacancyStatus,
 } from './types';
-
-const VACANCIES_KEY = ['vacancies'] as const;
 
 interface PendingVacancy {
   id: number;
@@ -35,8 +31,6 @@ interface ActionChange {
   status: RowAction;
   comment?: string;
 }
-
-type CachedPages = InfiniteData<VacancyPage, number | undefined>;
 
 /** The filter as the API's `status` — All is the page's own statuses, never the whole
  * table: NEW / FILTERED_OUT are /inbox's, the pipeline /applications'. */
@@ -71,97 +65,43 @@ export function useVacancies() {
 /**
  * A table of vacancy rows — /vacancies' and /inbox's: the server's list, paged, and the
  * row writes (a status move, optimistic and toasted; Decline, Save for later and Apply
- * behind their dialogs). `filters` are the page's own, keyed under ['vacancies'].
+ * behind their dialogs). `filters` are the page's own, keyed under `queryKeys.vacancies`.
  */
 export function useVacancyRows(
   filters: readonly unknown[],
   fetchPage: (cursor: number | undefined) => Promise<VacancyPage>,
 ) {
-  const queryClient = useQueryClient();
-
-  // The filters are part of the key: a different filter is a different list. So every
-  // write below goes through the key *prefix*, never one exact key — while a new
-  // filter's first page loads, its exact entry does not exist yet, and a write to it
-  // would be a no-op with nothing to roll back. The prefix reaches /vacancies' and
-  // /inbox's entries alike; each is an infinite query, and the write patches every page.
+  // The filters are part of the key, so a different filter is a different list. The
+  // writes go through the prefix (see `useRowMutation`), which reaches /vacancies' and
+  // /inbox's entries alike.
   //
-  // Not visible while that page loads: `keepPreviousData` shows the old result frozen,
-  // so a write lands in the cache, not on screen, until the new page arrives.
-  const queryKey = [...VACANCIES_KEY, ...filters];
+  // Not visible while a new filter's page loads: `keepPreviousData` shows the old result
+  // frozen, so a write lands in the cache, not on screen, until the new page arrives.
+  const { savingIds, rowErrors, rowMutation } = useRowMutation<VacancyListItem>(
+    queryKeys.vacancies(),
+  );
 
   // The server filters and sorts; `useInfiniteList` keeps the previous rows on screen
   // while a new key loads, so the table does not blank on a filter change.
-  const { query, items, total, loadMore } = useInfiniteList(queryKey, fetchPage);
+  const { query, items, total, loadMore } = useInfiniteList(
+    queryKeys.vacancies(...filters),
+    fetchPage,
+  );
   const loading = query.isPending;
   const loadError = query.error ? query.error.message : null;
 
-  // Per-row UI bookkeeping. The cache is the source of truth for the data itself;
-  // these just track which rows are mid-flight / errored so the table can show it.
-  const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
-  const [rowErrors, setRowErrors] = useState<Map<number, string>>(new Map());
   const [pendingDecline, setPendingDecline] = useState<PendingVacancy | null>(null);
   const [pendingSave, setPendingSave] = useState<PendingVacancy | null>(null);
   const [pendingApply, setPendingApply] = useState<PendingVacancy | null>(null);
 
-  /** Undo a `patchCachedItem` — every key it wrote, back to the snapshot.
-   * `setQueryData` ignores `undefined`, so a page that had no data keeps none. */
-  function restorePages(previous: [QueryKey, CachedPages | undefined][] | undefined) {
-    for (const [key, data] of previous ?? []) {
-      queryClient.setQueryData(key, data);
-    }
-  }
-
-  /** Optimistic write into **every** cached page, shared by both mutations. The row
-   * keeps its place even when it leaves the filter: the refetch in `onSettled` is what
-   * drops it. */
-  function patchCachedItem(id: number, next: VacancyStatus) {
-    queryClient.setQueriesData<CachedPages>({ queryKey: VACANCIES_KEY }, (old) =>
-      old
-        ? {
-            ...old,
-            pages: old.pages.map((page) => ({
-              ...page,
-              items: page.items.map((item) => (item.id === id ? { ...item, status: next } : item)),
-            })),
-          }
-        : old,
-    );
-  }
-
   const actionMutation = useMutation({
-    mutationFn: ({ id, status, comment }: ActionChange) => updateVacancyStatus(id, status, comment),
-    onMutate: async ({ id, status }) => {
-      // Don't let an in-flight refetch clobber the optimistic write.
-      await queryClient.cancelQueries({ queryKey });
-      setSavingIds((prev) => new Set(prev).add(id));
-      setRowErrors((prev) => {
-        const next = new Map(prev);
-        next.delete(id);
-        return next;
-      });
-      const previous = queryClient.getQueriesData<CachedPages>({ queryKey: VACANCIES_KEY });
-      patchCachedItem(id, status);
-      return { previous };
-    },
-    onError: (err, { id }, context) => {
-      restorePages(context?.previous);
-      setRowErrors((prev) =>
-        new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
-      );
-    },
+    ...rowMutation({
+      mutationFn: ({ id, status, comment }: ActionChange) =>
+        updateVacancyStatus(id, status, comment),
+      patch: (item, { status }) => ({ ...item, status }),
+      invalidates: staleAfter.statusWrite,
+    }),
     onSuccess: (item) => toastMoved(item.status, item),
-    onSettled: (_data, _err, { id }) => {
-      setSavingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      void queryClient.invalidateQueries({ queryKey: VACANCIES_KEY });
-      // The vacancy's own page shows the status too.
-      void queryClient.invalidateQueries({ queryKey: ['vacancy'] });
-      // Triage moves change the dashboard's counts.
-      void queryClient.invalidateQueries({ queryKey: ['stats'] });
-    },
   });
 
   function requestActionChange(id: number, status: RowAction) {
@@ -203,47 +143,21 @@ export function useVacancyRows(
   // comment) and moves the vacancy to APPLIED in the same transaction — so this path
   // does not call updateVacancyStatus.
   const applyMutation = useMutation({
-    mutationFn: ({ id, details }: { id: number; details: ApplyDetails }) =>
-      recordApplication({
-        vacancyId: id,
-        salaryInApplication: details.salary || undefined,
-        usedTailoredResume: details.usedTailoredResume,
-        comment: details.comment || undefined,
-      }),
-    onMutate: async ({ id }) => {
-      await queryClient.cancelQueries({ queryKey });
-      setSavingIds((prev) => new Set(prev).add(id));
-      setRowErrors((prev) => {
-        const next = new Map(prev);
-        next.delete(id);
-        return next;
-      });
-      const previous = queryClient.getQueriesData<CachedPages>({ queryKey: VACANCIES_KEY });
-      patchCachedItem(id, VACANCY_ACTION.APPLIED);
-      return { previous };
-    },
-    onError: (err, { id }, context) => {
-      restorePages(context?.previous);
-      setRowErrors((prev) =>
-        new Map(prev).set(id, err instanceof Error ? err.message : 'Failed to save'),
-      );
-    },
+    ...rowMutation({
+      mutationFn: ({ id, details }: { id: number; details: ApplyDetails }) =>
+        recordApplication({
+          vacancyId: id,
+          salaryInApplication: details.salary || undefined,
+          usedTailoredResume: details.usedTailoredResume,
+          comment: details.comment || undefined,
+        }),
+      patch: (item) => ({ ...item, status: VACANCY_ACTION.APPLIED }),
+      invalidates: staleAfter.statusWrite,
+    }),
     // Here, not at the call site: the dialog unmounts the moment it is confirmed, so a
     // `toast.success` next to `mutate()` would announce success before the server
     // answered — even when the answer is a 422.
     onSuccess: () => toast.success('Application submitted!'),
-    onSettled: (_data, _err, { id }) => {
-      setSavingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      void queryClient.invalidateQueries({ queryKey: VACANCIES_KEY });
-      void queryClient.invalidateQueries({ queryKey: ['applications'] });
-      void queryClient.invalidateQueries({ queryKey: ['application-company'] });
-      void queryClient.invalidateQueries({ queryKey: ['vacancy'] });
-      void queryClient.invalidateQueries({ queryKey: ['stats'] });
-    },
   });
 
   function confirmApply(details: ApplyDetails) {

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { listVacanciesPage } from '../vacancies/api';
 import { VACANCY_ACTION } from '../vacancies/types';
 import { fetchStats } from './api';
@@ -8,9 +9,9 @@ const REVIEW_QUEUE_SIZE = 10;
 
 /** Two requests: the numbers, and the top of the triage queue in the server's order. */
 export function useDashboard() {
-  const stats = useQuery({ queryKey: ['stats'], queryFn: fetchStats });
+  const stats = useQuery({ queryKey: queryKeys.stats(), queryFn: fetchStats });
   const reviewQueue = useQuery({
-    queryKey: ['dashboard', 'review-queue'],
+    queryKey: queryKeys.dashboard('review-queue'),
     queryFn: () =>
       listVacanciesPage({
         status: [VACANCY_ACTION.NOT_REVIEWED],

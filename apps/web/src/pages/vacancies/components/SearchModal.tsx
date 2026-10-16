@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { SearchInput } from '@/components/ui/SearchInput';
+import { queryKeys } from '@/lib/queryKeys';
 import { listApplicationsPage } from '@/pages/applications/api';
 import { isPipelineStatus } from '@/pages/applications/types';
 import { listVacanciesPage } from '../api';
@@ -42,8 +43,7 @@ export function SearchModal({
         : vacancyStatusSchema.options;
 
   const { data, isPending, error } = useQuery({
-    // Not under ['vacancies'], as the company modal's: the tables' writes invalidate that.
-    queryKey: ['vacancy-search', term, statuses],
+    queryKey: queryKeys.vacancySearch(term, statuses),
     queryFn: () => listVacanciesPage({ search: term, status: statuses, limit: 100 }),
     // An empty box shows nothing, not the whole table.
     enabled: term !== '',
@@ -57,7 +57,7 @@ export function SearchModal({
   // row can be among them.
   // One page of 500: a term matching more applications loses the oldest marks.
   const applications = useQuery({
-    queryKey: ['application-search', term],
+    queryKey: queryKeys.applicationSearch(term),
     queryFn: () => listApplicationsPage({ search: term, limit: 500 }),
     enabled: term !== '' && statuses.some(isPipelineStatus),
     staleTime: 0,
