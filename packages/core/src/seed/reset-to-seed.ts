@@ -18,11 +18,16 @@ const DISPOSABLE_DB = /_(e2e|test|demo)$/;
  * SEED_VACANCIES through the services as that user, so the journal and the comments are
  * the ones the app itself writes. Users, sessions and other users' vacancies are left
  * alone. Then every date is moved back
- * relative to now — the last move `daysAgo` days ago, one day per earlier step — so the
- * timeout rule gives the same answer on every run. Refuses, before any write, a database
- * whose name (asked of the connection itself) does not end in `_e2e`, `_test` or `_demo`.
+ * relative to `now` — the last move `daysAgo` days ago, one day per earlier step — so the
+ * timeout rule gives the same answer on every run. `now` is a parameter so the visual
+ * tests can pin it (`e2e/clock.ts`). Refuses, before any write, a database whose name
+ * (asked of the connection itself) does not end in `_e2e`, `_test` or `_demo`.
  */
-export async function resetToSeed(prisma: PrismaClient, userId: string): Promise<void> {
+export async function resetToSeed(
+  prisma: PrismaClient,
+  userId: string,
+  now = new Date(),
+): Promise<void> {
   const [{ name }] = await prisma.$queryRaw<{ name: string }[]>`SELECT current_database() AS name`;
   if (!DISPOSABLE_DB.test(name)) {
     throw new Error(`resetToSeed refuses "${name}": only a *_e2e, *_test or *_demo database`);
@@ -99,7 +104,6 @@ export async function resetToSeed(prisma: PrismaClient, userId: string): Promise
   // The new dates, as (ids, dates) column pairs: three UPDATEs instead of one per row
   // (about 700, seconds against Docker on Windows). Raw SQL is outside forUser: the ids
   // were read through it, and the Vacancy UPDATE checks the owner as well.
-  const now = Date.now();
   const dated = {
     change: { ids: [] as number[], at: [] as string[] },
     comment: { ids: [] as number[], at: [] as string[] },
@@ -109,7 +113,7 @@ export async function resetToSeed(prisma: PrismaClient, userId: string): Promise
     const steps = journals[i].length;
     // A minute apart per vacancy, so no two share a date.
     const at = (step: number) =>
-      new Date(now - (v.daysAgo + steps - 1 - step) * DAY - i * MINUTE).toISOString();
+      new Date(now.getTime() - (v.daysAgo + steps - 1 - step) * DAY - i * MINUTE).toISOString();
     for (const [step, id] of byVacancy(changes, ids[i]).entries()) {
       dated.change.ids.push(id);
       dated.change.at.push(at(step));
@@ -129,7 +133,8 @@ export async function resetToSeed(prisma: PrismaClient, userId: string): Promise
     prisma.$executeRaw`UPDATE "Comment" AS t SET "createdAt" = d.at
       FROM unnest(${comment.ids}::int[], ${comment.at}::timestamp(3)[]) AS d(id, at)
       WHERE t.id = d.id`,
-    prisma.$executeRaw`UPDATE "Vacancy" AS t SET "createdAt" = d.c, "statusChangedAt" = d.m
+    prisma.$executeRaw`UPDATE "Vacancy" AS t SET "createdAt" = d.c, "statusChangedAt" = d.m,
+        "updatedAt" = d.m
       FROM unnest(${vacancy.ids}::int[], ${vacancy.createdAt}::timestamp(3)[],
         ${vacancy.movedAt}::timestamp(3)[]) AS d(id, c, m)
       WHERE t.id = d.id AND t."userId" = ${userId}`,

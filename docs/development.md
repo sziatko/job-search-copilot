@@ -72,6 +72,8 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 | `npm run mcp:inspect` | the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) web UI over the MCP server (stdio, needs `.env`) — browse the tools and call them |
 | `npm test` / `npm run test:watch` | Vitest across all workspaces (needs the test DB) |
 | `npm run test:e2e` | Playwright end-to-end over its own api, web and `job_search_copilot_e2e` ([ADR-0037](decisions/0037-e2e-playwright.md)); not part of `npm test` |
+| `npm run test:visual` | the visual tests (`e2e/visual.spec.ts`) in the Playwright Linux image, through `docker compose run visual`; extra arguments go to Playwright |
+| `npm run test:visual:update` | the same, rewriting the baselines it differs from |
 | `npm run screenshots` | retake the README's screenshots (`docs/screenshots/`) on the e2e seed, light and dark |
 | `npm run seed` | reset the e2e database to the made-up seed (refuses any DB not named `*_e2e` / `*_test` / `*_demo`) |
 | `npm run lint` / `npm run lint:fix` / `npm run format` | Biome |
@@ -84,7 +86,7 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
 Postgres service on every push and PR; on a PR a second job, `e2e`, runs
-`npm run test:e2e` ([ADR-0037](decisions/0037-e2e-playwright.md)).
+`npm run test:e2e` and the visual tests in the Playwright image ([ADR-0037](decisions/0037-e2e-playwright.md)).
 
 Database and migration conventions:
 [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
@@ -103,6 +105,18 @@ How a test finds an element, in the web tests and the Playwright specs alike:
 - **Never by CSS class.** Classes belong to styling and can be renamed without a test
   noticing.
 
+Visual tests (`npm run test:visual`) compare every page, dialog and empty state with a
+baseline PNG in `e2e/visual.spec.ts-snapshots/`, at a desktop and a phone width, light
+and dark. They run only in the Playwright image (`e2e/Dockerfile`, the image CI's `e2e`
+job runs in): font rendering differs on Windows and macOS, so a baseline from the host
+would never match. Like `test:e2e`, they read core's `dist/` (the stack's `core`
+watcher, or `npm run build --workspace=@job-search-copilot/core`).
+
+When a change is meant to look different: `npm run test:visual:update`, open the
+changed PNGs in the diff, and commit them with the change. `npm run test:visual --
+-g dashboard` narrows a run. A failed run's diffs are in `playwright-report/`
+(`npx playwright show-report`). A new page, dialog or empty state gets a test there.
+
 ## Gotchas
 
 - **`npm test` can pass while `core` does not build.** Vitest strips types without
@@ -116,7 +130,7 @@ How a test finds an element, in the web tests and the Playwright specs alike:
   on its prompt holding the advisory lock. More in
   [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
 - **CSS is invisible to the web tests.** `index.css` never loads in jsdom, so layout,
-  hover and placement need a browser (Playwright, `npm run test:e2e`).
+  hover and placement need a browser (Playwright, `npm run test:e2e`, `npm run test:visual`).
 - **MSW in the web tests:** a later `server.use()` wins, but inside one call the first
   handler wins; `passthrough()` sends the *real* request (to the dev API on :3000), it
   is not "try the next handler".

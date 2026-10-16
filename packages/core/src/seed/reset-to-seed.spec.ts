@@ -57,6 +57,19 @@ describe('resetToSeed', () => {
     expect(stale).toBe(0);
   }, 120_000);
 
+  it('dates every vacancy from the `now` it is given', async () => {
+    const now = new Date('2026-03-02T10:00:00Z');
+
+    await resetToSeed(prisma, userId, now);
+
+    // The newest seed vacancy moved `now`; nothing is dated after it.
+    const { _max } = await prisma.vacancy.aggregate({
+      where: { userId },
+      _max: { createdAt: true, statusChangedAt: true, updatedAt: true },
+    });
+    expect(_max).toEqual({ createdAt: now, statusChangedAt: now, updatedAt: now });
+  }, 120_000);
+
   it("leaves another user's vacancies alone", async () => {
     const other = await createUser();
     const kept = await prisma.vacancy.create({

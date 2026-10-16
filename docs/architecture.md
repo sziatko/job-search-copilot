@@ -122,7 +122,9 @@ title (`routeMeta.ts`). Presentational pieces are in `src/components/ui/`, the s
 ## Dev stack (Docker Compose)
 
 `docker-compose.yml` runs: `postgres`, a `core` build watcher (`tsc --watch`),
-`api`, `mcp`, `mcp-http`, `web`.
+`api`, `mcp`, `mcp-http`, `web`. One more, `visual`, starts only on
+`npm run test:visual`: the visual tests in the Playwright image
+([ADR-0037](decisions/0037-e2e-playwright.md)).
 
 - **File watchers poll.** Bind-mount change events don't reliably reach containers
   on Windows/Docker Desktop, so `tsc --watch`, `nest start --watch`
