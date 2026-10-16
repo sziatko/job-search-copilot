@@ -3,6 +3,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -91,6 +92,8 @@ function VacancyView() {
   const id = Number(rawId);
   const page = useVacancyPage(id);
   const { data: vacancy, isPending, error } = page.vacancy;
+  // Each card is a region named by its heading, for a screen reader to jump between.
+  const cardId = useId();
 
   if (!Number.isInteger(id) || vacancy === null) {
     return (
@@ -117,24 +120,24 @@ function VacancyView() {
       <BackLink />
       <Header vacancy={vacancy} page={page} />
 
-      <div className="card mb-[16px]">
+      <section className="card mb-[16px]" aria-labelledby={`${cardId}-history`}>
         <div className="card-head">
-          <h2>Status history</h2>
+          <h2 id={`${cardId}-history`}>Status history</h2>
         </div>
         <Timeline steps={vacancy.timeline} />
-      </div>
+      </section>
 
       <div className="dash-grid">
         <div className="stack-gap">
-          <div className="card">
+          <section className="card" aria-labelledby={`${cardId}-description`}>
             <div className="card-head">
-              <h2>Description</h2>
+              <h2 id={`${cardId}-description`}>Description</h2>
             </div>
             <Description text={vacancy.fullText} />
-          </div>
-          <div className="card">
+          </section>
+          <section className="card" aria-labelledby={`${cardId}-comments`}>
             <div className="card-head">
-              <h2>Comments &amp; history</h2>
+              <h2 id={`${cardId}-comments`}>Comments &amp; history</h2>
               <div className="count">
                 {vacancy.comments.length} {vacancy.comments.length === 1 ? 'entry' : 'entries'}
               </div>
@@ -145,19 +148,19 @@ function VacancyView() {
               error={page.commentError}
               onSubmit={page.addComment}
             />
-          </div>
+          </section>
         </div>
-        <div className="card">
+        <section className="card" aria-labelledby={`${cardId}-details`}>
           <div className="card-head">
-            <h2>Details</h2>
+            <h2 id={`${cardId}-details`}>Details</h2>
           </div>
           <Facts vacancy={vacancy} />
-        </div>
+        </section>
       </div>
 
-      <div className="card mt-[16px]">
+      <section className="card mt-[16px]" aria-labelledby={`${cardId}-others`}>
         <div className="card-head">
-          <h2>Other vacancies at {vacancy.company}</h2>
+          <h2 id={`${cardId}-others`}>Other vacancies at {vacancy.company}</h2>
           <div className="count">
             {page.othersPending
               ? 'Loading…'
@@ -165,7 +168,7 @@ function VacancyView() {
           </div>
         </div>
         <OtherVacancies items={page.others} pending={page.othersPending} />
-      </div>
+      </section>
     </>
   );
 }
@@ -198,7 +201,7 @@ function VacancySkeleton() {
           <div className="fact-list">
             {Array.from({ length: FACT_COUNT }, (_, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
-              <div key={i} className="fact-row">
+              <div key={i} className="fact-row" data-testid="fact-row">
                 <span className="skeleton w-[35%]" />
                 <span className="skeleton w-[25%]" />
               </div>
@@ -406,7 +409,9 @@ function Timeline({ steps }: { steps: VacancyDetail['timeline'] }) {
                 {isLast && bad && <IconCross />}
                 {isLast && good && <IconCheck />}
               </div>
-              <div className="timeline-label">{STATUS_LABELS[step.status]}</div>
+              <div className="timeline-label" data-testid="timeline-status">
+                {STATUS_LABELS[step.status]}
+              </div>
               <time className="timeline-date mono">
                 {dateFormatter.format(new Date(step.createdAt))}
               </time>
@@ -467,11 +472,11 @@ function Comments({ comments }: { comments: VacancyComment[] }) {
     return <div className="empty-state">No comments yet</div>;
   }
   return (
-    <div className="history-list">
+    <ul className="history-list" aria-label="Comments">
       {comments.map((comment) => {
         const source = SOURCE_META[comment.source];
         return (
-          <div key={comment.id} className="history-item">
+          <li key={comment.id} className="history-item">
             <div className={`history-badge ${source.className}`} aria-hidden>
               {source.label[0]}
             </div>
@@ -484,10 +489,10 @@ function Comments({ comments }: { comments: VacancyComment[] }) {
               </div>
               <div className="history-text">{comment.body}</div>
             </div>
-          </div>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
 
@@ -540,7 +545,7 @@ function CommentForm({
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="fact-row">
+    <div className="fact-row" data-testid="fact-row">
       <span className="fact-label">{label}</span>
       <span className="fact-value">{children}</span>
     </div>

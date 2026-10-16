@@ -23,19 +23,26 @@ export function KpiTile({
   const body = (
     <>
       <div className="kpi-label">{label}</div>
-      <div className="kpi-value">{value}</div>
+      <div className="kpi-value" data-testid="kpi-value">
+        {value}
+      </div>
       {note && <div className="kpi-note">{note}</div>}
     </>
   );
 
   if (!onClick) {
-    return <div className={className}>{body}</div>;
+    return (
+      <div className={className} data-testid="kpi-tile">
+        {body}
+      </div>
+    );
   }
 
   return (
     <button
       type="button"
       className={className}
+      data-testid="kpi-tile"
       onClick={onClick}
       aria-pressed={!!selected}
       // Without this the name is the label and value run together ("Timeout1").

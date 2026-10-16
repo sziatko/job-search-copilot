@@ -3,15 +3,20 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { reached, seedCount, seedOpen, seedStatus, seedTimedOut } from './seed';
 
-const rows = (page: Page) => page.locator('.table-body-scroll tbody tr');
+/** A vacancy's id as its row shows it: `#42`. */
+const ID = /^#\d+$/;
+/** The table's vacancy rows — the header row has no id. */
+const rows = (page: Page) => page.getByRole('row').filter({ has: page.getByText(ID) });
 const rowOf = (page: Page, id: number) =>
-  rows(page).filter({ has: page.locator('.id', { hasText: new RegExp(`^#${id}$`) }) });
+  rows(page).filter({ has: page.getByText(`#${id}`, { exact: true }) });
 const showing = (n: number) => `Showing ${n} of ${n}`;
 /** A KPI tile: a button named "<label>: <count>". */
 const tile = (page: Page, label: string, count: number) =>
   page.getByRole('button', { name: `${label}: ${count}`, exact: true });
-/** The toolbar's filter — every row's select is named "Status" too. */
-const filterSelect = (page: Page) => page.locator('.filter-select');
+/** The toolbar's filter — each row's select is "Status of <role> at <company>". */
+const filterSelect = (page: Page) => page.getByLabel('Status', { exact: true });
+/** The ⏳ mark's bubble. */
+const timeoutMark = /days since last update$/;
 
 const ofStatus = (status: string) => seedCount((v) => seedStatus(v) === status);
 const pipeline = seedCount((v) => (PIPELINE_STATUSES as readonly string[]).includes(seedStatus(v)));
@@ -44,9 +49,7 @@ test('the tiles filter the table: pressed, and kept in the URL', async ({ page }
   await expect(page.getByText(showing(timedOut))).toBeVisible();
   await expect(filterSelect(page)).toHaveValue('TIMEOUT');
   // Every row on screen carries the hourglass.
-  await expect(rows(page).locator('.timeout-mark')).toHaveCount(
-    await rows(page).locator('.id').count(),
-  );
+  await expect(rows(page).getByText(timeoutMark)).toHaveCount(await rows(page).count());
 
   const rejected = tile(page, 'Rejected', ofStatus('REJECTED'));
   await rejected.click();
@@ -70,7 +73,7 @@ test('the Status select: Active, Timeout, Awaiting', async ({ page }) => {
   await expect(page).toHaveURL(/\?status=ACTIVE$/);
   await expect(page.getByText(showing(active))).toBeVisible();
   await expect(tile(page, 'Active', active)).toHaveAttribute('aria-pressed', 'true');
-  await expect(rows(page).locator('.timeout-mark')).toHaveCount(0);
+  await expect(rows(page).getByText(timeoutMark)).toHaveCount(0);
 
   await filterSelect(page).selectOption({ label: 'Timeout' });
   await expect(page).toHaveURL(/\?status=TIMEOUT$/);
@@ -113,14 +116,14 @@ test("a move to Awaiting, then Offer: the tiles and the dashboard's counts follo
   await page.goto('/');
   const kpi = (label: string) =>
     page
-      .locator('.kpi-tile')
+      .getByTestId('kpi-tile')
       .filter({ has: page.getByText(label, { exact: true }) })
-      .locator('.kpi-value');
+      .getByTestId('kpi-value');
   const funnel = (label: string) =>
     page
-      .locator('.funnel-row')
+      .getByTestId('funnel-row')
       .filter({ has: page.getByText(label, { exact: true }) })
-      .locator('.funnel-value');
+      .getByTestId('funnel-value');
   await expect(kpi('Interviews')).toHaveText(String(interview + 1));
   await expect(funnel('Got a response')).toHaveText(String(responded + 1));
   await expect(funnel('Interview')).toHaveText(String(interview + 1));
@@ -144,7 +147,7 @@ test('the Edit dialog updates salary, CV and comment', async ({ page, db }) => {
   await expect(dialog).toBeHidden();
   await expect(row.getByText('77k EUR / year')).toBeVisible();
   await expect(row.getByText('✓')).toBeVisible();
-  await expect(row.locator('.comment-cell')).toContainText(comment);
+  await expect(row).toContainText(comment);
 });
 
 test("the merged comment's Show more / Show less", async ({ page, db }) => {
@@ -154,16 +157,19 @@ test("the merged comment's Show more / Show less", async ({ page, db }) => {
     orderBy: { id: 'asc' },
   });
   await page.goto('/applications?status=INTERVIEW');
-  const cell = rowOf(page, id).locator('.comment-cell');
+  // The cell that holds the toggle, whichever way it reads.
+  const cell = rowOf(page, id)
+    .getByRole('cell')
+    .filter({ has: page.getByRole('button', { name: /^Show (more|less)$/ }) });
 
   const more = cell.getByRole('button', { name: 'Show more' });
   await expect(more).toHaveAttribute('aria-expanded', 'false');
-  const clamped = await cell.locator('.clamp').evaluate((el) => el.clientHeight);
+  const clamped = await cell.evaluate((el) => el.clientHeight);
   await more.click();
   const less = cell.getByRole('button', { name: 'Show less' });
   await expect(less).toHaveAttribute('aria-expanded', 'true');
-  await expect(cell.locator('hr').first()).toBeVisible();
-  expect(await cell.locator('.clamp').evaluate((el) => el.clientHeight)).toBeGreaterThan(clamped);
+  await expect(cell.getByRole('separator').first()).toBeVisible();
+  expect(await cell.evaluate((el) => el.clientHeight)).toBeGreaterThan(clamped);
 
   await less.click();
   await expect(more).toBeVisible();

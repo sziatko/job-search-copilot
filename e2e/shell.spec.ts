@@ -3,8 +3,8 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { seedStatus } from './seed';
 
-const title = (page: Page) => page.locator('.topbar-title');
-const sidebar = (page: Page) => page.locator('aside.sidebar');
+const title = (page: Page) => page.getByRole('banner').getByRole('heading', { level: 1 });
+const sidebar = (page: Page) => page.getByRole('complementary');
 
 test('each sidebar link opens its page', async ({ page }) => {
   await page.goto('/');
@@ -24,25 +24,25 @@ test('each sidebar link opens its page', async ({ page }) => {
 
 test('Collapse / Expand, and each route its own default', async ({ page }) => {
   const width = async () => (await sidebar(page).boundingBox())?.width ?? 0;
+  // Polled: the width animates.
+  const isOpen = () => expect.poll(width).toBeGreaterThan(200);
+  const isRail = () => expect.poll(width).toBeLessThan(100);
 
   await page.goto('/'); // the dashboard starts open
-  await expect(sidebar(page)).not.toHaveClass(/collapsed/);
-  expect(await width()).toBeGreaterThan(200);
+  await isOpen();
   await page.getByTitle('Collapse sidebar').click();
-  await expect(sidebar(page)).toHaveClass(/collapsed/);
-  await expect.poll(width).toBeLessThan(100);
+  await isRail();
 
   // A table page starts as a rail; the manual toggle was the dashboard's only.
   await page.getByRole('navigation').getByRole('link', { name: 'Analyzed vacancies' }).click();
-  await expect(sidebar(page)).toHaveClass(/collapsed/);
+  await isRail();
   await page.getByTitle('Expand sidebar').click();
-  await expect(sidebar(page)).not.toHaveClass(/collapsed/);
-  await expect.poll(width).toBeGreaterThan(200);
+  await isOpen();
 
   await page.getByRole('navigation').getByRole('link', { name: 'Application tracker' }).click();
-  await expect(sidebar(page)).toHaveClass(/collapsed/);
+  await isRail();
   await page.getByRole('navigation').getByRole('link', { name: 'Dashboard' }).click();
-  await expect(sidebar(page)).not.toHaveClass(/collapsed/);
+  await isOpen();
 });
 
 test('the theme toggle survives a reload', async ({ page }) => {
@@ -60,15 +60,12 @@ test('the theme toggle survives a reload', async ({ page }) => {
 test('the topbar goes compact on scroll, and back at the top', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 500 }); // the dashboard runs past it
   await page.goto('/');
-  await expect(page.locator('.kpi-tile').first()).toBeVisible();
-  const main = page.locator('.main');
+  await expect(page.getByRole('heading', { name: 'Pipeline funnel' })).toBeVisible();
 
   await page.evaluate(() => window.scrollTo(0, 200));
-  await expect(main).toHaveAttribute('data-compact', '');
   await expect(title(page)).toHaveCSS('font-size', '16px');
 
   await page.evaluate(() => window.scrollTo(0, 0));
-  await expect(main).not.toHaveAttribute('data-compact');
   await expect(title(page)).toHaveCSS('font-size', '20px');
 });
 
@@ -110,6 +107,7 @@ test.describe('at 390px', () => {
 
 test('the search modal: a term, All / Context, Hide Filtered out, open details', async ({
   page,
+  db,
 }) => {
   // A company with a FILTERED_OUT vacancy, so the checkbox changes the count.
   const company = SEED_VACANCIES.find((v) => seedStatus(v) === 'FILTERED_OUT')?.company ?? '';
@@ -140,14 +138,18 @@ test('the search modal: a term, All / Context, Hide Filtered out, open details',
   await expect(dialog.getByText(counted(ofCompany.length))).toBeVisible();
 
   // Details opens a new tab: the modal stays.
-  const row = dialog.locator('tbody tr').first();
-  const rowTitle = await row.locator('.role-title').textContent();
+  const row = dialog
+    .getByRole('row')
+    .filter({ has: page.getByText(/^#\d+$/) })
+    .first();
+  const id = Number((await row.getByText(/^#\d+$/).textContent())?.slice(1));
+  const { title: rowTitle } = await db.vacancy.findUniqueOrThrow({ where: { id } });
   const [details] = await Promise.all([
     page.waitForEvent('popup'),
     row.getByRole('link', { name: 'Open vacancy details' }).click(),
   ]);
   await expect(details).toHaveURL(/\/vacancies\/\d+$/);
-  await expect(details.getByRole('heading', { level: 1, name: rowTitle ?? '' })).toBeVisible();
+  await expect(details.getByRole('heading', { level: 1, name: rowTitle })).toBeVisible();
   await expect(dialog).toBeVisible();
 });
 

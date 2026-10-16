@@ -56,7 +56,7 @@ export function ApplicationsTable({
   filterKey: string;
   emptyMessage: string;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
   const { virtualItems, paddingTop, paddingBottom, measureElement } = useVirtualRows(
     scrollRef,
     items.length,
@@ -65,7 +65,8 @@ export function ApplicationsTable({
   );
 
   return (
-    <div ref={scrollRef} className="table-body-scroll">
+    // A named region: the box scrolls on its own, and a screen reader can jump to it.
+    <section ref={scrollRef} className="table-body-scroll" aria-label="Applications">
       <table className="min-w-[1210px] table-fixed" aria-busy={loading}>
         <thead>
           <tr>
@@ -190,6 +191,7 @@ export function ApplicationsTable({
                 </td>
                 <td>
                   <ApplicationStatusSelect
+                    label={`Status of ${item.title} at ${item.company}`}
                     value={item.status}
                     disabled={savingIds.has(item.id)}
                     onChange={(status) => onStatusChange(item.id, status)}
@@ -208,6 +210,6 @@ export function ApplicationsTable({
           )}
         </tbody>
       </table>
-    </div>
+    </section>
   );
 }

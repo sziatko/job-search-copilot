@@ -14,9 +14,9 @@ test('the tiles and the funnel count the seed', async ({ page }) => {
 
   const tile = (label: string) =>
     page
-      .locator('.kpi-tile')
+      .getByTestId('kpi-tile')
       .filter({ has: page.getByText(label, { exact: true }) })
-      .locator('.kpi-value');
+      .getByTestId('kpi-value');
   await expect(tile('Logged')).toHaveText(String(SEED_VACANCIES.length));
   await expect(tile('Awaiting analysis')).toHaveText(
     String(seedCount((v) => seedStatus(v) === 'NEW')),
@@ -30,9 +30,9 @@ test('the tiles and the funnel count the seed', async ({ page }) => {
 
   const funnel = (label: string) =>
     page
-      .locator('.funnel-row')
+      .getByTestId('funnel-row')
       .filter({ has: page.getByText(label, { exact: true }) })
-      .locator('.funnel-value');
+      .getByTestId('funnel-value');
   await expect(funnel('Logged')).toHaveText(String(SEED_VACANCIES.length));
   await expect(funnel('Recommended')).toHaveText(String(recommended));
   await expect(funnel('Applied')).toHaveText(String(applied));
@@ -41,19 +41,20 @@ test('the tiles and the funnel count the seed', async ({ page }) => {
 });
 
 test('a "Needs your review" link opens its vacancy', async ({ page }) => {
-  const items = page.locator('.attn-item');
-  await expect(items).toHaveCount(10); // the queue's size; the seed has more NOT_REVIEWED
-  const title = await items.first().locator('.attn-title').textContent();
+  const links = page.getByRole('list', { name: 'Needs your review' }).getByRole('link');
+  await expect(links).toHaveCount(10); // the queue's size; the seed has more NOT_REVIEWED
+  // Each link is named "Review <title>".
+  const title = (await links.first().getAttribute('aria-label'))?.replace(/^Review /, '');
 
-  await items.first().getByRole('link', { name: 'Review' }).click();
+  await links.first().click();
   await expect(page).toHaveURL(/\/vacancies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1, name: title ?? '' })).toBeVisible();
 });
 
 test('a Recent activity link opens its vacancy', async ({ page }) => {
-  const items = page.locator('.activity-item');
+  const items = page.getByRole('list', { name: 'Recent activity' }).getByRole('listitem');
   await expect(items).toHaveCount(6);
-  const link = items.first().locator('.role-link');
+  const link = items.first().getByRole('link');
   const title = await link.textContent();
 
   await link.click();

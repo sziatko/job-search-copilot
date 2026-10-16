@@ -100,7 +100,7 @@ export function VacancyTable({
   /** The page's filter: a change scrolls the box back to the top. */
   filterKey: string;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
   const { virtualItems, paddingTop, paddingBottom, measureElement } = useVirtualRows(
     scrollRef,
     items.length,
@@ -109,7 +109,8 @@ export function VacancyTable({
   );
 
   return (
-    <div ref={scrollRef} className="table-body-scroll">
+    // A named region: the box scrolls on its own, and a screen reader can jump to it.
+    <section ref={scrollRef} className="table-body-scroll" aria-label="Vacancies">
       <table className="min-w-[1200px] table-fixed" aria-busy={loading}>
         <thead>
           <tr>
@@ -235,6 +236,6 @@ export function VacancyTable({
           )}
         </tbody>
       </table>
-    </div>
+    </section>
   );
 }

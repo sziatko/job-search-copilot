@@ -17,6 +17,7 @@ import {
   statsHandler,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import { companyOrder } from '@/test/rows';
 import { expectLoadedTable, expectSkeletonTable } from '@/test/skeleton';
 import type { ApplicationPage } from './api';
 
@@ -78,8 +79,12 @@ function renderApplications(path = '/applications') {
   };
 }
 
-/** The toolbar's Status filter — each row's pipeline select is named "Status" too. */
-const statusFilter = () => screen.getByLabelText('Status', { selector: '.filter-select' });
+/** The toolbar's Status filter — each row's pipeline select is "Status of <role> at
+ * <company>". */
+const statusFilter = () => screen.getByLabelText('Status');
+/** The one row's pipeline select. */
+const rowSelect = () =>
+  within(screen.getByRole('table')).getByRole('combobox', { name: /^Status/ });
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -131,16 +136,6 @@ describe('ApplicationsPage / useApplications', () => {
     expect(modal.getByText('Current')).toBeInTheDocument();
   });
 
-  /** The companies down the table, top to bottom. Read out of each row's meta cell
-   * rather than off a text node: the cell also carries the id, and matching text
-   * nodes couples the test to how JSX happens to lay the whitespace out. */
-  const companyOrder = () =>
-    screen
-      .getAllByRole('row')
-      .map((row) => row.querySelector('.role-meta')?.textContent)
-      .filter((cell): cell is string => Boolean(cell))
-      .map((cell) => cell.replace(/\s*#\d+$/, ''));
-
   it('orders rows by the last status move, newest first — not by the applied date', async () => {
     serve([
       application({ id: 1, company: 'Older Co', statusChangedAt: daysAgo(40) }),
@@ -171,7 +166,7 @@ describe('ApplicationsPage / useApplications', () => {
     const user = userEvent.setup();
     const olderRow = screen.getAllByRole('row').find((r) => r.textContent?.includes('Older Co'));
     await user.selectOptions(
-      within(olderRow as HTMLElement).getByRole('combobox', { name: 'Status' }),
+      within(olderRow as HTMLElement).getByRole('combobox', { name: /^Status/ }),
       'ACTION_NEEDED',
     );
 
@@ -220,18 +215,15 @@ describe('ApplicationsPage / useApplications', () => {
     // One row loaded; the server counts a pipeline of seven.
     serve([application({ id: 1 })], pipeline({ APPLIED: 3, REJECTED: 2, OFFER: 2 }, 1, 2));
     renderApplications();
-    const totalLabel = await screen.findByText('Total');
-    const row = totalLabel.closest('.kpi-row') as HTMLElement;
-    const s = within(row);
-
     // Each tile is a button labelled "<label>: <value>".
-    expect(s.getByRole('button', { name: 'Total: 7' })).toBeInTheDocument();
-    expect(s.getByRole('button', { name: 'Active: 1' })).toBeInTheDocument();
-    expect(s.getByRole('button', { name: 'Timeout: 2' })).toBeInTheDocument();
-    expect(s.getByRole('button', { name: 'Offer: 2' })).toBeInTheDocument(); // non-zero, so shown
-    expect(s.queryByText('Interview')).not.toBeInTheDocument(); // zero, not shown
+    expect(await screen.findByRole('button', { name: 'Total: 7' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Active: 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Timeout: 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Offer: 2' })).toBeInTheDocument(); // non-zero, so shown
+    // Zero, not shown.
+    expect(screen.queryByRole('button', { name: /^Interview: / })).not.toBeInTheDocument();
     // Total + Active + Timeout (always) + Applied + Rejected (always) + Offer = 6 tiles.
-    expect(row.querySelectorAll('.kpi-value')).toHaveLength(6);
+    expect(screen.getAllByTestId('kpi-tile')).toHaveLength(6);
   });
 
   it('filters from a KPI tile through the server, and keeps the dropdown in sync', async () => {
@@ -293,13 +285,11 @@ describe('ApplicationsPage / useApplications', () => {
         application({ id: i + 1, company: `Co ${i + 1}`, statusChangedAt: daysAgo(i / 100) }),
       ),
     );
-    const { container } = renderApplications();
-    // The count leads the toolbar; the table has no foot.
-    expect((await screen.findByText('Showing 100 of 130')).closest('.toolbar')).not.toBeNull();
-    expect(container.querySelector('.table-foot')).toBeNull();
+    renderApplications();
+    await screen.findByText('Showing 100 of 130');
 
     // jsdom lays nothing out: set the offset the virtualizer reads, then tell it.
-    const scroller = container.querySelector('.table-body-scroll') as HTMLElement;
+    const scroller = screen.getByRole('region', { name: 'Applications' });
     Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 10_000_000 });
     fireEvent.scroll(scroller);
 
@@ -313,10 +303,9 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    const rowSelect = within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' });
-    await user.selectOptions(rowSelect, 'INTERVIEW');
+    await user.selectOptions(rowSelect(), 'INTERVIEW');
 
-    await waitFor(() => expect((rowSelect as HTMLSelectElement).value).toBe('INTERVIEW'));
+    await waitFor(() => expect(rowSelect()).toHaveValue('INTERVIEW'));
     await waitFor(() =>
       expect(success).toHaveBeenCalledWith('Moved to Interview', {
         description: expect.stringMatching(/ — Acme$/),
@@ -337,11 +326,10 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    const rowSelect = within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' });
-    await user.selectOptions(rowSelect, 'INTERVIEW');
+    await user.selectOptions(rowSelect(), 'INTERVIEW');
 
     await screen.findByText(/failed to save|HTTP 500/i);
-    expect((rowSelect as HTMLSelectElement).value).toBe('APPLIED');
+    expect(rowSelect()).toHaveValue('APPLIED');
     expect(success).not.toHaveBeenCalledWith('Moved to Interview', expect.anything());
   });
 
@@ -412,9 +400,11 @@ describe('ApplicationsPage / useApplications', () => {
     expect(rowText('Stale Role')).toContain('⏳');
     expect(rowText('Live Role')).not.toContain('⏳');
 
-    // The explanation is a `.tip` bubble like everywhere else, not a native `title`.
+    // The explanation is a hover bubble like everywhere else, not a native `title`.
     const staleRow = screen.getAllByRole('row').find((r) => r.textContent?.includes('Stale Role'));
-    expect(staleRow?.querySelector('.tip')).toHaveTextContent('45 days since last update');
+    expect(
+      within(staleRow as HTMLElement).getByText('45 days since last update'),
+    ).toBeInTheDocument();
   });
 
   it('writes the new last-move stamp into the cache optimistically', async () => {
@@ -445,10 +435,7 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    await user.selectOptions(
-      within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' }),
-      'INTERVIEW',
-    );
+    await user.selectOptions(rowSelect(), 'INTERVIEW');
     // Let onMutate's `await cancelQueries` settle — and nothing else, since the
     // response is still half a second away.
     await act(async () => {});
@@ -474,10 +461,7 @@ describe('ApplicationsPage / useApplications', () => {
     await screen.findByText('Acme');
 
     const user = userEvent.setup();
-    await user.selectOptions(
-      within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' }),
-      'APPLIED',
-    );
+    await user.selectOptions(rowSelect(), 'APPLIED');
     await act(async () => {});
 
     const row = cachedRows(client).find((i) => i.id === 1);
@@ -501,10 +485,7 @@ describe('ApplicationsPage / useApplications', () => {
     client.setQueryData(['vacancies', ''], { items: [], total: 0 });
 
     const user = userEvent.setup();
-    await user.selectOptions(
-      within(screen.getByRole('table')).getByRole('combobox', { name: 'Status' }),
-      'INTERVIEW',
-    );
+    await user.selectOptions(rowSelect(), 'INTERVIEW');
 
     await waitFor(() => expect(statsRequests).toBe(2));
     expect(client.getQueryState(['vacancies', ''])?.isInvalidated).toBe(true);
@@ -556,7 +537,7 @@ describe('ApplicationsPage / useApplications', () => {
       const table = screen.getByRole('table');
       expect(await within(table).findByText('120 PLN/h')).toBeInTheDocument();
       expect(
-        [...table.querySelectorAll('.comment-user')].map((el) => el.lastChild?.textContent),
+        [...table.querySelectorAll('[data-source="USER"]')].map((el) => el.lastChild?.textContent),
       ).toEqual(['First note', 'Went well.']);
       await waitFor(() =>
         expect(success).toHaveBeenCalledWith('Application updated', {

@@ -97,7 +97,7 @@ describe('the shell', () => {
     renderAt('/profile');
 
     expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
-    expect(screen.getByText('JD')).toHaveClass('avatar');
+    expect(screen.getByText('JD')).toBeInTheDocument(); // the initials
   });
 });
 

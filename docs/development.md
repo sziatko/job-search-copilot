@@ -89,6 +89,20 @@ Postgres service on every push and PR; on a PR a second job, `e2e`, runs
 Database and migration conventions:
 [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
 
+## Testing
+
+How a test finds an element, in the web tests and the Playwright specs alike:
+
+- **By role, label or text** — `getByRole`, `getByLabel(Text)`, `getByText`, narrowed with
+  `within` or a parent locator. When nothing names the element, give the component the
+  name a screen-reader user would want too (a labelled list or region, a control named
+  for its row) rather than a test hook.
+- **`data-testid` only where nothing accessible exists** — a number in a KPI tile, a
+  funnel or fact row, a timeline step. A state shown only by style is a `data-*`
+  attribute that names it (`data-source`, `data-compact`).
+- **Never by CSS class.** Classes belong to styling and can be renamed without a test
+  noticing.
+
 ## Gotchas
 
 - **`npm test` can pass while `core` does not build.** Vitest strips types without

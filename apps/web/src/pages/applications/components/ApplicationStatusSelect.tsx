@@ -11,10 +11,13 @@ const OPTIONS: SelectOption<ApplicationStatus>[] = applicationStatusSchema.optio
 }));
 
 export function ApplicationStatusSelect({
+  label = 'Status',
   value,
   disabled,
   onChange,
 }: {
+  /** A row's select names its row, so a screen reader can tell them apart. */
+  label?: string;
   value: ApplicationStatus;
   disabled?: boolean;
   onChange: (value: ApplicationStatus) => void;
@@ -22,7 +25,7 @@ export function ApplicationStatusSelect({
   return (
     <Select
       className="status-select"
-      label="Status"
+      label={label}
       value={value}
       options={OPTIONS}
       disabled={disabled}

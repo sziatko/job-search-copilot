@@ -60,12 +60,14 @@ function Funnel({ steps }: { steps: FunnelStep[] }) {
             : '—';
 
         return (
-          <div className="funnel-row" key={step.label}>
+          <div className="funnel-row" data-testid="funnel-row" key={step.label}>
             <div className="funnel-name">{step.label}</div>
             <div className="funnel-track">
               <div className="funnel-fill" style={{ width: `${width}%` }} />
             </div>
-            <div className="funnel-value">{step.value}</div>
+            <div className="funnel-value" data-testid="funnel-value">
+              {step.value}
+            </div>
             <div className="funnel-conv">{conversion}</div>
           </div>
         );
@@ -80,20 +82,26 @@ function ReviewQueue({ items }: { items: VacancyListItem[] }) {
   }
 
   return (
-    <div className="attn-list">
+    <ul className="attn-list" aria-label="Needs your review">
       {items.map((item) => (
-        <div className="attn-item" key={item.id}>
+        <li className="attn-item" key={item.id}>
           <div className="attn-score">{item.matchScore === null ? '—' : `${item.matchScore}%`}</div>
           <div className="attn-body">
             <div className="attn-title">{item.title}</div>
             <div className="attn-sub">{item.company}</div>
           </div>
-          <Link to="/vacancies/$id" params={{ id: String(item.id) }} className="attn-go">
+          <Link
+            to="/vacancies/$id"
+            params={{ id: String(item.id) }}
+            className="attn-go"
+            // Ten links read "Review" otherwise.
+            aria-label={`Review ${item.title}`}
+          >
             Review
           </Link>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -103,9 +111,9 @@ function RecentActivity({ items }: { items: RecentMove[] }) {
   }
 
   return (
-    <div className="activity-list">
+    <ul className="activity-list" aria-label="Recent activity">
       {items.map((item) => (
-        <div className="activity-item" key={item.id}>
+        <li className="activity-item" key={item.id}>
           <div className={`activity-dot ${ACTIVITY[item.status].dot}`} />
           <div className="activity-body">
             <div className="activity-title">
@@ -123,9 +131,9 @@ function RecentActivity({ items }: { items: RecentMove[] }) {
             </div>
           </div>
           <div className="activity-time">{timeAgo(item.createdAt)}</div>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -137,7 +145,7 @@ function DashboardSkeleton() {
       <div aria-hidden className="kpi-row">
         {Array.from({ length: 6 }, (_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
-          <div key={i} className="kpi-tile">
+          <div key={i} className="kpi-tile" data-testid="kpi-tile">
             <span className="skeleton h-[11px] w-[60%]" />
             <span className="skeleton mt-[12px] h-[28px] w-[40%]" />
             <span className="skeleton mt-[8px] h-[11px] w-[80%]" />
@@ -235,7 +243,7 @@ export function DashboardPage() {
           </div>
           <div className="fact-list">
             {dropped.map((row) => (
-              <div className="fact-row" key={row.label}>
+              <div className="fact-row" data-testid="fact-row" key={row.label}>
                 <span className="fact-label">{row.label}</span>
                 <span className="fact-value">{row.value}</span>
               </div>

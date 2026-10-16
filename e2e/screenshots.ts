@@ -30,15 +30,13 @@ for (const theme of ['light', 'dark'] as const) {
       // Mounted first: before that there are no skeletons either (vite dev's first load).
       await expect(page.locator('#root')).not.toBeEmpty();
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.skeleton')).toHaveCount(0);
+      await expect(page.getByText('Loading…')).toHaveCount(0);
       if (name === 'applications') {
         // Picture only: nine tiles wrap at 1440 px, so the least telling one, Applied,
         // is hidden to keep the strip on one row. The app itself shows it.
-        await page
-          .locator('.kpi-tile', { has: page.locator('.kpi-label', { hasText: /^Applied$/ }) })
-          .evaluate((tile) => {
-            (tile as HTMLElement).style.display = 'none';
-          });
+        await page.getByRole('button', { name: /^Applied: / }).evaluate((tile) => {
+          (tile as HTMLElement).style.display = 'none';
+        });
       }
       await page.screenshot({ path: path.join(out, `${name}-${theme}.png`) });
     }

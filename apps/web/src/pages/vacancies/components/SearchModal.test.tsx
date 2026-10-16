@@ -126,16 +126,16 @@ describe('SearchModal', () => {
     expect(modal.getByText('2 vacancies, newest first')).toBeInTheDocument();
     expect(modal.queryByText('Frontend Lead')).not.toBeInTheDocument();
     const row = (title: string) => within(modal.getByText(title).closest('tr') as HTMLElement);
-    expect(row('Data Engineer').getByText('Interview')).toHaveClass('tag');
+    expect(row('Data Engineer').getByText('Interview')).toBeInTheDocument();
     expect(
       row('Backend Engineer').getByRole('button', { name: /copy backend engineer/i }),
     ).toBeInTheDocument();
     expect(
       row('Backend Engineer').getByRole('link', { name: /open vacancy details/i }),
     ).toHaveAttribute('target', '_blank');
-    expect((await row('Data Engineer').findByText('⏳')).querySelector('.tip')).toHaveTextContent(
-      '45 days since last update',
-    );
+    expect(
+      within(await row('Data Engineer').findByText('⏳')).getByText('45 days since last update'),
+    ).toBeInTheDocument();
     // Date, Vacancy, Score, Status, CV, Actions.
     const cv = (title: string) =>
       (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[4];
@@ -143,10 +143,10 @@ describe('SearchModal', () => {
     expect(cv('Backend Engineer')).toHaveTextContent('—');
 
     // The page's table still lists its own NOT_REVIEWED rows, Beta Corp included.
-    const page = within(document.querySelector('.card') as HTMLElement);
+    const page = within(screen.getByRole('region', { name: 'Vacancies' }));
     expect(page.getByText('Beta Corp')).toBeInTheDocument();
     expect(page.queryByText('Data Engineer')).not.toBeInTheDocument();
-    expect(page.getByText('Showing 2 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Showing 2 of 2')).toBeInTheDocument();
   });
 
   it('asks nothing for an empty or blank term', async () => {
@@ -166,7 +166,7 @@ describe('SearchModal', () => {
     expect(requests.slice(before)).toEqual([]);
     expect(modal.queryByRole('table')).not.toBeInTheDocument();
     // The table's place holds an empty state, not nothing.
-    expect(modal.getByText('Type a company or role.')).toHaveClass('empty-state');
+    expect(modal.getByText('Type a company or role.')).toBeInTheDocument();
   });
 
   it('shows an empty state for no match, and the table once rows come back', async () => {
@@ -175,7 +175,7 @@ describe('SearchModal', () => {
     const box = modal.getByRole('searchbox');
 
     await user.type(box, 'zzz');
-    expect(await modal.findByText('No vacancies match.')).toHaveClass('empty-state');
+    expect(await modal.findByText('No vacancies match.')).toBeInTheDocument();
     expect(modal.queryByRole('table')).not.toBeInTheDocument();
 
     await user.clear(box);

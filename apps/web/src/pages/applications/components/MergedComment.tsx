@@ -46,7 +46,7 @@ export function MergedComment({ comments }: { comments: ApplicationComment[] }) 
         {comments.map((comment, i) => (
           <span key={comment.id}>
             {i > 0 && (expanded ? <hr className="my-[4px] border-t border-border" /> : ' — ')}
-            <span className={SOURCE_CLASS[comment.source]}>
+            <span className={SOURCE_CLASS[comment.source]} data-source={comment.source}>
               <time className="mono text-ink-faint">
                 {dateFormatter.format(new Date(comment.createdAt))}:{' '}
               </time>

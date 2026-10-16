@@ -81,7 +81,7 @@ describe('InboxPage', () => {
     for (const other of ['Textless Co', 'Mine Co', 'Skipped Co', 'Triaged Co']) {
       expect(screen.queryByText(other)).not.toBeInTheDocument();
     }
-    expect(rowOf('Queued Co').getByText('New', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Queued Co').getByText('New')).toBeInTheDocument();
     expect(screen.getByText('Showing 1 of 1')).toBeInTheDocument();
     expect(queries).toEqual([{ limit: '100', status: 'NEW', hasText: 'true' }]);
   });
@@ -100,7 +100,7 @@ describe('InboxPage', () => {
     // Both the user's and the analyzer's.
     await user.click(screen.getByRole('button', { name: 'Filtered out' }));
     expect(await screen.findByText('Mine Co')).toBeInTheDocument();
-    expect(rowOf('Mine Co').getByText('Filtered out', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Mine Co').getByText('Filtered out')).toBeInTheDocument();
     expect(screen.getByText('Skipped Co')).toBeInTheDocument();
     expect(screen.queryByText('Textless Co')).not.toBeInTheDocument();
     expect(router.state.location.search).toEqual({ tab: 'filtered-out' });

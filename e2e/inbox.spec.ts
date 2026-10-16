@@ -2,9 +2,12 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { seedCount, seedStatus } from './seed';
 
-const rows = (page: Page) => page.locator('.table-body-scroll tbody tr');
+/** A vacancy's id as its row shows it: `#42`. */
+const ID = /^#\d+$/;
+/** The table's vacancy rows — the header row has no id. */
+const rows = (page: Page) => page.getByRole('row').filter({ has: page.getByText(ID) });
 const rowOf = (page: Page, id: string) =>
-  rows(page).filter({ has: page.locator('.id', { hasText: new RegExp(`^#${id}$`) }) });
+  rows(page).filter({ has: page.getByText(`#${id}`, { exact: true }) });
 const showing = (n: number) => `Showing ${n} of ${n}`;
 const tab = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
@@ -35,7 +38,7 @@ test('the three tabs, and ?tab=', async ({ page }) => {
 
 test('Filter out moves a queued row to Filtered out', async ({ page }) => {
   await page.goto('/inbox');
-  const id = (await rows(page).locator('.id').first().textContent())?.slice(1) ?? '';
+  const id = (await rows(page).getByText(ID).first().textContent())?.slice(1) ?? '';
 
   await rowOf(page, id).getByRole('button', { name: 'Filter out' }).click();
   await expect(page.getByText('Moved to Filtered out')).toBeVisible();
@@ -50,7 +53,7 @@ test('Back to queue returns an unanalysed filtered-out row', async ({ page }) =>
   const row = rows(page)
     .filter({ has: page.getByRole('button', { name: 'Back to queue' }) })
     .first();
-  const id = (await row.locator('.id').textContent())?.slice(1) ?? '';
+  const id = (await row.getByText(ID).textContent())?.slice(1) ?? '';
 
   await row.getByRole('button', { name: 'Back to queue' }).click();
   await expect(page.getByText('Moved to New')).toBeVisible();
