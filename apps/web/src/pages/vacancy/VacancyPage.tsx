@@ -9,11 +9,17 @@ import {
   useState,
 } from 'react';
 import { IconCheck, IconChevronLeft, IconCross, IconExternal } from '@/components/icons';
+import { Button, buttonClass } from '@/components/ui/Button';
+import { Card, CardHead, CardSub, CardTitle } from '@/components/ui/Card';
 import { DetailsLink } from '@/components/ui/DetailsLink';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Textarea } from '@/components/ui/Field';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { Select, type SelectOption } from '@/components/ui/Select';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { SkeletonRows } from '@/components/ui/SkeletonRows';
+import { Tag } from '@/components/ui/Tag';
 import { isSafeExternalUrl } from '@/lib/url';
 import { ApplicationStatusSelect } from '../applications/components/ApplicationStatusSelect';
 import { isPipelineStatus } from '../applications/types';
@@ -99,7 +105,7 @@ function VacancyView() {
     return (
       <>
         <BackLink />
-        <div className="empty-state">Vacancy not found.</div>
+        <EmptyState>Vacancy not found.</EmptyState>
       </>
     );
   }
@@ -107,7 +113,7 @@ function VacancyView() {
     return (
       <>
         <BackLink />
-        <div className="empty-state">Failed to load the vacancy: {error.message}</div>
+        <EmptyState>Failed to load the vacancy: {error.message}</EmptyState>
       </>
     );
   }
@@ -120,55 +126,55 @@ function VacancyView() {
       <BackLink />
       <Header vacancy={vacancy} page={page} />
 
-      <section className="card mb-[16px]" aria-labelledby={`${cardId}-history`}>
-        <div className="card-head">
-          <h2 id={`${cardId}-history`}>Status history</h2>
-        </div>
+      <Card as="section" className="mb-4" aria-labelledby={`${cardId}-history`}>
+        <CardHead>
+          <CardTitle id={`${cardId}-history`}>Status history</CardTitle>
+        </CardHead>
         <Timeline steps={vacancy.timeline} />
-      </section>
+      </Card>
 
       <div className="dash-grid">
         <div className="stack-gap">
-          <section className="card" aria-labelledby={`${cardId}-description`}>
-            <div className="card-head">
-              <h2 id={`${cardId}-description`}>Description</h2>
-            </div>
+          <Card as="section" aria-labelledby={`${cardId}-description`}>
+            <CardHead>
+              <CardTitle id={`${cardId}-description`}>Description</CardTitle>
+            </CardHead>
             <Description text={vacancy.fullText} />
-          </section>
-          <section className="card" aria-labelledby={`${cardId}-comments`}>
-            <div className="card-head">
-              <h2 id={`${cardId}-comments`}>Comments &amp; history</h2>
-              <div className="count">
+          </Card>
+          <Card as="section" aria-labelledby={`${cardId}-comments`}>
+            <CardHead>
+              <CardTitle id={`${cardId}-comments`}>Comments &amp; history</CardTitle>
+              <CardSub>
                 {vacancy.comments.length} {vacancy.comments.length === 1 ? 'entry' : 'entries'}
-              </div>
-            </div>
+              </CardSub>
+            </CardHead>
             <Comments comments={vacancy.comments} />
             <CommentForm
               saving={page.commentSaving}
               error={page.commentError}
               onSubmit={page.addComment}
             />
-          </section>
+          </Card>
         </div>
-        <section className="card" aria-labelledby={`${cardId}-details`}>
-          <div className="card-head">
-            <h2 id={`${cardId}-details`}>Details</h2>
-          </div>
+        <Card as="section" aria-labelledby={`${cardId}-details`}>
+          <CardHead>
+            <CardTitle id={`${cardId}-details`}>Details</CardTitle>
+          </CardHead>
           <Facts vacancy={vacancy} />
-        </section>
+        </Card>
       </div>
 
-      <section className="card mt-[16px]" aria-labelledby={`${cardId}-others`}>
-        <div className="card-head">
-          <h2 id={`${cardId}-others`}>Other vacancies at {vacancy.company}</h2>
-          <div className="count">
+      <Card as="section" className="mt-4" aria-labelledby={`${cardId}-others`}>
+        <CardHead>
+          <CardTitle id={`${cardId}-others`}>Other vacancies at {vacancy.company}</CardTitle>
+          <CardSub>
             {page.othersPending
               ? 'Loading…'
               : `${page.others.length} ${page.others.length === 1 ? 'vacancy' : 'vacancies'}`}
-          </div>
-        </div>
+          </CardSub>
+        </CardHead>
         <OtherVacancies items={page.others} pending={page.othersPending} />
-      </section>
+      </Card>
     </>
   );
 }
@@ -184,30 +190,30 @@ function VacancySkeleton() {
       <span className="sr-only">Loading…</span>
       <BackLink />
       <div aria-hidden className="detail-header">
-        <div className="w-full max-w-[520px]">
-          <span className="skeleton h-[13px] w-[30%]" />
-          <span className="skeleton mt-[10px] h-[22px] w-[80%]" />
-          <span className="skeleton mt-[14px] h-[12px] w-[40%]" />
+        <div className="w-full max-w-130">
+          <Skeleton className="h-3.25 w-[30%]" />
+          <Skeleton className="mt-2.5 h-5.5 w-[80%]" />
+          <Skeleton className="mt-3.5 h-3 w-[40%]" />
         </div>
-        <span className="skeleton h-[32px] w-[200px]" />
+        <Skeleton className="h-8 w-50" />
       </div>
-      <SkeletonCard lines={1} className="mb-[16px]" />
+      <SkeletonCard lines={1} className="mb-4" />
       <div className="dash-grid">
         <SkeletonCard lines={6} />
-        <div aria-hidden className="card">
-          <div className="card-head">
-            <span className="skeleton h-[15px] w-[35%]" />
-          </div>
+        <Card aria-hidden>
+          <CardHead>
+            <Skeleton className="h-3.75 w-[35%]" />
+          </CardHead>
           <div className="fact-list">
             {Array.from({ length: FACT_COUNT }, (_, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
               <div key={i} className="fact-row" data-testid="fact-row">
-                <span className="skeleton w-[35%]" />
-                <span className="skeleton w-[25%]" />
+                <Skeleton className="h-3 w-[35%]" />
+                <Skeleton className="h-3 w-[25%]" />
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );
@@ -252,7 +258,7 @@ function Header({
         <h1 className="detail-title">{vacancy.title}</h1>
         <div className="detail-meta-row">
           <span className="detail-id-tag">#{vacancy.id}</span>
-          {!analysed && <span className="tag neutral">Not analysed yet</span>}
+          {!analysed && <Tag tone="neutral">Not analysed yet</Tag>}
           {analysed && <ScorePill score={vacancy.matchScore} />}
           {analysed &&
             (linkable ? (
@@ -260,7 +266,7 @@ function Header({
                 href={vacancy.applyUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="rec-link"
+                className="no-underline hover:brightness-105"
                 title="Open original posting"
               >
                 <RecommendationTag recommendation={vacancy.recommendation} />
@@ -269,7 +275,7 @@ function Header({
               <RecommendationTag recommendation={vacancy.recommendation} />
             ))}
         </div>
-        {page.statusError && <p className="mt-[6px] text-[12px] text-bad">{page.statusError}</p>}
+        {page.statusError && <p className="mt-[6px] text-sm text-bad">{page.statusError}</p>}
       </div>
       <div className="detail-header-actions">
         <StatusControl vacancy={vacancy} page={page} />
@@ -284,7 +290,7 @@ function Header({
             href={vacancy.applyUrl}
             target="_blank"
             rel="noreferrer"
-            className="icon-btn"
+            className={buttonClass('icon')}
             aria-label="Open original posting"
           >
             <IconExternal />
@@ -337,7 +343,6 @@ function StatusControl({
   return (
     <>
       <Select
-        className="status-select"
         label="Status"
         value={status}
         options={options}
@@ -437,12 +442,7 @@ function Description({ text }: { text: string | null }) {
   }, [text]);
 
   if (!text?.trim()) {
-    return (
-      <div className="empty-block">
-        <p>No posting text</p>
-        <span>None has come in for this vacancy yet.</span>
-      </div>
-    );
+    return <EmptyState title="No posting text">None has come in for this vacancy yet.</EmptyState>;
   }
 
   return (
@@ -469,7 +469,7 @@ function Description({ text }: { text: string | null }) {
 
 function Comments({ comments }: { comments: VacancyComment[] }) {
   if (comments.length === 0) {
-    return <div className="empty-state">No comments yet</div>;
+    return <EmptyState>No comments yet</EmptyState>;
   }
   return (
     <ul className="history-list" aria-label="Comments">
@@ -521,7 +521,7 @@ function CommentForm({
         submit();
       }}
     >
-      <textarea
+      <Textarea
         aria-label="Add a comment"
         placeholder="Add a comment…"
         value={body}
@@ -533,12 +533,11 @@ function CommentForm({
           }
         }}
         rows={2}
-        className="field-input w-full resize-y"
       />
-      {error && <p className="self-start text-[12px] text-bad">{error}</p>}
-      <button type="submit" className="btn btn-primary" disabled={saving || body.trim() === ''}>
+      {error && <p className="self-start text-sm text-bad">{error}</p>}
+      <Button type="submit" variant="primary" disabled={saving || body.trim() === ''}>
         {saving ? 'Saving…' : 'Add comment'}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -577,7 +576,7 @@ function Facts({ vacancy }: { vacancy: VacancyDetail }) {
 
 function OtherVacancies({ items, pending }: { items: VacancyListItem[]; pending: boolean }) {
   if (!pending && items.length === 0) {
-    return <div className="empty-state">No other vacancies</div>;
+    return <EmptyState>No other vacancies</EmptyState>;
   }
   return (
     <div className="overflow-x-auto">
@@ -617,9 +616,7 @@ function OtherVacancies({ items, pending }: { items: VacancyListItem[]; pending:
               </td>
               <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
               <td>
-                <span className={`tag ${STATUS_TAGS[item.status].variant}`}>
-                  {STATUS_TAGS[item.status].text}
-                </span>
+                <Tag tone={STATUS_TAGS[item.status].tone}>{STATUS_TAGS[item.status].text}</Tag>
               </td>
             </tr>
           ))}

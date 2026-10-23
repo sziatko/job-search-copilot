@@ -1,5 +1,7 @@
 import { Link } from '@tanstack/react-router';
-import { KpiTile } from '@/components/ui/KpiTile';
+import { Card, CardHead, CardSub, CardTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { KpiRow, KpiTile, KpiTileSkeleton } from '@/components/ui/KpiTile';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { APPLICATION_STATUS_LABELS } from '../applications/constants';
 import type { ApplicationStatus } from '../applications/types';
@@ -78,7 +80,7 @@ function Funnel({ steps }: { steps: FunnelStep[] }) {
 
 function ReviewQueue({ items }: { items: VacancyListItem[] }) {
   if (items.length === 0) {
-    return <div className="empty-state">Everything is triaged. Nice.</div>;
+    return <EmptyState>Everything is triaged. Nice.</EmptyState>;
   }
 
   return (
@@ -107,7 +109,7 @@ function ReviewQueue({ items }: { items: VacancyListItem[] }) {
 
 function RecentActivity({ items }: { items: RecentMove[] }) {
   if (items.length === 0) {
-    return <div className="empty-state">No status changes yet.</div>;
+    return <EmptyState>No status changes yet.</EmptyState>;
   }
 
   return (
@@ -142,21 +144,17 @@ function DashboardSkeleton() {
   return (
     <section className="view" aria-busy="true">
       <span className="sr-only">Loading…</span>
-      <div aria-hidden className="kpi-row">
+      <KpiRow aria-hidden>
         {Array.from({ length: 6 }, (_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
-          <div key={i} className="kpi-tile" data-testid="kpi-tile">
-            <span className="skeleton h-[11px] w-[60%]" />
-            <span className="skeleton mt-[12px] h-[28px] w-[40%]" />
-            <span className="skeleton mt-[8px] h-[11px] w-[80%]" />
-          </div>
+          <KpiTileSkeleton key={i} />
         ))}
-      </div>
+      </KpiRow>
       <div className="dash-grid">
         <SkeletonCard lines={14} />
         <SkeletonCard lines={9} />
       </div>
-      <SkeletonCard lines={5} className="mt-[16px]" />
+      <SkeletonCard lines={5} className="mt-4" />
     </section>
   );
 }
@@ -167,9 +165,9 @@ export function DashboardPage() {
   if (loadError) {
     return (
       <section className="view">
-        <div className="card">
-          <div className="empty-state">Failed to load the dashboard: {loadError}</div>
-        </div>
+        <Card>
+          <EmptyState>Failed to load the dashboard: {loadError}</EmptyState>
+        </Card>
       </section>
     );
   }
@@ -199,7 +197,7 @@ export function DashboardPage() {
 
   return (
     <section className="view">
-      <div className="kpi-row">
+      <KpiRow>
         <KpiTile label="Logged" value={stats.logged} note="postings seen, deduped by URL" />
         <KpiTile
           label="Awaiting analysis"
@@ -209,7 +207,7 @@ export function DashboardPage() {
         <KpiTile
           label="Awaiting triage"
           value={stats.awaitingTriage}
-          variant="accent"
+          tone="accent"
           note="scored, not yet decided"
         />
         <KpiTile label="Recommended" value={stats.recommended} note="analyzer says apply" />
@@ -221,26 +219,26 @@ export function DashboardPage() {
         <KpiTile
           label="Interviews"
           value={stats.interview}
-          variant="good"
+          tone="good"
           note={`${stats.actionNeeded} need your reply`}
         />
-      </div>
+      </KpiRow>
 
       <div className="dash-grid">
-        <div className="card">
-          <div className="card-head">
+        <Card>
+          <CardHead>
             <div>
-              <h2>Pipeline funnel</h2>
-              <div className="count">From logged to interview</div>
+              <CardTitle>Pipeline funnel</CardTitle>
+              <CardSub>From logged to interview</CardSub>
             </div>
-          </div>
+          </CardHead>
           <Funnel steps={steps} />
-          <div className="card-head border-t border-border">
+          <CardHead className="border-t border-border">
             <div>
-              <h2>Dropped out</h2>
-              <div className="count">Where the rest went</div>
+              <CardTitle>Dropped out</CardTitle>
+              <CardSub>Where the rest went</CardSub>
             </div>
-          </div>
+          </CardHead>
           <div className="fact-list">
             {dropped.map((row) => (
               <div className="fact-row" data-testid="fact-row" key={row.label}>
@@ -249,30 +247,30 @@ export function DashboardPage() {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
-        <div className="card flex flex-col">
-          <div className="card-head">
+        <Card className="flex flex-col">
+          <CardHead>
             <div>
-              <h2>Needs your review</h2>
-              <div className="count">Top recommended, not yet triaged</div>
+              <CardTitle>Needs your review</CardTitle>
+              <CardSub>Top recommended, not yet triaged</CardSub>
             </div>
-          </div>
+          </CardHead>
           <div className="review-scroll">
             <ReviewQueue items={reviewQueue} />
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div className="card mt-[16px]">
-        <div className="card-head">
+      <Card className="mt-4">
+        <CardHead>
           <div>
-            <h2>Recent activity</h2>
-            <div className="count">Latest status changes across applications</div>
+            <CardTitle>Recent activity</CardTitle>
+            <CardSub>Latest status changes across applications</CardSub>
           </div>
-        </div>
+        </CardHead>
         <RecentActivity items={stats.recent} />
-      </div>
+      </Card>
     </section>
   );
 }

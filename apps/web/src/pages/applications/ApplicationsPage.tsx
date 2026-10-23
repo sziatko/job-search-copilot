@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ApplyDialog } from '@/pages/vacancies/components/ApplyDialog';
 import { CompanyHistoryModal } from '@/pages/vacancies/components/CompanyHistoryModal';
 import { SearchModal } from '@/pages/vacancies/components/SearchModal';
@@ -42,21 +45,21 @@ export function ApplicationsPage() {
         <ApplicationsKpis stats={stats} filter={statusFilter} onFilterChange={setStatusFilter} />
       )}
 
-      <div className="card">
+      <Card className="flex flex-1 flex-col">
         <div className="toolbar">
           {!loadError && !loading && (
             <span className="toolbar-count">
               Showing {visibleItems.length} of {total}
             </span>
           )}
-          <button type="button" className="btn ml-auto" onClick={() => setSearching(true)}>
+          <Button className="ml-auto" onClick={() => setSearching(true)}>
             Search
-          </button>
+          </Button>
           <ApplicationStatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         </div>
 
         {loadError ? (
-          <div className="empty-state">Failed to load applications: {loadError}</div>
+          <EmptyState>Failed to load applications: {loadError}</EmptyState>
         ) : (
           <ApplicationsTable
             loading={loading}
@@ -71,7 +74,7 @@ export function ApplicationsPage() {
             emptyMessage={emptyMessage}
           />
         )}
-      </div>
+      </Card>
 
       {companyHistory && (
         <CompanyHistoryModal

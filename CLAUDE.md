@@ -44,6 +44,8 @@ Quote them from there if you change one; keep this list in step.
     in code, tests, docs and commits, never ones from the dev DB.
 11. **Every domain query is scoped to its user** — through `forUser(db, userId)` in
     `core`; another user's row is a 404.
+12. **The web UI is built from `components/ui`** — no new component classes in
+    `index.css`.
 
 ## Writing docs and comments
 

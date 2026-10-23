@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation } from '@tanstack/react-router';
 import { useState } from 'react';
 import { JscLogo } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 import { authClient } from '@/lib/auth';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -51,18 +52,13 @@ export function ConsentPage() {
           {error}
         </p>
       )}
-      <div className="flex w-full flex-col gap-[10px]">
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={busy}
-          onClick={() => answer(true)}
-        >
+      <div className="flex w-full flex-col gap-2.5">
+        <Button variant="primary" disabled={busy} onClick={() => answer(true)}>
           Allow
-        </button>
-        <button type="button" className="btn" disabled={busy} onClick={() => answer(false)}>
+        </Button>
+        <Button disabled={busy} onClick={() => answer(false)}>
           Deny
-        </button>
+        </Button>
       </div>
     </main>
   );

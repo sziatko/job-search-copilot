@@ -3,15 +3,14 @@ export interface SelectOption<T extends string> {
   label: string;
 }
 
-/** Native `<select>` wrapper. `className` picks the design's variant
- * (`filter-select` for toolbars, `status-select` for a table row). */
+/** Native `<select>` wrapper, for a toolbar's filter and a row's status alike. Disabled
+ * while its row saves. */
 export function Select<T extends string>({
   id,
   label,
   value,
   options,
   disabled,
-  className,
   onChange,
 }: {
   id?: string;
@@ -20,7 +19,6 @@ export function Select<T extends string>({
   value: T;
   options: readonly SelectOption<T>[];
   disabled?: boolean;
-  className?: string;
   onChange: (value: T) => void;
 }) {
   return (
@@ -30,7 +28,7 @@ export function Select<T extends string>({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as T)}
-      className={className}
+      className="rounded-md border border-border-strong bg-surface px-2.5 py-1.75 text-sm font-semibold text-ink disabled:cursor-wait disabled:opacity-50"
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>

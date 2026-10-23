@@ -36,11 +36,10 @@ for (const theme of ['light', 'dark'] as const) {
       await page.addInitScript((t) => localStorage.setItem('jsc-theme', t), theme);
     });
 
-    // Limit: the app's sizes are fractional, so a <select> can sit on a quarter pixel and
-    // Chromium then draws its text 1px off on some runs — a few hundred pixels. So many
-    // may differ; whole-pixel sizes make every shot exact, and then this goes.
+    // Exact: every size is a whole pixel (index.css), so no text lands on a sub-pixel
+    // that Chromium rasterises differently from run to run.
     const shot = (page: Page, name: string, fullPage = true) =>
-      expect(page).toHaveScreenshot(`${name}-${theme}.png`, { fullPage, maxDiffPixels: 600 });
+      expect(page).toHaveScreenshot(`${name}-${theme}.png`, { fullPage });
 
     for (const [name, path] of [
       ['dashboard', '/'],

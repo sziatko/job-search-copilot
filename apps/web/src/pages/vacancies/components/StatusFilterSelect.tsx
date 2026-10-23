@@ -28,13 +28,7 @@ export function StatusFilterSelect({
   return (
     <div className="filter-group">
       <label htmlFor={id}>Status</label>
-      <Select
-        id={id}
-        className="filter-select"
-        value={value}
-        options={OPTIONS}
-        onChange={onChange}
-      />
+      <Select id={id} value={value} options={OPTIONS} onChange={onChange} />
     </div>
   );
 }

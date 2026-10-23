@@ -1,6 +1,8 @@
 import { useRef } from 'react';
 import { IconEdit, IconHistory } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 import { DetailsLink } from '@/components/ui/DetailsLink';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { SkeletonRows } from '@/components/ui/SkeletonRows';
 import { useVirtualRows } from '@/components/useVirtualRows';
@@ -85,7 +87,7 @@ export function ApplicationsTable({
           {!loading && items.length === 0 && (
             <tr>
               <td colSpan={COL_COUNT}>
-                <div className="empty-state">{emptyMessage}</div>
+                <EmptyState>{emptyMessage}</EmptyState>
               </td>
             </tr>
           )}
@@ -159,10 +161,8 @@ export function ApplicationsTable({
                 <td>
                   <ScorePill score={item.matchScore} />
                 </td>
-                <td className="mono text-[12px]">{item.salaryInApplication ?? '—'}</td>
-                <td className="text-[12px] text-ink-muted">
-                  {item.usedTailoredResume ? '✓' : '—'}
-                </td>
+                <td className="mono text-sm">{item.salaryInApplication ?? '—'}</td>
+                <td className="text-sm text-ink-muted">{item.usedTailoredResume ? '✓' : '—'}</td>
                 <td>
                   <MergedComment comments={item.comments} />
                 </td>
@@ -176,16 +176,15 @@ export function ApplicationsTable({
                       title={item.title}
                       applyUrl={item.applyUrl}
                     />
-                    <button
-                      type="button"
+                    <Button
+                      variant="icon"
                       aria-label={`Edit ${item.title} at ${item.company}`}
                       disabled={savingIds.has(item.id)}
                       onClick={() => onEdit(item)}
-                      className="icon-btn disabled:opacity-50"
                     >
                       <IconEdit />
                       <span className="tip">Edit</span>
-                    </button>
+                    </Button>
                     <DetailsLink id={item.id} />
                   </div>
                 </td>
@@ -197,7 +196,7 @@ export function ApplicationsTable({
                     onChange={(status) => onStatusChange(item.id, status)}
                   />
                   {rowErrors.has(item.id) && (
-                    <p className="mt-[4px] text-[11.5px] text-bad">{rowErrors.get(item.id)}</p>
+                    <p className="mt-[4px] text-xs text-bad">{rowErrors.get(item.id)}</p>
                   )}
                 </td>
               </tr>

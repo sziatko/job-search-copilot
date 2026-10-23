@@ -1,6 +1,7 @@
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { JscLogo } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 import { authClient } from '@/lib/auth';
 
 const route = getRouteApi('/login');
@@ -54,16 +55,16 @@ export function LoginPage() {
           {shown}
         </p>
       )}
-      <div className="flex w-full flex-col gap-[10px]">
-        <button type="button" className="btn" disabled={busy} onClick={() => social('google')}>
+      <div className="flex w-full flex-col gap-2.5">
+        <Button disabled={busy} onClick={() => social('google')}>
           Continue with Google
-        </button>
-        <button type="button" className="btn" disabled={busy} onClick={() => social('linkedin')}>
+        </Button>
+        <Button disabled={busy} onClick={() => social('linkedin')}>
           Continue with LinkedIn
-        </button>
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={passkey}>
+        </Button>
+        <Button variant="primary" disabled={busy} onClick={passkey}>
           Sign in with a passkey
-        </button>
+        </Button>
       </div>
       <p>No account yet? Sign in with Google or LinkedIn first, then add a passkey on Profile.</p>
     </main>

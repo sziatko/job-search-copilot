@@ -17,8 +17,8 @@ theme. Several of these are agreements between files that no compiler checks.
      `useTheme().toggle`: a click stores and applies the opposite of the theme on
      screen. Nothing stored means no attribute. One module-level store
      (`useSyncExternalStore`), so the toggle and the toaster see the same click;
-   - `apps/web/src/index.css` — `:root` follows the OS media query;
-     `data-theme="light"` blocks it, `data-theme="dark"` overrides it.
+   - `apps/web/src/index.css` — every colour is one `light-dark()` pair; `:root`'s
+     `color-scheme: light dark` picks the OS's side, and `data-theme` pins it.
 2. **The shell is a parent route**, `RootLayout` (sidebar, topbar), around every
    signed-in page.
 3. **Route chrome is declared on the route**: `staticData` of type `RouteMeta`

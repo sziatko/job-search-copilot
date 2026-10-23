@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { IconArrowRight } from '@/components/icons';
+import { buttonClass } from './Button';
 
 /** The in-app way to a vacancy's page, beside a title that links to the posting
  * itself — the title stays external in every table, where opening the posting is
@@ -12,7 +13,7 @@ export function DetailsLink({ id, newTab }: { id: number; newTab?: boolean }) {
       params={{ id: String(id) }}
       target={newTab ? '_blank' : undefined}
       aria-label="Open vacancy details"
-      className="icon-btn"
+      className={buttonClass('icon')}
     >
       <IconArrowRight />
       <span className="tip">Details</span>

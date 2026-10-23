@@ -1,11 +1,18 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Design tokens. Every color the app uses comes from here — never a raw
-   Tailwind palette name (bg-slate-50, text-gray-900). The theme switch works
-   by redefining these variables, which is why no `dark:` variant appears
-   anywhere: a utility like `bg-surface` resolves through var(--color-surface),
-   so flipping the variable re-themes every consumer at once.
+   Design tokens — what a utility may take a size, a corner or a colour from.
+   Tailwind's own text and radius scales are cleared, so `text-sm` and
+   `rounded-md` mean the values below and nothing else; spacing stays Tailwind's
+   4px-step scale (`px-4.5` is 18px). Every size is a whole pixel, line heights
+   included (1.5× the size, rounded): a fractional one puts text on sub-pixels,
+   which Chromium rasterises differently from run to run.
+
+   Each colour is written once, as `light-dark(<light>, <dark>)`. Which side applies
+   is the element's `color-scheme`: the OS's by default, pinned by `data-theme`
+   (the end of this file). So no `dark:` variant appears anywhere: `bg-surface`
+   resolves through var(--color-surface), and the scheme picks its value. Never a
+   raw Tailwind palette name (bg-slate-50) or a raw colour in a component.
 
    Ported from docs/design/dashboard-reference_2.html.
 --------------------------------------------------------------------------- */
@@ -13,35 +20,97 @@
   --font-sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-bg: #f5f7fb;
-  --color-surface: #ffffff;
-  --color-surface-alt: #eef2fa;
-  --color-surface-sunken: #e7edf7;
-  --color-border: #dae3f0;
-  --color-border-strong: #becde3;
-  --color-ink: #12151e;
-  --color-ink-soft: #3a4252;
-  --color-ink-muted: #69738a;
-  --color-ink-faint: #99a2b4;
-  --color-accent: #2e5cd6;
-  --color-accent-ink: #1f45b0;
-  --color-accent-soft: #e6edfc;
-  --color-accent-soft-border: #c2d3f5;
-  --color-good: #17a874;
-  --color-good-soft: #e2f6ec;
-  --color-good-soft-border: #bae9d1;
-  --color-warn: #b4780a;
-  --color-warn-soft: #fbf0da;
-  --color-warn-soft-border: #efd79c;
-  --color-bad: #dc3d3d;
-  --color-bad-ink: #b32b2b;
-  --color-bad-soft: #fbeaea;
-  --color-bad-soft-border: #f2c3c3;
+  --text-*: initial;
+  --text-2xs: 10px;
+  --text-2xs--line-height: 15px;
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 12px;
+  --text-sm--line-height: 18px;
+  --text-base: 13px;
+  --text-base--line-height: 20px;
+  --text-md: 14px;
+  --text-md--line-height: 21px;
+  --text-lg: 15px;
+  --text-lg--line-height: 22px;
+  --text-xl: 16px;
+  --text-xl--line-height: 24px;
+  --text-2xl: 17px;
+  --text-2xl--line-height: 26px;
+  --text-3xl: 20px;
+  --text-3xl--line-height: 30px;
+  --text-4xl: 22px;
+  --text-4xl--line-height: 33px;
+  --text-5xl: 25px;
+  --text-5xl--line-height: 38px;
+
+  /* `rounded-full` is Tailwind's own and stays: the pills. */
+  --radius-*: initial;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+
+  --color-bg: light-dark(#f5f7fb, #12151c);
+  --color-surface: light-dark(#ffffff, #1a1e27);
+  --color-surface-alt: light-dark(#eef2fa, #21262f);
+  --color-surface-sunken: light-dark(#e7edf7, #0f1218);
+  --color-border: light-dark(#dae3f0, #2c3240);
+  --color-border-strong: light-dark(#becde3, #3b4252);
+  --color-ink: light-dark(#12151e, #eaedf2);
+  --color-ink-soft: light-dark(#3a4252, #c2c9d6);
+  --color-ink-muted: light-dark(#69738a, #8b93a3);
+  --color-ink-faint: light-dark(#99a2b4, #5e6577);
+  --color-accent: light-dark(#2e5cd6, #6e9ee8);
+  --color-accent-ink: light-dark(#1f45b0, #9bbef2);
+  --color-accent-soft: light-dark(#e6edfc, #22304a);
+  --color-accent-soft-border: light-dark(#c2d3f5, #35456a);
+  --color-good: light-dark(#17a874, #4cbb87);
+  --color-good-soft: light-dark(#e2f6ec, #17301f);
+  --color-good-soft-border: light-dark(#bae9d1, #275639);
+  --color-warn: light-dark(#b4780a, #dcab3f);
+  --color-warn-soft: light-dark(#fbf0da, #362a0e);
+  --color-warn-soft-border: light-dark(#efd79c, #5c481b);
+  --color-bad: light-dark(#dc3d3d, #e17575);
+  --color-bad-ink: light-dark(#b32b2b, #eb9a9a);
+  --color-bad-soft: light-dark(#fbeaea, #3a1d1d);
+  --color-bad-soft-border: light-dark(#f2c3c3, #5e2e2e);
+  /* Behind a dialog, and behind the phone's open sidebar. */
+  --color-scrim: rgba(10, 12, 16, 0.4);
 
   /* Named -card/-pop rather than -sm/-md: those two are Tailwind's own theme
      keys, and declaring them here would silently override shadow-sm/shadow-md. */
-  --shadow-card: 0 1px 2px rgba(18, 21, 30, 0.06);
-  --shadow-pop: 0 8px 22px rgba(18, 21, 30, 0.09);
+  --shadow-card: 0 1px 2px light-dark(rgba(18, 21, 30, 0.06), rgba(0, 0, 0, 0.3));
+  --shadow-pop: 0 8px 22px light-dark(rgba(18, 21, 30, 0.09), rgba(0, 0, 0, 0.4));
+
+  /* A loading bar's sweep (`Skeleton`): its gradient is twice the bar's width and
+     repeats, so sliding it one full width is a seamless loop. */
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+}
+
+/* The width below which the sidebar becomes a drawer; the media queries at the end
+   of the components layer break at the same one. */
+@custom-variant narrow (@media (max-width: 860px));
+/* /applications' KPI strip (`KpiRow`): one row of chips once the page scrolls, and
+   always on a narrow screen. `.view-fill` scopes it to the table pages, so the
+   dashboard's tiles keep their grid; RootLayout sets `data-compact`. */
+@custom-variant strip {
+  .main[data-compact] .view-fill & {
+    @slot;
+  }
+  @media (max-width: 860px) {
+    .view-fill & {
+      @slot;
+    }
+  }
 }
 
 @layer base {
@@ -135,17 +204,17 @@
     @apply flex items-center gap-[10px] px-[8px] py-[4px];
   }
   .brand-name {
-    @apply text-[15px] font-extrabold leading-[1.15] tracking-[-0.01em];
+    @apply text-lg font-extrabold leading-4.25 tracking-[-0.01em];
   }
 
   .nav {
     @apply flex flex-col gap-[2px];
   }
   .nav-label {
-    @apply px-[10px] pb-[4px] pt-[10px] text-[10.5px] font-bold uppercase tracking-[.07em] text-ink-faint;
+    @apply px-[10px] pb-[4px] pt-[10px] text-2xs font-bold uppercase tracking-[.07em] text-ink-faint;
   }
   .nav-item {
-    @apply flex w-full cursor-pointer items-center gap-[10px] rounded-[9px] border border-transparent bg-transparent px-[10px] py-[9px] text-left text-[13.5px] font-semibold text-ink-soft no-underline;
+    @apply flex w-full cursor-pointer items-center gap-[10px] rounded-md border border-transparent bg-transparent px-[10px] py-[9px] text-left text-base font-semibold text-ink-soft no-underline;
   }
   .nav-item svg {
     @apply h-[16px] w-[16px] flex-none opacity-80;
@@ -166,20 +235,17 @@
     @apply bg-transparent text-ink-soft;
   }
   .soon-pill {
-    @apply ml-auto rounded-[20px] border border-border bg-surface-sunken px-[6px] py-[1px] text-[9.5px] font-bold tracking-[.04em] text-ink-muted;
+    @apply ml-auto rounded-full border border-border bg-surface-sunken px-[6px] py-[1px] text-2xs font-bold tracking-[.04em] text-ink-muted;
   }
 
   .sidebar-foot {
     @apply mt-auto flex items-center gap-[9px] border-t border-border px-[8px] pb-[4px] pt-[10px];
   }
   .avatar {
-    @apply flex h-[28px] w-[28px] flex-none items-center justify-center rounded-full border border-border bg-surface-sunken text-[11px] font-bold text-ink-muted;
+    @apply flex h-[28px] w-[28px] flex-none items-center justify-center rounded-full border border-border bg-surface-sunken text-xs font-bold text-ink-muted;
   }
   .foot-name {
-    @apply text-[12.5px] font-bold leading-[1.2];
-  }
-  .foot-role {
-    @apply text-[10.5px] text-ink-muted;
+    @apply text-sm font-bold leading-3.5;
   }
 
   /* A <button> rather than the mockup's <div>: it is a dismiss control, and a
@@ -198,7 +264,7 @@
   }
 
   .rail-toggle {
-    @apply my-[2px] flex w-full cursor-pointer items-center gap-[10px] rounded-[9px] border border-border bg-surface-alt px-[10px] py-[8px] text-[12px] font-bold text-ink-muted;
+    @apply my-[2px] flex w-full cursor-pointer items-center gap-[10px] rounded-md border border-border bg-surface-alt px-[10px] py-[8px] text-sm font-bold text-ink-muted;
   }
   .rail-toggle:hover {
     @apply border-border-strong text-ink;
@@ -214,7 +280,7 @@
     transition: padding 0.18s ease;
   }
   .topbar-title {
-    @apply text-[20px] font-extrabold tracking-[-0.01em];
+    @apply text-3xl font-extrabold tracking-[-0.01em];
     transition: font-size 0.18s ease;
   }
   /* RootLayout sets data-compact once anything on the page scrolls. */
@@ -222,10 +288,10 @@
     @apply py-[8px];
   }
   .main[data-compact] .topbar-title {
-    @apply text-[16px];
+    @apply text-xl;
   }
   .menu-toggle {
-    @apply hidden h-[34px] w-[34px] flex-none cursor-pointer items-center justify-center rounded-[8px] border border-border bg-surface text-ink-soft;
+    @apply hidden h-[34px] w-[34px] flex-none cursor-pointer items-center justify-center rounded-md border border-border bg-surface text-ink-soft;
   }
 
   .view {
@@ -233,8 +299,8 @@
   }
   /* The table pages (/vacancies, /applications, /inbox): the table's scroll box runs
      to the window's bottom, so the page itself does not scroll. A flex column from
-     .main down — .main takes the window's height, the view and the card fill it,
-     the scroll box takes what is left. `min-height: 320px` is the floor for short
+     .main down — .main takes the window's height, the view and the card fill it
+     (the page gives its `Card` `flex-1`), the scroll box takes what is left. `min-height: 320px` is the floor for short
      windows (the page scrolls then). `contain: size` keeps the rows out of the
      box's intrinsic height, so the view and the card size to that floor rather
      than to every loaded row, and grow around it instead of letting it spill out.
@@ -248,10 +314,7 @@
   .view.view-fill {
     @apply flex flex-1 flex-col pb-[24px];
   }
-  .view-fill > .card {
-    @apply flex flex-1 flex-col;
-  }
-  .view-fill > .card > .table-body-scroll {
+  .view-fill > * > .table-body-scroll {
     flex: 1;
     min-height: 320px;
     max-height: none;
@@ -259,109 +322,22 @@
   }
 
   /* ---------- shared bits ---------- */
-  .kpi-row {
-    @apply mb-[12px] grid gap-[12px];
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
-  .kpi-tile {
-    @apply rounded-[12px] border border-border bg-surface px-[16px] py-[14px] text-left shadow-card;
-  }
-  .kpi-tile .kpi-label {
-    @apply text-[11px] font-bold uppercase tracking-[.04em] text-ink-muted;
-  }
-  .kpi-tile .kpi-value {
-    @apply mt-[6px] font-mono text-[25px] font-semibold tracking-[-0.01em];
-  }
-  .kpi-tile .kpi-note {
-    @apply mt-[3px] text-[11.5px] text-ink-faint;
-  }
-  .kpi-tile.accent .kpi-value {
-    @apply text-accent-ink;
-  }
-  .kpi-tile.good .kpi-value {
-    @apply text-good;
-  }
-  .kpi-tile.bad .kpi-value {
-    @apply text-bad;
-  }
-  /* Not in the mockup: the Timeout tile needs a colour between good and bad. */
-  .kpi-tile.warn .kpi-value {
-    @apply text-warn;
-  }
-  /* The mockup draws KPI tiles as inert <div>s. Ours are quick filters, so they
-     need a pressed state that the mockup has no equivalent for. */
-  .kpi-tile.selected {
-    @apply border-accent-soft-border bg-accent-soft;
-  }
-  button.kpi-tile {
-    @apply cursor-pointer transition-colors;
-  }
-  button.kpi-tile:hover {
-    @apply border-border-strong;
-  }
-  /* /applications' tiles once the page scrolls (and always at ≤ 860px, below): one
-     row of chips — "Applied 12" — that scrolls sideways inside itself, so the table
-     gets the height back. Scoped to .view-fill, so the dashboard's tiles keep their
-     grid. The same rules are repeated in the media query. */
-  .main[data-compact] .view-fill .kpi-row {
-    @apply flex gap-[8px] overflow-x-auto;
-  }
-  .main[data-compact] .view-fill .kpi-tile {
-    @apply flex flex-none items-baseline gap-[6px] rounded-full px-[12px] py-[5px];
-  }
-  .main[data-compact] .view-fill .kpi-value {
-    @apply mt-0 text-[14px];
-  }
-  .main[data-compact] .view-fill .kpi-note {
-    @apply hidden;
-  }
-
-  .card {
-    @apply rounded-[14px] border border-border bg-surface shadow-card;
-  }
-  .card-head {
-    @apply flex flex-wrap items-center justify-between gap-[12px] px-[18px] pb-[12px] pt-[16px];
-  }
-  .card-head h2 {
-    @apply text-[15px] font-extrabold;
-  }
-  .card-head .count {
-    @apply mt-[2px] text-[12px] text-ink-muted;
-  }
-
   .toolbar {
     @apply flex flex-wrap items-center gap-[10px] px-[18px] pb-[10px];
   }
   /* The table pages' toolbar opens their card. */
-  .view-fill > .card > .toolbar {
+  .view-fill > * > .toolbar {
     @apply pt-[12px];
   }
-  .search-input {
-    @apply min-w-[160px] flex-1 basis-[220px] rounded-[9px] border border-border-strong bg-surface-sunken px-[12px] py-[8px] text-[13px] text-ink;
-  }
-  .search-input:focus {
-    @apply bg-surface outline outline-2 outline-accent-soft-border;
-    outline-offset: 0;
-  }
-  .search-input::placeholder {
-    @apply text-ink-faint;
-  }
-  select.filter-select,
-  select.status-select {
-    @apply rounded-[9px] border border-border-strong bg-surface px-[10px] py-[7px] text-[12.5px] font-semibold text-ink;
-  }
-  select.status-select:disabled {
-    @apply cursor-wait opacity-50;
-  }
   .filter-group {
-    @apply flex items-center gap-[7px] text-[12px] font-semibold text-ink-muted;
+    @apply flex items-center gap-[7px] text-sm font-semibold text-ink-muted;
   }
   /* /inbox's tabs: a segmented control, the pressed one tinted like the active nav item. */
   .tabs {
-    @apply flex flex-wrap gap-[3px] rounded-[10px] border border-border bg-surface-sunken p-[3px];
+    @apply flex flex-wrap gap-[3px] rounded-lg border border-border bg-surface-sunken p-[3px];
   }
   .tab {
-    @apply cursor-pointer rounded-[7px] border border-transparent bg-transparent px-[12px] py-[5px] text-[12.5px] font-semibold text-ink-muted;
+    @apply cursor-pointer rounded-sm border border-transparent bg-transparent px-[12px] py-[5px] text-sm font-semibold text-ink-muted;
   }
   .tab:hover {
     @apply text-ink;
@@ -377,10 +353,10 @@
   /* inset shadow, not border-bottom: with border-collapse: collapse the border is
      painted with the table, so a sticky <thead> visibly detaches while scrolling. */
   thead th {
-    @apply sticky top-0 z-10 bg-surface px-[18px] py-[9px] text-left text-[10.5px] font-bold uppercase tracking-[.05em] text-ink-faint shadow-[inset_0_-1px_0_var(--color-border)];
+    @apply sticky top-0 z-10 bg-surface px-[18px] py-[9px] text-left text-2xs font-bold uppercase tracking-[.05em] text-ink-faint shadow-[inset_0_-1px_0_var(--color-border)];
   }
   tbody td {
-    @apply border-b border-border px-[18px] py-[13px] align-top text-[13px];
+    @apply border-b border-border px-[18px] py-[13px] align-top text-base;
   }
   tbody tr:last-child td {
     @apply border-b-0;
@@ -406,7 +382,7 @@
   }
 
   .role-title {
-    @apply text-[13.5px] font-bold text-ink;
+    @apply text-base font-bold text-ink;
   }
   .role-link {
     @apply text-ink no-underline;
@@ -415,16 +391,16 @@
     @apply text-accent-ink underline;
   }
   .role-meta {
-    @apply mt-[2px] text-[12px] text-ink-muted;
+    @apply mt-[2px] text-sm text-ink-muted;
   }
   .role-meta .id {
     @apply text-ink-faint;
   }
   .date-cell {
-    @apply whitespace-nowrap text-[12.5px] text-ink-soft;
+    @apply whitespace-nowrap text-sm text-ink-soft;
   }
   .date-upd {
-    @apply mt-[1px] text-[10.5px] text-ink-faint;
+    @apply mt-[1px] text-2xs text-ink-faint;
   }
   .timeout-mark {
     /* `relative` is what its `.tip` is positioned against. */
@@ -440,48 +416,14 @@
     @apply left-auto right-0 translate-x-0;
   }
 
-  .pill {
-    @apply inline-flex items-center gap-[4px] whitespace-nowrap rounded-[20px] border border-transparent px-[9px] py-[2px] font-mono text-[12px] font-semibold;
-  }
-  .pill.score-hi {
-    @apply border-good-soft-border bg-good-soft text-good;
-  }
-  .pill.score-mid {
-    @apply border-warn-soft-border bg-warn-soft text-warn;
-  }
-  .pill.score-lo {
-    @apply border-border bg-surface-sunken text-ink-muted;
-  }
-  .tag {
-    @apply whitespace-nowrap rounded-[20px] border border-transparent px-[9px] py-[3px] font-sans text-[11px] font-bold;
-  }
-  .tag.good {
-    @apply border-good-soft-border bg-good-soft text-good;
-  }
-  .tag.warn {
-    @apply border-warn-soft-border bg-warn-soft text-warn;
-  }
-  .tag.bad {
-    @apply border-bad-soft-border bg-bad-soft text-bad;
-  }
-  .tag.neutral {
-    @apply border-border bg-surface-sunken text-ink-muted;
-  }
-  .tag.accent {
-    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
-  }
-
   .comment-cell {
-    @apply max-w-[340px] text-[12.5px] leading-[1.5] text-ink-soft;
+    @apply max-w-[340px] text-sm text-ink-soft;
   }
   .comment-cell .clamp {
     @apply line-clamp-2;
   }
   .comment-cell.expanded .clamp {
     -webkit-line-clamp: unset;
-  }
-  .show-more {
-    @apply cursor-pointer border-none bg-transparent pt-[3px] text-[12px] font-bold text-accent;
   }
   .comment-user {
     @apply text-ink;
@@ -493,31 +435,17 @@
     @apply text-ink-muted;
   }
 
-  .icon-btn {
-    @apply relative inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[8px] border border-border-strong bg-surface text-ink-muted;
-  }
-  .icon-btn:hover {
-    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
-  }
-  /* Decline keeps the red it wore as a text button: hovering to accent would read
-     as "harmless" on the one control in the row that is not. */
-  .icon-btn-danger:hover {
-    @apply border-bad-soft-border bg-bad-soft text-bad-ink;
-  }
-  .icon-btn svg {
-    @apply h-[14px] w-[14px];
-  }
-  /* The bubble an `.icon-btn` or a `.meta-btn` reveals — the only label the Action
+  /* The bubble an icon button or a `.meta-btn` reveals — the only label the Action
      column's four icon controls have, the duplicates button's count, and the copy
      buttons' "Copied" confirmation. One class for all of them: a hover tip and a
      flash are the same box with the same reveal. */
   .tip {
-    @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-ink px-[7px] py-[3px] text-[10.5px] font-bold text-bg opacity-0;
+    @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-sm bg-ink px-[7px] py-[3px] text-2xs font-bold text-bg opacity-0;
     transition: opacity 0.15s ease;
   }
-  /* Whichever element directly contains the bubble reveals it. This used to name
-     `.icon-btn` and `.meta-btn` one by one; a list is what the next tip has to be
-     added to, and the ⏳ marker (a `<span>`, cue-on-hover only) is the third. */
+  /* Whichever element directly contains the bubble reveals it — not a list of the
+     controls that carry one, which the next tip would have to be added to; the ⏳
+     marker is a `<span>`, cue-on-hover only. */
   :hover > .tip,
   :focus-visible > .tip,
   .flash > .tip {
@@ -525,10 +453,10 @@
   }
 
   /* The duplicates button in a row's meta line. Shaped for 12px text rather than
-     `.icon-btn`'s 30px square, which would stretch the row and push the meta line
+     an icon button's 30px square, which would stretch the row and push the meta line
      around as it appears. `relative` is what its `.tip` is positioned against. */
   .meta-btn {
-    @apply relative ml-[6px] inline-flex cursor-pointer items-center gap-[3px] rounded-[6px] border border-border-strong px-[5px] py-[1px] align-middle text-[11px] font-bold text-ink-muted;
+    @apply relative ml-[6px] inline-flex cursor-pointer items-center gap-[3px] rounded-sm border border-border-strong px-[5px] py-[1px] align-middle text-xs font-bold text-ink-muted;
   }
   .meta-btn:hover {
     @apply border-accent-soft-border bg-accent-soft text-accent-ink;
@@ -537,38 +465,8 @@
     @apply h-[11px] w-[11px];
   }
 
-  .empty-state {
-    @apply px-[18px] py-[46px] text-center text-[13px] text-ink-muted;
-  }
-  /* A loading bar in the shape of what loads (SkeletonRows). The gradient is twice
-     the bar's width and repeats, so sliding it one full width is a seamless loop. */
-  .skeleton {
-    @apply block h-[12px] rounded-[6px];
-    background:
-      linear-gradient(
-        90deg,
-        var(--color-surface-sunken) 25%,
-        var(--color-surface-alt) 50%,
-        var(--color-surface-sunken) 75%
-      )
-      0 0 / 200% 100%;
-    animation: skeleton-shimmer 1.4s ease-in-out infinite;
-  }
-  @keyframes skeleton-shimmer {
-    from {
-      background-position: 100% 0;
-    }
-    to {
-      background-position: -100% 0;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .skeleton {
-      animation: none;
-    }
-  }
   .toolbar-count {
-    @apply whitespace-nowrap text-[12px] text-ink-muted;
+    @apply whitespace-nowrap text-sm text-ink-muted;
   }
 
   /* ---------- dashboard ---------- */
@@ -597,13 +495,13 @@
     @apply flex flex-wrap items-baseline gap-x-[8px] gap-y-[6px];
   }
   .funnel-name {
-    @apply whitespace-nowrap text-[12.5px] font-bold text-ink-soft;
+    @apply whitespace-nowrap text-sm font-bold text-ink-soft;
   }
   .funnel-track {
-    @apply order-1 h-[28px] basis-full overflow-hidden rounded-[7px] bg-surface-sunken;
+    @apply order-1 h-[28px] basis-full overflow-hidden rounded-sm bg-surface-sunken;
   }
   .funnel-fill {
-    @apply h-full rounded-[7px];
+    @apply h-full rounded-sm;
     min-width: 3%;
   }
   .funnel-row:nth-child(1) .funnel-fill {
@@ -622,10 +520,10 @@
     background: var(--funnel-5);
   }
   .funnel-value {
-    @apply font-mono text-[13px] font-semibold;
+    @apply font-mono text-base font-semibold;
   }
   .funnel-conv {
-    @apply ml-auto whitespace-nowrap font-mono text-[11px] text-ink-faint;
+    @apply ml-auto whitespace-nowrap font-mono text-xs text-ink-faint;
   }
 
   .attn-list,
@@ -641,7 +539,7 @@
     @apply border-b-0;
   }
   .attn-score {
-    @apply min-w-[40px] flex-none rounded-[8px] border border-good-soft-border bg-good-soft px-[7px] py-[5px] text-center font-mono text-[12.5px] font-bold text-good;
+    @apply min-w-[40px] flex-none rounded-md border border-good-soft-border bg-good-soft px-[7px] py-[5px] text-center font-mono text-sm font-bold text-good;
   }
   .attn-body,
   .activity-body {
@@ -649,14 +547,14 @@
   }
   .attn-title,
   .activity-title {
-    @apply overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold;
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-base font-bold;
   }
   .attn-sub,
   .activity-sub {
-    @apply mt-[1px] text-[11.5px] text-ink-muted;
+    @apply mt-[1px] text-xs text-ink-muted;
   }
   .attn-go {
-    @apply flex-none cursor-pointer rounded-[7px] border border-accent-soft-border bg-accent-soft px-[9px] py-[5px] text-[11.5px] font-bold text-accent;
+    @apply flex-none cursor-pointer rounded-sm border border-accent-soft-border bg-accent-soft px-[9px] py-[5px] text-xs font-bold text-accent;
   }
   .activity-dot {
     @apply h-[8px] w-[8px] flex-none rounded-full;
@@ -671,7 +569,7 @@
     @apply bg-accent;
   }
   .activity-time {
-    @apply flex-none font-mono text-[11px] text-ink-faint;
+    @apply flex-none font-mono text-xs text-ink-faint;
   }
 
   /* ---------- profile / soon ---------- */
@@ -679,86 +577,29 @@
     @apply mx-auto flex max-w-[420px] flex-col items-center gap-[14px] px-[20px] py-[70px] text-center;
   }
   .soon-icon {
-    @apply flex h-[52px] w-[52px] items-center justify-center rounded-[14px] border border-accent-soft-border bg-accent-soft text-accent-ink;
+    @apply flex h-[52px] w-[52px] items-center justify-center rounded-xl border border-accent-soft-border bg-accent-soft text-accent-ink;
   }
   .soon-icon svg {
     @apply h-[24px] w-[24px];
   }
   /* Preflight strips heading weight, so the mockup's size-only rule needs it back. */
   .soon-wrap h2 {
-    @apply text-[17px] font-bold;
+    @apply text-2xl font-bold;
   }
   .soon-wrap p {
-    @apply text-[13px] leading-[1.55] text-ink-muted;
+    @apply text-base leading-5 text-ink-muted;
   }
   .soon-list {
-    @apply flex w-full flex-col gap-[5px] rounded-[10px] border border-border bg-surface-alt px-[16px] py-[12px] text-left text-[12.5px] text-ink-soft;
-  }
-
-  /* ---------- dialogs + forms (not in the mockup; themed so they don't stay white) ---------- */
-  .dialog-title {
-    @apply text-[17px] font-extrabold;
-  }
-  .dialog-sub {
-    @apply mt-[4px] text-[13px] text-ink-muted;
-  }
-  .dialog-actions {
-    @apply mt-[24px] flex justify-end gap-[10px];
-  }
-
-  /* `text-bg` on an accent fill, the inversion the mockup's .copied-flag already
-     uses: --color-accent is dark in the light theme and light in the dark one,
-     so a fixed white/black label would fail contrast in one of them. */
-  .btn {
-    @apply cursor-pointer rounded-[9px] border border-border-strong bg-surface px-[14px] py-[8px] text-[13px] font-bold text-ink;
-  }
-  .btn:hover {
-    @apply bg-surface-alt;
-  }
-  .btn-primary {
-    @apply border-transparent bg-accent text-bg;
-  }
-  .btn-primary:hover {
-    @apply bg-accent-ink;
-  }
-  .btn-danger {
-    @apply border-transparent bg-bad text-bg;
-  }
-  /* Without this, :hover falls through to .btn's grey — a grey flash on a red
-     button. Invisible in a lone dialog; not in a column of them. */
-  .btn-danger:hover {
-    @apply bg-bad-ink;
-  }
-
-  .field-label {
-    @apply block text-[12.5px] font-bold text-ink-soft;
-  }
-  .field-input {
-    @apply mt-[6px] w-full rounded-[9px] border border-border-strong bg-surface px-[12px] py-[8px] text-[13px] text-ink;
-  }
-  .field-input:focus {
-    @apply bg-surface outline outline-2 outline-accent-soft-border outline-offset-0;
-  }
-  .field-check {
-    @apply flex items-center gap-[8px] text-[13px] text-ink-soft;
+    @apply flex w-full flex-col gap-[5px] rounded-lg border border-border bg-surface-alt px-[16px] py-[12px] text-left text-sm text-ink-soft;
   }
 
   /* ---------- vacancy detail (docs/design/vacancy-detail-reference.html) ---------- */
   .role-title-row {
     @apply flex items-center gap-[6px];
   }
-  .row-link-btn {
-    @apply inline-flex h-[21px] w-[21px] flex-none items-center justify-center rounded-[6px] border border-border text-ink-faint no-underline;
-  }
-  .row-link-btn:hover {
-    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
-  }
-  .row-link-btn svg {
-    @apply h-[11px] w-[11px];
-  }
 
   .back-link {
-    @apply mb-[14px] inline-flex cursor-pointer items-center gap-[6px] text-[12.5px] font-semibold text-ink-muted no-underline;
+    @apply mb-[14px] inline-flex cursor-pointer items-center gap-[6px] text-sm font-semibold text-ink-muted no-underline;
   }
   .back-link:hover {
     @apply text-accent-ink;
@@ -774,26 +615,19 @@
     @apply mb-[6px] flex items-center gap-[8px];
   }
   .detail-company-name {
-    @apply text-[13px] font-semibold text-ink-muted;
+    @apply text-base font-semibold text-ink-muted;
   }
   .detail-title {
-    @apply text-[22px] font-extrabold leading-[1.2] tracking-[-0.01em];
+    @apply text-4xl font-extrabold leading-6.5 tracking-[-0.01em];
   }
   .detail-id-tag {
     @apply font-mono font-semibold;
   }
   .detail-meta-row {
-    @apply mt-[10px] flex flex-wrap items-center gap-[8px] text-[12.5px] text-ink-muted;
+    @apply mt-[10px] flex flex-wrap items-center gap-[8px] text-sm text-ink-muted;
   }
   .detail-header-actions {
     @apply flex flex-none items-center gap-[8px];
-  }
-  .rec-link {
-    @apply no-underline;
-  }
-  .rec-link:hover .tag {
-    @apply border-good-soft-border;
-    filter: brightness(1.05);
   }
 
   .status-timeline {
@@ -804,7 +638,7 @@
     width: 108px;
   }
   .timeline-dot {
-    @apply flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 text-[11px] font-bold;
+    @apply flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 text-xs font-bold;
     background: var(--color-surface);
   }
   .timeline-node.node-done .timeline-dot {
@@ -825,13 +659,13 @@
     @apply h-[12px] w-[12px];
   }
   .timeline-label {
-    @apply text-[11.5px] font-bold text-ink;
+    @apply text-xs font-bold text-ink;
   }
   .timeline-node.node-done .timeline-label {
     @apply font-semibold text-ink-muted;
   }
   .timeline-date {
-    @apply text-[10.5px] text-ink-faint;
+    @apply text-2xs text-ink-faint;
   }
   /* Fixed, not flex-1: a short timeline stays compact at the left edge, and a long one
      lays its steps out evenly (the card scrolls sideways). */
@@ -871,7 +705,7 @@
     @apply relative;
   }
   .desc-body {
-    @apply whitespace-pre-line px-[18px] pb-[18px] pt-[2px] text-[13.5px] leading-[1.65] text-ink-soft;
+    @apply whitespace-pre-line px-[18px] pb-[18px] pt-[2px] text-base leading-5.25 text-ink-soft;
     max-height: 220px;
     overflow: hidden;
   }
@@ -886,7 +720,7 @@
     @apply hidden;
   }
   .desc-toggle {
-    @apply mx-[18px] mb-[16px] mt-[10px] inline-flex cursor-pointer items-center gap-[5px] rounded-[8px] border border-border-strong bg-surface px-[10px] py-[6px] text-[12px] font-bold text-accent-ink;
+    @apply mx-[18px] mb-[16px] mt-[10px] inline-flex cursor-pointer items-center gap-[5px] rounded-md border border-border-strong bg-surface px-[10px] py-[6px] text-sm font-bold text-accent-ink;
   }
   .desc-toggle:hover {
     @apply border-accent-soft-border bg-accent-soft;
@@ -897,22 +731,6 @@
   }
   .desc-toggle.expanded svg {
     transform: rotate(180deg);
-  }
-
-  .empty-block {
-    @apply mx-auto flex max-w-[320px] flex-col items-center gap-[10px] px-[20px] py-[38px] text-center;
-  }
-  .empty-block .empty-icon {
-    @apply flex h-[40px] w-[40px] items-center justify-center rounded-[12px] border border-accent-soft-border bg-accent-soft text-accent-ink;
-  }
-  .empty-block .empty-icon svg {
-    @apply h-[19px] w-[19px];
-  }
-  .empty-block p {
-    @apply text-[12.5px] font-bold text-ink;
-  }
-  .empty-block span {
-    @apply text-[12px] text-ink-muted;
   }
 
   .history-list {
@@ -946,13 +764,13 @@
     @apply flex flex-wrap items-baseline justify-between gap-[8px];
   }
   .history-source {
-    @apply text-[12.5px] font-bold text-ink;
+    @apply text-sm font-bold text-ink;
   }
   .history-time {
-    @apply flex-none font-mono text-[11px] text-ink-faint;
+    @apply flex-none font-mono text-xs text-ink-faint;
   }
   .history-text {
-    @apply mt-[3px] whitespace-pre-line text-[12.5px] leading-[1.55] text-ink-soft;
+    @apply mt-[3px] whitespace-pre-line text-sm leading-4.75 text-ink-soft;
   }
   .comment-form {
     @apply flex flex-col items-end gap-[8px] border-t border-border px-[18px] py-[13px];
@@ -962,7 +780,7 @@
     @apply flex flex-col;
   }
   .fact-row {
-    @apply flex items-center justify-between gap-[10px] border-b border-border px-[18px] py-[10px] text-[12.5px];
+    @apply flex items-center justify-between gap-[10px] border-b border-border px-[18px] py-[10px] text-sm;
   }
   .fact-row:last-child {
     @apply border-b-0;
@@ -1014,36 +832,20 @@
     }
     .scrim.show {
       @apply fixed inset-0 z-30 block;
-      background: rgba(10, 12, 16, 0.4);
+      background: var(--color-scrim);
     }
     .topbar {
       @apply px-[16px] py-[14px];
     }
     /* 16px keeps "Application tracker" on one line at 390px: the topbar stays 66px. */
     .topbar-title {
-      @apply text-[16px];
+      @apply text-xl;
     }
     .view {
       @apply px-[14px] pb-[44px] pt-[12px];
     }
     .view.view-fill {
       @apply pb-[18px];
-    }
-    .kpi-row {
-      grid-template-columns: repeat(2, 1fr);
-    }
-    /* /applications' compact strip, always on here — see .main[data-compact] above. */
-    .view-fill .kpi-row {
-      @apply flex gap-[8px] overflow-x-auto;
-    }
-    .view-fill .kpi-tile {
-      @apply flex flex-none items-baseline gap-[6px] rounded-full px-[12px] py-[5px];
-    }
-    .view-fill .kpi-value {
-      @apply mt-0 text-[14px];
-    }
-    .view-fill .kpi-note {
-      @apply hidden;
     }
     .funnel-conv {
       @apply hidden;
@@ -1064,101 +866,30 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Runtime theme tokens. The utilities above resolve through var(), so
-   redefining them here re-themes everything — that is the entire mechanism, and
-   why no `dark:` variant is needed.
-
-   Three states:
-     no data-theme  -> follows the OS (the media query below)
-     data-theme=light -> forced light, the :not() guard blocks the media query
-     data-theme=dark  -> forced dark, overrides everything
-
-   Ported from docs/design/dashboard-reference_2.html.
+   The theme switch (ADR-0024): which side of every `light-dark()` applies.
+     no data-theme    -> follows the OS
+     data-theme=light -> pinned light
+     data-theme=dark  -> pinned dark
+   Below it, the page-level values no utility reads.
 --------------------------------------------------------------------------- */
 :root {
-  --rail-w: 72px;
-  color-scheme: light;
-  --scroll-thumb: #c3cddc;
-  /* The funnel's five stages, one hue each: the dataviz skill's categorical
-     slots 1–5 (blue, orange, aqua, yellow, magenta), light and dark steps,
-     validated for adjacent-pair colour-blind separation on the funnel track. */
-  --funnel-1: #2a78d6;
-  --funnel-2: #eb6834;
-  --funnel-3: #1baf7a;
-  --funnel-4: #eda100;
-  --funnel-5: #e87ba4;
+  color-scheme: light dark;
 }
 :root[data-theme="light"] {
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --color-bg: #12151c;
-    --color-surface: #1a1e27;
-    --color-surface-alt: #21262f;
-    --color-surface-sunken: #0f1218;
-    --color-border: #2c3240;
-    --color-border-strong: #3b4252;
-    --color-ink: #eaedf2;
-    --color-ink-soft: #c2c9d6;
-    --color-ink-muted: #8b93a3;
-    --color-ink-faint: #5e6577;
-    --color-accent: #6e9ee8;
-    --color-accent-ink: #9bbef2;
-    --color-accent-soft: #22304a;
-    --color-accent-soft-border: #35456a;
-    --color-good: #4cbb87;
-    --color-good-soft: #17301f;
-    --color-good-soft-border: #275639;
-    --color-warn: #dcab3f;
-    --color-warn-soft: #362a0e;
-    --color-warn-soft-border: #5c481b;
-    --color-bad: #e17575;
-    --color-bad-ink: #eb9a9a;
-    --color-bad-soft: #3a1d1d;
-    --color-bad-soft-border: #5e2e2e;
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
-    --scroll-thumb: #3f4757;
-    --funnel-1: #3987e5;
-    --funnel-2: #d95926;
-    --funnel-3: #199e70;
-    --funnel-4: #c98500;
-    --funnel-5: #d55181;
-  }
-}
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #12151c;
-  --color-surface: #1a1e27;
-  --color-surface-alt: #21262f;
-  --color-surface-sunken: #0f1218;
-  --color-border: #2c3240;
-  --color-border-strong: #3b4252;
-  --color-ink: #eaedf2;
-  --color-ink-soft: #c2c9d6;
-  --color-ink-muted: #8b93a3;
-  --color-ink-faint: #5e6577;
-  --color-accent: #6e9ee8;
-  --color-accent-ink: #9bbef2;
-  --color-accent-soft: #22304a;
-  --color-accent-soft-border: #35456a;
-  --color-good: #4cbb87;
-  --color-good-soft: #17301f;
-  --color-good-soft-border: #275639;
-  --color-warn: #dcab3f;
-  --color-warn-soft: #362a0e;
-  --color-warn-soft-border: #5c481b;
-  --color-bad: #e17575;
-  --color-bad-soft: #3a1d1d;
-  --color-bad-soft-border: #5e2e2e;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-pop: 0 10px 28px rgba(0, 0, 0, 0.4);
-  --scroll-thumb: #3f4757;
-  --funnel-1: #3987e5;
-  --funnel-2: #d95926;
-  --funnel-3: #199e70;
-  --funnel-4: #c98500;
-  --funnel-5: #d55181;
+}
+:root {
+  --rail-w: 72px;
+  --scroll-thumb: light-dark(#c3cddc, #3f4757);
+  /* The funnel's five stages, one hue each: the dataviz skill's categorical
+     slots 1–5 (blue, orange, aqua, yellow, magenta), light and dark steps,
+     validated for adjacent-pair colour-blind separation on the funnel track. */
+  --funnel-1: light-dark(#2a78d6, #3987e5);
+  --funnel-2: light-dark(#eb6834, #d95926);
+  --funnel-3: light-dark(#1baf7a, #199e70);
+  --funnel-4: light-dark(#eda100, #c98500);
+  --funnel-5: light-dark(#e87ba4, #d55181);
 }

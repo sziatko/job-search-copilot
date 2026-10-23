@@ -1,4 +1,6 @@
 import { useId } from 'react';
+import { Button } from '@/components/ui/Button';
+import { DialogActions, DialogSub, DialogTitle } from '@/components/ui/Dialog';
 import { Modal } from '@/components/ui/Modal';
 
 export function ConfirmDialog({
@@ -19,18 +21,14 @@ export function ConfirmDialog({
   const titleId = useId();
   return (
     <Modal onClose={onCancel} labelledBy={titleId}>
-      <h2 id={titleId} className="dialog-title">
-        {title}
-      </h2>
-      <p className="dialog-sub">{description}</p>
-      <div className="dialog-actions">
-        <button type="button" onClick={onCancel} className="btn">
-          {cancelLabel}
-        </button>
-        <button type="button" onClick={onConfirm} className="btn btn-danger">
+      <DialogTitle id={titleId}>{title}</DialogTitle>
+      <DialogSub>{description}</DialogSub>
+      <DialogActions>
+        <Button onClick={onCancel}>{cancelLabel}</Button>
+        <Button variant="danger" onClick={onConfirm}>
           {confirmLabel}
-        </button>
-      </div>
+        </Button>
+      </DialogActions>
     </Modal>
   );
 }

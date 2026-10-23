@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { SkeletonRows } from '@/components/ui/SkeletonRows';
+import { Tag } from '@/components/ui/Tag';
 import { isSafeExternalUrl } from '@/lib/url';
 import { daysSinceLastMove } from '@/pages/applications/constants';
 import type { ApplicationListItem } from '@/pages/applications/types';
@@ -107,7 +108,11 @@ export function ModalVacancyTable({
                   )}
                   {/* Which of these rows is the one you clicked — a sibling
                       can carry another spelling of the company. */}
-                  {isCurrent && <span className="tag accent ml-[7px] align-middle">Current</span>}
+                  {isCurrent && (
+                    <Tag tone="accent" className="ml-1.75 align-middle">
+                      Current
+                    </Tag>
+                  )}
                   <div className="role-meta">
                     {item.company} <span className="id">#{item.id}</span>
                   </div>
@@ -115,12 +120,10 @@ export function ModalVacancyTable({
                 {/* No analysis, no score — as on /vacancies. */}
                 <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
                 <td>
-                  <span className={`tag ${STATUS_TAGS[item.status].variant}`}>
-                    {STATUS_TAGS[item.status].text}
-                  </span>
+                  <Tag tone={STATUS_TAGS[item.status].tone}>{STATUS_TAGS[item.status].text}</Tag>
                 </td>
                 {/* /applications' CV column; a row never applied to has no CV. */}
-                <td className="text-[12px] text-ink-muted">
+                <td className="text-sm text-ink-muted">
                   {application?.usedTailoredResume ? '✓' : '—'}
                 </td>
                 <td>

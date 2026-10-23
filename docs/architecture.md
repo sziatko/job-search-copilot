@@ -66,6 +66,28 @@ needs it, into `domain/`; plumbing over Prisma with no domain meaning, into `db/
 spec sits next to its file; `isolation.spec.ts`, across every service, stays at the
 root.
 
+### Inside `apps/web/src`
+
+```
+src/
+  main.tsx, App.tsx  boot and the providers; router.tsx is the route tree
+  index.css          the design tokens (@theme), the base styles, and the rules
+                     of the shell, the tables and the page layouts
+  pages/<route>/     one folder per route: the page, its hooks, its API calls,
+                     its own components/
+  components/ui/     the UI library: primitives that own their styles
+  components/        the rest of what pages share: the shell (RootLayout.tsx,
+                     shell/), the icons, the virtualized rows
+  lib/               what every page shares that is not UI: the HTTP helper
+                     (api.ts), the cursor-paged query (useInfiniteList.ts,
+                     ADR-0030), the query keys, each route's title (routeMeta.ts)
+```
+
+**The UI is built from `components/ui`.** Markup starts from a primitive there, and a
+piece more than one page needs becomes one — never a new component class in
+`index.css`. How to use one and how to add one:
+[`apps/web/src/components/ui/README.md`](../apps/web/src/components/ui/README.md).
+
 ## Request lifecycles
 
 **Analyzer saves a vacancy** (the write path):
@@ -112,12 +134,6 @@ apps/mcp  record_application { company, title, ... }
 Both transports call the same core service methods; there is no business logic in
 `apps/api` or `apps/mcp` beyond input validation and shaping the response. See
 [`contracts.md`](contracts.md) for the exact surfaces.
-
-In `apps/web`, `src/lib/` holds what every page shares: the HTTP helper (`api.ts`:
-`apiFetch`, `parseResponse`, `cursorPageSchema`), the cursor-paged query
-(`useInfiniteList.ts`, [ADR-0030](decisions/0030-cursor-paging.md)) and each route's
-title (`routeMeta.ts`). Presentational pieces are in `src/components/ui/`, the shell in
-`src/components/RootLayout.tsx` + `src/components/shell/`.
 
 ## Dev stack (Docker Compose)
 
@@ -227,6 +243,12 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
     user's row answers like a missing one (404, never 403).
     → [ADR-0038](decisions/0038-multi-user-shared-schema.md),
     [ADR-0039](decisions/0039-api-keys-per-user.md)
+12. **The web UI is built from `components/ui`.** A page's markup comes from the
+    primitives there, which own their styles; no new component class goes into
+    `index.css`. Nothing fails when a page styles a
+    `<button>` by hand — it just drifts from every other one.
+    → [Inside `apps/web/src`](#inside-appswebsrc),
+    [`components/ui/README.md`](../apps/web/src/components/ui/README.md)
 
 ## Stack
 

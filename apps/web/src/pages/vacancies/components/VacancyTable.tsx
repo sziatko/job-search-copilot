@@ -8,10 +8,12 @@ import {
   IconHistory,
   IconUndo,
 } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { SkeletonRows } from '@/components/ui/SkeletonRows';
+import { Tag } from '@/components/ui/Tag';
 import { useVirtualRows } from '@/components/useVirtualRows';
 import { isSafeExternalUrl } from '@/lib/url';
 import { isPipelineStatus } from '../../applications/types';
@@ -187,9 +189,7 @@ export function VacancyTable({
                   {item.estimationComment ? <ExpandableText text={item.estimationComment} /> : '—'}
                 </td>
                 <td>
-                  <span className={`tag ${STATUS_TAGS[item.status].variant}`}>
-                    {STATUS_TAGS[item.status].text}
-                  </span>
+                  <Tag tone={STATUS_TAGS[item.status].tone}>{STATUS_TAGS[item.status].text}</Tag>
                 </td>
                 <td>
                   {/* The status buttons all mean the same thing — a status change —
@@ -208,22 +208,21 @@ export function VacancyTable({
                     {actionsFor(item).map((action) => {
                       const { verb, Icon, danger } = ROW_BUTTONS[action];
                       return (
-                        <button
+                        <Button
                           key={action}
-                          type="button"
+                          variant={danger ? 'iconDanger' : 'icon'}
                           disabled={saving || applied}
                           onClick={() => onActionChange(item.id, action)}
-                          className={`icon-btn ${danger ? 'icon-btn-danger ' : ''}disabled:opacity-50`}
                         >
                           <Icon />
                           <span className="tip">{verb}</span>
-                        </button>
+                        </Button>
                       );
                     })}
                     <DetailsLink id={item.id} />
                   </div>
                   {rowErrors.has(item.id) && (
-                    <p className="mt-[4px] text-[11.5px] text-bad">{rowErrors.get(item.id)}</p>
+                    <p className="mt-[4px] text-xs text-bad">{rowErrors.get(item.id)}</p>
                   )}
                 </td>
               </tr>

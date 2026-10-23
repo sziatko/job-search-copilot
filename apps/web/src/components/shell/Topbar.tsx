@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { IconMenu } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 import { authClient } from '@/lib/auth';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -19,11 +20,7 @@ function SignOutButton() {
     queryClient.clear();
     await navigate({ to: '/login' });
   }
-  return (
-    <button type="button" className="btn" onClick={signOut}>
-      Sign out
-    </button>
-  );
+  return <Button onClick={signOut}>Sign out</Button>;
 }
 
 /**

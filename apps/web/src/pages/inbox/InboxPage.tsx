@@ -1,6 +1,9 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 import { z } from 'zod';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { listVacanciesPage } from '../vacancies/api';
 import { CompanyHistoryModal } from '../vacancies/components/CompanyHistoryModal';
 import { SearchModal } from '../vacancies/components/SearchModal';
@@ -65,7 +68,7 @@ export function InboxPage() {
 
   return (
     <section className="view view-fill">
-      <div className="card">
+      <Card className="flex flex-1 flex-col">
         <div className="toolbar">
           <fieldset className="tabs">
             <legend className="sr-only">Inbox tab</legend>
@@ -89,16 +92,14 @@ export function InboxPage() {
                 Showing {items.length} of {total}
               </span>
             )}
-            <button type="button" className="btn" onClick={() => setSearching(true)}>
-              Search
-            </button>
+            <Button onClick={() => setSearching(true)}>Search</Button>
           </div>
         </div>
 
         {loadError ? (
-          <div className="empty-state">Failed to load the inbox: {loadError}</div>
+          <EmptyState>Failed to load the inbox: {loadError}</EmptyState>
         ) : !loading && items.length === 0 ? (
-          <div className="empty-state">{empty}</div>
+          <EmptyState>{empty}</EmptyState>
         ) : (
           <VacancyTable
             loading={loading}
@@ -111,7 +112,7 @@ export function InboxPage() {
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
           />
         )}
-      </div>
+      </Card>
 
       {companyHistory && (
         <CompanyHistoryModal

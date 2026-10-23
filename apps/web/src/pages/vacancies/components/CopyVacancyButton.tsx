@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { IconCopy } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 
 interface CopyVacancyButtonProps {
   id: number;
@@ -44,17 +45,17 @@ URL: ${applyUrl}`;
   };
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="icon"
       aria-label={`Copy ${title} at ${company}`}
       disabled={disabled}
       onClick={handleCopy}
-      className={`icon-btn ${copied ? 'flash' : ''} disabled:opacity-50`}
+      className={copied ? 'flash' : ''}
     >
       <IconCopy />
       <span className="tip" role="status">
         {copied ? 'Copied' : 'Copy'}
       </span>
-    </button>
+    </Button>
   );
 }

@@ -1,5 +1,9 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { DialogActions, DialogSub, DialogTitle } from '@/components/ui/Dialog';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Checkbox } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { queryKeys } from '@/lib/queryKeys';
@@ -72,63 +76,51 @@ export function SearchModal({
       maxWidthClassName="max-w-3xl"
       initialFocus={searchRef}
     >
-      <h2 id={titleId} className="dialog-title">
-        Search vacancies
-      </h2>
+      <DialogTitle id={titleId}>Search vacancies</DialogTitle>
 
-      <div className="mt-[14px] flex flex-wrap items-center gap-x-[16px] gap-y-[10px]">
+      <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
         <SearchInput value={text} onChange={setText} inputRef={searchRef} />
-        <fieldset className="flex items-center gap-[12px]">
+        <fieldset className="flex items-center gap-3">
           <legend className="sr-only">Search in</legend>
-          <label className="field-check">
-            <input
-              type="radio"
-              name={scopeName}
-              checked={scope === 'all'}
-              onChange={() => setScope('all')}
-              className="h-4 w-4 accent-[var(--color-accent)]"
-            />
-            All
-          </label>
-          <label className="field-check">
-            <input
-              type="radio"
-              name={scopeName}
-              checked={scope === 'context'}
-              onChange={() => setScope('context')}
-              className="h-4 w-4 accent-[var(--color-accent)]"
-            />
-            Context
-          </label>
+          <Checkbox
+            type="radio"
+            label="All"
+            name={scopeName}
+            checked={scope === 'all'}
+            onChange={() => setScope('all')}
+          />
+          <Checkbox
+            type="radio"
+            label="Context"
+            name={scopeName}
+            checked={scope === 'context'}
+            onChange={() => setScope('context')}
+          />
         </fieldset>
         {/* Under Context the page decides: /inbox's holds FILTERED_OUT, the others' never do. */}
-        <label className="field-check has-[:disabled]:opacity-50">
-          <input
-            type="checkbox"
-            checked={hideFilteredOut}
-            disabled={scope !== 'all'}
-            onChange={(e) => setHideFilteredOut(e.target.checked)}
-            className="h-4 w-4 accent-[var(--color-accent)]"
-          />
-          Hide Filtered out
-        </label>
+        <Checkbox
+          label="Hide Filtered out"
+          checked={hideFilteredOut}
+          disabled={scope !== 'all'}
+          onChange={(e) => setHideFilteredOut(e.target.checked)}
+        />
       </div>
 
-      <p className="dialog-sub">
+      <DialogSub>
         {term !== '' && isPending
           ? 'Loading…'
           : term !== '' && items.length > 0
             ? countLine(items.length, data?.total ?? 0)
             : 'Matches company or role.'}
-      </p>
+      </DialogSub>
 
       {/* The table's place always holds something — an empty state until there are
           rows, then the table, which grows with them up to its 60vh scroll box — so
           the dialog does not jump from a bare form to a full table. */}
       {term !== '' && error ? (
-        <div className="empty-state">
+        <EmptyState>
           Failed to search: {error instanceof Error ? error.message : String(error)}
-        </div>
+        </EmptyState>
       ) : term !== '' && (isPending || items.length > 0) ? (
         <ModalVacancyTable
           items={items}
@@ -136,16 +128,12 @@ export function SearchModal({
           loading={isPending}
         />
       ) : (
-        <div className="empty-state">
-          {term === '' ? 'Type a company or role.' : 'No vacancies match.'}
-        </div>
+        <EmptyState>{term === '' ? 'Type a company or role.' : 'No vacancies match.'}</EmptyState>
       )}
 
-      <div className="dialog-actions">
-        <button type="button" className="btn" onClick={onClose}>
-          Close
-        </button>
-      </div>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
     </Modal>
   );
 }

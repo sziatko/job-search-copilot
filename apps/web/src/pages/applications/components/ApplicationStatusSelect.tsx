@@ -23,13 +23,6 @@ export function ApplicationStatusSelect({
   onChange: (value: ApplicationStatus) => void;
 }) {
   return (
-    <Select
-      className="status-select"
-      label={label}
-      value={value}
-      options={OPTIONS}
-      disabled={disabled}
-      onChange={onChange}
-    />
+    <Select label={label} value={value} options={OPTIONS} disabled={disabled} onChange={onChange} />
   );
 }

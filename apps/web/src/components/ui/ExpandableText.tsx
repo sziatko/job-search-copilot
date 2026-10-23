@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { Button } from './Button';
 
 /**
  * Text that clamps to two lines, with a "Show more" toggle that appears only
@@ -31,9 +32,8 @@ export function ExpandableText({ text }: { text: string }) {
         {text}
       </div>
       {clampable && (
-        <button
-          type="button"
-          className="show-more"
+        <Button
+          variant="ghost"
           aria-expanded={expanded}
           onClick={() => setExpanded((v) => !v)}
           onKeyDown={(e) => {
@@ -41,7 +41,7 @@ export function ExpandableText({ text }: { text: string }) {
           }}
         >
           {expanded ? 'Show less' : 'Show more'}
-        </button>
+        </Button>
       )}
     </div>
   );

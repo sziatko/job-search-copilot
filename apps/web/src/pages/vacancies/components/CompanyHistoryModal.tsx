@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useId } from 'react';
+import { Button } from '@/components/ui/Button';
+import { DialogActions, DialogSub, DialogTitle } from '@/components/ui/Dialog';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { queryKeys } from '@/lib/queryKeys';
 import { listApplicationsPage } from '@/pages/applications/api';
@@ -47,17 +50,13 @@ export function CompanyHistoryModal({
 
   return (
     <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName="max-w-3xl">
-      <h2 id={titleId} className="dialog-title">
-        All vacancies at {company}
-      </h2>
-      <p className="dialog-sub">
-        {isPending ? 'Loading…' : countLine(items.length, data?.total ?? 0)}
-      </p>
+      <DialogTitle id={titleId}>All vacancies at {company}</DialogTitle>
+      <DialogSub>{isPending ? 'Loading…' : countLine(items.length, data?.total ?? 0)}</DialogSub>
 
       {error ? (
-        <div className="empty-state">
+        <EmptyState>
           Failed to load this company: {error instanceof Error ? error.message : String(error)}
-        </div>
+        </EmptyState>
       ) : (
         <ModalVacancyTable
           items={items}
@@ -67,11 +66,9 @@ export function CompanyHistoryModal({
         />
       )}
 
-      <div className="dialog-actions">
-        <button type="button" className="btn" onClick={onClose}>
-          Close
-        </button>
-      </div>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
     </Modal>
   );
 }

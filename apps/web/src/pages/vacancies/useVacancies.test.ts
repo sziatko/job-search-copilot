@@ -354,7 +354,7 @@ describe('VacanciesPage / useVacancies', () => {
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
 
-    // Scoped by `.tag`: the Status column, not a button's bubble.
+    // Within the row only the Status column's tag says it: no row offers its own status.
     expect(rowOf('Acme').getByText('Saved for later')).toBeInTheDocument();
     expect(rowOf('Beta Corp').getByText('Declined')).toBeInTheDocument();
   });

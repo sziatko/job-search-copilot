@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 import { IconPerson } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHead, CardTitle } from '@/components/ui/Card';
+import { Input, Label } from '@/components/ui/Field';
 import { SoonPage } from '@/components/ui/SoonPage';
 import { authClient } from '@/lib/auth';
 import { queryKeys } from '@/lib/queryKeys';
@@ -39,18 +42,13 @@ function PasskeysCard() {
 
   return (
     <section className="view pb-0">
-      <div className="card">
-        <div className="card-head">
-          <h2>Passkeys</h2>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={add.isPending}
-            onClick={() => add.mutate()}
-          >
+      <Card>
+        <CardHead>
+          <CardTitle>Passkeys</CardTitle>
+          <Button variant="primary" disabled={add.isPending} onClick={() => add.mutate()}>
             Add a passkey
-          </button>
-        </div>
+          </Button>
+        </CardHead>
         <div className="toolbar flex-col items-stretch">
           {passkeys.isPending && <p className="text-ink-muted">Loading…</p>}
           {passkeys.isError && <p className="text-bad">Failed to load passkeys</p>}
@@ -58,9 +56,9 @@ function PasskeysCard() {
             <p className="text-ink-muted">No passkeys yet. Add one to sign in without Google.</p>
           )}
           {passkeys.data && passkeys.data.length > 0 && (
-            <ul className="flex flex-col gap-[8px]">
+            <ul className="flex flex-col gap-2">
               {passkeys.data.map((key) => (
-                <li key={key.id} className="flex items-center justify-between gap-[12px]">
+                <li key={key.id} className="flex items-center justify-between gap-3">
                   <span>
                     {key.name || 'Passkey'}
                     <span className="text-ink-muted">
@@ -68,20 +66,15 @@ function PasskeysCard() {
                       · added {new Date(key.createdAt).toLocaleDateString()}
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate(key.id)}
-                  >
+                  <Button disabled={remove.isPending} onClick={() => remove.mutate(key.id)}>
                     Remove
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
         </div>
-      </div>
+      </Card>
     </section>
   );
 }
@@ -124,48 +117,39 @@ function ApiKeysCard() {
 
   return (
     <section className="view pb-0">
-      <div className="card">
-        <div className="card-head">
-          <h2>API keys</h2>
-        </div>
+      <Card>
+        <CardHead>
+          <CardTitle>API keys</CardTitle>
+        </CardHead>
         <div className="toolbar flex-col items-stretch">
           <form
-            className="flex items-end gap-[12px]"
+            className="flex items-end gap-3"
             onSubmit={(e) => {
               e.preventDefault();
               create.mutate(name.trim());
             }}
           >
             <div className="flex-1">
-              <label htmlFor={nameId} className="field-label">
-                Key name
-              </label>
-              <input
+              <Label htmlFor={nameId}>Key name</Label>
+              <Input
                 id={nameId}
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. n8n"
-                className="field-input"
               />
             </div>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={create.isPending || !name.trim()}
-            >
+            <Button type="submit" variant="primary" disabled={create.isPending || !name.trim()}>
               Create a key
-            </button>
+            </Button>
           </form>
           {create.data && (
-            <div className="flex flex-col gap-[8px]">
+            <div className="flex flex-col gap-2">
               <p>Copy this key now: it will not be shown again.</p>
-              <div className="flex items-center gap-[12px]">
+              <div className="flex items-center gap-3">
                 <code className="break-all">{create.data}</code>
-                <button type="button" className="btn" onClick={() => copy(create.data)}>
-                  Copy
-                </button>
+                <Button onClick={() => copy(create.data)}>Copy</Button>
               </div>
             </div>
           )}
@@ -175,9 +159,9 @@ function ApiKeysCard() {
             <p className="text-ink-muted">No API keys yet. Create one for n8n or MCP.</p>
           )}
           {keys.data && keys.data.length > 0 && (
-            <ul className="flex flex-col gap-[8px]">
+            <ul className="flex flex-col gap-2">
               {keys.data.map((key) => (
-                <li key={key.id} className="flex items-center justify-between gap-[12px]">
+                <li key={key.id} className="flex items-center justify-between gap-3">
                   <span>
                     {key.name || 'API key'}
                     <span className="text-ink-muted">
@@ -188,20 +172,15 @@ function ApiKeysCard() {
                         : 'never used'}
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={revoke.isPending}
-                    onClick={() => revoke.mutate(key.id)}
-                  >
+                  <Button disabled={revoke.isPending} onClick={() => revoke.mutate(key.id)}>
                     Revoke
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
         </div>
-      </div>
+      </Card>
     </section>
   );
 }

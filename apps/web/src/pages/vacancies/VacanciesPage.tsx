@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ApplyDialog } from './components/ApplyDialog';
 import { CompanyHistoryModal } from './components/CompanyHistoryModal';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -43,7 +46,7 @@ export function VacanciesPage() {
 
   return (
     <section className="view view-fill">
-      <div className="card">
+      <Card className="flex flex-1 flex-col">
         {/* Same shape as /applications' card: the page title is the shell's, so there
             is no head here and the toolbar carries the top padding. The status
             filter goes to the server, so the count is the server's match count —
@@ -57,16 +60,16 @@ export function VacanciesPage() {
               Showing {items.length} of {total}
             </span>
           )}
-          <button type="button" className="btn ml-auto" onClick={() => setSearching(true)}>
+          <Button className="ml-auto" onClick={() => setSearching(true)}>
             Search
-          </button>
+          </Button>
           <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
         </div>
 
         {loadError ? (
-          <div className="empty-state">Failed to load vacancies: {loadError}</div>
+          <EmptyState>Failed to load vacancies: {loadError}</EmptyState>
         ) : !loading && items.length === 0 ? (
-          <div className="empty-state">No vacancies match this filter.</div>
+          <EmptyState>No vacancies match this filter.</EmptyState>
         ) : (
           <VacancyTable
             loading={loading}
@@ -79,7 +82,7 @@ export function VacanciesPage() {
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
           />
         )}
-      </div>
+      </Card>
 
       {pendingDecline && (
         <ConfirmDialog

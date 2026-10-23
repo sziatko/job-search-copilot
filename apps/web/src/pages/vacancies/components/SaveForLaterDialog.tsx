@@ -1,4 +1,7 @@
 import { type FormEvent, useId, useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { DialogActions, DialogSub, DialogTitle } from '@/components/ui/Dialog';
+import { Label, Textarea } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 
 /** Save for later, with an optional note on why — saved as a USER comment with the
@@ -36,36 +39,29 @@ export function SaveForLaterDialog({
   return (
     <Modal onClose={onCancel} labelledBy={titleId} maxWidthClassName="max-w-md">
       <form onSubmit={handleSubmit}>
-        <h2 id={titleId} className="dialog-title">
-          Save for later
-        </h2>
-        <p className="dialog-sub">
+        <DialogTitle id={titleId}>Save for later</DialogTitle>
+        <DialogSub>
           {title} — {company}
-        </p>
+        </DialogSub>
 
-        <div className="mt-[16px]">
-          <label htmlFor={commentId} className="field-label">
-            Comment
-          </label>
-          <textarea
+        <div className="mt-4">
+          <Label htmlFor={commentId}>Comment</Label>
+          <Textarea
             id={commentId}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={handleTextareaKeyDown}
             rows={3}
             placeholder="Why set it aside? (optional)"
-            className="field-input resize-y"
           />
         </div>
 
-        <div className="dialog-actions">
-          <button type="button" onClick={onCancel} className="btn">
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary">
+        <DialogActions>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button type="submit" variant="primary">
             Save for later
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       </form>
     </Modal>
   );

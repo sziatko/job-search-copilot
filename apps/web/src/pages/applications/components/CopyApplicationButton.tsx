@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { IconCopy } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 
 interface CopyApplicationButtonProps {
   id: number;
@@ -8,7 +9,7 @@ interface CopyApplicationButtonProps {
   applyUrl: string;
 }
 
-/** The mockup's `.icon-btn` with a "Copied" bubble. The payload is ours — the
+/** The mockup's icon button with a "Copied" bubble. The payload is ours — the
  * mockup's is a shorter one-liner that drops the id and URL. */
 export function CopyApplicationButton({
   id,
@@ -44,16 +45,16 @@ URL: ${applyUrl}`;
   };
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="icon"
       aria-label={`Copy ${title} at ${company}`}
       onClick={handleCopy}
-      className={`icon-btn ${copied ? 'flash' : ''}`}
+      className={copied ? 'flash' : ''}
     >
       <IconCopy />
       <span className="tip" role="status">
         {copied ? 'Copied' : 'Copy'}
       </span>
-    </button>
+    </Button>
   );
 }

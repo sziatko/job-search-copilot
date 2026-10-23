@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { Button } from '@/components/ui/Button';
 import type { ApplicationComment, CommentSource } from '../types';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
@@ -56,9 +57,8 @@ export function MergedComment({ comments }: { comments: ApplicationComment[] }) 
         ))}
       </div>
       {clampable && (
-        <button
-          type="button"
-          className="show-more"
+        <Button
+          variant="ghost"
           aria-expanded={expanded}
           onClick={() => setExpanded((v) => !v)}
           onKeyDown={(e) => {
@@ -66,7 +66,7 @@ export function MergedComment({ comments }: { comments: ApplicationComment[] }) 
           }}
         >
           {expanded ? 'Show less' : 'Show more'}
-        </button>
+        </Button>
       )}
     </div>
   );
