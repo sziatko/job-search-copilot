@@ -136,6 +136,14 @@ changed PNGs in the diff, and commit them with the change. `npm run test:visual 
   -- --name <name>`. Through the root script npm eats `--name`, and Prisma then waits
   on its prompt holding the advisory lock. More in
   [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
+- **Vitest from Git Bash after `cd /c/...`** fails every web file with "Vitest failed
+  to find the runner" (the drive letter's case). Run it from PowerShell, or from the
+  default working directory.
+- **Vitest's first run can fail with "Failed to start forks worker"** — a cold-start
+  timeout, not a test failure; the rerun passes.
+- **A full visual run is slow on Windows** (vite dev over the bind mount), and the first
+  one builds the image. Don't run `npm test` beside it: the load can time a screenshot
+  out.
 - **CSS is invisible to the web tests.** `index.css` never loads in jsdom, so layout,
   hover and placement need a browser (Playwright, `npm run test:e2e`, `npm run test:visual`).
 - **MSW in the web tests:** a later `server.use()` wins, but inside one call the first
