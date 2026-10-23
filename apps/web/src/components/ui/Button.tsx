@@ -8,7 +8,7 @@ const ICON =
  * The looks a button comes in. `text-bg` on a filled one is the inversion the mockup's
  * copied flag already uses: --color-accent is dark in the light theme and light in the
  * dark one, so a fixed white or black label would fail contrast in one of them. An
- * icon button is labelled by its `.tip` bubble (and `aria-label` where the bubble is
+ * icon button is labelled by its `Tip` (and `aria-label` where the bubble is
  * not the name), which it is the positioning box for.
  */
 const VARIANTS = {

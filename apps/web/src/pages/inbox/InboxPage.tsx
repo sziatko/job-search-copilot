@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListCount, ListFrame } from '@/components/ui/ListFrame';
 import { Tabs } from '@/components/ui/Tabs';
-import { listVacanciesPage } from '../vacancies/api';
-import { CompanyHistoryModal } from '../vacancies/components/CompanyHistoryModal';
-import { SearchModal } from '../vacancies/components/SearchModal';
-import { VacancyTable } from '../vacancies/components/VacancyTable';
-import { STATUS_CONTEXT } from '../vacancies/types';
-import { useVacancyRows } from '../vacancies/useVacancies';
+import { View } from '@/components/ui/View';
+import { CompanyHistoryModal } from '@/components/vacancies/CompanyHistoryModal';
+import { SearchModal } from '@/components/vacancies/SearchModal';
+import { VacancyTable } from '@/components/vacancies/VacancyTable';
+import { listVacanciesPage } from '@/lib/vacancies/api';
+import { STATUS_CONTEXT } from '@/lib/vacancies/types';
+import { useVacancyRows } from '@/lib/vacancies/useVacancyRows';
 
 /** The inbox's tabs, in the URL as `?tab=` — Queue being the absent value. */
 export const inboxTabSchema = z.enum(['queue', 'no-text', 'filtered-out']);
@@ -70,7 +71,7 @@ export function InboxPage() {
   const [searching, setSearching] = useState(false);
 
   return (
-    <section className="view view-fill">
+    <View fill>
       <ListFrame
         toolbar={
           <>
@@ -118,6 +119,6 @@ export function InboxPage() {
       {searching && (
         <SearchModal context={STATUS_CONTEXT.inbox.options} onClose={() => setSearching(false)} />
       )}
-    </section>
+    </View>
   );
 }

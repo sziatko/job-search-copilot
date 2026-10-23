@@ -1,6 +1,6 @@
 import { Select, type SelectOption } from '@/components/ui/Select';
-import { APPLICATION_STATUS_LABELS } from '../constants';
-import { type ApplicationStatus, applicationStatusSchema } from '../types';
+import { APPLICATION_STATUS_LABELS } from '@/lib/applications/constants';
+import { type ApplicationStatus, applicationStatusSchema } from '@/lib/applications/types';
 
 // Schema order, which is pipeline order: Applied → Action needed → Interview →
 // Awaiting → Offer → Rejected. (The mockup lists five of these in a different

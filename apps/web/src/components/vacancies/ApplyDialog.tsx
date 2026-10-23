@@ -3,12 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { DialogActions, DialogSub, DialogTitle } from '@/components/ui/Dialog';
 import { Checkbox, Input, Label, Textarea } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
-
-export interface ApplyDetails {
-  salary: string;
-  usedTailoredResume: boolean;
-  comment: string;
-}
+import type { ApplyDetails } from '@/lib/applications/types';
 
 /** Opened from /vacancies to record an application, and from /applications, pre-filled
  * with `initial`, to edit one. The comment is never pre-filled: comments are

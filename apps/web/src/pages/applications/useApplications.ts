@@ -2,19 +2,23 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { queryKeys, staleAfter } from '@/lib/queryKeys';
-import { useInfiniteList } from '@/lib/useInfiniteList';
-import { useRowMutation } from '@/lib/useRowMutation';
-import { fetchStats } from '@/pages/dashboard/api';
-import { toastMoved } from '@/pages/vacancies/constants';
-import { listApplicationsPage, updateApplication, updateApplicationStatus } from './api';
+import {
+  listApplicationsPage,
+  updateApplication,
+  updateApplicationStatus,
+} from '@/lib/applications/api';
 import {
   type ApplicationListItem,
   type ApplicationStatus,
   type ApplicationStatusFilter,
   STATUS_FILTER_ALL,
   type UpdateApplicationInput,
-} from './types';
+} from '@/lib/applications/types';
+import { queryKeys, staleAfter } from '@/lib/queryKeys';
+import { fetchStats } from '@/lib/stats/api';
+import { useInfiniteList } from '@/lib/useInfiniteList';
+import { useRowMutation } from '@/lib/useRowMutation';
+import { toastMoved } from '@/lib/vacancies/constants';
 
 interface StatusChange {
   id: number;

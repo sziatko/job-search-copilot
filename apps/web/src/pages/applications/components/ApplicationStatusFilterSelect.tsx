@@ -1,6 +1,9 @@
 import { FilterSelect, type SelectOption } from '@/components/ui/Select';
-import { APPLICATION_STATUS_LABELS, FILTER_LABELS } from '../constants';
-import { type ApplicationStatusFilter, applicationStatusFilterValues } from '../types';
+import { APPLICATION_STATUS_LABELS, FILTER_LABELS } from '@/lib/applications/constants';
+import {
+  type ApplicationStatusFilter,
+  applicationStatusFilterValues,
+} from '@/lib/applications/types';
 
 // Typed as the full filter union, so adding a filter value without a label here is a
 // compile error rather than a blank row in the dropdown.

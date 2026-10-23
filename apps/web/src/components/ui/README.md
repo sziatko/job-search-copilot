@@ -16,6 +16,7 @@ each with a one-line doc comment saying what it is for.
   same property do not override each other by order in the string — whichever the
   stylesheet emits later wins — so a `className` that restyles a primitive is a bug
   waiting for a reordering.
+- **A page's body is a `View`** (`fill` on a list page), under the shell's topbar.
 - **A link that looks like a button** takes `buttonClass(variant)` (`Button.tsx`).
 - **A list is a `Table` of column definitions** — each a header, a width and a `cell`
   — never a `<table>` by hand; its cells come from `TableCells.tsx` where one fits. A

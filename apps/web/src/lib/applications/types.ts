@@ -1,4 +1,4 @@
-// Runtime contract for /api/v1/applications. Same rules as pages/vacancies/types.ts:
+// Runtime contract for /api/v1/applications. Same rules as ../vacancies/types.ts:
 // zod is the single source of truth, TS types are inferred, api.ts parses every
 // response through these, and @job-search-copilot/core is NOT imported (Prisma/pg
 // must not enter the browser bundle — ADR-0012). Enum values are never written as
@@ -10,7 +10,7 @@ import {
   type VacancyComment,
   type VacancyStatus,
   vacancyCommentSchema,
-} from '../vacancies/types';
+} from '@/lib/vacancies/types';
 
 /** The pipeline: the statuses /applications shows — its context. */
 export const applicationStatusSchema = STATUS_CONTEXT.applications;
@@ -48,7 +48,7 @@ export const applicationStatusFilterSchema = z.enum([
 // file imports that one, never the reverse).
 const applicationCommentSchema = vacancyCommentSchema;
 
-export type { CommentSource } from '../vacancies/types';
+export type { CommentSource } from '@/lib/vacancies/types';
 export type ApplicationComment = VacancyComment;
 
 /** A vacancy in the pipeline; `id` is the vacancy's. */
@@ -97,4 +97,11 @@ export interface RecordApplicationInput {
   salaryInApplication?: string;
   usedTailoredResume?: boolean;
   comment?: string;
+}
+
+/** What the apply dialog collects, as typed: a blank field is an empty string. */
+export interface ApplyDetails {
+  salary: string;
+  usedTailoredResume: boolean;
+  comment: string;
 }

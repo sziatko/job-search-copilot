@@ -1,5 +1,5 @@
 import { ExpandableText } from '@/components/ui/ExpandableText';
-import type { ApplicationComment, CommentSource } from '../types';
+import type { ApplicationComment, CommentSource } from '@/lib/applications/types';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
@@ -27,7 +27,7 @@ export function MergedComment({ comments }: { comments: ApplicationComment[] }) 
           <span key={comment.id}>
             {i > 0 && (expanded ? <hr className="my-1 border-t border-border" /> : ' — ')}
             <span className={SOURCE_CLASS[comment.source]} data-source={comment.source}>
-              <time className="mono text-ink-faint">
+              <time className="font-mono tabular-nums text-ink-faint">
                 {dateFormatter.format(new Date(comment.createdAt))}:{' '}
               </time>
               {comment.body}

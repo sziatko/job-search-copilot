@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListCount, ListFrame } from '@/components/ui/ListFrame';
-import { ApplyDialog } from '@/pages/vacancies/components/ApplyDialog';
-import { CompanyHistoryModal } from '@/pages/vacancies/components/CompanyHistoryModal';
-import { SearchModal } from '@/pages/vacancies/components/SearchModal';
-import { STATUS_CONTEXT } from '@/pages/vacancies/types';
+import { View } from '@/components/ui/View';
+import { ApplyDialog } from '@/components/vacancies/ApplyDialog';
+import { CompanyHistoryModal } from '@/components/vacancies/CompanyHistoryModal';
+import { SearchModal } from '@/components/vacancies/SearchModal';
+import { type ApplicationListItem, STATUS_FILTER_ALL } from '@/lib/applications/types';
+import { STATUS_CONTEXT } from '@/lib/vacancies/types';
 import { ApplicationStatusFilterSelect } from './components/ApplicationStatusFilterSelect';
 import { ApplicationsKpis } from './components/ApplicationsKpis';
 import { ApplicationsTable } from './components/ApplicationsTable';
-import { type ApplicationListItem, STATUS_FILTER_ALL } from './types';
 import { useApplications } from './useApplications';
 
 export function ApplicationsPage() {
@@ -40,7 +41,7 @@ export function ApplicationsPage() {
       : 'No applications match this filter.';
 
   return (
-    <section className="view view-fill">
+    <View fill>
       {stats && (
         <ApplicationsKpis stats={stats} filter={statusFilter} onFilterChange={setStatusFilter} />
       )}
@@ -109,6 +110,6 @@ export function ApplicationsPage() {
           }}
         />
       )}
-    </section>
+    </View>
   );
 }

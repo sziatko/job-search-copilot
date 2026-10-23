@@ -1,3 +1,4 @@
+import { ApplicationStatusSelect } from '@/components/applications/ApplicationStatusSelect';
 import { IconEdit } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
 import { DetailsLink } from '@/components/ui/DetailsLink';
@@ -11,10 +12,10 @@ import {
   RoleTitle,
   RowError,
 } from '@/components/ui/TableCells';
-import { daysSinceLastMove } from '../constants';
-import type { ApplicationListItem, ApplicationStatus } from '../types';
-import { ApplicationStatusSelect } from './ApplicationStatusSelect';
-import { CopyApplicationButton } from './CopyApplicationButton';
+import { Tip } from '@/components/ui/Tip';
+import { CopyVacancyButton } from '@/components/vacancies/CopyVacancyButton';
+import { daysSinceLastMove } from '@/lib/applications/constants';
+import type { ApplicationListItem, ApplicationStatus } from '@/lib/applications/types';
 import { MergedComment } from './MergedComment';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -86,7 +87,9 @@ export function ApplicationsTable({
     {
       header: 'Salary',
       width: 120,
-      cell: (item) => <div className="mono text-sm">{item.salaryInApplication ?? '—'}</div>,
+      cell: (item) => (
+        <div className="font-mono text-sm tabular-nums">{item.salaryInApplication ?? '—'}</div>
+      ),
     },
     {
       header: 'CV',
@@ -99,11 +102,11 @@ export function ApplicationsTable({
     {
       header: 'Action',
       width: 136,
-      // Icons, labelled by their `.tip` bubbles — the /vacancies Action column's
+      // Icons, labelled by their `Tip`s — the /vacancies Action column's
       // pattern. Edit waits while the row saves.
       cell: (item) => (
         <div className="flex items-center gap-1.5">
-          <CopyApplicationButton
+          <CopyVacancyButton
             id={item.id}
             company={item.company}
             title={item.title}
@@ -116,7 +119,7 @@ export function ApplicationsTable({
             onClick={() => onEdit(item)}
           >
             <IconEdit />
-            <span className="tip">Edit</span>
+            <Tip>Edit</Tip>
           </Button>
           <DetailsLink id={item.id} />
         </div>

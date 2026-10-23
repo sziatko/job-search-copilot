@@ -3,7 +3,7 @@
 // value forces every map here to be updated too.
 import { toast } from 'sonner';
 import type { Tone } from '@/components/ui/tone';
-import { APPLICATION_STATUS_LABELS } from '../applications/constants';
+import { APPLICATION_STATUS_LABELS } from '@/lib/applications/constants';
 import type { Recommendation, VacancyStatus } from './types';
 
 export const STATUS_LABELS = {

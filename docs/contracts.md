@@ -12,7 +12,7 @@ The field-level detail lives in one place each, not here:
 - **MCP** — each tool's description and `.describe()`d fields, in
   `apps/mcp/src/*/*.tools.ts` and `*.schemas.ts`. `npm run mcp:inspect` shows them as
   a client sees them.
-- **Web** — the zod schemas in `apps/web/src/pages/*/types.ts`.
+- **Web** — the zod schemas in `apps/web/src/lib/*/types.ts`.
 
 ## REST API
 
@@ -69,7 +69,7 @@ query that finds nothing (`getById`) answers `null` and the controller sends Nes
 > - A path, the prefix or the version → `apps/web/src/lib/api.ts` (`API_BASE`), the
 >   features' `api.ts`, the MSW handlers, the api e2e specs.
 > - `POST /applications`' envelope → `recordApplicationResponseSchema` in
->   `apps/web/src/pages/applications/types.ts`, `useVacancies.ts`.
+>   `apps/web/src/lib/applications/types.ts`, `useVacancyRows.ts`.
 > - A status code → the api e2e assertions, [ADR-0005](decisions/0005-analyze-once.md).
 > - A list-item field → the core type and select, **and** the web schema, by hand
 >   ([ADR-0012](decisions/0012-web-hand-written-contract.md)). The field reaches MCP
@@ -129,7 +129,7 @@ every client shows.
 
 ## Web ↔ API contract
 
-`apps/web/src/pages/*/types.ts` hold zod schemas of the API's JSON; the types are
+`apps/web/src/lib/*/types.ts` hold zod schemas of the API's JSON; the types are
 `z.infer`red from them, and every response goes through `parseResponse()`
 (`apps/web/src/lib/api.ts`). A mismatch throws a short "unexpected format" message,
 logged in full to the console. Dates cross as strings.

@@ -1,5 +1,9 @@
 import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
-import { APPLICATION_STATUS_LABELS, APPLICATION_STATUS_ORDER, FILTER_LABELS } from '../constants';
+import {
+  APPLICATION_STATUS_LABELS,
+  APPLICATION_STATUS_ORDER,
+  FILTER_LABELS,
+} from '@/lib/applications/constants';
 import {
   type ApplicationStatus,
   type ApplicationStatusFilter,
@@ -7,7 +11,7 @@ import {
   STATUS_FILTER_ACTIVE,
   STATUS_FILTER_ALL,
   STATUS_FILTER_TIMEOUT,
-} from '../types';
+} from '@/lib/applications/types';
 
 // Which tiles get a coloured value, mirroring the mockup's tracker tiles.
 const KPI_TONES: Partial<Record<ApplicationStatus, 'good' | 'bad'>> = {

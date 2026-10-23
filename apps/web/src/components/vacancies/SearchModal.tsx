@@ -6,11 +6,11 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Checkbox } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { SearchInput } from '@/components/ui/SearchInput';
+import { listApplicationsPage } from '@/lib/applications/api';
+import { isPipelineStatus } from '@/lib/applications/types';
 import { queryKeys } from '@/lib/queryKeys';
-import { listApplicationsPage } from '@/pages/applications/api';
-import { isPipelineStatus } from '@/pages/applications/types';
-import { listVacanciesPage } from '../api';
-import { type VacancyStatus, vacancyStatusSchema } from '../types';
+import { listVacanciesPage } from '@/lib/vacancies/api';
+import { type VacancyStatus, vacancyStatusSchema } from '@/lib/vacancies/types';
 import { countLine, ModalVacancyTable } from './ModalVacancyTable';
 
 /** All with Hide Filtered out on: the whole table but what was screened out. */

@@ -1,6 +1,10 @@
 import { FilterSelect, type SelectOption } from '@/components/ui/Select';
-import { STATUS_LABELS } from '../constants';
-import { STATUS_FILTER_ALL, type StatusFilterValue, statusFilterValues } from '../types';
+import { STATUS_LABELS } from '@/lib/vacancies/constants';
+import {
+  STATUS_FILTER_ALL,
+  type StatusFilterValue,
+  statusFilterValues,
+} from '@/lib/vacancies/types';
 
 // The page's own statuses (its context); the pipeline is /applications'.
 const LABELS: Record<StatusFilterValue, string> = {

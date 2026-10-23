@@ -50,6 +50,46 @@
       }
     },
     {
+      "includes": ["apps/web/src/pages/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/pages/**", "../*/**"],
+                    "message": "A page imports only from its own folder, components/ and lib/ (docs/architecture.md § Web)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/src/components/**", "apps/web/src/lib/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/pages/**"],
+                    "message": "components/ and lib/ never import a page (docs/architecture.md § Web)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["apps/web/src/index.css"],
       "linter": {
         "rules": {

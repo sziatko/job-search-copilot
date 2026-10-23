@@ -1,7 +1,7 @@
 // Runtime contract for GET /api/v1/stats — hand-written, not a `core` import
 // (ADR-0012; see vacancies/types.ts). Each field is defined in ADR-0031.
 import { z } from 'zod';
-import { applicationStatusSchema } from '../applications/types';
+import { applicationStatusSchema } from '@/lib/applications/types';
 
 export const statsSchema = z.object({
   logged: z.number(),

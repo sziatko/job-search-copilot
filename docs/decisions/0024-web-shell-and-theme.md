@@ -25,8 +25,8 @@ theme. Several of these are agreements between files that no compiler checks.
    (`title`, `rail`). `rail` starts the table-heavy pages with the sidebar collapsed
    to an icon rail.
 4. **`/` is the dashboard**, counted by `GET /stats` ([ADR-0031](0031-stats-endpoint.md)).
-5. **A page not built yet** renders `SoonPage`, and its sidebar item carries a `SOON`
-   badge (part of `/profile` today).
+5. **A feature not built yet** shows a `ComingSoon` panel where it will be (the rest of
+   `/profile` today).
 
 ## Why this and not the alternatives
 - **The theme applied in React on mount** — the first paint happens before hydration,
@@ -53,8 +53,7 @@ theme. Several of these are agreements between files that no compiler checks.
   `type="module"` (the flash returns), and private mode makes `localStorage` throw.
 - **A page outside `RootLayout`** loses the navigation, the theme toggle and the scroll
   reset at once.
-- **A placeholder that becomes real** → remove its `SOON` badge in
-  `components/shell/Sidebar.tsx` and its `SoonPage`.
+- **A placeholder that becomes real** → remove its `ComingSoon`.
 
 ## Related
 [ADR-0020](0020-web-router-tanstack.md), [ADR-0031](0031-stats-endpoint.md).

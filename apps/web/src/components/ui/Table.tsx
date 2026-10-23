@@ -18,7 +18,7 @@ const CELL = 'border-b border-border px-4.5 py-3.25 align-top text-base';
 const HEADER =
   'sticky top-0 z-10 bg-surface px-4.5 py-2.25 text-left text-2xs font-bold uppercase tracking-[.05em] text-ink-faint shadow-[inset_0_-1px_0_var(--color-border)]';
 // A list page's box: it runs to the window's bottom (its card fills the view — see
-// `.view-fill`), 320px at the least. `contain-size` keeps the rows out of its intrinsic
+// `View`'s `fill`), 320px at the least. `contain-size` keeps the rows out of its intrinsic
 // height, so the card sizes to that floor rather than to every loaded row. The stable
 // gutter keeps the columns from widening by a scrollbar when a filter leaves too few
 // rows to scroll.

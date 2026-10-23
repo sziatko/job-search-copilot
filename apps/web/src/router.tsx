@@ -1,16 +1,16 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
+import { applicationStatusFilterSchema } from '@/lib/applications/types';
+import { statusFilterSchema as vacancyStatusFilterSchema } from '@/lib/vacancies/types';
 import { RootLayout } from './components/RootLayout';
 import { authClient } from './lib/auth';
 import type { RouteMeta } from './lib/routeMeta';
 import { ApplicationsPage } from './pages/applications/ApplicationsPage';
-import { applicationStatusFilterSchema } from './pages/applications/types';
 import { ConsentPage } from './pages/consent/ConsentPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { InboxPage, inboxTabSchema } from './pages/inbox/InboxPage';
 import { LoginPage } from './pages/login/LoginPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
-import { statusFilterSchema as vacancyStatusFilterSchema } from './pages/vacancies/types';
 import { VacanciesPage } from './pages/vacancies/VacanciesPage';
 import { VacancyPage } from './pages/vacancy/VacancyPage';
 

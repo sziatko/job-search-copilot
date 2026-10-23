@@ -71,17 +71,33 @@ root.
 ```
 src/
   main.tsx, App.tsx  boot and the providers; router.tsx is the route tree
-  index.css          the design tokens (@theme), the base styles, and the rules
-                     of the shell and the page layouts
-  pages/<route>/     one folder per route: the page, its hooks, its API calls,
-                     its own components/
+  index.css          the design tokens (@theme), the custom variants (narrow,
+                     rail, compact, …), the base styles; no component classes
+  pages/<route>/     one folder per route: the page, the sections it is split
+                     into, its hooks, its own components/
   components/ui/     the UI library: primitives that own their styles
-  components/        the rest of what pages share: the shell (RootLayout.tsx,
-                     shell/), the icons, the virtualized rows
-  lib/               what every page shares that is not UI: the HTTP helper
-                     (api.ts), the cursor-paged query (useInfiniteList.ts,
-                     ADR-0030), the query keys, each route's title (routeMeta.ts)
+  components/<feature>/  domain widgets more than one page shows: the vacancy
+                     table and dialogs, the status tags and selects
+  components/        the shell (RootLayout.tsx, shell/), the icons, the
+                     virtualized rows
+  lib/<feature>/     each API resource's zod schemas (types.ts), calls (api.ts),
+                     labels (constants.ts), and the hooks pages share
+  lib/               the rest that is not UI: the HTTP helper (api.ts), the
+                     cursor-paged query (useInfiniteList.ts, ADR-0030), the row
+                     mutation, the query keys, each route's title (routeMeta.ts)
 ```
+
+**A page imports only from its own folder, `components/` and `lib/`** — never from
+another page; and `components/` and `lib/` never import a page. What a second page
+needs moves out to one of them. Biome's `noRestrictedImports` enforces both
+(`biome.json`): inside `pages/`, no `@/pages/…` and no relative path that climbs into a
+sibling folder.
+
+**A file is split by job, not by length**: one that holds several sections, its own
+data writes beside its markup, or a near-copy of a sibling. A page's sections are files
+beside it (`pages/vacancy/Header.tsx`, `Timeline.tsx`, …); its queries and mutations
+are a hook there (`useProfile.ts`). A large file of one uniform kind (`icons.tsx`,
+`router.tsx`) stays whole.
 
 **The UI is built from `components/ui`.** Markup starts from a primitive there, and a
 piece more than one page needs becomes one — never a new component class in
@@ -110,7 +126,7 @@ The analysis queue: list_vacancies({ status: ['NEW'], hasText: true })
 **User works through the list** (the read/update path):
 
 ```
-apps/web  useVacancies()  (TanStack Query)
+apps/web  useVacancyRows()  (TanStack Query)
   → GET  /api/v1/vacancies?limit=100        → VacancyService.list()
   → PATCH /api/v1/vacancies/:id/status     → VacancyService.updateStatus() → writeStatus()
         (optimistic cache update in the hook; rollback on error; invalidate on settle)
@@ -243,10 +259,11 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
     user's row answers like a missing one (404, never 403).
     → [ADR-0038](decisions/0038-multi-user-shared-schema.md),
     [ADR-0039](decisions/0039-api-keys-per-user.md)
-12. **The web UI is built from `components/ui`.** A page's markup comes from the
-    primitives there, which own their styles; no new component class goes into
-    `index.css`. Nothing fails when a page styles a
-    `<button>` by hand — it just drifts from every other one.
+12. **The web UI is built from `components/ui`; a page never imports another page.** A
+    page's markup comes from the primitives there, which own their styles; no new
+    component class goes into `index.css`. Nothing fails when a page styles a
+    `<button>` by hand — it just drifts from every other one. The import rule is the
+    one part a tool checks (Biome's `noRestrictedImports`).
     → [Inside `apps/web/src`](#inside-appswebsrc),
     [`components/ui/README.md`](../apps/web/src/components/ui/README.md)
 

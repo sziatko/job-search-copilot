@@ -6,7 +6,8 @@ import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
 import { toast } from 'sonner';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Stats } from '@/pages/dashboard/types';
+import type { ApplicationPage } from '@/lib/applications/api';
+import type { Stats } from '@/lib/stats/types';
 import { routeTree } from '@/router';
 import {
   buildHandlers,
@@ -19,7 +20,6 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { companyOrder } from '@/test/rows';
 import { expectLoadedTable, expectSkeletonTable } from '@/test/skeleton';
-import type { ApplicationPage } from './api';
 
 const DAY = 86_400_000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();

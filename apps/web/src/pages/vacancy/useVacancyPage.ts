@@ -1,12 +1,16 @@
 import { type QueryKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { recordApplication, updateApplicationStatus } from '@/lib/applications/api';
+import type { ApplicationStatus, ApplyDetails } from '@/lib/applications/types';
 import { queryKeys, staleAfter } from '@/lib/queryKeys';
-import { recordApplication, updateApplicationStatus } from '../applications/api';
-import type { ApplicationStatus } from '../applications/types';
-import { addComment, getVacancy, listVacanciesPage, updateVacancyStatus } from '../vacancies/api';
-import type { ApplyDetails } from '../vacancies/components/ApplyDialog';
-import { toastMoved } from '../vacancies/constants';
-import type { RowAction } from '../vacancies/types';
+import {
+  addComment,
+  getVacancy,
+  listVacanciesPage,
+  updateVacancyStatus,
+} from '@/lib/vacancies/api';
+import { toastMoved } from '@/lib/vacancies/constants';
+import type { RowAction } from '@/lib/vacancies/types';
 
 /**
  * One vacancy and its company's others, and the page's writes. Not optimistic, unlike

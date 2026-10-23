@@ -5,7 +5,8 @@ import { Topbar } from './shell/Topbar';
 
 /**
  * The app shell: fixed sidebar + sticky topbar, with each page rendering into
- * the outlet as a `.view`.
+ * the outlet as a `View`. `data-rail` and `data-compact` are what index.css's `rail`
+ * and `compact` variants read.
  */
 export function RootLayout() {
   const matches = useMatches();
@@ -51,10 +52,12 @@ export function RootLayout() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="flex min-h-screen" data-rail={collapsed || undefined}>
+      {/* A <button> rather than the mockup's <div>: it is a dismiss control, and a
+          click-only div fails the a11y lint. */}
       <button
         type="button"
-        className={`scrim ${mobileOpen ? 'show' : ''}`}
+        className={`hidden border-0 p-0 ${mobileOpen ? 'narrow:fixed narrow:inset-0 narrow:z-30 narrow:block narrow:bg-scrim' : ''}`}
         onClick={() => setMobileOpen(false)}
         aria-label="Close navigation"
         tabIndex={-1}
@@ -65,7 +68,12 @@ export function RootLayout() {
         onToggleRail={() => setOverride({ path: pathname, value: !collapsed })}
         onCloseMobile={() => setMobileOpen(false)}
       />
-      <div ref={mainRef} className={`main ${collapsed ? 'rail' : ''}`}>
+      <div
+        ref={mainRef}
+        // A list page's View fills the window: dvh, as a phone's collapsing URL bar would
+        // otherwise leave the page a bar's height to scroll.
+        className="ml-61 flex min-w-0 flex-1 flex-col transition-[margin-left] duration-180 has-[>[data-view=fill]]:h-dvh rail:ml-(--rail-w) narrow:ml-0"
+      >
         <Topbar title={meta.title ?? ''} onOpenMobile={() => setMobileOpen(true)} />
         <Outlet />
       </div>

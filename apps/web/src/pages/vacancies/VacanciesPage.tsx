@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListCount, ListFrame } from '@/components/ui/ListFrame';
-import { ApplyDialog } from './components/ApplyDialog';
-import { CompanyHistoryModal } from './components/CompanyHistoryModal';
-import { ConfirmDialog } from './components/ConfirmDialog';
-import { SaveForLaterDialog } from './components/SaveForLaterDialog';
-import { SearchModal } from './components/SearchModal';
+import { View } from '@/components/ui/View';
+import { ApplyDialog } from '@/components/vacancies/ApplyDialog';
+import { CompanyHistoryModal } from '@/components/vacancies/CompanyHistoryModal';
+import { ConfirmDialog } from '@/components/vacancies/ConfirmDialog';
+import { SaveForLaterDialog } from '@/components/vacancies/SaveForLaterDialog';
+import { SearchModal } from '@/components/vacancies/SearchModal';
+import { VacancyTable } from '@/components/vacancies/VacancyTable';
+import { STATUS_CONTEXT } from '@/lib/vacancies/types';
 import { StatusFilterSelect } from './components/StatusFilterSelect';
-import { VacancyTable } from './components/VacancyTable';
-import { STATUS_CONTEXT } from './types';
 import { useVacancies } from './useVacancies';
 
 export function VacanciesPage() {
@@ -45,7 +46,7 @@ export function VacanciesPage() {
   const [searching, setSearching] = useState(false);
 
   return (
-    <section className="view view-fill">
+    <View fill>
       {/* The status filter goes to the server, so the count is the server's match count.
           Gated: "Showing 0 of 0" during the first load is a claim about the data, and
           there is no data yet. Search is a modal with its own results (SearchModal); it
@@ -124,6 +125,6 @@ export function VacanciesPage() {
           onConfirm={confirmApply}
         />
       )}
-    </section>
+    </View>
   );
 }

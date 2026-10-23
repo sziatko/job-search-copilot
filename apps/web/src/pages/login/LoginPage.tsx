@@ -2,6 +2,7 @@ import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { JscLogo } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
+import { CenterColumn } from '@/components/ui/CenterColumn';
 import { authClient } from '@/lib/auth';
 
 const route = getRouteApi('/login');
@@ -47,7 +48,7 @@ export function LoginPage() {
   }
 
   return (
-    <main className="soon-wrap">
+    <CenterColumn as="main">
       <JscLogo size={52} />
       <h2>Sign in to Job Search Copilot</h2>
       {shown && (
@@ -67,6 +68,6 @@ export function LoginPage() {
         </Button>
       </div>
       <p>No account yet? Sign in with Google or LinkedIn first, then add a passkey on Profile.</p>
-    </main>
+    </CenterColumn>
   );
 }

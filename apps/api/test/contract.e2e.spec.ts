@@ -8,13 +8,13 @@ import {
   applicationListItemSchema,
   applicationPageSchema,
   recordApplicationResponseSchema,
-} from '@/pages/applications/types';
-import { statsSchema } from '@/pages/dashboard/types';
+} from '@/lib/applications/types';
+import { statsSchema } from '@/lib/stats/types';
 import {
   vacancyDetailSchema,
   vacancyListItemSchema,
   vacancyPageSchema,
-} from '@/pages/vacancies/types';
+} from '@/lib/vacancies/types';
 import { type Api, createTestApp, signedInAgent } from './test-app';
 
 /**

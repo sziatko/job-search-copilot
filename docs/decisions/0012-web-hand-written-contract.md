@@ -8,7 +8,7 @@
 them.
 
 ## Decision
-Don't. `apps/web/src/pages/*/types.ts` define zod schemas of the API's JSON by hand;
+Don't. `apps/web/src/lib/*/types.ts` define zod schemas of the API's JSON by hand;
 the TypeScript types are `z.infer`red from them, and every response is parsed through
 them (`parseResponse()` in `apps/web/src/lib/api.ts`: it logs the detail and throws a
 short message).

@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { listVacanciesPage } from '../vacancies/api';
-import { VACANCY_ACTION } from '../vacancies/types';
-import { fetchStats } from './api';
+import { fetchStats } from '@/lib/stats/api';
+import { listVacanciesPage } from '@/lib/vacancies/api';
+import { VACANCY_ACTION } from '@/lib/vacancies/types';
 
 /** Enough to fill the funnel card's height on a desktop; the rest scrolls in the card. */
 const REVIEW_QUEUE_SIZE = 10;

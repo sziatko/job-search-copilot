@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { isSafeExternalUrl } from '@/lib/url';
 import { IconHistory } from '../icons';
+import { Tip } from './Tip';
 
 /** A row's date: the day, with the ⏳ of an application gone quiet and the date of its
  * last move under it. `quietDays` and `updated` come only when the row has them. */
@@ -16,11 +17,10 @@ export function DateCell({
   return (
     <div className="whitespace-nowrap text-sm text-ink-soft">
       {quietDays !== undefined && (
-        // `relative` is what its `.tip` is positioned against — from the left edge, not
-        // centred: the ⏳ leads the first column, where a centred bubble's left half is
-        // clipped by the scroll box.
+        // From the left edge, not centred: the ⏳ leads the first column, where a centred
+        // bubble's left half is clipped by the scroll box.
         <span className="relative mr-1 text-warn">
-          ⏳<span className="tip left-0 translate-x-0">{quietDays} days since last update</span>
+          ⏳<Tip align="start">{quietDays} days since last update</Tip>
         </span>
       )}
       {date}
@@ -88,9 +88,9 @@ export function CompanyHistoryButton({
       {/* The count is decoration and the bubble is the label, so the button does not
           read out "7, 7 other vacancies at contoso". */}
       <span aria-hidden>{others}</span>
-      <span className="tip">
+      <Tip>
         {others} other {others === 1 ? 'vacancy' : 'vacancies'} at {company}
-      </span>
+      </Tip>
     </button>
   );
 }

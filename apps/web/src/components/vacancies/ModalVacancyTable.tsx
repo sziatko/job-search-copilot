@@ -3,9 +3,9 @@ import { ScorePill } from '@/components/ui/ScorePill';
 import { type Column, Table } from '@/components/ui/Table';
 import { DateCell, RoleMeta, RoleTitle } from '@/components/ui/TableCells';
 import { Tag } from '@/components/ui/Tag';
-import { daysSinceLastMove } from '@/pages/applications/constants';
-import type { ApplicationListItem } from '@/pages/applications/types';
-import type { VacancyListItem } from '../types';
+import { daysSinceLastMove } from '@/lib/applications/constants';
+import type { ApplicationListItem } from '@/lib/applications/types';
+import type { VacancyListItem } from '@/lib/vacancies/types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { StatusTag } from './StatusTag';
 

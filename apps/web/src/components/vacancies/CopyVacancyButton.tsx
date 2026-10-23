@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { IconCopy } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
+import { Tip } from '@/components/ui/Tip';
 
 interface CopyVacancyButtonProps {
   id: number;
@@ -10,6 +11,8 @@ interface CopyVacancyButtonProps {
   disabled?: boolean;
 }
 
+/** The mockup's icon button with a "Copied" bubble. The payload is ours — the
+ * mockup's is a shorter one-liner that drops the id and URL. */
 export function CopyVacancyButton({
   id,
   company,
@@ -50,12 +53,11 @@ URL: ${applyUrl}`;
       aria-label={`Copy ${title} at ${company}`}
       disabled={disabled}
       onClick={handleCopy}
-      className={copied ? 'flash' : ''}
     >
       <IconCopy />
-      <span className="tip" role="status">
+      <Tip role="status" show={copied}>
         {copied ? 'Copied' : 'Copy'}
-      </span>
+      </Tip>
     </Button>
   );
 }

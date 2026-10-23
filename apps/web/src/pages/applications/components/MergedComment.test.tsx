@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ApplicationComment, CommentSource } from '../types';
+import type { ApplicationComment, CommentSource } from '@/lib/applications/types';
 import { MergedComment } from './MergedComment';
 
 const comment = (

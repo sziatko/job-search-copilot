@@ -18,14 +18,15 @@ import {
   RoleTitle,
   RowError,
 } from '@/components/ui/TableCells';
-import { isPipelineStatus } from '../../applications/types';
+import { Tip } from '@/components/ui/Tip';
+import { isPipelineStatus } from '@/lib/applications/types';
 import {
   ROW_ACTION,
   type RowAction,
   VACANCY_ACTION,
   type VacancyAction,
   type VacancyListItem,
-} from '../types';
+} from '@/lib/vacancies/types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { RecommendationTag } from './RecommendationTag';
 import { StatusTag } from './StatusTag';
@@ -140,7 +141,7 @@ export function VacancyTable({
           <>
             {/* The status buttons all mean the same thing — a status change — so they
                 save and disable together. Only Apply and Decline confirm first; see
-                requestActionChange. Icons rather than text (the `.tip` bubble is the
+                requestActionChange. Icons rather than text (the `Tip` is the
                 label): words per row, repeated down every row, are what made this
                 column the widest one. */}
             <div className="flex flex-wrap items-center gap-1.5">
@@ -161,7 +162,7 @@ export function VacancyTable({
                     onClick={() => onActionChange(item.id, action)}
                   >
                     <Icon />
-                    <span className="tip">{verb}</span>
+                    <Tip>{verb}</Tip>
                   </Button>
                 );
               })}

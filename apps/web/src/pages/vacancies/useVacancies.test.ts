@@ -6,6 +6,7 @@ import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
 import { toast } from 'sonner';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { VacancyListItem } from '@/lib/vacancies/types';
 import { routeTree } from '@/router';
 import {
   buildHandlers,
@@ -17,7 +18,6 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { companyOrder } from '@/test/rows';
 import { expectLoadedTable, expectSkeletonTable } from '@/test/skeleton';
-import type { VacancyListItem } from './types';
 
 const vacancy = fakeVacancy;
 

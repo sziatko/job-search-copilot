@@ -3,6 +3,7 @@ import { useLocation } from '@tanstack/react-router';
 import { useState } from 'react';
 import { JscLogo } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
+import { CenterColumn } from '@/components/ui/CenterColumn';
 import { authClient } from '@/lib/auth';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -40,7 +41,7 @@ export function ConsentPage() {
   }
 
   return (
-    <main className="soon-wrap">
+    <CenterColumn as="main">
       <JscLogo size={52} />
       <h2>{name} wants to use Job Search Copilot</h2>
       <p>
@@ -60,6 +61,6 @@ export function ConsentPage() {
           Deny
         </Button>
       </div>
-    </main>
+    </CenterColumn>
   );
 }

@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/Button';
 import { DialogActions, DialogSub, DialogTitle } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
+import { listApplicationsPage } from '@/lib/applications/api';
 import { queryKeys } from '@/lib/queryKeys';
-import { listApplicationsPage } from '@/pages/applications/api';
-import { listVacanciesPage } from '../api';
+import { listVacanciesPage } from '@/lib/vacancies/api';
 import { countLine, ModalVacancyTable } from './ModalVacancyTable';
 
 /**
