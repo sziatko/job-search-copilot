@@ -18,7 +18,8 @@ import { ScorePill } from '@/components/ui/ScorePill';
 import { Select, type SelectOption } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
-import { SkeletonRows } from '@/components/ui/SkeletonRows';
+import { type Column, Table } from '@/components/ui/Table';
+import { DateCell, RoleMeta, RoleTitle } from '@/components/ui/TableCells';
 import { Tag } from '@/components/ui/Tag';
 import { isSafeExternalUrl } from '@/lib/url';
 import { ApplicationStatusSelect } from '../applications/components/ApplicationStatusSelect';
@@ -28,8 +29,9 @@ import { ConfirmDialog } from '../vacancies/components/ConfirmDialog';
 import { CopyVacancyButton } from '../vacancies/components/CopyVacancyButton';
 import { RecommendationTag } from '../vacancies/components/RecommendationTag';
 import { SaveForLaterDialog } from '../vacancies/components/SaveForLaterDialog';
+import { StatusTag } from '../vacancies/components/StatusTag';
 import { actionsFor } from '../vacancies/components/VacancyTable';
-import { STATUS_LABELS, STATUS_TAGS } from '../vacancies/constants';
+import { STATUS_LABELS } from '../vacancies/constants';
 import {
   type CommentSource,
   ROW_ACTION,
@@ -578,50 +580,31 @@ function OtherVacancies({ items, pending }: { items: VacancyListItem[]; pending:
   if (!pending && items.length === 0) {
     return <EmptyState>No other vacancies</EmptyState>;
   }
-  return (
-    <div className="overflow-x-auto">
-      <table aria-busy={pending}>
-        <thead>
-          <tr>
-            <th style={{ width: 120 }}>Added</th>
-            <th>Vacancy</th>
-            <th style={{ width: 90 }}>Score</th>
-            <th style={{ width: 150 }}>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pending && <SkeletonRows rows={3} cols={4} />}
-          {items.map((item) => (
-            <tr key={item.id}>
-              <td className="date-cell">{dateFormatter.format(new Date(item.createdAt))}</td>
-              <td>
-                <div className="role-title-row">
-                  {isSafeExternalUrl(item.applyUrl) ? (
-                    <a
-                      href={item.applyUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="role-title role-link"
-                    >
-                      {item.title}
-                    </a>
-                  ) : (
-                    <span className="role-title">{item.title}</span>
-                  )}
-                  <DetailsLink id={item.id} />
-                </div>
-                <div className="role-meta">
-                  {item.company} <span className="id">#{item.id}</span>
-                </div>
-              </td>
-              <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
-              <td>
-                <Tag tone={STATUS_TAGS[item.status].tone}>{STATUS_TAGS[item.status].text}</Tag>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  return <Table columns={OTHER_COLUMNS} items={items} loading={pending} skeletonRows={3} />;
 }
+
+const OTHER_COLUMNS: Column<VacancyListItem>[] = [
+  {
+    header: 'Added',
+    width: 120,
+    cell: (item) => <DateCell date={dateFormatter.format(new Date(item.createdAt))} />,
+  },
+  {
+    header: 'Vacancy',
+    cell: (item) => (
+      <>
+        <div className="flex items-center gap-1.5">
+          <RoleTitle title={item.title} href={item.applyUrl} />
+          <DetailsLink id={item.id} />
+        </div>
+        <RoleMeta company={item.company} id={item.id} />
+      </>
+    ),
+  },
+  {
+    header: 'Score',
+    width: 90,
+    cell: (item) => <ScorePill score={item.hasAnalysis ? item.matchScore : null} />,
+  },
+  { header: 'Status', width: 150, cell: (item) => <StatusTag status={item.status} /> },
+];

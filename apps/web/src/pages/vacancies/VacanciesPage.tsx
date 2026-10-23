@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ListCount, ListFrame } from '@/components/ui/ListFrame';
 import { ApplyDialog } from './components/ApplyDialog';
 import { CompanyHistoryModal } from './components/CompanyHistoryModal';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -46,26 +46,21 @@ export function VacanciesPage() {
 
   return (
     <section className="view view-fill">
-      <Card className="flex flex-1 flex-col">
-        {/* Same shape as /applications' card: the page title is the shell's, so there
-            is no head here and the toolbar carries the top padding. The status
-            filter goes to the server, so the count is the server's match count —
-            the loaded rows catch up with it as the table scrolls. Gated like the
-            /applications': "Showing 0 of 0" during the first load is a claim about the
-            data, and there is no data yet. Search is a modal with its own results
-            (SearchModal); it never filters this table. */}
-        <div className="toolbar">
-          {!loadError && !loading && (
-            <span className="toolbar-count">
-              Showing {items.length} of {total}
-            </span>
-          )}
-          <Button className="ml-auto" onClick={() => setSearching(true)}>
-            Search
-          </Button>
-          <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
-        </div>
-
+      {/* The status filter goes to the server, so the count is the server's match count.
+          Gated: "Showing 0 of 0" during the first load is a claim about the data, and
+          there is no data yet. Search is a modal with its own results (SearchModal); it
+          never filters this table. */}
+      <ListFrame
+        toolbar={
+          <>
+            {!loadError && !loading && <ListCount shown={items.length} total={total} />}
+            <Button className="ml-auto" onClick={() => setSearching(true)}>
+              Search
+            </Button>
+            <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
+          </>
+        }
+      >
         {loadError ? (
           <EmptyState>Failed to load vacancies: {loadError}</EmptyState>
         ) : !loading && items.length === 0 ? (
@@ -82,7 +77,7 @@ export function VacanciesPage() {
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
           />
         )}
-      </Card>
+      </ListFrame>
 
       {pendingDecline && (
         <ConfirmDialog

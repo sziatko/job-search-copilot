@@ -2,24 +2,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { type RefObject, useEffect, useRef } from 'react';
 
 /**
- * Row virtualization for a scrollable `<table>`. Only the rows in (and near) the
- * viewport are kept in the DOM; the rest are represented by two spacer `<tr>`s
- * whose heights push the scrollbar to the right size. Row heights are measured, so
- * variable-height rows (expanded comments) stay correct.
- *
- * Wire-up in the table:
- *   const scrollRef = useRef<HTMLDivElement>(null);
- *   const v = useVirtualRows(scrollRef, rows.length);
- *   <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
- *     <table className="table-fixed">
- *       <thead className="sticky top-0"> … </thead>
- *       <tbody>
- *         {v.paddingTop > 0 && <tr aria-hidden><td colSpan={N} style={{ height: v.paddingTop }} /></tr>}
- *         {v.virtualItems.map(vi => <tr key={rows[vi.index].id} data-index={vi.index} ref={v.measureElement}> … </tr>)}
- *         {v.paddingBottom > 0 && <tr aria-hidden><td colSpan={N} style={{ height: v.paddingBottom }} /></tr>}
- *       </tbody>
- *     </table>
- *   </div>
+ * Row virtualization for a scrollable `<table>` — `Table`'s `virtual` prop
+ * (`ui/Table.tsx`). Only the rows in (and near) the viewport are kept in the DOM; the
+ * rest are represented by two spacer `<tr>`s whose heights push the scrollbar to the
+ * right size. Row heights are measured, so variable-height rows (expanded comments)
+ * stay correct.
  *
  * `onEndReached` is the infinite-scroll trigger (ADR-0030): called when the last
  * loaded row enters the rendered window — the overscan puts that ~12 rows before the

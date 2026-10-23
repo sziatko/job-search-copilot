@@ -72,7 +72,7 @@ root.
 src/
   main.tsx, App.tsx  boot and the providers; router.tsx is the route tree
   index.css          the design tokens (@theme), the base styles, and the rules
-                     of the shell, the tables and the page layouts
+                     of the shell and the page layouts
   pages/<route>/     one folder per route: the page, its hooks, its API calls,
                      its own components/
   components/ui/     the UI library: primitives that own their styles

@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 export interface SelectOption<T extends string> {
   value: T;
   label: string;
@@ -36,5 +38,24 @@ export function Select<T extends string>({
         </option>
       ))}
     </select>
+  );
+}
+
+/** A toolbar's filter: its visible label beside the select. */
+export function FilterSelect<T extends string>({
+  label,
+  ...props
+}: {
+  label: string;
+  value: T;
+  options: readonly SelectOption<T>[];
+  onChange: (value: T) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="flex items-center gap-1.75 text-sm font-semibold text-ink-muted">
+      <label htmlFor={id}>{label}</label>
+      <Select id={id} {...props} />
+    </div>
   );
 }

@@ -1,23 +1,24 @@
-import { useRef } from 'react';
 import {
   IconBan,
   IconBookmark,
   IconCheck,
   IconCross,
   IconFilter,
-  IconHistory,
   IconUndo,
 } from '@/components/icons';
 import { Button } from '@/components/ui/Button';
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
-import { SkeletonRows } from '@/components/ui/SkeletonRows';
-import { Tag } from '@/components/ui/Tag';
-import { useVirtualRows } from '@/components/useVirtualRows';
-import { isSafeExternalUrl } from '@/lib/url';
+import { type Column, Table } from '@/components/ui/Table';
+import {
+  CompanyHistoryButton,
+  DateCell,
+  RoleMeta,
+  RoleTitle,
+  RowError,
+} from '@/components/ui/TableCells';
 import { isPipelineStatus } from '../../applications/types';
-import { STATUS_TAGS } from '../constants';
 import {
   ROW_ACTION,
   type RowAction,
@@ -27,6 +28,7 @@ import {
 } from '../types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { RecommendationTag } from './RecommendationTag';
+import { StatusTag } from './StatusTag';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
@@ -64,19 +66,8 @@ export function actionsFor({
   return VACANCY_ACTIONS.filter((action) => action !== own);
 }
 
-const COL_COUNT = 7;
-
-/**
- * These px widths are authoritative because the table sets `table-fixed` — in
- * auto layout they would only be hints the cell content can override, which is
- * what made the columns resize as the data changed.
- *
- * Fixed layout also means content can never widen a column; it wraps instead.
- * So each fixed width has to fit its own content PLUS the cell's 36px of
- * horizontal padding. Vacancy and Comment are deliberately left without a
- * width: the two of them split whatever is left, down the middle.
- */
-
+/** The rows of /vacancies and /inbox. Vacancy and Comment have no width: the two split
+ * what the others leave. */
 export function VacancyTable({
   loading,
   items,
@@ -87,8 +78,6 @@ export function VacancyTable({
   onEndReached,
   filterKey,
 }: {
-  /** The first page is on its way: skeleton rows under the real header. `items` is
-   * empty until then, so `onEndReached` cannot fire over the skeleton. */
   loading: boolean;
   items: VacancyListItem[];
   savingIds: Set<number>;
@@ -97,144 +86,102 @@ export function VacancyTable({
   /** Better than a per-row modal: the rows are virtualized, so anything mounted
    * inside one unmounts as soon as it scrolls out of the window. */
   onShowCompanyHistory: (company: string, vacancyId: number) => void;
-  /** The next page, when the last loaded row scrolls into the window (ADR-0030). */
   onEndReached: () => void;
   /** The page's filter: a change scrolls the box back to the top. */
   filterKey: string;
 }) {
-  const scrollRef = useRef<HTMLElement>(null);
-  const { virtualItems, paddingTop, paddingBottom, measureElement } = useVirtualRows(
-    scrollRef,
-    items.length,
-    onEndReached,
-    filterKey,
-  );
+  const columns: Column<VacancyListItem>[] = [
+    {
+      header: 'Added',
+      width: 90,
+      cell: (item) => <DateCell date={dateFormatter.format(new Date(item.createdAt))} />,
+    },
+    {
+      header: 'Vacancy',
+      cell: (item) => (
+        <>
+          <RoleTitle title={item.title} href={item.applyUrl} />
+          <RoleMeta company={item.company} id={item.id}>
+            <CompanyHistoryButton
+              company={item.company}
+              matchCount={item.companyMatchCount}
+              onClick={() => onShowCompanyHistory(item.company, item.id)}
+            />
+          </RoleMeta>
+        </>
+      ),
+    },
+    {
+      header: 'Score',
+      width: 90,
+      // No analysis, no score. Same rule as the modal's cell — one field decides, so
+      // the two cannot disagree.
+      cell: (item) => <ScorePill score={item.hasAnalysis ? item.matchScore : null} />,
+    },
+    {
+      header: 'Rec.',
+      width: 120,
+      cell: (item) => <RecommendationTag recommendation={item.recommendation} />,
+    },
+    {
+      header: 'Comment',
+      cell: (item) =>
+        item.estimationComment ? <ExpandableText>{item.estimationComment}</ExpandableText> : '—',
+    },
+    { header: 'Status', width: 150, cell: (item) => <StatusTag status={item.status} /> },
+    {
+      header: 'Action',
+      width: 246,
+      cell: (item) => {
+        const saving = savingIds.has(item.id);
+        // Once applied, the row's status moves on /applications only.
+        const applied = isPipelineStatus(item.status);
+        return (
+          <>
+            {/* The status buttons all mean the same thing — a status change — so they
+                save and disable together. Only Apply and Decline confirm first; see
+                requestActionChange. Icons rather than text (the `.tip` bubble is the
+                label): words per row, repeated down every row, are what made this
+                column the widest one. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CopyVacancyButton
+                id={item.id}
+                company={item.company}
+                title={item.title}
+                applyUrl={item.applyUrl}
+                disabled={saving}
+              />
+              {actionsFor(item).map((action) => {
+                const { verb, Icon, danger } = ROW_BUTTONS[action];
+                return (
+                  <Button
+                    key={action}
+                    variant={danger ? 'iconDanger' : 'icon'}
+                    disabled={saving || applied}
+                    onClick={() => onActionChange(item.id, action)}
+                  >
+                    <Icon />
+                    <span className="tip">{verb}</span>
+                  </Button>
+                );
+              })}
+              <DetailsLink id={item.id} />
+            </div>
+            <RowError>{rowErrors.get(item.id)}</RowError>
+          </>
+        );
+      },
+    },
+  ];
 
   return (
-    // A named region: the box scrolls on its own, and a screen reader can jump to it.
-    <section ref={scrollRef} className="table-body-scroll" aria-label="Vacancies">
-      <table className="min-w-[1200px] table-fixed" aria-busy={loading}>
-        <thead>
-          <tr>
-            <th style={{ width: 90 }}>Added</th>
-            <th>Vacancy</th>
-            <th style={{ width: 90 }}>Score</th>
-            <th style={{ width: 120 }}>Rec.</th>
-            <th>Comment</th>
-            <th style={{ width: 150 }}>Status</th>
-            <th style={{ width: 246 }}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading && <SkeletonRows rows={8} cols={COL_COUNT} />}
-          {paddingTop > 0 && (
-            <tr aria-hidden className="hover:bg-transparent">
-              <td colSpan={COL_COUNT} className="border-0 p-0" style={{ height: paddingTop }} />
-            </tr>
-          )}
-          {virtualItems.map((virtualRow) => {
-            const item = items[virtualRow.index];
-            // 1 means "no siblings" — the count includes this row.
-            const others = (item.companyMatchCount ?? 0) - 1;
-            const othersLabel = `${others} other ${others === 1 ? 'vacancy' : 'vacancies'} at ${item.company}`;
-            const saving = savingIds.has(item.id);
-            // Once applied, the row's status moves on /applications only.
-            const applied = isPipelineStatus(item.status);
-            return (
-              <tr
-                key={item.id}
-                data-index={virtualRow.index}
-                ref={measureElement}
-                className="hover:bg-surface-alt"
-              >
-                <td className="date-cell">{dateFormatter.format(new Date(item.createdAt))}</td>
-                <td>
-                  {isSafeExternalUrl(item.applyUrl) ? (
-                    <a
-                      href={item.applyUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="role-title role-link"
-                    >
-                      {item.title}
-                    </a>
-                  ) : (
-                    <span className="role-title">{item.title}</span>
-                  )}
-                  <div className="role-meta">
-                    {item.company} <span className="id">#{item.id}</span>
-                    {others >= 1 && (
-                      <button
-                        type="button"
-                        onClick={() => onShowCompanyHistory(item.company, item.id)}
-                        className="meta-btn"
-                      >
-                        <IconHistory />
-                        {/* The count is decoration and the bubble below is the
-                            label, so the button does not read out "7, 7 other
-                            vacancies at contoso". */}
-                        <span aria-hidden>{others}</span>
-                        <span className="tip">{othersLabel}</span>
-                      </button>
-                    )}
-                  </div>
-                </td>
-                {/* No analysis, no score. Same rule as the modal's cell — one field
-                    decides, so the two cannot disagree. */}
-                <td>{item.hasAnalysis ? <ScorePill score={item.matchScore} /> : '—'}</td>
-                <td>
-                  <RecommendationTag recommendation={item.recommendation} />
-                </td>
-                <td>
-                  {item.estimationComment ? <ExpandableText text={item.estimationComment} /> : '—'}
-                </td>
-                <td>
-                  <Tag tone={STATUS_TAGS[item.status].tone}>{STATUS_TAGS[item.status].text}</Tag>
-                </td>
-                <td>
-                  {/* The status buttons all mean the same thing — a status change —
-                      so they save and disable together. Only Apply and Decline
-                      confirm first; see requestActionChange. Icons rather than text
-                      (the `.tip` bubble is the label): words per row, repeated down
-                      every row, are what made this column the widest one. */}
-                  <div className="flex flex-wrap items-center gap-[6px]">
-                    <CopyVacancyButton
-                      id={item.id}
-                      company={item.company}
-                      title={item.title}
-                      applyUrl={item.applyUrl}
-                      disabled={saving}
-                    />
-                    {actionsFor(item).map((action) => {
-                      const { verb, Icon, danger } = ROW_BUTTONS[action];
-                      return (
-                        <Button
-                          key={action}
-                          variant={danger ? 'iconDanger' : 'icon'}
-                          disabled={saving || applied}
-                          onClick={() => onActionChange(item.id, action)}
-                        >
-                          <Icon />
-                          <span className="tip">{verb}</span>
-                        </Button>
-                      );
-                    })}
-                    <DetailsLink id={item.id} />
-                  </div>
-                  {rowErrors.has(item.id) && (
-                    <p className="mt-[4px] text-xs text-bad">{rowErrors.get(item.id)}</p>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-          {paddingBottom > 0 && (
-            <tr aria-hidden className="hover:bg-transparent">
-              <td colSpan={COL_COUNT} className="border-0 p-0" style={{ height: paddingBottom }} />
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </section>
+    <Table
+      label="Vacancies"
+      columns={columns}
+      items={items}
+      loading={loading}
+      minWidth={1200}
+      virtual={{ onEndReached, resetKey: filterKey }}
+    />
   );
 }

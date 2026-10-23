@@ -2,8 +2,9 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ListCount, ListFrame } from '@/components/ui/ListFrame';
+import { Tabs } from '@/components/ui/Tabs';
 import { listVacanciesPage } from '../vacancies/api';
 import { CompanyHistoryModal } from '../vacancies/components/CompanyHistoryModal';
 import { SearchModal } from '../vacancies/components/SearchModal';
@@ -46,6 +47,8 @@ const TABS: Record<
   },
 };
 
+const TAB_OPTIONS = inboxTabSchema.options.map((value) => ({ value, label: TABS[value].label }));
+
 /** `/inbox` — the vacancies before triage: the analysis queue, the ones still without
  * text, and the ones screened out. Newest first, paged by the server (ADR-0030). */
 export function InboxPage() {
@@ -68,34 +71,24 @@ export function InboxPage() {
 
   return (
     <section className="view view-fill">
-      <Card className="flex flex-1 flex-col">
-        <div className="toolbar">
-          <fieldset className="tabs">
-            <legend className="sr-only">Inbox tab</legend>
-            {inboxTabSchema.options.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className="tab"
-                aria-pressed={value === tab}
-                onClick={() =>
-                  void navigate({ search: { tab: value === INBOX_TAB.queue ? undefined : value } })
-                }
-              >
-                {TABS[value].label}
-              </button>
-            ))}
-          </fieldset>
-          <div className="ml-auto flex items-center gap-[10px]">
-            {!loadError && !loading && (
-              <span className="toolbar-count">
-                Showing {items.length} of {total}
-              </span>
-            )}
-            <Button onClick={() => setSearching(true)}>Search</Button>
-          </div>
-        </div>
-
+      <ListFrame
+        toolbar={
+          <>
+            <Tabs
+              legend="Inbox tab"
+              options={TAB_OPTIONS}
+              value={tab}
+              onChange={(value) =>
+                void navigate({ search: { tab: value === INBOX_TAB.queue ? undefined : value } })
+              }
+            />
+            <div className="ml-auto flex items-center gap-2.5">
+              {!loadError && !loading && <ListCount shown={items.length} total={total} />}
+              <Button onClick={() => setSearching(true)}>Search</Button>
+            </div>
+          </>
+        }
+      >
         {loadError ? (
           <EmptyState>Failed to load the inbox: {loadError}</EmptyState>
         ) : !loading && items.length === 0 ? (
@@ -112,7 +105,7 @@ export function InboxPage() {
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
           />
         )}
-      </Card>
+      </ListFrame>
 
       {companyHistory && (
         <CompanyHistoryModal

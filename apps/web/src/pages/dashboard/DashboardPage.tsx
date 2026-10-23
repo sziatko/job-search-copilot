@@ -125,7 +125,7 @@ function RecentActivity({ items }: { items: RecentMove[] }) {
               <Link
                 to="/vacancies/$id"
                 params={{ id: String(item.vacancyId) }}
-                className="role-link"
+                className="text-ink no-underline hover:text-accent-ink hover:underline"
               >
                 {item.title}
               </Link>{' '}

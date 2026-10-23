@@ -49,7 +49,7 @@ function PasskeysCard() {
             Add a passkey
           </Button>
         </CardHead>
-        <div className="toolbar flex-col items-stretch">
+        <div className="flex flex-col gap-2.5 px-4.5 pb-2.5">
           {passkeys.isPending && <p className="text-ink-muted">Loading…</p>}
           {passkeys.isError && <p className="text-bad">Failed to load passkeys</p>}
           {passkeys.data?.length === 0 && (
@@ -121,7 +121,7 @@ function ApiKeysCard() {
         <CardHead>
           <CardTitle>API keys</CardTitle>
         </CardHead>
-        <div className="toolbar flex-col items-stretch">
+        <div className="flex flex-col gap-2.5 px-4.5 pb-2.5">
           <form
             className="flex items-end gap-3"
             onSubmit={(e) => {

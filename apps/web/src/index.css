@@ -297,146 +297,21 @@
   .view {
     @apply px-[28px] pb-[56px] pt-[16px];
   }
-  /* The table pages (/vacancies, /applications, /inbox): the table's scroll box runs
-     to the window's bottom, so the page itself does not scroll. A flex column from
-     .main down — .main takes the window's height, the view and the card fill it
-     (the page gives its `Card` `flex-1`), the scroll box takes what is left. `min-height: 320px` is the floor for short
-     windows (the page scrolls then). `contain: size` keeps the rows out of the
-     box's intrinsic height, so the view and the card size to that floor rather
-     than to every loaded row, and grow around it instead of letting it spill out.
-     Child combinators: a modal's scroll box inside the view (the company history)
-     keeps its 560px. */
-  /* dvh: a phone's collapsing URL bar would otherwise leave the page a bar's height
-     to scroll. */
+  /* The list pages (/vacancies, /applications, /inbox): the table's box runs to the
+     window's bottom, so the page itself does not scroll. A flex column from .main
+     down: .main takes the window's height (dvh: a phone's collapsing URL bar would
+     otherwise leave the page a bar's height to scroll), the view fills it, and
+     `ListFrame`'s card and `Table`'s box fill the view. */
   .main:has(> .view-fill) {
     height: 100dvh;
   }
   .view.view-fill {
     @apply flex flex-1 flex-col pb-[24px];
   }
-  .view-fill > * > .table-body-scroll {
-    flex: 1;
-    min-height: 320px;
-    max-height: none;
-    contain: size;
-  }
 
   /* ---------- shared bits ---------- */
-  .toolbar {
-    @apply flex flex-wrap items-center gap-[10px] px-[18px] pb-[10px];
-  }
-  /* The table pages' toolbar opens their card. */
-  .view-fill > * > .toolbar {
-    @apply pt-[12px];
-  }
-  .filter-group {
-    @apply flex items-center gap-[7px] text-sm font-semibold text-ink-muted;
-  }
-  /* /inbox's tabs: a segmented control, the pressed one tinted like the active nav item. */
-  .tabs {
-    @apply flex flex-wrap gap-[3px] rounded-lg border border-border bg-surface-sunken p-[3px];
-  }
-  .tab {
-    @apply cursor-pointer rounded-sm border border-transparent bg-transparent px-[12px] py-[5px] text-sm font-semibold text-ink-muted;
-  }
-  .tab:hover {
-    @apply text-ink;
-  }
-  .tab[aria-pressed="true"] {
-    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
-  }
-
-  table {
-    @apply w-full border-collapse;
-    min-width: 760px;
-  }
-  /* inset shadow, not border-bottom: with border-collapse: collapse the border is
-     painted with the table, so a sticky <thead> visibly detaches while scrolling. */
-  thead th {
-    @apply sticky top-0 z-10 bg-surface px-[18px] py-[9px] text-left text-2xs font-bold uppercase tracking-[.05em] text-ink-faint shadow-[inset_0_-1px_0_var(--color-border)];
-  }
-  tbody td {
-    @apply border-b border-border px-[18px] py-[13px] align-top text-base;
-  }
-  tbody tr:last-child td {
-    @apply border-b-0;
-  }
-  tbody tr:hover {
-    @apply bg-surface-alt;
-  }
-  /* The history modal's own row — the one the user clicked to open it. Plain
-     `bg-accent-soft` on the <tr> would lose to `tbody tr:hover` above, so the
-     marker would vanish under the very cursor that opened the modal; half-strength
-     keeps the `Current` pill, which wears the full tint, readable on top of it. */
-  .row-current,
-  .row-current:hover {
-    @apply bg-accent-soft/50;
-  }
-  .table-body-scroll {
-    @apply overflow-auto;
-    max-height: 560px;
-    /* Reserve the scrollbar's lane whether or not it is showing. Without this,
-       filtering down to fewer rows removes the scrollbar and every column
-       silently gains ~15px — the table appears to jump as the data changes. */
-    scrollbar-gutter: stable;
-  }
-
-  .role-title {
-    @apply text-base font-bold text-ink;
-  }
-  .role-link {
-    @apply text-ink no-underline;
-  }
-  .role-link:hover {
-    @apply text-accent-ink underline;
-  }
-  .role-meta {
-    @apply mt-[2px] text-sm text-ink-muted;
-  }
-  .role-meta .id {
-    @apply text-ink-faint;
-  }
-  .date-cell {
-    @apply whitespace-nowrap text-sm text-ink-soft;
-  }
-  .date-upd {
-    @apply mt-[1px] text-2xs text-ink-faint;
-  }
-  .timeout-mark {
-    /* `relative` is what its `.tip` is positioned against. */
-    @apply relative text-warn;
-  }
-  /* Two places a centred bubble cannot go. The ⏳ leads the first column, where it
-     loses its left half to the scroll box's edge — clipped, not just overhanging.
-     The theme toggle trails the topbar, where the same half goes off the window. */
-  .date-cell .tip {
-    @apply left-0 translate-x-0;
-  }
-  .topbar .tip {
-    @apply left-auto right-0 translate-x-0;
-  }
-
-  .comment-cell {
-    @apply max-w-[340px] text-sm text-ink-soft;
-  }
-  .comment-cell .clamp {
-    @apply line-clamp-2;
-  }
-  .comment-cell.expanded .clamp {
-    -webkit-line-clamp: unset;
-  }
-  .comment-user {
-    @apply text-ink;
-  }
-  .comment-status {
-    @apply text-accent-ink;
-  }
-  .comment-analyzer {
-    @apply text-ink-muted;
-  }
-
-  /* The bubble an icon button or a `.meta-btn` reveals — the only label the Action
-     column's four icon controls have, the duplicates button's count, and the copy
+  /* The bubble an icon button or a table's history button reveals — the only label
+     the Action column's icon controls have, the history button's count, and the copy
      buttons' "Copied" confirmation. One class for all of them: a hover tip and a
      flash are the same box with the same reveal. */
   .tip {
@@ -451,22 +326,10 @@
   .flash > .tip {
     @apply opacity-100;
   }
-
-  /* The duplicates button in a row's meta line. Shaped for 12px text rather than
-     an icon button's 30px square, which would stretch the row and push the meta line
-     around as it appears. `relative` is what its `.tip` is positioned against. */
-  .meta-btn {
-    @apply relative ml-[6px] inline-flex cursor-pointer items-center gap-[3px] rounded-sm border border-border-strong px-[5px] py-[1px] align-middle text-xs font-bold text-ink-muted;
-  }
-  .meta-btn:hover {
-    @apply border-accent-soft-border bg-accent-soft text-accent-ink;
-  }
-  .meta-btn svg {
-    @apply h-[11px] w-[11px];
-  }
-
-  .toolbar-count {
-    @apply whitespace-nowrap text-sm text-ink-muted;
+  /* The theme toggle trails the topbar, where a centred bubble's right half would go
+     off the window. */
+  .topbar .tip {
+    @apply left-auto right-0 translate-x-0;
   }
 
   /* ---------- dashboard ---------- */
@@ -594,10 +457,6 @@
   }
 
   /* ---------- vacancy detail (docs/design/vacancy-detail-reference.html) ---------- */
-  .role-title-row {
-    @apply flex items-center gap-[6px];
-  }
-
   .back-link {
     @apply mb-[14px] inline-flex cursor-pointer items-center gap-[6px] text-sm font-semibold text-ink-muted no-underline;
   }

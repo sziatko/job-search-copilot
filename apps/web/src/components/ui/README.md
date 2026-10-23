@@ -17,6 +17,12 @@ each with a one-line doc comment saying what it is for.
   stylesheet emits later wins — so a `className` that restyles a primitive is a bug
   waiting for a reordering.
 - **A link that looks like a button** takes `buttonClass(variant)` (`Button.tsx`).
+- **A list is a `Table` of column definitions** — each a header, a width and a `cell`
+  — never a `<table>` by hand; its cells come from `TableCells.tsx` where one fits. A
+  list page puts it in a `ListFrame`, which owns the card, the toolbar and the fill
+  down to the window's bottom.
+- **A cell that changes the text size wraps it in a block** (`<div className="text-sm">`),
+  not a `<span>`: inline, the smaller text still sits on the cell's own taller line.
 
 ## Adding one
 

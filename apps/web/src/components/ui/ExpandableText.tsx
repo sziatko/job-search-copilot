@@ -1,13 +1,17 @@
-import { useCallback, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { Button } from './Button';
 
 /**
- * Text that clamps to two lines, with a "Show more" toggle that appears only
- * when the text actually overflows — a comment that already fits would
- * otherwise get a button that does nothing. Same `.comment-cell` styling as the
- * applications table's merged comment, over a single source.
+ * A table cell's long text, clamped to two lines, with a "Show more" toggle that
+ * appears only when the text actually overflows — a comment that already fits would
+ * otherwise get a button that does nothing. `children` as a function renders by state:
+ * the merged comments' separators change when expanded.
  */
-export function ExpandableText({ text }: { text: string }) {
+export function ExpandableText({
+  children,
+}: {
+  children: ReactNode | ((expanded: boolean) => ReactNode);
+}) {
   const [clampable, setClampable] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -27,9 +31,9 @@ export function ExpandableText({ text }: { text: string }) {
   }, []);
 
   return (
-    <div className={`comment-cell ${expanded ? 'expanded' : ''}`}>
-      <div ref={measureRef} className="clamp">
-        {text}
+    <div className="max-w-85 text-sm text-ink-soft">
+      <div ref={measureRef} className={expanded ? '' : 'line-clamp-2'}>
+        {typeof children === 'function' ? children(expanded) : children}
       </div>
       {clampable && (
         <Button

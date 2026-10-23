@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ListCount, ListFrame } from '@/components/ui/ListFrame';
 import { ApplyDialog } from '@/pages/vacancies/components/ApplyDialog';
 import { CompanyHistoryModal } from '@/pages/vacancies/components/CompanyHistoryModal';
 import { SearchModal } from '@/pages/vacancies/components/SearchModal';
@@ -45,19 +45,17 @@ export function ApplicationsPage() {
         <ApplicationsKpis stats={stats} filter={statusFilter} onFilterChange={setStatusFilter} />
       )}
 
-      <Card className="flex flex-1 flex-col">
-        <div className="toolbar">
-          {!loadError && !loading && (
-            <span className="toolbar-count">
-              Showing {visibleItems.length} of {total}
-            </span>
-          )}
-          <Button className="ml-auto" onClick={() => setSearching(true)}>
-            Search
-          </Button>
-          <ApplicationStatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
-        </div>
-
+      <ListFrame
+        toolbar={
+          <>
+            {!loadError && !loading && <ListCount shown={visibleItems.length} total={total} />}
+            <Button className="ml-auto" onClick={() => setSearching(true)}>
+              Search
+            </Button>
+            <ApplicationStatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
+          </>
+        }
+      >
         {loadError ? (
           <EmptyState>Failed to load applications: {loadError}</EmptyState>
         ) : (
@@ -74,7 +72,7 @@ export function ApplicationsPage() {
             emptyMessage={emptyMessage}
           />
         )}
-      </Card>
+      </ListFrame>
 
       {companyHistory && (
         <CompanyHistoryModal

@@ -1,5 +1,4 @@
-import { useId } from 'react';
-import { Select, type SelectOption } from '@/components/ui/Select';
+import { FilterSelect, type SelectOption } from '@/components/ui/Select';
 import { APPLICATION_STATUS_LABELS, FILTER_LABELS } from '../constants';
 import { type ApplicationStatusFilter, applicationStatusFilterValues } from '../types';
 
@@ -21,11 +20,5 @@ export function ApplicationStatusFilterSelect({
   value: ApplicationStatusFilter;
   onChange: (value: ApplicationStatusFilter) => void;
 }) {
-  const id = useId();
-  return (
-    <div className="filter-group">
-      <label htmlFor={id}>Status</label>
-      <Select id={id} value={value} options={OPTIONS} onChange={onChange} />
-    </div>
-  );
+  return <FilterSelect label="Status" value={value} options={OPTIONS} onChange={onChange} />;
 }
