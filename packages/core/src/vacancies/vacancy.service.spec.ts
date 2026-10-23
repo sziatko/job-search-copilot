@@ -157,8 +157,8 @@ describe('VacancyService', () => {
         'First pass.',
       );
       expect(all.items[0].estimationComment).toBe('First pass.');
-      expect(await getPrisma().comment.count()).toBe(1);
-      expect(await getPrisma().statusChange.count()).toBe(2);
+      expect(await getPrisma().comment.count({ where: { vacancy: { userId } } })).toBe(1);
+      expect(await getPrisma().statusChange.count({ where: { vacancy: { userId } } })).toBe(2);
     });
 
     it('writes the estimationComment as one ANALYZER comment', async () => {
@@ -204,7 +204,7 @@ describe('VacancyService', () => {
       });
       expect(await journal(vacancy.id)).toEqual(['NEW', 'FILTERED_OUT']);
       expect((await service.getById(userId, vacancy.id))?.estimationComment).toBe('Strong match.');
-      expect(await getPrisma().vacancy.count()).toBe(1);
+      expect(await getPrisma().vacancy.count({ where: { userId } })).toBe(1);
     });
 
     it('keeps the text a row intake took in already has', async () => {
@@ -415,7 +415,7 @@ describe('VacancyService', () => {
         status: 'NOT_REVIEWED',
       });
       expect(await journal(id)).toEqual(['NEW', 'NOT_REVIEWED']);
-      expect(await getPrisma().comment.count()).toBe(1);
+      expect(await getPrisma().comment.count({ where: { vacancy: { userId } } })).toBe(1);
     });
 
     it('scores a pipeline placeholder and leaves its status alone', async () => {
@@ -1006,7 +1006,7 @@ describe('VacancyService', () => {
           data: { ...row, userId, matchScore: 50, recommendation: 'APPLY' },
         }),
       ).rejects.toThrow(/Vacancy_new_is_unanalysed/);
-      expect(await getPrisma().vacancy.count()).toBe(0);
+      expect(await getPrisma().vacancy.count({ where: { userId } })).toBe(0);
     });
   });
 
@@ -1142,7 +1142,7 @@ describe('VacancyService', () => {
       await expect(
         service.updateStatus(userId, 999_999, 'SAVED_FOR_LATER', 'note'),
       ).rejects.toBeInstanceOf(VacancyNotFoundError);
-      expect(await getPrisma().comment.count()).toBe(0);
+      expect(await getPrisma().comment.count({ where: { vacancy: { userId } } })).toBe(0);
     });
 
     it('writes no comment when the move is refused', async () => {

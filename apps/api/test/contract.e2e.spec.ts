@@ -15,7 +15,13 @@ import {
   vacancyListItemSchema,
   vacancyPageSchema,
 } from '@/lib/vacancies/types';
-import { type Api, createTestApp, signedInAgent } from './test-app';
+import {
+  type Api,
+  createTestApp,
+  deleteTestUsers,
+  deleteTestVacancies,
+  signedInAgent,
+} from './test-app';
 
 /**
  * The web↔API contract (invariant 5): the web's zod schemas are hand-written, and its
@@ -47,7 +53,8 @@ describe('Web↔API contract (e2e)', () => {
       title: 'Frontend Engineer',
       fullText,
     });
-    return (await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
+    return (await prisma.vacancy.findFirstOrThrow({ where: { userId: api.userId, applyUrl: url } }))
+      .id;
   }
 
   beforeAll(async () => {
@@ -73,12 +80,10 @@ describe('Web↔API contract (e2e)', () => {
     full = res.body.id;
   });
 
-  afterEach(async () => {
-    await prisma.vacancy.deleteMany();
-  });
+  afterEach(deleteTestVacancies);
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    await deleteTestUsers();
     await app.close();
     await prisma.$disconnect();
   });

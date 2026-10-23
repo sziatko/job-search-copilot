@@ -36,8 +36,8 @@ Quote them from there if you change one; keep this list in step.
 4. **`recommendation` is stored canonical-English.**
 5. **The web app's API contract is a hand-written zod schema**, not a `core` import.
 6. **`apps/api` disables Biome's `useImportType`.**
-7. **Tests run against a real `job_search_copilot_test` database**, sequentially
-   (`fileParallelism: false`), and are integration tests, not Prisma mocks.
+7. **Tests run against a real `job_search_copilot_test` database**, files in parallel,
+   each test cleaning up only its own users' rows; integration tests, not Prisma mocks.
 8. **Env is loaded by the app entrypoint, validated at boot.**
 9. **Every REST route is closed by default** — anonymous or machine access is explicit.
 10. **No real job-search data in the repo** — made-up companies, ids, rates and counts

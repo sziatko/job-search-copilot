@@ -2,7 +2,13 @@ import 'reflect-metadata';
 import { getPrisma } from '@job-search-copilot/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { type Api, createTestApp, signedInAgent } from './test-app';
+import {
+  type Api,
+  createTestApp,
+  deleteTestUsers,
+  deleteTestVacancies,
+  signedInAgent,
+} from './test-app';
 
 /** [source, body] per comment, in the order the API returned them. */
 const notes = (item: { comments: { source: string; body: string }[] }) =>
@@ -40,12 +46,10 @@ describe('Applications (e2e)', () => {
     api = await signedInAgent(app);
   });
 
-  afterEach(async () => {
-    await prisma.vacancy.deleteMany();
-  });
+  afterEach(deleteTestVacancies);
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    await deleteTestUsers();
     await app.close();
     await prisma.$disconnect();
   });

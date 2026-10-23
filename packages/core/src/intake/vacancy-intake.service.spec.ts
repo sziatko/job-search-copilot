@@ -70,7 +70,7 @@ describe('VacancyIntakeService.intake', () => {
       new: true,
     });
 
-    const stored = await prisma.vacancy.findFirstOrThrow();
+    const stored = await prisma.vacancy.findFirstOrThrow({ where: { userId } });
     expect(stored).toMatchObject({
       applyUrl: 'https://acme.com/jobs/1',
       company: 'Acme',
@@ -85,20 +85,24 @@ describe('VacancyIntakeService.intake', () => {
     });
     expect(await journal(stored.id)).toEqual(['NEW']);
     expect(await intake.intake(userId, entry({ url: raw }))).toEqual({ new: false });
-    expect(await prisma.vacancy.count()).toBe(1);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(1);
   });
 
   it('stores the text when the new entry carries some', async () => {
     await intake.intake(userId, entry({ fullText: text('The posting.') }));
-    expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBe(text('The posting.'));
+    expect((await prisma.vacancy.findFirstOrThrow({ where: { userId } })).fullText).toBe(
+      text('The posting.'),
+    );
   });
 
   it('takes text under 200 characters as none, so a later full text still fills it', async () => {
     await intake.intake(userId, entry({ fullText: `  ${'Sign in'.padEnd(199, '.')}  ` }));
-    expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBeNull();
+    expect((await prisma.vacancy.findFirstOrThrow({ where: { userId } })).fullText).toBeNull();
 
     await intake.intake(userId, entry({ fullText: text('The posting.') }));
-    expect((await prisma.vacancy.findFirstOrThrow()).fullText).toBe(text('The posting.'));
+    expect((await prisma.vacancy.findFirstOrThrow({ where: { userId } })).fullText).toBe(
+      text('The posting.'),
+    );
   });
 
   it('matches a LinkedIn locale link with slug and ?trk= against the www key', async () => {
@@ -123,12 +127,12 @@ describe('VacancyIntakeService.intake', () => {
         entry({ url: 'https://acme.com/jobs/2', company: 'ACME', title: 'dev' }),
       ),
     ).toEqual({ new: false });
-    expect(await prisma.vacancy.count()).toBe(1);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(1);
   });
 
   it('on a hit fills only the missing text — never a status, a source or a name', async () => {
     await intake.intake(userId, entry());
-    const { id } = await prisma.vacancy.findFirstOrThrow();
+    const { id } = await prisma.vacancy.findFirstOrThrow({ where: { userId } });
     await prisma.vacancy.update({ where: { id }, data: { status: 'FILTERED_OUT' } });
 
     await intake.intake(
@@ -137,7 +141,7 @@ describe('VacancyIntakeService.intake', () => {
     );
     await intake.intake(userId, entry({ fullText: text('A second text.') }));
 
-    expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
+    expect(await prisma.vacancy.findFirstOrThrow({ where: { userId } })).toMatchObject({
       company: 'Acme',
       title: 'Dev',
       source: null,
@@ -172,13 +176,13 @@ describe('VacancyIntakeService.intake', () => {
       ),
     ).toEqual({ new: false });
 
-    expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
+    expect(await prisma.vacancy.findFirstOrThrow({ where: { userId } })).toMatchObject({
       id: vacancy.id,
       fullText: 'Analysed text.',
       matchScore: 80,
       status: 'NOT_REVIEWED',
     });
-    expect(await prisma.vacancy.count()).toBe(1);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(1);
   });
 
   it.each([
@@ -188,7 +192,7 @@ describe('VacancyIntakeService.intake', () => {
     [{ title: '  ' }],
   ])('rejects %j — a vacancy needs all three — and creates nothing', async (overrides) => {
     await expect(intake.intake(userId, entry(overrides))).rejects.toThrow(InvalidIntakeEntryError);
-    expect(await prisma.vacancy.count()).toBe(0);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(0);
   });
 });
 
@@ -223,6 +227,6 @@ describe('VacancyIntakeService.intakeMany', () => {
         entry({ url: 'https://acme.com/jobs/5' }),
       ]),
     ).toEqual({ new: ['https://acme.com/jobs/5'] });
-    expect(await prisma.vacancy.count()).toBe(1);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(1);
   });
 });

@@ -33,7 +33,7 @@ async function queued(url: string, fullText?: string): Promise<number> {
     title: url,
     fullText,
   });
-  return (await getPrisma().vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
+  return (await getPrisma().vacancy.findFirstOrThrow({ where: { userId, applyUrl: url } })).id;
 }
 
 const validArgs = {
@@ -56,7 +56,7 @@ describe('job-search-copilot MCP server', () => {
   });
 
   afterEach(async () => {
-    await prisma.vacancy.deleteMany();
+    await prisma.vacancy.deleteMany({ where: { userId } });
   });
 
   afterAll(async () => {
@@ -93,7 +93,7 @@ describe('job-search-copilot MCP server', () => {
       arguments: { ...validArgs, recommendation: 'ПОДАВАТИСЯ' },
     });
     expect(result.isError).toBe(true);
-    expect(await prisma.vacancy.count()).toBe(0);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(0);
   });
 
   it('sends the cross-tool rules as its instructions', async () => {
@@ -920,7 +920,7 @@ describe('job-search-copilot MCP server', () => {
       arguments: { url, company: 'Acme', title: 'Engineer', source: 'linkedin' },
     });
     expect(JSON.parse(textOf(first))).toEqual({ new: true });
-    expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
+    expect(await prisma.vacancy.findFirstOrThrow({ where: { userId } })).toMatchObject({
       status: 'NEW',
       source: 'linkedin',
       recommendation: null,
@@ -945,7 +945,7 @@ describe('job-search-copilot MCP server', () => {
         true,
       );
     }
-    expect(await prisma.vacancy.count()).toBe(0);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(0);
   });
 
   it('intake_vacancies_batch returns the raw urls of the new entries', async () => {
@@ -980,7 +980,7 @@ describe('job-search-copilot MCP server', () => {
       });
       expect(result.isError).toBe(true);
     }
-    expect(await prisma.vacancy.count()).toBe(0);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(0);
   });
 
   it('intake_vacancies_batch rejects an empty or oversized array', async () => {

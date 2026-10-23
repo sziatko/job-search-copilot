@@ -105,6 +105,13 @@ How a test finds an element, in the web tests and the Playwright specs alike:
 - **Never by CSS class.** Classes belong to styling and can be renamed without a test
   noticing.
 
+A DB-backed test (core, api, mcp) makes its own users — `createUser()` in core,
+`signIn` / `signedInAgent` / `createApiKey` in api — and its rows hang off them; cleanup
+deletes only those users, and the rest goes by cascade. Files run in parallel on the one
+test DB, so every delete, count and lookup a test makes filters by its user: a bare
+`count()` or `findFirst()` sees another file's rows, and passes only when the file runs
+alone. Why: [ADR-0015](decisions/0015-testing-strategy.md).
+
 Visual tests (`npm run test:visual`) compare every page, dialog and empty state with a
 baseline PNG in `e2e/visual.spec.ts-snapshots/`, at a desktop and a phone width, light
 and dark. They run only in the Playwright image (`e2e/Dockerfile`, the image CI's `e2e`

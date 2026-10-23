@@ -16,9 +16,19 @@ beforeEach(async () => {
 
 async function counts() {
   const [byStatus, comments, changes, timedOut] = await Promise.all([
-    prisma.vacancy.groupBy({ by: ['status'], _count: true, orderBy: { status: 'asc' } }),
-    prisma.comment.groupBy({ by: ['source'], _count: true, orderBy: { source: 'asc' } }),
-    prisma.statusChange.count(),
+    prisma.vacancy.groupBy({
+      by: ['status'],
+      where: { userId },
+      _count: true,
+      orderBy: { status: 'asc' },
+    }),
+    prisma.comment.groupBy({
+      by: ['source'],
+      where: { vacancy: { userId } },
+      _count: true,
+      orderBy: { source: 'asc' },
+    }),
+    prisma.statusChange.count({ where: { vacancy: { userId } } }),
     new ApplicationService(prisma).list(userId, { state: 'timedOut' }),
   ]);
   return { byStatus, comments, changes, timedOut: timedOut.total };
@@ -40,7 +50,7 @@ describe('resetToSeed', () => {
     await resetToSeed(prisma, userId);
 
     expect(await counts()).toEqual(first);
-    expect(await prisma.vacancy.count()).toBe(SEED_VACANCIES.length);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(SEED_VACANCIES.length);
     expect(SEED_VACANCIES.length).toBeGreaterThan(100);
     expect(first.byStatus.map((row) => row.status)).toEqual(Object.values(VacancyStatus));
     expect(first.comments.map((row) => row.source)).toEqual(['ANALYZER', 'USER', 'AGENT']);
@@ -53,7 +63,8 @@ describe('resetToSeed', () => {
     // Each vacancy's date is its journal's last.
     const [{ stale }] = await prisma.$queryRaw<{ stale: number }[]>`
       SELECT count(*)::int AS stale FROM "Vacancy" v
-      WHERE v."statusChangedAt" <> (SELECT max("createdAt") FROM "StatusChange" s WHERE s."vacancyId" = v.id)`;
+      WHERE v."userId" = ${userId}
+        AND v."statusChangedAt" <> (SELECT max("createdAt") FROM "StatusChange" s WHERE s."vacancyId" = v.id)`;
     expect(stale).toBe(0);
   }, 120_000);
 

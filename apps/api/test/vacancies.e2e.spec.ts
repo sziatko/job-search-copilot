@@ -2,7 +2,13 @@ import 'reflect-metadata';
 import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { type Api, createTestApp, signedInAgent } from './test-app';
+import {
+  type Api,
+  createTestApp,
+  deleteTestUsers,
+  deleteTestVacancies,
+  signedInAgent,
+} from './test-app';
 
 // End-to-end: boots the real Nest app (same ValidationPipe as setup-app.ts) against
 // the real test database, and hits it over HTTP via supertest. This is what
@@ -30,7 +36,8 @@ describe('Vacancies (e2e)', () => {
       company: 'Queued Co',
       title: url,
     });
-    return (await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
+    return (await prisma.vacancy.findFirstOrThrow({ where: { userId: api.userId, applyUrl: url } }))
+      .id;
   }
 
   beforeAll(async () => {
@@ -38,12 +45,10 @@ describe('Vacancies (e2e)', () => {
     api = await signedInAgent(app);
   });
 
-  afterEach(async () => {
-    await prisma.vacancy.deleteMany();
-  });
+  afterEach(deleteTestVacancies);
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    await deleteTestUsers();
     await app.close();
     await prisma.$disconnect();
   });
@@ -93,7 +98,7 @@ describe('Vacancies (e2e)', () => {
           .send({ ...validPayload, applyUrl })
           .expect(400);
       }
-      expect(await prisma.vacancy.count()).toBe(0);
+      expect(await prisma.vacancy.count({ where: { userId: api.userId } })).toBe(0);
     });
 
     it('attaches the analysis to a row intake took in: 200, no Location', async () => {
@@ -114,7 +119,9 @@ describe('Vacancies (e2e)', () => {
         { url: raw, company: 'Acme Sp. z o.o.', title: 'Senior Dev', source: 'linkedin' },
       ]).expect(200);
       expect(first.body).toEqual({ new: [raw] });
-      expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
+      expect(
+        await prisma.vacancy.findFirstOrThrow({ where: { userId: api.userId } }),
+      ).toMatchObject({
         applyUrl: 'https://www.linkedin.com/jobs/view/3900000001',
         status: 'NEW',
         recommendation: null,
@@ -127,7 +134,7 @@ describe('Vacancies (e2e)', () => {
         { url: 'https://acme.com/careers/42', company: 'Acme', title: 'Senior Dev!' },
       ]).expect(200);
       expect(again.body).toEqual({ new: [] });
-      expect(await prisma.vacancy.count()).toBe(1);
+      expect(await prisma.vacancy.count({ where: { userId: api.userId } })).toBe(1);
     });
 
     it('fills the posting text on a second call, and nothing else', async () => {
@@ -136,7 +143,9 @@ describe('Vacancies (e2e)', () => {
       const res = await intake([{ ...entry, source: 'justjoin', fullText }]).expect(200);
       expect(res.body).toEqual({ new: [] });
       expect(
-        await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: entry.url } }),
+        await prisma.vacancy.findFirstOrThrow({
+          where: { userId: api.userId, applyUrl: entry.url },
+        }),
       ).toMatchObject({ fullText, source: null, status: 'NEW' });
     });
 
@@ -156,7 +165,7 @@ describe('Vacancies (e2e)', () => {
       await intake(
         Array.from({ length: 101 }, (_, i) => ({ ...entry, url: `https://a.com/${i}` })),
       ).expect(400);
-      expect(await prisma.vacancy.count()).toBe(0);
+      expect(await prisma.vacancy.count({ where: { userId: api.userId } })).toBe(0);
     });
 
     it('accepts a ~1 MB body', async () => {

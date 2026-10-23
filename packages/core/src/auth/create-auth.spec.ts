@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { handleOAuthUserInfo } from 'better-auth/oauth2';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { getPrisma } from '../db/prisma-client';
 import { verifyApiKey } from './api-key';
 import { createAuth } from './create-auth';
@@ -18,6 +18,12 @@ const auth = createAuth(prisma, {
   mcpUrl: 'http://localhost:3001/mcp',
 });
 
+// The one user these tests sign up (the allowed email); its accounts, sessions and keys
+// go with it. `tests/setup.ts` deletes only the users `createUser` made.
+afterEach(async () => {
+  await prisma.user.deleteMany({ where: { email: 'me@example.com' } });
+});
+
 // What a social sign-in's callback calls once Google has vouched for the email.
 async function signUpWithGoogle(email: string) {
   const ctx = await auth.$context;
@@ -32,8 +38,10 @@ describe('createAuth', () => {
     await expect(signUpWithGoogle('stranger@example.com')).rejects.toThrow(
       'This email may not sign up',
     );
-    expect(await prisma.user.count()).toBe(0);
-    expect(await prisma.account.count()).toBe(0);
+    expect(await prisma.user.count({ where: { email: 'stranger@example.com' } })).toBe(0);
+    expect(
+      await prisma.account.count({ where: { accountId: 'google-sub-stranger@example.com' } }),
+    ).toBe(0);
   });
 
   it('signs up an allowed email, whatever its case, and writes a session for it', async () => {
@@ -60,7 +68,7 @@ describe('createAuth', () => {
       account: { providerId: 'linkedin', accountId: 'li-sub' },
     });
     expect(result.error).toBe('account not linked');
-    expect(await prisma.account.count()).toBe(1);
+    expect(await prisma.account.count({ where: { user: { email: 'me@example.com' } } })).toBe(1);
   });
 });
 

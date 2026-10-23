@@ -102,7 +102,7 @@ describe('forUser', () => {
     await expect(asB.comment.deleteMany()).rejects.toThrow(
       'forUser does not scope Comment.deleteMany',
     );
-    expect(await prisma.comment.count()).toBe(1);
+    expect(await prisma.comment.count({ where: { vacancyId: aRow.id } })).toBe(1);
   });
 
   it('refuses an empty userId', () => {

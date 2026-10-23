@@ -26,12 +26,16 @@ function token(audience = mcpUrl) {
     .sign(privateKey);
 }
 
+/** The key owners `apiKey` made, deleted in `afterAll`. */
+const owners: string[] = [];
+
 /** What /profile's "Create" does: an API key for a new user, through the API's auth. */
 async function apiKey(): Promise<string> {
   const prisma = getPrisma();
   const user = await prisma.user.create({
     data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
   });
+  owners.push(user.id);
   const provider = { clientId: 'test-client-id', clientSecret: 'test-client-secret' };
   const auth = createAuth(prisma, {
     secret: 'test-secret-at-least-32-characters-long',
@@ -60,7 +64,7 @@ describe('MCP over HTTP', () => {
 
   afterAll(async () => {
     server.close();
-    await getPrisma().user.deleteMany(); // their keys go with them (cascade)
+    await getPrisma().user.deleteMany({ where: { id: { in: owners } } }); // keys cascade
   });
 
   const initialize = (headers: Record<string, string> = {}) =>

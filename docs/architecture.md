@@ -234,8 +234,8 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 6. **`apps/api` disables Biome's `useImportType`.** NestJS DI + `class-validator`
    need types used in decorated positions to be *runtime* imports. Turning the
    rule back on silently breaks DI. → [ADR-0014](decisions/0014-biome-and-nest-di-import-type.md)
-7. **Tests run against a real `job_search_copilot_test` database**, sequentially
-   (`fileParallelism: false`), and are integration tests, not Prisma mocks.
+7. **Tests run against a real `job_search_copilot_test` database**, files in parallel,
+   each test cleaning up only its own users' rows; integration tests, not Prisma mocks.
    → [ADR-0015](decisions/0015-testing-strategy.md)
 8. **Env is loaded by the app entrypoint, validated at boot.** `packages/core`
    does not load `.env`; a missing/invalid var fails startup with a readable
