@@ -81,9 +81,8 @@ export interface ListApplicationsFilters {
   state?: ApplicationState;
   /** Default 50, max 500. */
   limit?: number;
-  /** MCP's paging. Not with `cursor` — REST answers both with a 400. */
-  offset?: number;
-  /** The web's paging (ADR-0030): the `id` of the last row the caller has. */
+  /** The paging (ADR-0030): the `id` of the last row the caller has — the previous
+   * page's `nextCursor`. */
   cursor?: number;
 }
 

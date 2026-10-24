@@ -1,7 +1,7 @@
 import type { ApplicationService } from '@job-search-copilot/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { BATCH_MAX, pagination } from '../common/schemas';
+import { BATCH_MAX, PAGING_NOTE, pagination } from '../common/schemas';
 import { json, ref, toolError, withDomainErrors } from '../common/tool-result';
 import { VacancyStatusEnum } from '../vacancies/vacancies.schemas';
 import {
@@ -84,7 +84,8 @@ export function registerApplicationTools(
         'LinkedIn link from an email matches). Each item carries status, ' +
         'statusChangedAt, appliedAt (null if the vacancy skipped APPLIED), salary / CV, ' +
         'company / title / applyUrl / matchScore / recommendation, and `comments` — ' +
-        '[{ id, createdAt, body, source }], oldest first, source ANALYZER | USER | AGENT.',
+        '[{ id, createdAt, body, source }], oldest first, source ANALYZER | USER | AGENT. ' +
+        PAGING_NOTE,
       inputSchema: {
         status: PipelineStatusEnum.optional(),
         search: z.string().optional(),
@@ -94,11 +95,7 @@ export function registerApplicationTools(
         ...pagination(APPLICATION_LIST_MAX),
       },
     },
-    async (filters) => {
-      // `nextCursor` is the web's (ADR-0030); this tool pages by offset.
-      const { items, total } = await applications.list(userId, filters);
-      return json({ items, total });
-    },
+    async (filters) => json(await applications.list(userId, filters)),
   );
 
   server.registerTool(

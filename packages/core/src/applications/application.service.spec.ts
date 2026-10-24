@@ -362,15 +362,21 @@ describe('ApplicationService', () => {
       expect((await applications.list(userId, { company: 'acme', title: 'lead' })).total).toBe(0);
     });
 
-    it('respects limit/offset', async () => {
-      const page = await applications.list(userId, { limit: 1, offset: 1 });
-      expect(page.items).toHaveLength(1);
-      expect(page.total).toBe(2);
+    it('respects limit, and pages on by nextCursor', async () => {
+      const first = await applications.list(userId, { limit: 1 });
+      const second = await applications.list(userId, {
+        limit: 1,
+        cursor: first.nextCursor ?? -1,
+      });
+      expect([first.items.length, second.items.length]).toEqual([1, 1]);
+      expect(second.items[0].id).not.toBe(first.items[0].id);
+      expect([first.total, second.total, second.nextCursor]).toEqual([2, 2, null]);
     });
 
     it('orders rows that share one statusChangedAt, so two pages do not overlap', async () => {
-      // Rows can share one date (a batch written at once), so a tie is a normal case. Read as windows, an unstable order serves one row twice and skips
-      // another; `id desc` is what makes them disjoint.
+      // Rows can share one date (a batch written at once), so a tie is a normal case. Paged
+      // over an unstable order, one row is served twice and another skipped; `id desc` is
+      // what makes the pages disjoint.
       const stamp = new Date('2099-01-01');
       for (const company of ['Tie One', 'Tie Two', 'Tie Three']) {
         const vacancy = await seedVacancy({ company, title: 'Same Stamp' });
@@ -382,7 +388,10 @@ describe('ApplicationService', () => {
       }
 
       const first = await applications.list(userId, { limit: 3 });
-      const second = await applications.list(userId, { limit: 3, offset: 3 });
+      const second = await applications.list(userId, {
+        limit: 3,
+        cursor: first.nextCursor ?? -1,
+      });
 
       const tiedIds = first.items.map((item) => item.id);
       expect(first.items.every((item) => item.statusChangedAt.getTime() === stamp.getTime())).toBe(

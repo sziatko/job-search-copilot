@@ -30,9 +30,9 @@ key is a `401`. Swagger is outside Nest's router, so the guard does not cover it
 **One user per request** ([ADR-0038](decisions/0038-multi-user-shared-schema.md)) — the
 session's, or the key's owner. Another user's id answers `404`, as an unknown one.
 
-**Lists** ([ADR-0030](decisions/0030-cursor-paging.md)) take `cursor` (the last row's
-`id`) or `offset`, not both (`400`), and answer `{ items, total, nextCursor }`. `total`
-is the count matching the filter, not the page size.
+**Lists** ([ADR-0030](decisions/0030-cursor-paging.md)) take `cursor` (the previous
+page's `nextCursor`) and answer `{ items, total, nextCursor }`. `total` is the count
+matching the filter, not the page size.
 
 | Route | Does | Success |
 | --- | --- | --- |
@@ -95,7 +95,7 @@ text just sent.
 | Save analysed | `save_vacancy`, `save_vacancies_batch` (not transactional) |
 | Intake | `intake_vacancy`, `intake_vacancies_batch` (no posting text over MCP) |
 | The analysis queue | `list_vacancies` (`status: ['NEW'], hasText: true`) → `get_vacancies_batch` (1–10) → `submit_analysis` / `submit_analyses_batch` (1–10, one transaction) |
-| Read | `get_vacancy`, `list_vacancies`, `list_applications` (`offset` paging only) |
+| Read | `get_vacancy`, `list_vacancies`, `list_applications` (`cursor` paging, as REST) |
 | Applications | `record_application`, `record_applications_batch` (one transaction), `update_application`, `update_vacancy_status`, `add_comment` |
 
 Rules that span tools go to the client as the server's `instructions`

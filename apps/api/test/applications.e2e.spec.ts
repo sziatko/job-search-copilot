@@ -172,11 +172,10 @@ describe('Applications (e2e)', () => {
       expect(second.body).toMatchObject({ items: [{ id: a }], total: 2, nextCursor: null });
     });
 
-    it('400s for limit above 500, a status outside the pipeline, a bad state, or cursor with offset', async () => {
+    it('400s for limit above 500, a status outside the pipeline, or a bad state', async () => {
       await api.get('/api/v1/applications?limit=1000').expect(400);
       await api.get('/api/v1/applications?status=DECLINED').expect(400);
       await api.get('/api/v1/applications?state=TIMEOUT').expect(400);
-      await api.get('/api/v1/applications?cursor=5&offset=0').expect(400);
     });
   });
 

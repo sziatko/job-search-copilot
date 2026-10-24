@@ -456,7 +456,7 @@ describe('job-search-copilot MCP server', () => {
     expect(applicationsAt501.isError).toBe(true);
   });
 
-  it('list_vacancies pages with limit and offset without shrinking total', async () => {
+  it('list_vacancies pages through by nextCursor without shrinking total', async () => {
     const client = await connectedClient();
     await client.callTool({
       name: 'save_vacancies_batch',
@@ -469,18 +469,23 @@ describe('job-search-copilot MCP server', () => {
       },
     });
 
-    const page = await client.callTool({
-      name: 'list_vacancies',
-      arguments: { limit: 2, offset: 1 },
-    });
-    const body = JSON.parse(textOf(page));
+    const titles: string[] = [];
+    let cursor: number | undefined;
+    for (let call = 0; call < 3; call += 1) {
+      const page = await client.callTool({
+        name: 'list_vacancies',
+        arguments: { limit: 2, cursor },
+      });
+      const body = JSON.parse(textOf(page));
+      // `total` is the match count, not the size of the page — the same contract the
+      // web app leans on to use `limit=1` as a count endpoint.
+      expect(body.total).toBe(5);
+      titles.push(...body.items.map((item: { title: string }) => item.title));
+      cursor = body.nextCursor ?? undefined;
+    }
 
-    // `total` is the match count, not the size of the page — the same contract the
-    // web app leans on to use `limit=1` as a count endpoint.
-    expect(body.items).toHaveLength(2);
-    expect(body.total).toBe(5);
-    // The web's cursor paging (ADR-0030) does not leak into the tool's output.
-    expect(Object.keys(body)).toEqual(['items', 'total']);
+    expect(titles).toEqual(['Role 5', 'Role 4', 'Role 3', 'Role 2', 'Role 1']);
+    expect(cursor).toBeUndefined();
   });
 
   it('update_vacancy_status triages a vacancy; list_vacancies filters by several statuses', async () => {

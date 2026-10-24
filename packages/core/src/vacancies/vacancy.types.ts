@@ -77,9 +77,8 @@ export interface ListVacanciesFilters {
   /** true: only rows with posting text; false: only rows without. */
   hasText?: boolean;
   limit?: number;
-  /** MCP's paging. Not with `cursor` — REST answers both with a 400. */
-  offset?: number;
-  /** The web's paging (ADR-0030): the `id` of the last row the caller has. */
+  /** The paging (ADR-0030): the `id` of the last row the caller has — the previous
+   * page's `nextCursor`. */
   cursor?: number;
   /** Default `newest`. */
   sort?: VacancySort;

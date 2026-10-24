@@ -31,7 +31,7 @@ choice (a status code, an index type) is a section of
 | [0025](0025-vacancies-list-search-server-side.md) | The vacancies list: server-side search, a derived company count |
 | [0027](0027-linkedin-site-rule.md) | LinkedIn site rule: one key per job id, locale host merged |
 | [0029](0029-one-vacancy-table.md) | One `Vacancy` table: one status, a `StatusChange` journal, comments with a `source` |
-| [0030](0030-cursor-paging.md) | The web's tables page by a Prisma cursor; MCP keeps offset |
+| [0030](0030-cursor-paging.md) | Every list pages by a Prisma cursor |
 | [0031](0031-stats-endpoint.md) | One stats endpoint; the funnel counts the journal |
 | [0032](0032-same-company-normalised-name.md) | Same company = an equal normalised name |
 | [0033](0033-unscored-vacancies-in-one-table.md) | Unscored vacancies live in `Vacancy`: `NEW` and `FILTERED_OUT` |

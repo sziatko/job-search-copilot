@@ -33,13 +33,7 @@ export class ListApplicationsQueryDto {
   @Max(500)
   limit?: number;
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number;
-
-  /** The web's paging (ADR-0030); not with `offset` — the controller 400s. */
+  /** The paging (ADR-0030): the previous page's `nextCursor`. */
   @IsOptional()
   @Type(() => Number)
   @IsInt()

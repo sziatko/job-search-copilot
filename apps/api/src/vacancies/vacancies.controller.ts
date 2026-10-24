@@ -1,6 +1,5 @@
 import { VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -96,12 +95,9 @@ export class VacanciesController {
     return this.vacancies.submitAnalyses(userId, dto.analyses);
   }
 
-  /** `{ items, total, nextCursor }`; paged by `offset` or `cursor`, not both (ADR-0030). */
+  /** `{ items, total, nextCursor }`; paged by `cursor` (ADR-0030). */
   @Get()
   list(@CurrentUserId() userId: string, @Query() query: ListVacanciesQueryDto) {
-    if (query.cursor !== undefined && query.offset !== undefined) {
-      throw new BadRequestException('cursor and offset cannot be combined');
-    }
     return this.vacancies.list(userId, query);
   }
 

@@ -351,7 +351,6 @@ export class VacancyService {
             ? where
             : { OR: [where, { id: cursor }] },
         orderBy: ORDER_BY[filters.sort ?? 'newest'],
-        ...(filters.offset && { skip: filters.offset }),
         ...cursorArgs(cursor, limit),
         select: LIST_SELECT,
       }),

@@ -323,8 +323,7 @@ describe('Vacancies (e2e)', () => {
       expect(next.body).toMatchObject({ items: [{ company: 'Co 1' }], total: 3, nextCursor: null });
     });
 
-    it('400s on cursor with offset, a bad cursor, or an unknown sort', async () => {
-      await api.get('/api/v1/vacancies?cursor=5&offset=0').expect(400);
+    it('400s on a bad cursor or an unknown sort', async () => {
       await api.get('/api/v1/vacancies?cursor=abc').expect(400);
       await api.get('/api/v1/vacancies?sort=oldest').expect(400);
     });

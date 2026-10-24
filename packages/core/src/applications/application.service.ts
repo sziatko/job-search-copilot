@@ -167,10 +167,8 @@ export class ApplicationService {
         where,
         // The last move first — a fresh application tops the list; a comment or an
         // edit does not reorder. `statusChangedAt` alone is not a total order (rows
-        // can share one date), and offset paging over a tie has no defined
-        // window, so `id` breaks it — and Prisma's cursor needs a total order (ADR-0030).
+        // can share one date), and Prisma's cursor needs one, so `id` breaks it (ADR-0030).
         orderBy: [{ statusChangedAt: 'desc' }, { id: 'desc' }],
-        ...(filters.offset && { skip: filters.offset }),
         ...cursorArgs(cursor, limit),
         select: APPLICATION_SELECT,
       }),

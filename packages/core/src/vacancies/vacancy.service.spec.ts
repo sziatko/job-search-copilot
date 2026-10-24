@@ -619,10 +619,12 @@ describe('VacancyService', () => {
       expect(items[0].title).toBe('Frontend Lead');
     });
 
-    it('respects limit/offset', async () => {
-      const page = await service.list(userId, { limit: 1, offset: 1 });
-      expect(page.items).toHaveLength(1);
-      expect(page.total).toBe(2);
+    it('respects limit, and pages on by nextCursor', async () => {
+      const first = await service.list(userId, { limit: 1 });
+      const second = await service.list(userId, { limit: 1, cursor: first.nextCursor ?? -1 });
+      expect([first.items.length, second.items.length]).toEqual([1, 1]);
+      expect(second.items[0].id).not.toBe(first.items[0].id);
+      expect([first.total, second.total, second.nextCursor]).toEqual([2, 2, null]);
     });
 
     it('filters by hasText, and marks each item', async () => {
