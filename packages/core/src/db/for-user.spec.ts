@@ -1,9 +1,11 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import path from 'node:path';
 import { Prisma } from '@prisma/client';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createUser } from '../../tests/user';
-import { forUser } from './for-user';
+import { ApplicationService } from '../applications/application.service';
+import { VacancyIntakeService } from '../intake/vacancy-intake.service';
+import { StatsService } from '../stats/stats.service';
+import { VacancyService } from '../vacancies/vacancy.service';
+import { forUser, type Unscoped } from './for-user';
 import { getPrisma } from './prisma-client';
 
 const prisma = getPrisma();
@@ -117,32 +119,68 @@ describe('forUser', () => {
       }),
     ).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
   });
+
+  it('throws on any other model, so a relation cannot read past it', async () => {
+    const asB = forUser(prisma, b);
+    await expect(
+      asB.user.findUnique({ where: { id: a }, include: { vacancies: true } }),
+    ).rejects.toThrow('forUser does not scope User.findUnique');
+  });
+
+  it('nests only a create in a vacancy write, and never moves its owner', async () => {
+    const asB = forUser(prisma, b);
+    const own = await asB.vacancy.create({
+      data: {
+        userId: b,
+        company: 'Beta',
+        title: 'QA',
+        applyUrl: 'https://example.com/b',
+        comments: { create: { body: "B's note.", source: 'USER' } },
+      },
+    });
+    const [aComment] = await prisma.comment.findMany({ where: { vacancyId: aRow.id } });
+    await expect(
+      asB.vacancy.update({
+        where: { id: own.id },
+        data: { comments: { connect: { id: aComment.id } } },
+      }),
+    ).rejects.toThrow('nests only a create (comments)');
+    await expect(
+      asB.vacancy.update({ where: { id: own.id }, data: { userId: a } }),
+    ).rejects.toThrow('cannot change its owner');
+    await expect(
+      asB.vacancy.update({ where: { id: own.id }, data: { user: { connect: { id: a } } } }),
+    ).rejects.toThrow('cannot change its owner');
+
+    expect(await prisma.comment.findUnique({ where: { id: aComment.id } })).toMatchObject({
+      vacancyId: aRow.id,
+    });
+    expect(await prisma.vacancy.findUnique({ where: { id: own.id } })).toMatchObject({
+      userId: b,
+    });
+  });
 });
 
-/** Every source file of core, from `src/` down — not only this spec's folder. */
-const SRC = path.resolve(import.meta.dirname, '..');
-
-/** Core's source files outside forUser, specs left out. */
-function sources(dir = SRC): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const file = path.join(dir, entry.name);
-    if (entry.isDirectory()) return sources(file);
-    return file.endsWith('.ts') && !file.endsWith('.spec.ts') && entry.name !== 'for-user.ts'
-      ? [file]
-      : [];
+describe('the raw client reaches a domain model only through forUser (ADR-0038)', () => {
+  // Checked by `npm run typecheck` (tsconfig.spec.json): each line below must not compile.
+  it('as Unscoped, it has no model delegates and no $transaction', () => {
+    const raw: Unscoped = prisma;
+    // @ts-expect-error — no delegates
+    void raw.vacancy;
+    // @ts-expect-error — no transaction outside the scope
+    void raw.$transaction;
   });
-}
 
-describe('every domain query goes through forUser (ADR-0038)', () => {
-  it.each(sources().map((file) => [path.relative(SRC, file), file]))('%s', (_, file) => {
-    const code = readFileSync(file, 'utf8');
-    // The raw client never reaches a domain model: the services hold it as `this.db`,
-    // resetToSeed as `prisma`, and a raw transaction is called `tx`.
-    expect(code).not.toMatch(/\b(?:this\.db|tx|prisma)\??\.(?:vacancy|statusChange|comment)\b/);
-    expect(code).not.toMatch(/\bthis\.db\.\$transaction\b/);
-    // `this.db` appears only as forUser's argument.
-    expect(code.match(/\bthis\.db\b/g)?.length ?? 0).toBe(
-      code.match(/\bforUser\(this\.db, userId\)/g)?.length ?? 0,
-    );
+  it('every service holds it as Unscoped', () => {
+    // Element access reaches a private field, so only its type is checked.
+    const DB = 'db';
+    // @ts-expect-error — `db` is Unscoped
+    void new VacancyService(prisma)[DB].vacancy;
+    // @ts-expect-error — `db` is Unscoped
+    void new ApplicationService(prisma)[DB].vacancy;
+    // @ts-expect-error — `db` is Unscoped
+    void new StatsService(prisma)[DB].vacancy;
+    // @ts-expect-error — `db` is Unscoped
+    void new VacancyIntakeService(prisma)[DB].vacancy;
   });
 });

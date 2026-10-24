@@ -1,5 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
-import { forUser, type UserTx } from '../db/for-user';
+import { forUser, type Unscoped, type UserTx } from '../db/for-user';
 import { getPrisma } from '../db/prisma-client';
 import { InvalidIntakeEntryError } from '../domain/errors';
 import { matchKeys } from '../domain/identity';
@@ -43,7 +42,7 @@ function prepare(entry: VacancyIntakeInput): PreparedEntry | null {
 export class VacancyIntakeService {
   /** @param db defaults (on construction, not import) to the lazy process-wide client —
    *   same rationale as VacancyService. Nest passes its managed client. */
-  constructor(private readonly db: PrismaClient = getPrisma()) {}
+  constructor(private readonly db: Unscoped = getPrisma()) {}
 
   /** One posting. An entry without an http(s) url, a company or a title is an error,
    * not a silent skip: the caller must not read "not taken in" as "duplicate". */

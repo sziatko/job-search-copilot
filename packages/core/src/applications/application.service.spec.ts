@@ -805,7 +805,7 @@ describe('ApplicationService', () => {
       const existing = await seedVacancy({ company: 'Batch Co', title: 'Dev' });
       const { results } = await applications.recordMany(userId, [
         { vacancyId: existing.id },
-        { company: 'Fresh Co', title: 'Engineer', matchScore: 65 },
+        { company: 'Fresh Co', title: 'Engineer' },
       ]);
       expect(results.map((r) => r.resolution)).toEqual(['linked-by-id', 'created-vacancy']);
       expect((await applications.list(userId)).total).toBe(2);

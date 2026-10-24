@@ -127,7 +127,8 @@ changed PNGs in the diff, and commit them with the change. `npm run test:visual 
 ## Gotchas
 
 - **`npm test` can pass while `core` does not build.** Vitest strips types without
-  checking them; `npm run typecheck` is the one thing that typechecks `core`. Read a
+  checking them; `npm run typecheck` is the one thing that typechecks `core`, its specs
+  included (`packages/core/tsconfig.spec.json` — the build leaves them out). Read a
   build's exit code, not its output files: `tsc` emits JS even when it fails.
 - **`npm install -w <workspace> <pkg>` crashes** here (arborist, `reading 'location'`).
   Add the dependency to the workspace's `package.json`, then run `npm install` at the

@@ -1,6 +1,6 @@
-import type { CommentSource, PrismaClient, VacancyStatus } from '@prisma/client';
+import type { CommentSource, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
-import { forUser, orNotFound, type UserDb, type UserTx } from '../db/for-user';
+import { forUser, orNotFound, type Unscoped, type UserDb, type UserTx } from '../db/for-user';
 import { textFilters } from '../db/like';
 import { cursorArgs, toCursorPage } from '../db/paging';
 import { getPrisma } from '../db/prisma-client';
@@ -94,7 +94,7 @@ export class ApplicationService {
   /** @param db only ever used through `forUser` (every public method takes the user's id
    *   first, ADR-0038). Defaults (on construction, not import) to the lazy process-wide client —
    *   same rationale as VacancyService. Nest passes its managed client. */
-  constructor(private readonly db: PrismaClient = getPrisma()) {}
+  constructor(private readonly db: Unscoped = getPrisma()) {}
 
   /**
    * Record that the user applied to a role. In one transaction: resolve the vacancy

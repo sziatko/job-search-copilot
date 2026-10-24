@@ -26,7 +26,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "typecheck": "npm run build --workspace=@job-search-copilot/core && tsc -p apps/api/tsconfig.build.json --noEmit && tsc -p apps/mcp/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit && tsc -p e2e/tsconfig.json"
+    "typecheck": "npm run build --workspace=@job-search-copilot/core && tsc -p packages/core/tsconfig.spec.json && tsc -p apps/api/tsconfig.build.json --noEmit && tsc -p apps/mcp/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit && tsc -p e2e/tsconfig.json"
   },
   "allowScripts": {
     "@prisma/engines@7.10.0": true,

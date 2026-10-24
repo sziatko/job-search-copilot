@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  // The specs, type-checked by `npm run typecheck` — the build leaves them out. Vitest
+  // runs them as ES modules, hence `import.meta` and the bundler resolution.
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "module": "preserve",
+    "moduleResolution": "bundler"
+  },
+  "include": ["src", "tests"],
+  "exclude": []
+}

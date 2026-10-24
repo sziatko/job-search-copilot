@@ -256,8 +256,10 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 11. **Every domain query is scoped to its user.** `Vacancy`
     has a `userId`; core's services take it as their first argument and query only
     through `forUser(db, userId)`, which adds the owner to every `Vacancy`, `Comment`
-    and `StatusChange` query. A query on the raw client reads every user's rows; another
-    user's row answers like a missing one (404, never 403).
+    and `StatusChange` query and throws on any other model. The services hold the raw
+    client as `Unscoped` (`$extends` only), so a query on it does not compile — one
+    would read every user's rows. Another user's row answers like a missing one (404,
+    never 403).
     → [ADR-0038](decisions/0038-multi-user-shared-schema.md),
     [ADR-0039](decisions/0039-api-keys-per-user.md)
 12. **The web UI is built from `components/ui`; a page never imports another page.** A

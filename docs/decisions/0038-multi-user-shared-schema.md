@@ -15,7 +15,10 @@ One database and one schema; `Vacancy.userId` → `User` (`onDelete: Cascade`),
 as the first argument; inside core every query goes through `forUser(db, userId)`, a
 Prisma `$extends` client that adds `userId` to `Vacancy` reads, updates and deletes,
 `vacancy: { userId }` to `StatusChange` and `Comment` queries, requires `userId` on a
-create, and throws on an operation it does not know. Another user's row answers like a
+create, lets a `Vacancy` write nest only a `create` and never change its owner, and
+throws on an operation or a model it does not know. The services hold the raw client
+as `Unscoped` — `Pick<PrismaClient, '$extends'>` — so `forUser` is the only thing they
+can do with it. Another user's row answers like a
 missing one: `null` in core, 404 over REST, not-found over MCP. Sign-up stays limited
 to `AUTH_ALLOWED_EMAILS`.
 
@@ -37,20 +40,25 @@ to `AUTH_ALLOWED_EMAILS`.
 - **403 for another user's row** — tells the caller the id exists.
 
 ## Consequences
-- A forgotten filter is not possible inside core, short of bypassing `forUser`. A test
-  scans `src/` and keeps `this.db.vacancy` / `tx.vacancy` out of the services
-  (`for-user.spec.ts`); `isolation.spec.ts` runs every public method as another user and
-  checks the owner's rows are untouched.
-- `forUser` covers `Vacancy`, `Comment` and `StatusChange` only. A nested relation from
-  another model (`user.findUnique({ include: { vacancies } })`) is outside it.
+- A forgotten filter is not possible inside core, short of bypassing `forUser`:
+  `this.db.vacancy` in a service does not compile. `for-user.spec.ts` pins that with
+  `@ts-expect-error` lines, checked by `npm run typecheck` (`tsconfig.spec.json` — the
+  build leaves specs out); `isolation.spec.ts` runs every public method as another user
+  and checks the owner's rows are untouched.
+- `forUser` scopes `Vacancy`, `Comment` and `StatusChange` and throws on any other
+  model, so a relation read from one (`user.findUnique({ include: { vacancies } })`)
+  cannot reach past it.
 - Ids stay sequential integers, so they hint at the total row count across users.
   Acceptable for allowlisted accounts.
 - Deleting a user deletes their vacancies, comments and journal.
 
 ## What this constrains — breaks if you change it
 - A query on `Vacancy`, `Comment` or `StatusChange` on the raw client (not `forUser`)
-  reads every user's rows. The scanning test is the guard: it reads files from disk, so
-  a moved folder can silently shrink what it scans — check its count after a move.
+  reads every user's rows. The guard is the `Unscoped` type: a service typed
+  `PrismaClient` again compiles, and only the spec's `@ts-expect-error` lines notice. A
+  new service gets its line there.
+- A model `forUser` scopes gains a new relation: a nested `create` through it is
+  allowed, so check it cannot reach another user's row.
 - A raw SQL query (`$queryRaw`) is outside `forUser`: it must filter by `userId` itself.
 - `applyUrl` is unique per user, not globally: a lookup by `applyUrl` alone
   (`findUnique({ where: { applyUrl } })`) does not compile, and must not be worked around.

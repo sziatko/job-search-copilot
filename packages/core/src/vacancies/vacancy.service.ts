@@ -1,6 +1,6 @@
-import type { PrismaClient, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
+import type { Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
-import { forUser, orNotFound, type UserDb, type UserTx } from '../db/for-user';
+import { forUser, orNotFound, type Unscoped, type UserDb, type UserTx } from '../db/for-user';
 import { textFilters } from '../db/like';
 import { cursorArgs, toCursorPage } from '../db/paging';
 import { getPrisma } from '../db/prisma-client';
@@ -190,12 +190,12 @@ async function withDerivedFields(
  */
 export class VacancyService {
   /**
-   * @param db PrismaClient to run against, only ever through `forUser`. Defaults
-   *   (evaluated on construction, not import) to the lazy process-wide client so DI-less
-   *   entrypoints (the MCP server) can `new` this directly; Nest passes its
+   * @param db the client to run against, reachable only through `forUser` (`Unscoped`).
+   *   Defaults (evaluated on construction, not import) to the lazy process-wide client so
+   *   DI-less entrypoints (the MCP server) can `new` this directly; Nest passes its
    *   lifecycle-managed PrismaService client.
    */
-  constructor(private readonly db: PrismaClient = getPrisma()) {}
+  constructor(private readonly db: Unscoped = getPrisma()) {}
 
   /**
    * Persist a freshly analyzed vacancy, keyed by applyUrl. The analysis is written once
