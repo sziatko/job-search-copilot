@@ -358,7 +358,7 @@ async function resolveVacancy(
   }
   if (matches.length > 1) {
     throw new AmbiguousVacancyMatchError(
-      `"${company}" / "${title}" matches ${matches.length} analyzed vacancies ` +
+      `"${company}" / "${title}" matches ${matches.length} existing vacancies` +
         `(ids: ${matches.map((m) => m.id).join(', ')}). Pass vacancyId to disambiguate.`,
     );
   }

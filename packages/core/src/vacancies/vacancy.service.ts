@@ -24,8 +24,9 @@ import type {
   VacancySort,
 } from './vacancy.types';
 
-/** The analyzer's comment: the first `ANALYZER` row. A relation read, so every
- * reader selects it through here and flattens it with `withEstimation`. */
+/** The analyzer's comment: the first `ANALYZER` row. A list row selects it through here
+ * and flattens it with `withEstimation`; the detail reads every comment and finds the
+ * same row among them (`toDetail`). */
 const ANALYZER_COMMENT = {
   where: { source: 'ANALYZER' },
   orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
