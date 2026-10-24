@@ -161,8 +161,6 @@ The repo is set up so an AI agent can work on it for weeks without losing the th
 - **No personal data.** Tests, the seed and these screenshots use made-up companies, and
   a git hook blocks a commit or a push that carries my real data.
 
-The rules the agent follows are in [`CLAUDE.md`](CLAUDE.md).
-
 ## Roadmap
 
 - **Deploy** to a small VPS with HTTPS, so claude.ai can reach the MCP server and the

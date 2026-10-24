@@ -10,7 +10,7 @@
       "!packages/core/prisma/migrations",
       "!apps/web/dist",
       "!docs/design",
-      "!.claude/settings.local.json"
+      "!.claude"
     ]
   },
   "formatter": {
