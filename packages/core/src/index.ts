@@ -33,7 +33,7 @@ export {
   VacancyNotFoundError,
 } from './domain/errors';
 export { companyGroupKey, normalizeCompanyKey, normalizeTitleKey } from './domain/identity';
-export { deriveRecommendationFromScore, parseRecommendation } from './domain/recommendation';
+export { parseRecommendation } from './domain/recommendation';
 export type { PipelineStatus } from './domain/status';
 export { PIPELINE_STATUSES } from './domain/status';
 export type { VacancyIntakeInput } from './intake/vacancy-intake';

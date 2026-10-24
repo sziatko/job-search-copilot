@@ -30,17 +30,15 @@ export function registerApplicationTools(
         'case, punctuation and legal forms (`Acme` finds `Acme Sp. z o.o.`) — an unknown ' +
         'link (a company ATS link for a LinkedIn vacancy) still falls back to the name. A ' +
         'unique match moves that vacancy to APPLIED; no match creates a minimal vacancy ' +
-        'row (no posting text; a score and verdict only when you pass `matchScore`, ' +
-        'otherwise it has no analysis), also APPLIED; more than one match is an error ' +
+        'row, also APPLIED — no posting text and no analysis: a score and verdict come ' +
+        'only through submit_analysis / save_vacancy. More than one match is an error ' +
         'listing the candidate ids — retry with ' +
         'the right one as `vacancyId`. A vacancy already in the pipeline (APPLIED … ' +
-        'REJECTED) is an error too. `matchScore` / `estimationComment` only shape a ' +
-        'vacancy this call creates, and so does an `applyUrl` that matched nothing (as ' +
-        'its link). `status` records it further along — APPLIED is ' +
+        'REJECTED) is an error too. An `applyUrl` that matched nothing becomes the link ' +
+        'of the vacancy this call creates. `status` records it further along — APPLIED is ' +
         "still journaled first, as the applied date. `comment` is the user's own note: it " +
-        'is added to the vacancy as a USER comment. `estimationComment` becomes the ' +
-        'ANALYZER comment of a vacancy this call creates, and is ignored when it links to ' +
-        'an existing one. Returns { success: true, application: { id, company, title } } ' +
+        'is added to the vacancy as a USER comment. ' +
+        'Returns { success: true, application: { id, company, title } } ' +
         "— `id` is the vacancy's. Use list_applications to see full state. Recording " +
         'several applications at once? Use record_applications_batch instead.',
       inputSchema: RecordApplicationItemSchema.shape,

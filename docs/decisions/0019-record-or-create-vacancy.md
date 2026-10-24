@@ -20,12 +20,10 @@ analysed: there is no row to move.
   `Acme Sp. z o.o.`. A url that matches nothing (the company's ATS link for a posting
   stored under its LinkedIn link) falls through to the name.
   - one match → link to it;
-  - none → **create** a placeholder: no posting text; no analysis unless a
-    `matchScore` was passed (then `recommendation` is the caller's, or
-    `deriveRecommendationFromScore`: ≥ 70 `APPLY`, ≥ 50 `APPLY_WITH_CAVEATS`, else
-    `SKIP`); an `ANALYZER` comment only if one was passed; `applyUrl` the passed one,
-    or a synthetic `tracker://<company>/<title>/<date>`. Journaled `NEW` like every
-    vacancy;
+  - none → **create** a placeholder: no posting text, no analysis and no `ANALYZER`
+    comment — only the analyzer writes those (`submit_analysis` may score it later);
+    `applyUrl` the passed one, or a synthetic `tracker://<company>/<title>/<date>`.
+    Journaled `NEW` like every vacancy;
   - several → `AmbiguousVacancyMatchError`, listing the ids.
 - Then `writeStatus(APPLIED)`, and `writeStatus(status)` if the caller records it
   further along — so the applied date is in the journal either way.
@@ -37,17 +35,17 @@ be applied to again.
 - **Require an analysis first** — contradicts the "I applied to X in a chat" flow this
   exists for.
 - **A fuzzy match** — links an application to the wrong posting, silently.
+- **Take a score from the caller** (as this did until 2026-10) — a verdict derived from
+  the score by thresholds of its own, which the web's colours did not share: a second
+  analyzer, worse than none.
 
 ## Consequences
-- `record()` creates vacancies too, but writes status only through `writeStatus`, so
-  invariant 3 holds: the analysis and the status still have disjoint writers.
+- `record()` creates vacancies too, but writes no analysis and writes status only
+  through `writeStatus`, so invariant 3 holds: the analysis and the status still have
+  disjoint writers.
 - A placeholder sits in the pipeline, so `/vacancies`' default filter does not show it.
 
 ## What this constrains — breaks if you change it
-- The score → recommendation thresholds → `deriveRecommendationFromScore`
-  (`domain/recommendation.ts`) and its spec. The web colours a score in
-  `ScorePill.tsx` at 70 / **55**, while core cuts at 70 / **50**: a 52 is
-  `APPLY_WITH_CAVEATS` in the database and "low" on screen. Nothing makes them agree.
 - A status written in `record()` other than through `writeStatus` → the applied date
   goes missing and the cache drifts from the journal.
 - Matching on `companyGroupKey` ([ADR-0032](0032-same-company-normalised-name.md))

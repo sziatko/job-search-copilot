@@ -139,7 +139,7 @@ apps/web  ApplyDialog "mark as applied"  →  POST /api/v1/applications { vacanc
 apps/mcp  record_application { company, title, ... }
   → ApplicationService.record()   (packages/core, one transaction)
       → resolve the vacancy: link by id / link to a unique (company,title) match /
-        create a placeholder Vacancy (no text; an analysis only if a score was passed)
+        create a placeholder Vacancy (no text, no analysis)
       → already in the pipeline? AlreadyAppliedError
       → writeStatus(APPLIED), then writeStatus(status) if recorded further along
         (each a StatusChange row + the status / statusChangedAt cache)
@@ -204,8 +204,8 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 2. **A vacancy is analysed once.** A vacancy can exist before its analysis (status
    `NEW`, `matchScore` and `recommendation` both `null`); the analysis is written once
    and never overwritten — `writeAnalysis` in `vacancy.service.ts` (`save()`,
-   `submitAnalysis`) is a conditional write (`recommendation IS NULL`), and `record()`
-   writes one only on the vacancy it creates; `save()` returns an analysed row for a
+   `submitAnalysis`) is a conditional write (`recommendation IS NULL`), the only writer
+   of one; `save()` returns an analysed row for a
    given `applyUrl` untouched, `submitAnalysis` refuses one (`AlreadyAnalysedError`).
    Both fields or neither, and never on a `NEW` row: two DB CHECKs.
    Anything that expects re-analysis to update stored fields is wrong.
@@ -214,10 +214,11 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    [`domain-model.md`](domain-model.md)
 3. **`recommendation` is the analyzer's; `status` is the user's.** They are
    independent axes and neither is derived from the other, and they have disjoint
-   writers: `save()` / `submitAnalysis()` (through `writeAnalysis`) and `record()`'s
-   create-vacancy path write the analysis fields
-   (and a new vacancy's first `NEW`); `writeStatus()` alone writes `status`
-   + `statusChangedAt` and the `StatusChange` journal, in one transaction. **One
+   writers: `save()` / `submitAnalysis()` (through `writeAnalysis`) alone write the
+   analysis fields — `record()` creates its placeholder unanalysed
+   ([ADR-0019](decisions/0019-record-or-create-vacancy.md)); `writeStatus()` alone
+   writes `status` + `statusChangedAt` and the `StatusChange` journal, in one
+   transaction, a new vacancy's first `NEW` (`firstStatus`) aside. **One
    exception:** the analysis moves a vacancy out of `NEW`, through `writeStatus()` in
    the transaction that writes it — `SKIP` → `FILTERED_OUT`, else `NOT_REVIEWED`
    (`statusAfterAnalysis`, in `core`, never in an agent). Only from `NEW`, so it never

@@ -884,27 +884,6 @@ describe('VacancyService', () => {
         expect(items[0].hasAnalysis).toBe(false);
         expect(items[0].estimationComment).toBeNull();
       });
-
-      it('reads the recommendation, not the analyzer comment', async () => {
-        const applications = new ApplicationService();
-        await applications.record(userId, {
-          company: 'Noted Co',
-          title: 'Imported Role',
-          estimationComment: 'From tracker notes.',
-        });
-        await applications.record(userId, {
-          company: 'Scored Co',
-          title: 'Imported Role',
-          matchScore: 60,
-        });
-        const noted = (await service.list(userId, { company: 'Noted Co' })).items[0];
-        expect(noted).toMatchObject({
-          hasAnalysis: false,
-          estimationComment: 'From tracker notes.',
-        });
-        const scored = (await service.list(userId, { company: 'Scored Co' })).items[0];
-        expect(scored).toMatchObject({ hasAnalysis: true, estimationComment: null });
-      });
     });
 
     describe('search', () => {

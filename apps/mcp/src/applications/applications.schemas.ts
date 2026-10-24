@@ -4,7 +4,6 @@ import {
   type RecordApplicationInput,
 } from '@job-search-copilot/core';
 import { z } from 'zod';
-import { matchScore } from '../common/schemas';
 
 /** APPLIED … REJECTED: the statuses an application can be recorded or listed in. */
 export const PipelineStatusEnum = z.enum(PIPELINE_STATUSES);
@@ -21,8 +20,6 @@ export const RecordApplicationItemSchema = z.object({
   company: z.string().min(1).optional(),
   title: z.string().min(1).optional(),
   applyUrl: z.url().optional(),
-  matchScore: matchScore.optional(),
-  estimationComment: z.string().optional(),
   salaryInApplication: z
     .string()
     .optional()

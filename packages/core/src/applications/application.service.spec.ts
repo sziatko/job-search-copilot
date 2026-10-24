@@ -198,20 +198,18 @@ describe('ApplicationService', () => {
       expect(result.application.id).toBe(vacancy.id);
     });
 
-    it('creates a placeholder vacancy when nothing matches', async () => {
+    it('creates an unanalysed placeholder vacancy when nothing matches', async () => {
       const result = await applications.record(userId, {
         company: 'Never Analyzed Co',
         title: 'Staff Engineer',
-        matchScore: 72,
-        estimationComment: 'From tracker notes.',
       });
 
       expect(result.resolution).toBe('created-vacancy');
       expect(result.vacancyCreated).toBe(true);
-      expect(result.application.matchScore).toBe(72);
-      expect(result.application.recommendation).toBe('APPLY'); // derived from 72
+      expect(result.application.matchScore).toBeNull();
+      expect(result.application.recommendation).toBeNull();
       expect(result.application.applyUrl).toMatch(/^tracker:\/\//);
-      expect(notes(result.application)).toEqual([['ANALYZER', 'From tracker notes.']]);
+      expect(result.application.comments).toEqual([]);
 
       const created = await vacancies.getById(userId, result.application.id);
       expect(created?.fullText).toBeNull();
@@ -221,24 +219,13 @@ describe('ApplicationService', () => {
       await expectCacheInStep(result.application.id);
     });
 
-    it('writes no ANALYZER comment for a placeholder given none', async () => {
+    it('adds no comment for a blank one', async () => {
       const result = await applications.record(userId, {
         company: 'Silent Co',
         title: 'Dev',
         comment: ' ',
       });
       expect(result.application.comments).toEqual([]);
-    });
-
-    it('creates no analysis without a matchScore, a recommendation alone ignored', async () => {
-      const result = await applications.record(userId, {
-        company: 'Blank Co',
-        title: 'Dev',
-        recommendation: 'SKIP',
-      });
-      expect(result.application.matchScore).toBeNull();
-      expect(result.application.recommendation).toBeNull();
-      expect(await journal(result.application.id)).toEqual(['NEW', 'APPLIED']);
     });
 
     it('throws AmbiguousVacancyMatchError on more than one match', async () => {

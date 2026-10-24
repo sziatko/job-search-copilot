@@ -18,7 +18,7 @@ Source of truth: [`packages/core/prisma/schema.prisma`](../packages/core/prisma/
 | **journal** | `StatusChange`: one row per status move. `status` on the vacancy is its cache. |
 | **event** | A pipeline status written again — a second interview round. Journaled; a triage repeat is refused. |
 | **timeout** | An open pipeline status with no move for 30 days. Derived, never stored. |
-| **placeholder** | A vacancy `record_application` created because no match existed: no posting text, an analysis only if a score was passed. |
+| **placeholder** | A vacancy `record_application` created because no match existed: no posting text, no analysis. |
 | **context** | The statuses one web page lists (`STATUS_CONTEXT`); `ALL` in its filter means those, not the whole table. |
 | **owner** | The user a vacancy belongs to (`userId`). Every query is scoped to one. |
 
@@ -82,8 +82,7 @@ This is the central modelling decision. The analyzer's suggestion and the user's
 decision are **different things on different axes**:
 
 - `recommendation` — set once, with `matchScore`, from the analyzer (`save()`,
-  `submitAnalysis()`, or a placeholder given a score). Never changed afterwards; `null`
-  until then.
+  `submitAnalysis()`). Never changed afterwards; `null` until then.
 - `status` — set only through `writeStatus()`, from the user (or an agent acting for
   them). Starts at `NEW`. Never inferred from `recommendation` — **with one exception**:
   the analysis moves a vacancy out of `NEW` in the transaction that writes it, `SKIP` →
@@ -207,10 +206,8 @@ zone: its `id` is the vacancy's, and applying moves the vacancy's own `status`.
 - **Record-or-link** (`record`, one transaction): link by `vacancyId` (web), or (MCP) to
   the vacancy with the passed `applyUrl`, else a unique `(companyKey, titleKey)` match —
   intake's match, an unknown url falling through to the name; zero matches → **create** a
-  placeholder `Vacancy` (`fullText` `null`; no analysis unless the caller passed a
-  `matchScore` — then `recommendation` is the caller's or derived from it, written once
-  the row has left `NEW`; an `ANALYZER` comment only when one was passed); more than
-  one → `AmbiguousVacancyMatchError`. Every vacancy is a candidate, the `NEW` and
+  placeholder `Vacancy` (`fullText` `null`, no analysis and no `ANALYZER` comment — the
+  analyzer may score it later); more than one → `AmbiguousVacancyMatchError`. Every vacancy is a candidate, the `NEW` and
   `FILTERED_OUT` ones included. A vacancy already in the pipeline →
   `AlreadyAppliedError`; one set back to triage can be applied to again. Then
   `writeStatus(APPLIED)` — and `writeStatus(status)` when the caller records it further
@@ -247,10 +244,8 @@ One note on a `Vacancy`, whoever wrote it — [ADR-0029](decisions/0029-one-vaca
 The writers, by source:
 
 - **`ANALYZER`** — with the analysis, through `writeAnalysis` (`VacancyService.save()`
-  and `submitAnalysis()`; a save on an analysed row writes nothing: analyze-once), and
-  `record()` when it creates a placeholder and was given an `estimationComment`. At most
-  one per vacancy in practice; reads take the first — so a placeholder created with a
-  note and scored later by `submitAnalysis` still shows the note.
+  and `submitAnalysis()`; a save on an analysed row writes nothing: analyze-once). At
+  most one per vacancy; reads take the first.
 - **`USER`** — `record()`'s and `update()`'s `comment`, and `updateStatus()` over REST.
 - **`AGENT`** — `updateStatus()` / `updateStatusByVacancy()` over MCP.
 
@@ -277,9 +272,8 @@ once". `save()` and `submitAnalysis()` write it through `writeAnalysis`
 (`WHERE recommendation IS NULL`, which takes the row lock — a concurrent analysis waits,
 then finds the row analysed), then from `NEW` the rule's status through `writeStatus`,
 then the analysis and its `ANALYZER` comment. Any status but `NEW` is left as it is (a
-pipeline placeholder). The one other writer is `record()`, for a placeholder it has just
-created in the same transaction: no other analysis can reach that row, so it writes the
-score itself once the row is `APPLIED`.
+pipeline placeholder). There is no other writer: `record()` creates its placeholder
+unanalysed.
 
 - `save()`: *find by the user's `applyUrl`* — none → create it in `NEW` and write the analysis
   (`created: true`); found without an analysis (intake took it in) → attach this one,
@@ -321,8 +315,8 @@ Added by hand in `--create-only` migrations — see
   `Vacancy_analysis_both_or_neither` — `("matchScore" IS NULL) = ("recommendation" IS NULL)`;
   `Vacancy_new_is_unanalysed` — `"status" <> 'NEW' OR "recommendation" IS NULL`.
   > Breaks if you change it: an insert or update that writes an analysis on a `NEW` row,
-  > or one field of it, is rejected — `save()` and `record()` create the row unanalysed,
-  > move it out of `NEW`, then write the analysis.
+  > or one field of it, is rejected — `save()` creates the row unanalysed, moves it out
+  > of `NEW`, then writes the analysis.
 - **`matchScore` CHECK** (`20260909224918_add_match_score_check`):
   `CHECK ("matchScore" >= 0 AND "matchScore" <= 100)`. The app validates 0–100 too
   (DTO, MCP zod); the DB does not rely on it.

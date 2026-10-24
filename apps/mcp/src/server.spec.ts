@@ -342,7 +342,7 @@ describe('job-search-copilot MCP server', () => {
       arguments: {
         applications: [
           { company: 'Batch Co', title: 'Backend Engineer' },
-          { company: 'Batch Co', title: 'Frontend Engineer', matchScore: 65 },
+          { company: 'Batch Co', title: 'Frontend Engineer', status: 'INTERVIEW' },
         ],
       },
     });
@@ -526,10 +526,11 @@ describe('job-search-copilot MCP server', () => {
     expect(JSON.parse(textOf(applications)).total).toBe(0);
   });
 
-  it('record_application creates a placeholder vacancy when nothing matches', async () => {
+  it('record_application creates an unanalysed placeholder, a score passed or not', async () => {
     const client = await connectedClient();
     const result = await client.callTool({
       name: 'record_application',
+      // Not in the schema any more: stripped, so only the analyzer writes a score.
       arguments: { company: 'Never Analyzed Co', title: 'Staff Engineer', matchScore: 72 },
     });
     const parsed = JSON.parse(textOf(result));
@@ -542,8 +543,8 @@ describe('job-search-copilot MCP server', () => {
       arguments: { company: 'Never Analyzed Co' },
     });
     const { items } = JSON.parse(textOf(list));
-    expect(items[0].matchScore).toBe(72);
-    expect(items[0].recommendation).toBe('APPLY');
+    expect(items[0].hasAnalysis).toBe(false);
+    expect(items[0].recommendation).toBeNull();
   });
 
   it('record_application links to an analyzed vacancy and moves it to APPLIED', async () => {

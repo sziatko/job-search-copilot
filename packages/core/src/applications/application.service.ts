@@ -1,4 +1,4 @@
-import type { CommentSource, PrismaClient, Recommendation, VacancyStatus } from '@prisma/client';
+import type { CommentSource, PrismaClient, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { forUser, orNotFound, type UserDb, type UserTx } from '../db/for-user';
 import { textFilters } from '../db/like';
@@ -13,7 +13,6 @@ import {
   VacancyNotFoundError,
 } from '../domain/errors';
 import { matchKeys } from '../domain/identity';
-import { deriveRecommendationFromScore } from '../domain/recommendation';
 import {
   activeWhere,
   commentOn,
@@ -100,7 +99,7 @@ export class ApplicationService {
   /**
    * Record that the user applied to a role. In one transaction: resolve the vacancy
    * (link by id, link to a unique (company,title) match, or create a minimal
-   * placeholder row, unanalysed unless given a score), move it to APPLIED (then to
+   * placeholder row, unanalysed), move it to APPLIED (then to
    * `status`, if given), and set salary / CV / comment. Throws a DomainError on blank
    * input, an unknown id, an ambiguous (company,title) match, or a vacancy already in
    * the pipeline.
@@ -308,9 +307,6 @@ interface ResolvedVacancy {
   vacancy: { id: number; status: VacancyStatus };
   resolution: VacancyResolution;
   vacancyCreated: boolean;
-  /** A created vacancy's analysis, written once the row has left NEW — the DB refuses
-   * an analysis on a NEW row (ADR-0033). Absent when there is none. */
-  analysis?: { matchScore: number; recommendation: Recommendation };
 }
 
 async function resolveVacancy(
@@ -363,34 +359,16 @@ async function resolveVacancy(
     );
   }
 
-  // No analysis unless the caller passed a score: the CHECK wants both fields or neither.
-  const analysis =
-    input.matchScore == null
-      ? undefined
-      : {
-          matchScore: input.matchScore,
-          recommendation: input.recommendation ?? deriveRecommendationFromScore(input.matchScore),
-        };
-  // The record is kept without a usable url — losing a whole application over a bad
-  // URL would be worse than an unlinked one.
+  // Unanalysed: only the analyzer writes an analysis (invariant 3). The record is kept
+  // without a usable url — losing a whole application over a bad URL would be worse
+  // than an unlinked one.
   const applyUrl = url ?? buildSyntheticApplyUrl(company, title, at);
-  const estimationComment = input.estimationComment?.trim();
   try {
     const created = await db.vacancy.create({
-      data: {
-        userId,
-        company,
-        title,
-        applyUrl,
-        ...matchKeys(company, title),
-        ...(estimationComment && {
-          comments: { create: { body: estimationComment, source: 'ANALYZER' } },
-        }),
-        ...firstStatus(at),
-      },
+      data: { userId, company, title, applyUrl, ...matchKeys(company, title), ...firstStatus(at) },
       select: { id: true, status: true },
     });
-    return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true, analysis };
+    return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true };
   } catch (err) {
     // The url was looked up above, so only a concurrent write gets here.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -410,12 +388,7 @@ async function recordWithin(
   input: RecordApplicationInput,
 ): Promise<RecordApplicationResult> {
   const at = new Date();
-  const { vacancy, resolution, vacancyCreated, analysis } = await resolveVacancy(
-    db,
-    userId,
-    input,
-    at,
-  );
+  const { vacancy, resolution, vacancyCreated } = await resolveVacancy(db, userId, input, at);
 
   if (PIPELINE.includes(vacancy.status)) {
     throw new AlreadyAppliedError(`Vacancy ${vacancy.id} is already ${vacancy.status}`);
@@ -432,7 +405,6 @@ async function recordWithin(
     data: {
       salaryInApplication: input.salaryInApplication?.trim() || null,
       usedTailoredResume: input.usedTailoredResume ?? false,
-      ...analysis,
       ...commentOn(input.comment, 'USER'),
     },
     select: APPLICATION_SELECT,
