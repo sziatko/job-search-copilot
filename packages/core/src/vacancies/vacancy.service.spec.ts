@@ -48,12 +48,15 @@ async function journal(vacancyId: number) {
   return rows.map((row) => row.status);
 }
 
+/** Posting text long enough to be stored (MIN_TEXT_LENGTH). */
+const FULL_TEXT = 'Full vacancy text goes here. '.padEnd(200, 'x');
+
 function input(overrides: Partial<SaveVacancyInput> = {}): SaveVacancyInput {
   return {
     company: 'Acme',
     title: 'Backend Engineer',
     applyUrl: 'https://example.com/jobs/1',
-    fullText: 'Full vacancy text goes here.',
+    fullText: FULL_TEXT,
     matchScore: 80,
     recommendation: 'APPLY',
     estimationComment: 'Strong match.',
@@ -200,7 +203,7 @@ describe('VacancyService', () => {
         matchScore: 80,
         recommendation: 'SKIP',
         status: 'FILTERED_OUT',
-        fullText: 'Full vacancy text goes here.',
+        fullText: FULL_TEXT,
       });
       expect(await journal(vacancy.id)).toEqual(['NEW', 'FILTERED_OUT']);
       expect((await service.getById(userId, vacancy.id))?.estimationComment).toBe('Strong match.');
@@ -218,6 +221,38 @@ describe('VacancyService', () => {
       const { attached, vacancy } = await service.save(userId, input());
       expect(attached).toBe(true);
       expect(vacancy.fullText).toBe(fullText);
+    });
+
+    it('stores a blank text as none, so intake can still fill it in', async () => {
+      const { vacancy } = await service.save(userId, input({ fullText: '' }));
+      expect(vacancy.fullText).toBeNull();
+      expect((await service.list(userId)).items[0].hasText).toBe(false);
+
+      await intake.intake(userId, {
+        url: 'https://example.com/jobs/1',
+        company: 'Acme',
+        title: 'Backend Engineer',
+        fullText: FULL_TEXT,
+      });
+      expect((await service.getById(userId, vacancy.id))?.fullText).toBe(FULL_TEXT);
+    });
+
+    it('takes text under 200 characters as none, created or attached', async () => {
+      const short = 'Please sign in to see this job.';
+      const created = await service.save(userId, input({ fullText: short }));
+      expect(created.vacancy.fullText).toBeNull();
+
+      await intake.intake(userId, {
+        url: 'https://example.com/jobs/2',
+        company: 'Acme',
+        title: 'Dev',
+      });
+      const attached = await service.save(
+        userId,
+        input({ applyUrl: 'https://example.com/jobs/2', title: 'Dev', fullText: short }),
+      );
+      expect(attached.attached).toBe(true);
+      expect(attached.vacancy.fullText).toBeNull();
     });
 
     it('collapses two tracking variants of one posting into a single row', async () => {

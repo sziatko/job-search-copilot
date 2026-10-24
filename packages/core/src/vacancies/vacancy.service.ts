@@ -8,6 +8,7 @@ import { ALL_COMMENTS } from '../domain/comments';
 import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from '../domain/company';
 import { AlreadyAnalysedError, VacancyNotFoundError } from '../domain/errors';
 import { matchKeys } from '../domain/identity';
+import { usablePostingText } from '../domain/posting-text';
 import { parseRecommendation } from '../domain/recommendation';
 import { commentOn, firstStatus, statusAfterAnalysis, writeStatus } from '../domain/status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from '../domain/url';
@@ -86,8 +87,9 @@ interface Analysis {
   matchScore: number;
   recommendation: Recommendation;
   estimationComment: string;
-  /** Filled in when the row has no text yet; never replaces one. */
-  fullText?: string;
+  /** Filled in when the row has no text yet; never replaces one. Already through
+   * `usablePostingText`. */
+  fullText?: string | null;
 }
 
 function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
@@ -99,9 +101,10 @@ function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
 }
 
 /**
- * Writes an analysis onto an unanalysed row, in the caller's transaction — the one
- * writer of an analysis on `Vacancy` (save()'s created and attached rows,
- * submitAnalysis); the analysis is written once (ADR-0033).
+ * Writes an analysis onto an unanalysed row, in the caller's transaction — how save()'s
+ * created and attached rows and submitAnalysis write one; the analysis is written once
+ * (ADR-0033). The one other writer is `record()`'s placeholder: a row it has just created
+ * in the same transaction, so there is no concurrent analysis for the lock below to stop.
  *
  * The conditional write comes first (`recommendation IS NULL`, a no-op `updatedAt`): it
  * takes the row lock, so a concurrent analysis of the same row waits for this one and
@@ -135,7 +138,7 @@ async function writeAnalysis(
     data: {
       matchScore: analysis.matchScore,
       recommendation: analysis.recommendation,
-      ...(row.fullText === null && analysis.fullText?.trim() && { fullText: analysis.fullText }),
+      ...(row.fullText === null && analysis.fullText && { fullText: analysis.fullText }),
       ...(estimationComment && {
         comments: { create: { body: estimationComment, source: 'ANALYZER' } },
       }),
@@ -222,7 +225,8 @@ export class VacancyService {
       return { created: false, attached: false, vacancy: existing };
     }
 
-    const analysis = { ...toAnalysis(input), fullText: input.fullText };
+    const fullText = usablePostingText(input.fullText);
+    const analysis = { ...toAnalysis(input), fullText };
     const at = new Date();
     if (existing) {
       const vacancy = await db.$transaction((db) => writeAnalysis(db, existing.id, analysis, at));
@@ -237,7 +241,7 @@ export class VacancyService {
             title: input.title,
             applyUrl,
             ...matchKeys(input.company, input.title),
-            fullText: input.fullText,
+            fullText,
             ...firstStatus(at),
           },
           select: { id: true },

@@ -383,7 +383,6 @@ async function resolveVacancy(
         title,
         applyUrl,
         ...matchKeys(company, title),
-        fullText: input.fullText?.trim() ? input.fullText : null,
         ...(estimationComment && {
           comments: { create: { body: estimationComment, source: 'ANALYZER' } },
         }),

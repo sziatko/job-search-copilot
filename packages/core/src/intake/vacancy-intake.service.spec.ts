@@ -156,7 +156,7 @@ describe('VacancyIntakeService.intake', () => {
       company: 'Acme Inc.',
       title: 'Backend Engineer',
       applyUrl: 'https://acme.com/jobs/9',
-      fullText: 'Analysed text.',
+      fullText: text('Analysed text.'),
       matchScore: 80,
       recommendation: 'APPLY',
       estimationComment: 'Strong match.',
@@ -178,7 +178,7 @@ describe('VacancyIntakeService.intake', () => {
 
     expect(await prisma.vacancy.findFirstOrThrow({ where: { userId } })).toMatchObject({
       id: vacancy.id,
-      fullText: 'Analysed text.',
+      fullText: text('Analysed text.'),
       matchScore: 80,
       status: 'NOT_REVIEWED',
     });

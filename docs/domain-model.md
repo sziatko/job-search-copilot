@@ -42,7 +42,7 @@ pipeline.
 | `applyUrl` | `String`, `@@unique([userId, applyUrl])` | **The natural key, per user** — two users may track one posting. The unique constraint is what enforces analyze-once at the DB level. Stored **canonicalized** — `normalizeApplyUrl()` drops the query string, the fragment and a trailing slash, so the spellings one posting arrives in share one row. Exception: a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept. → [ADR-0023](decisions/0023-canonical-applyurl.md) |
 | `companyKey` / `titleKey` | `String?` | The posting's match by name — intake's second match, and `record()` / `updateStatusByVacancy`'s lookup: `normalizeCompanyKey` / `normalizeTitleKey` (`identity.ts` — lowercase, punctuation collapsed, company legal suffixes stripped). `@@index([userId, companyKey, titleKey])`. Written on every create (intake, `save()`, `record()` — `matchKeys`); `null` only when the name normalizes to nothing (`—`), and such a row is matched by url only. Not `companyGroupKey()` — ADR-0032's company identity, which also drops places and notes, and is not stored (`identity.ts` says why the two differ). |
 | `source` | `String?` | Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source needs no migration; `null` on rows from `save()` and `record()`. |
-| `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet (intake without text, a placeholder). A list item carries `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
+| `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet (intake without text, a placeholder). Text too short to be a posting is stored as `null` on every path (`posting-text.ts`). A list item carries `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
 | `matchScore` | `Int?` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. `null` = not analysed yet. |
 | `recommendation` | `Recommendation?` enum | **The analyzer's call.** `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`; `null` = not analysed yet — with `matchScore`, both or neither (a CHECK). |
 | `comments` | `Comment[]` | Every note on the vacancy — see [`Comment`](#comment) below. The analyzer's reasoning is its `ANALYZER` row: reads still return it as `estimationComment` (`string \| null`), derived from the first one. |
@@ -272,11 +272,14 @@ How a posting enters `Vacancy` before any analysis — `VacancyIntakeService`
 ## Analyze-once
 
 A vacancy can exist before its analysis, so the rule is "the analysis is written
-once". One function writes it, `writeAnalysis` (`vacancy.service.ts`), in
-the caller's transaction: first a conditional write (`WHERE recommendation IS NULL`,
-which takes the row lock — a concurrent analysis waits, then finds the row analysed),
-then from `NEW` the rule's status through `writeStatus`, then the analysis and its
-`ANALYZER` comment. Any status but `NEW` is left as it is (a pipeline placeholder).
+once". `save()` and `submitAnalysis()` write it through `writeAnalysis`
+(`vacancy.service.ts`), in the caller's transaction: first a conditional write
+(`WHERE recommendation IS NULL`, which takes the row lock — a concurrent analysis waits,
+then finds the row analysed), then from `NEW` the rule's status through `writeStatus`,
+then the analysis and its `ANALYZER` comment. Any status but `NEW` is left as it is (a
+pipeline placeholder). The one other writer is `record()`, for a placeholder it has just
+created in the same transaction: no other analysis can reach that row, so it writes the
+score itself once the row is `APPLIED`.
 
 - `save()`: *find by the user's `applyUrl`* — none → create it in `NEW` and write the analysis
   (`created: true`); found without an analysis (intake took it in) → attach this one,

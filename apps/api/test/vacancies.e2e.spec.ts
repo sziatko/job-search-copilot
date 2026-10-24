@@ -23,7 +23,7 @@ describe('Vacancies (e2e)', () => {
     company: 'Acme',
     title: 'Backend Engineer',
     applyUrl: 'https://example.com/jobs/1',
-    fullText: 'Full vacancy text goes here.',
+    fullText: 'Full vacancy text goes here. '.padEnd(200, 'x'),
     matchScore: 80,
     recommendation: 'APPLY',
     estimationComment: 'Strong match.',

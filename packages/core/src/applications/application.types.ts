@@ -31,8 +31,6 @@ export interface RecordApplicationByVacancyInput {
   /** For a created vacancy with a `matchScore`: explicit, else derived from it. Ignored
    * without one — the analysis is both fields or neither. */
   recommendation?: Recommendation | null;
-  /** For a created vacancy: its posting text, else none (null). */
-  fullText?: string | null;
   /** For a created vacancy: its ANALYZER comment, else none. */
   estimationComment?: string | null;
   salaryInApplication?: string | null;
