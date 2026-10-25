@@ -1,4 +1,4 @@
-import { getPrisma, verifyApiKey } from '@job-search-copilot/core';
+import { getPrisma, RateLimitedError, verifyApiKey } from '@job-search-copilot/core';
 import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import type { OAuthTokenVerifier } from '@modelcontextprotocol/sdk/server/auth/provider.js';
@@ -32,13 +32,8 @@ export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
 
   const verifier: OAuthTokenVerifier = {
     async verifyAccessToken(token) {
-      if (token.startsWith('jsc_')) {
-        const owner = await verifyApiKey(getPrisma(), token);
-        if (!owner) throw new InvalidTokenError('Invalid API key');
-        // A key never expires, but requireBearerAuth refuses an authInfo without expiresAt.
-        const expiresAt = Math.floor(Date.now() / 1000) + 60;
-        return { token, clientId: 'api-key', scopes: [], expiresAt, extra: { sub: owner } };
-      }
+      // `auth` below took every valid key; one that gets here is unknown or revoked.
+      if (token.startsWith('jsc_')) throw new InvalidTokenError('Invalid API key');
       try {
         // `typ: at+jwt` (RFC 9068) keeps an ID token from passing as an access token.
         const { payload } = await jwtVerify(token, jwks, {
@@ -64,6 +59,27 @@ export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
       }
     },
   };
+  const bearer = requireBearerAuth({ verifier, resourceMetadataUrl });
+
+  /** A key is checked here, not in `verifier`: requireBearerAuth answers anything but a
+   * bad token with a 400 or a 500, and a key over its rate limit is a 429. */
+  const auth: express.RequestHandler = async (req, res, next) => {
+    const [scheme, key] = (req.headers.authorization ?? '').split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !key?.startsWith('jsc_')) {
+      return bearer(req, res, next);
+    }
+    let owner: string | null;
+    try {
+      owner = await verifyApiKey(getPrisma(), key);
+    } catch (err) {
+      if (!(err instanceof RateLimitedError)) throw err;
+      res.status(429).json({ error: 'too_many_requests', error_description: err.message });
+      return;
+    }
+    if (!owner) return bearer(req, res, next); // the verifier's 401
+    req.auth = { token: key, clientId: 'api-key', scopes: [], extra: { sub: owner } };
+    next();
+  };
 
   const app = express();
   // DNS-rebinding protection: only the host clients are told to call.
@@ -80,7 +96,7 @@ export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
     });
   });
 
-  app.post(url.pathname, requireBearerAuth({ verifier, resourceMetadataUrl }), async (req, res) => {
+  app.post(url.pathname, auth, async (req, res) => {
     const server = createServer({ userId: String(req.auth?.extra?.sub) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on('close', () => {

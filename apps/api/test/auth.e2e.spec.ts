@@ -131,6 +131,15 @@ describe('Auth (e2e)', () => {
       expect(row.comments.at(-1)).toMatchObject({ body: 'From n8n.', source: 'AGENT' });
     });
 
+    it('answers 429 once the key is over its rate limit', async () => {
+      const { key, id } = await createKey();
+      await prisma.apikey.update({ where: { id }, data: { rateLimitMax: 1 } });
+      const get = () =>
+        request(app.getHttpServer()).get('/api/v1/stats').set('Authorization', `Bearer ${key}`);
+      await get().expect(200);
+      await get().expect(429);
+    });
+
     it("leaves a session's comment USER", async () => {
       const { cookie, userId } = await signIn(app);
       const id = await queued(userId, 'https://acme.com/q/session');

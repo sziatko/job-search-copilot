@@ -134,6 +134,16 @@ describe('MCP over HTTP', () => {
     expect(res.headers.get('www-authenticate')).toContain('error="invalid_token"');
   });
 
+  it('answers 429 to an API key over its rate limit', async () => {
+    const key = await apiKey();
+    await getPrisma().apikey.updateMany({
+      where: { referenceId: owners.at(-1) },
+      data: { rateLimitMax: 1 },
+    });
+    expect((await initialize({ Authorization: `Bearer ${key}` })).status).toBe(200);
+    expect((await initialize({ Authorization: `Bearer ${key}` })).status).toBe(429);
+  });
+
   it('refuses a token issued for another audience', async () => {
     const res = await initialize({
       Authorization: `Bearer ${await token('http://localhost:9999/other')}`,

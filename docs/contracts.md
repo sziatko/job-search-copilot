@@ -25,7 +25,8 @@ session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` is anony
 The domain routes — `/vacancies`, `/applications`, `/stats` — also take
 `Authorization: Bearer jsc_…`, an API key from `/profile`
 ([ADR-0039](decisions/0039-api-keys-per-user.md)); a comment a key writes is `AGENT`,
-a session's `USER`. Swagger is outside Nest's router, so the guard does
+a session's `USER`. A key over its rate limit (1000 requests an hour) is a `429`, here
+and on the HTTP MCP. Swagger is outside Nest's router, so the guard does
 not cover it.
 
 **One user per request** ([ADR-0038](decisions/0038-multi-user-shared-schema.md)) — the

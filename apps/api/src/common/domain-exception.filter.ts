@@ -1,4 +1,9 @@
-import { AlreadyAnalysedError, DomainError, VacancyNotFoundError } from '@job-search-copilot/core';
+import {
+  AlreadyAnalysedError,
+  DomainError,
+  RateLimitedError,
+  VacancyNotFoundError,
+} from '@job-search-copilot/core';
 import {
   type ArgumentsHost,
   Catch,
@@ -12,6 +17,8 @@ import type { Response } from 'express';
 const STATUS_OF = new Map<unknown, HttpStatus>([
   [AlreadyAnalysedError, HttpStatus.CONFLICT],
   [VacancyNotFoundError, HttpStatus.NOT_FOUND],
+  // Thrown by ApiKeyGuard's verifyApiKey: filters catch a guard's exceptions too.
+  [RateLimitedError, HttpStatus.TOO_MANY_REQUESTS],
 ]);
 
 /**

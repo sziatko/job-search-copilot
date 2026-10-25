@@ -13,7 +13,9 @@ OAuth — Claude Desktop through `mcp-remote`, a script — needs a credential t
 ## Decision
 Better Auth's `@better-auth/api-key` plugin in `createAuth`: keys owned by a user
 (`referenceId`), stored hashed, prefix `jsc_`, shown once, managed on `/profile`
-(create, list, revoke). No expiry, no per-key scopes, rate limit off. A key is accepted:
+(create, list, revoke). No expiry, no per-key scopes. A rate limit of 1000 requests an
+hour per key, set in `API_KEY_OPTIONS` (`core/src/auth/api-key.ts`); a key over it is a
+`429` on REST and the HTTP MCP. A key is accepted:
 - on the domain REST routes (`/vacancies`, `/applications`, `/stats`), by `ApiKeyGuard`
   on each controller's class, as `Authorization: Bearer jsc_…`; a comment a key writes
   is `AGENT`;
@@ -21,7 +23,8 @@ Better Auth's `@better-auth/api-key` plugin in `createAuth`: keys owned by a use
 - by the stdio MCP, from `JSC_API_KEY`, verified once at boot.
 
 Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify through
-`core` (invariant 1). `enableSessionForAPIKeys` stays off.
+`core` (invariant 1); a key over its limit throws `RateLimitedError`.
+`enableSessionForAPIKeys` stays off.
 
 ## Why this and not the alternatives
 - **A hand-rolled key table** (prefix, SHA-256 hash, last used) — small, but Better
@@ -33,9 +36,12 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
   token before each run, for the same trust.
 - **Per-key scopes** — one more choice in the UI and in every guard, for two kinds of
   client. Revisit with a third.
-- **The plugin's rate limit** — 10 requests a day by default, copied onto each key at
-  creation; a scoring run is about a hundred MCP calls. It does nothing against a
-  leaked key; revoking does.
+- **No rate limit** — what this ADR first chose: the plugin's default, 10 requests a
+  day, would stop a scoring run of about a hundred MCP calls, and a limit does nothing
+  against a leaked key; revoking does. But a looping agent or n8n flow then writes
+  without end. 1000 an hour is ten scoring runs, far above real use.
+- **The api's own throttle (`@nestjs/throttler`)** — REST only, in memory per process;
+  the plugin's limit is in the key's row, so REST and the MCP share one count.
 - **Keys on the three n8n write routes only** — what this ADR first said, as hygiene.
   A key already reads and writes everything through MCP, so the narrow scope protected
   nothing, and n8n could not read the queue it was meant to clean up.
@@ -44,7 +50,10 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
 
 ## Consequences
 - One leaked key is one user's data, and it is revoked on its own.
-- `verifyApiKey` writes `lastRequest` on every call: a DB write per MCP request.
+- `verifyApiKey` writes `lastRequest` and `requestCount` on every call: a DB write per
+  request with a key.
+- The window restarts only after an hour with no request at all — each request moves
+  `lastRequest` — so the limit is 1000 calls per busy stretch, not per clock hour.
 - A key checked at boot stays valid in a running stdio process until it restarts.
 
 ## What this constrains — breaks if you change it
@@ -57,8 +66,12 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
   uses the HTTP MCP with a key.
 - Turning on `enableSessionForAPIKeys` lets a key into every REST route, `/api/auth/*`
   and any new controller included.
-- The HTTP MCP must give a key an `authInfo.expiresAt` (now + 60 s): the SDK's
-  `requireBearerAuth` refuses one without it.
+- The HTTP MCP checks a key in its own middleware, before the SDK's
+  `requireBearerAuth`: that one answers any error but a bad token with a 400 or a 500,
+  never a 429.
+- The plugin copies the limit onto a key when it is created and reads it from the row
+  after that: changing `API_KEY_OPTIONS` reaches old keys only through a migration
+  that updates their rows (as `20261025120000_api_key_rate_limit` did).
 - The verify-only Better Auth instance in `core` uses a random `secret`; it must never
   sign or issue anything, or that would not verify anywhere else.
 - Renaming the header, the scheme or the `jsc_` prefix breaks n8n's credential and the

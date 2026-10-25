@@ -29,6 +29,7 @@ export {
   InvalidApplicationInputError,
   InvalidIntakeEntryError,
   InvalidRecommendationError,
+  RateLimitedError,
   SameStatusError,
   VacancyNotFoundError,
 } from './domain/errors';

@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { handleOAuthUserInfo } from 'better-auth/oauth2';
 import { afterEach, describe, expect, it } from 'vitest';
 import { getPrisma } from '../db/prisma-client';
+import { RateLimitedError } from '../domain/errors';
 import { verifyApiKey } from './api-key';
 import { createAuth } from './create-auth';
 
@@ -85,12 +86,24 @@ describe('API keys', () => {
     expect(key).toMatch(/^jsc_/);
     const row = await prisma.apikey.findUniqueOrThrow({ where: { id } });
     expect(row.key).not.toBe(key);
-    expect(row.rateLimitEnabled).toBe(false);
+    expect(row).toMatchObject({
+      rateLimitEnabled: true,
+      rateLimitTimeWindow: 3_600_000,
+      rateLimitMax: 1000,
+    });
 
     expect(await verifyApiKey(prisma, key)).toBe(userId);
     expect(await verifyApiKey(prisma, key)).toBe(userId);
     const used = await prisma.apikey.findUniqueOrThrow({ where: { id } });
     expect(used.lastRequest).toBeInstanceOf(Date);
+  });
+
+  it('throws RateLimitedError once a key is over its limit, read from its row', async () => {
+    const { userId, key, id } = await createKey();
+    await prisma.apikey.update({ where: { id }, data: { rateLimitMax: 2 } });
+    expect(await verifyApiKey(prisma, key)).toBe(userId);
+    expect(await verifyApiKey(prisma, key)).toBe(userId);
+    await expect(verifyApiKey(prisma, key)).rejects.toBeInstanceOf(RateLimitedError);
   });
 
   it('verifies a revoked key, and garbage, to null', async () => {
