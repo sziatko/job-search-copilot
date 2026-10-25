@@ -38,3 +38,6 @@ export class AlreadyAnalysedError extends DomainError {}
 
 /** No vacancy has this id. */
 export class VacancyNotFoundError extends DomainError {}
+
+/** An API key over its rate limit (`API_KEY_OPTIONS`, ADR-0039). */
+export class RateLimitedError extends DomainError {}

@@ -66,6 +66,16 @@ const cases: [string, () => Promise<unknown>][] = [
       ),
   ],
   [
+    'VacancyService.markUnavailable — skipped, not moved',
+    async () =>
+      expect(
+        await vacancies.markUnavailable(b, [
+          { id: ids.queued, reason: 'Gone.' },
+          { id: ids.analysed, reason: 'Gone.' },
+        ]),
+      ).toEqual({ moved: [], skipped: [ids.queued, ids.analysed] }),
+  ],
+  [
     'VacancyService.submitAnalysis — a NEW row of A',
     () =>
       expect(vacancies.submitAnalysis(b, { id: ids.queued, ...analysis })).rejects.toBeInstanceOf(
@@ -204,7 +214,9 @@ describe("user B and user A's data", () => {
 
   it('keeps one applyUrl as two rows, one per user', async () => {
     await vacancies.save(b, posting(ANALYSED_URL, 'Backend Dev'));
-    const rows = await prisma.vacancy.findMany({ where: { applyUrl: ANALYSED_URL } });
+    const rows = await prisma.vacancy.findMany({
+      where: { userId: { in: [a, b] }, applyUrl: ANALYSED_URL },
+    });
     expect(rows.map((row) => row.userId).sort()).toEqual([a, b].sort());
   });
 

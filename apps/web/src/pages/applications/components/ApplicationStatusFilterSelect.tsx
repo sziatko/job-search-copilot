@@ -1,7 +1,9 @@
-import { useId } from 'react';
-import { Select, type SelectOption } from '@/components/ui/Select';
-import { APPLICATION_STATUS_LABELS, FILTER_LABELS } from '../constants';
-import { type ApplicationStatusFilter, applicationStatusFilterValues } from '../types';
+import { FilterSelect, type SelectOption } from '@/components/ui/Select';
+import { APPLICATION_STATUS_LABELS, FILTER_LABELS } from '@/lib/applications/constants';
+import {
+  type ApplicationStatusFilter,
+  applicationStatusFilterValues,
+} from '@/lib/applications/types';
 
 // Typed as the full filter union, so adding a filter value without a label here is a
 // compile error rather than a blank row in the dropdown.
@@ -21,17 +23,5 @@ export function ApplicationStatusFilterSelect({
   value: ApplicationStatusFilter;
   onChange: (value: ApplicationStatusFilter) => void;
 }) {
-  const id = useId();
-  return (
-    <div className="filter-group">
-      <label htmlFor={id}>Status</label>
-      <Select
-        id={id}
-        className="filter-select"
-        value={value}
-        options={OPTIONS}
-        onChange={onChange}
-      />
-    </div>
-  );
+  return <FilterSelect label="Status" value={value} options={OPTIONS} onChange={onChange} />;
 }

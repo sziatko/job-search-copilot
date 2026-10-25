@@ -18,23 +18,14 @@ export interface RecordApplicationByIdInput {
 
 /**
  * MCP path: the vacancy is identified by (company, title). A unique match links to it;
- * no match creates a minimal Vacancy, without an analysis unless a `matchScore` is
- * passed (see ApplicationService.record / ADR-0019); more than one match is an error.
+ * no match creates a minimal Vacancy without an analysis — only the analyzer writes one
+ * (see ApplicationService.record / ADR-0019); more than one match is an error.
  */
 export interface RecordApplicationByVacancyInput {
   company: string;
   title: string;
   /** Synthesized as `tracker://…` when absent. */
   applyUrl?: string | null;
-  /** For a created vacancy: its score. Absent = the vacancy has no analysis. */
-  matchScore?: number | null;
-  /** For a created vacancy with a `matchScore`: explicit, else derived from it. Ignored
-   * without one — the analysis is both fields or neither. */
-  recommendation?: Recommendation | null;
-  /** For a created vacancy: its posting text, else none (null). */
-  fullText?: string | null;
-  /** For a created vacancy: its ANALYZER comment, else none. */
-  estimationComment?: string | null;
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
   /** Added as a USER comment; a blank one adds none. */
@@ -90,9 +81,8 @@ export interface ListApplicationsFilters {
   state?: ApplicationState;
   /** Default 50, max 500. */
   limit?: number;
-  /** MCP's paging. Not with `cursor` — REST answers both with a 400. */
-  offset?: number;
-  /** The web's paging (ADR-0030): the `id` of the last row the caller has. */
+  /** The paging (ADR-0030): the `id` of the last row the caller has — the previous
+   * page's `nextCursor`. */
   cursor?: number;
 }
 

@@ -56,7 +56,7 @@ test('a passkey: add, sign out, sign in with it, remove', async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
   await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator('.topbar-title')).toHaveText('Dashboard');
+  await expect(page.getByRole('banner').getByRole('heading', { level: 1 })).toHaveText('Dashboard');
 
   await page.getByRole('navigation').getByRole('link', { name: 'Profile & forms' }).click();
   await removeButtons.click();
@@ -69,7 +69,7 @@ test('an API key: create, list, revoke', async ({ db, page }) => {
   await page.getByLabel('Key name').fill('Made-up n8n');
   await page.getByRole('button', { name: 'Create a key' }).click();
 
-  const shown = page.locator('code');
+  const shown = page.getByText(/^jsc_/);
   await expect(shown).toHaveText(/^jsc_/);
   const key = (await shown.textContent()) as string;
   const owner = await db.user.findFirstOrThrow();
@@ -91,7 +91,7 @@ test('a second account signs in to an empty dashboard', async ({ db, page }) => 
 
   await page.goto('/');
   await expect(
-    page.locator('.kpi-tile').filter({ hasText: 'Logged' }).locator('.kpi-value'),
+    page.getByTestId('kpi-tile').filter({ hasText: 'Logged' }).getByTestId('kpi-value'),
   ).toHaveText('0');
   await expect(page.getByText('Everything is triaged. Nice.')).toBeVisible();
   await expect(page.getByText('No status changes yet.')).toBeVisible();

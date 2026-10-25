@@ -1,6 +1,6 @@
-import type { CommentSource, PrismaClient, Recommendation, VacancyStatus } from '@prisma/client';
+import type { CommentSource, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
-import { forUser, orNotFound, type UserDb, type UserTx } from '../db/for-user';
+import { forUser, orNotFound, type Unscoped, type UserDb, type UserTx } from '../db/for-user';
 import { textFilters } from '../db/like';
 import { cursorArgs, toCursorPage } from '../db/paging';
 import { getPrisma } from '../db/prisma-client';
@@ -13,7 +13,6 @@ import {
   VacancyNotFoundError,
 } from '../domain/errors';
 import { matchKeys } from '../domain/identity';
-import { deriveRecommendationFromScore } from '../domain/recommendation';
 import {
   activeWhere,
   commentOn,
@@ -95,18 +94,23 @@ export class ApplicationService {
   /** @param db only ever used through `forUser` (every public method takes the user's id
    *   first, ADR-0038). Defaults (on construction, not import) to the lazy process-wide client —
    *   same rationale as VacancyService. Nest passes its managed client. */
-  constructor(private readonly db: PrismaClient = getPrisma()) {}
+  constructor(private readonly db: Unscoped = getPrisma()) {}
 
   /**
    * Record that the user applied to a role. In one transaction: resolve the vacancy
    * (link by id, link to a unique (company,title) match, or create a minimal
-   * placeholder row, unanalysed unless given a score), move it to APPLIED (then to
-   * `status`, if given), and set salary / CV / comment. Throws a DomainError on blank
-   * input, an unknown id, an ambiguous (company,title) match, or a vacancy already in
-   * the pipeline.
+   * placeholder row, unanalysed), move it to APPLIED (then to
+   * `status`, if given), and set salary / CV / comment — a `source` comment: USER (the
+   * user's note, from the web or MCP), AGENT from a REST API key. Throws a DomainError on
+   * blank input, an unknown id, an ambiguous (company,title) match, or a vacancy already
+   * in the pipeline.
    */
-  record(userId: string, input: RecordApplicationInput): Promise<RecordApplicationResult> {
-    return forUser(this.db, userId).$transaction((db) => recordWithin(db, userId, input));
+  record(
+    userId: string,
+    input: RecordApplicationInput,
+    source: CommentSource = 'USER',
+  ): Promise<RecordApplicationResult> {
+    return forUser(this.db, userId).$transaction((db) => recordWithin(db, userId, input, source));
   }
 
   /**
@@ -120,7 +124,7 @@ export class ApplicationService {
     return forUser(this.db, userId).$transaction(async (db) => {
       const results: RecordApplicationResult[] = [];
       for (const input of inputs) {
-        results.push(await recordWithin(db, userId, input));
+        results.push(await recordWithin(db, userId, input, 'USER'));
       }
       return { results };
     });
@@ -168,10 +172,8 @@ export class ApplicationService {
         where,
         // The last move first — a fresh application tops the list; a comment or an
         // edit does not reorder. `statusChangedAt` alone is not a total order (rows
-        // can share one date), and offset paging over a tie has no defined
-        // window, so `id` breaks it — and Prisma's cursor needs a total order (ADR-0030).
+        // can share one date), and Prisma's cursor needs one, so `id` breaks it (ADR-0030).
         orderBy: [{ statusChangedAt: 'desc' }, { id: 'desc' }],
-        ...(filters.offset && { skip: filters.offset }),
         ...cursorArgs(cursor, limit),
         select: APPLICATION_SELECT,
       }),
@@ -198,7 +200,7 @@ export class ApplicationService {
    * repeated pipeline status is an event, a repeated triage one throws SameStatusError.
    * `note`, when not blank, becomes a new `source`
    * comment in the same transaction. `source` is the
-   * caller's: AGENT over MCP, USER over REST. Throws VacancyNotFoundError for an unknown id.
+   * caller's: AGENT over MCP or a REST API key, USER from the web. Throws VacancyNotFoundError for an unknown id.
    */
   updateStatus(
     userId: string,
@@ -215,16 +217,22 @@ export class ApplicationService {
 
   /**
    * Edit what was entered when applying — the apply modal re-opened. A field left
-   * out is untouched; a blank string clears it. A non-blank `comment` adds a USER
-   * comment — it edits none. Throws VacancyNotFoundError for an unknown id.
+   * out is untouched; a blank string clears it. A non-blank `comment` adds a `source`
+   * comment (USER from the web, AGENT from an API key) — it edits none. Throws
+   * VacancyNotFoundError for an unknown id.
    */
-  update(userId: string, id: number, input: UpdateApplicationInput): Promise<ApplicationListItem> {
+  update(
+    userId: string,
+    id: number,
+    input: UpdateApplicationInput,
+    source: CommentSource = 'USER',
+  ): Promise<ApplicationListItem> {
     const text = (value: string | null | undefined) =>
       value === undefined ? undefined : value?.trim() || null;
     return updateRow(forUser(this.db, userId), id, {
       salaryInApplication: text(input.salaryInApplication),
       usedTailoredResume: input.usedTailoredResume,
-      ...commentOn(input.comment, 'USER'),
+      ...commentOn(input.comment, source),
     });
   }
 
@@ -308,9 +316,6 @@ interface ResolvedVacancy {
   vacancy: { id: number; status: VacancyStatus };
   resolution: VacancyResolution;
   vacancyCreated: boolean;
-  /** A created vacancy's analysis, written once the row has left NEW — the DB refuses
-   * an analysis on a NEW row (ADR-0033). Absent when there is none. */
-  analysis?: { matchScore: number; recommendation: Recommendation };
 }
 
 async function resolveVacancy(
@@ -358,40 +363,21 @@ async function resolveVacancy(
   }
   if (matches.length > 1) {
     throw new AmbiguousVacancyMatchError(
-      `"${company}" / "${title}" matches ${matches.length} analyzed vacancies ` +
+      `"${company}" / "${title}" matches ${matches.length} existing vacancies` +
         `(ids: ${matches.map((m) => m.id).join(', ')}). Pass vacancyId to disambiguate.`,
     );
   }
 
-  // No analysis unless the caller passed a score: the CHECK wants both fields or neither.
-  const analysis =
-    input.matchScore == null
-      ? undefined
-      : {
-          matchScore: input.matchScore,
-          recommendation: input.recommendation ?? deriveRecommendationFromScore(input.matchScore),
-        };
-  // The record is kept without a usable url — losing a whole application over a bad
-  // URL would be worse than an unlinked one.
+  // Unanalysed: only the analyzer writes an analysis (invariant 3). The record is kept
+  // without a usable url — losing a whole application over a bad URL would be worse
+  // than an unlinked one.
   const applyUrl = url ?? buildSyntheticApplyUrl(company, title, at);
-  const estimationComment = input.estimationComment?.trim();
   try {
     const created = await db.vacancy.create({
-      data: {
-        userId,
-        company,
-        title,
-        applyUrl,
-        ...matchKeys(company, title),
-        fullText: input.fullText?.trim() ? input.fullText : null,
-        ...(estimationComment && {
-          comments: { create: { body: estimationComment, source: 'ANALYZER' } },
-        }),
-        ...firstStatus(at),
-      },
+      data: { userId, company, title, applyUrl, ...matchKeys(company, title), ...firstStatus(at) },
       select: { id: true, status: true },
     });
-    return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true, analysis };
+    return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true };
   } catch (err) {
     // The url was looked up above, so only a concurrent write gets here.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -409,14 +395,10 @@ async function recordWithin(
   db: UserTx,
   userId: string,
   input: RecordApplicationInput,
+  source: CommentSource,
 ): Promise<RecordApplicationResult> {
   const at = new Date();
-  const { vacancy, resolution, vacancyCreated, analysis } = await resolveVacancy(
-    db,
-    userId,
-    input,
-    at,
-  );
+  const { vacancy, resolution, vacancyCreated } = await resolveVacancy(db, userId, input, at);
 
   if (PIPELINE.includes(vacancy.status)) {
     throw new AlreadyAppliedError(`Vacancy ${vacancy.id} is already ${vacancy.status}`);
@@ -433,8 +415,7 @@ async function recordWithin(
     data: {
       salaryInApplication: input.salaryInApplication?.trim() || null,
       usedTailoredResume: input.usedTailoredResume ?? false,
-      ...analysis,
-      ...commentOn(input.comment, 'USER'),
+      ...commentOn(input.comment, source),
     },
     select: APPLICATION_SELECT,
   });

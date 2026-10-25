@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ApplicationComment, CommentSource } from '../types';
+import type { ApplicationComment, CommentSource } from '@/lib/applications/types';
 import { MergedComment } from './MergedComment';
 
 const comment = (
@@ -10,16 +10,17 @@ const comment = (
   source: CommentSource,
 ): ApplicationComment => ({ id, createdAt, body, source });
 
-/** Each comment's class and text, in render order — the class is who wrote it, which
- * the text alone cannot show. */
-function partsOf(container: HTMLElement): [string, string | null][] {
-  return [...container.querySelectorAll('.comment-user, .comment-status, .comment-analyzer')].map(
-    (el) => [el.className, el.textContent],
-  );
+/** Each comment's source and text, in render order — the source is who wrote it, which
+ * the text alone cannot show (only its style does). */
+function partsOf(container: HTMLElement): [string | undefined, string | null][] {
+  return [...container.querySelectorAll<HTMLElement>('[data-source]')].map((el) => [
+    el.dataset.source,
+    el.textContent,
+  ]);
 }
 
-const clampedTextOf = (container: HTMLElement) =>
-  container.querySelector('.clamp')?.textContent ?? '';
+/** The cell's text. jsdom measures nothing, so no Show more button joins it. */
+const clampedTextOf = (container: HTMLElement) => container.textContent ?? '';
 
 describe('MergedComment', () => {
   it('renders every comment in the order given, dated, styled by its source', () => {
@@ -34,9 +35,9 @@ describe('MergedComment', () => {
     );
 
     expect(partsOf(container)).toEqual([
-      ['comment-analyzer', 'Sep 10: Strong match.'],
-      ['comment-user', 'Sep 12: My own note'],
-      ['comment-status', 'Sep 14: Recruiter called'],
+      ['ANALYZER', 'Sep 10: Strong match.'],
+      ['USER', 'Sep 12: My own note'],
+      ['AGENT', 'Sep 14: Recruiter called'],
     ]);
     // Collapsed, the parts are joined on one line — so the separator is the only
     // thing marking where one comment stops and the next begins.

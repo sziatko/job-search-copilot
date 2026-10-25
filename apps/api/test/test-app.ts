@@ -10,6 +10,21 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/setup-app';
 
+/** The users `signIn` and `createApiKey` made in this file, not yet deleted. */
+const users: string[] = [];
+
+/** Deletes the vacancies of the users made here (an `afterEach`); comments and status
+ * changes go with them. Other files' rows stay, so files can run at the same time. */
+export async function deleteTestVacancies(): Promise<void> {
+  await getPrisma().vacancy.deleteMany({ where: { userId: { in: users } } });
+}
+
+/** Deletes the users made here (an `afterAll`); sessions, keys and vacancies go with
+ * them (ON DELETE CASCADE). */
+export async function deleteTestUsers(): Promise<void> {
+  await getPrisma().user.deleteMany({ where: { id: { in: users.splice(0) } } });
+}
+
 /** The app as main.ts boots it: Nest's body parser off (AuthModule owns parsing). */
 export async function createTestApp(): Promise<NestExpressApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -22,7 +37,7 @@ export async function createTestApp(): Promise<NestExpressApplication> {
 /**
  * A signed-in user: a `User` and a `Session` row in the test DB, and the session cookie,
  * the token signed the way Better Auth signs its cookie (what its `testUtils` plugin
- * does, without putting a test plugin in `createAuth`). Delete users in `afterAll`.
+ * does, without putting a test plugin in `createAuth`). `deleteTestUsers` deletes it.
  */
 export async function signIn(
   app: NestExpressApplication,
@@ -30,6 +45,7 @@ export async function signIn(
   const user = await getPrisma().user.create({
     data: { id: randomUUID(), name: 'Test User', email: `${randomUUID()}@example.com` },
   });
+  users.push(user.id);
   const ctx = await app.get<AuthService<Auth>>(AuthService).instance.$context;
   const { token } = await ctx.internalAdapter.createSession(user.id);
   const value = `${token}.${await makeSignature(token, ctx.secret)}`;
@@ -49,6 +65,7 @@ export async function createApiKey(app: NestExpressApplication) {
   const user = await getPrisma().user.create({
     data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
   });
+  users.push(user.id);
   const auth = app.get<AuthService<Auth>>(AuthService);
   const created = await auth.api.createApiKey({ body: { name: 'n8n', userId: user.id } });
   return { key: created.key, id: created.id, userId: user.id };

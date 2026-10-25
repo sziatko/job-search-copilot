@@ -44,4 +44,4 @@ makes caching, retry, staleness and rollback our own bug surface.
 - `retry: false` dropped from the test wrapper → a mocked failure waits out the backoff.
 
 ## Related
-[ADR-0012](0012-web-hand-written-contract.md), `apps/web/src/pages/vacancies/useVacancies.ts`.
+[ADR-0012](0012-web-hand-written-contract.md), `apps/web/src/lib/vacancies/useVacancyRows.ts`.

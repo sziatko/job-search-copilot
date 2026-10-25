@@ -1,6 +1,6 @@
-import type { PrismaClient, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
+import type { CommentSource, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
-import { forUser, orNotFound, type UserDb, type UserTx } from '../db/for-user';
+import { forUser, orNotFound, type Unscoped, type UserDb, type UserTx } from '../db/for-user';
 import { textFilters } from '../db/like';
 import { cursorArgs, toCursorPage } from '../db/paging';
 import { getPrisma } from '../db/prisma-client';
@@ -8,6 +8,7 @@ import { ALL_COMMENTS } from '../domain/comments';
 import { companyMatchCounts, SAME_COMPANY_STATUSES, sameCompanyNames } from '../domain/company';
 import { AlreadyAnalysedError, VacancyNotFoundError } from '../domain/errors';
 import { matchKeys } from '../domain/identity';
+import { usablePostingText } from '../domain/posting-text';
 import { parseRecommendation } from '../domain/recommendation';
 import { commentOn, firstStatus, statusAfterAnalysis, writeStatus } from '../domain/status';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from '../domain/url';
@@ -23,8 +24,9 @@ import type {
   VacancySort,
 } from './vacancy.types';
 
-/** The analyzer's comment: the first `ANALYZER` row. A relation read, so every
- * reader selects it through here and flattens it with `withEstimation`. */
+/** The analyzer's comment: the first `ANALYZER` row. A list row selects it through here
+ * and flattens it with `withEstimation`; the detail reads every comment and finds the
+ * same row among them (`toDetail`). */
 const ANALYZER_COMMENT = {
   where: { source: 'ANALYZER' },
   orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -68,6 +70,9 @@ const ORDER_BY = {
   recommended: [{ recommendation: 'asc' }, { matchScore: 'desc' }, { id: 'desc' }],
 } satisfies Record<VacancySort, Prisma.VacancyOrderByWithRelationInput[]>;
 
+/** The vacancies nobody has acted on yet — the only ones markUnavailable moves. */
+const OPEN_QUEUE: readonly VacancyStatus[] = ['NEW', 'NOT_REVIEWED', 'SAVED_FOR_LATER'];
+
 const LIST_SELECT = {
   id: true,
   createdAt: true,
@@ -86,8 +91,9 @@ interface Analysis {
   matchScore: number;
   recommendation: Recommendation;
   estimationComment: string;
-  /** Filled in when the row has no text yet; never replaces one. */
-  fullText?: string;
+  /** Filled in when the row has no text yet; never replaces one. Already through
+   * `usablePostingText`. */
+  fullText?: string | null;
 }
 
 function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
@@ -99,9 +105,10 @@ function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
 }
 
 /**
- * Writes an analysis onto an unanalysed row, in the caller's transaction — the one
- * writer of an analysis on `Vacancy` (save()'s created and attached rows,
- * submitAnalysis); the analysis is written once (ADR-0033).
+ * Writes an analysis onto an unanalysed row, in the caller's transaction — how save()'s
+ * created and attached rows and submitAnalysis write one; the analysis is written once
+ * (ADR-0033). The one other writer is `record()`'s placeholder: a row it has just created
+ * in the same transaction, so there is no concurrent analysis for the lock below to stop.
  *
  * The conditional write comes first (`recommendation IS NULL`, a no-op `updatedAt`): it
  * takes the row lock, so a concurrent analysis of the same row waits for this one and
@@ -135,7 +142,7 @@ async function writeAnalysis(
     data: {
       matchScore: analysis.matchScore,
       recommendation: analysis.recommendation,
-      ...(row.fullText === null && analysis.fullText?.trim() && { fullText: analysis.fullText }),
+      ...(row.fullText === null && analysis.fullText && { fullText: analysis.fullText }),
       ...(estimationComment && {
         comments: { create: { body: estimationComment, source: 'ANALYZER' } },
       }),
@@ -186,12 +193,12 @@ async function withDerivedFields(
  */
 export class VacancyService {
   /**
-   * @param db PrismaClient to run against, only ever through `forUser`. Defaults
-   *   (evaluated on construction, not import) to the lazy process-wide client so DI-less
-   *   entrypoints (the MCP server) can `new` this directly; Nest passes its
+   * @param db the client to run against, reachable only through `forUser` (`Unscoped`).
+   *   Defaults (evaluated on construction, not import) to the lazy process-wide client so
+   *   DI-less entrypoints (the MCP server) can `new` this directly; Nest passes its
    *   lifecycle-managed PrismaService client.
    */
-  constructor(private readonly db: PrismaClient = getPrisma()) {}
+  constructor(private readonly db: Unscoped = getPrisma()) {}
 
   /**
    * Persist a freshly analyzed vacancy, keyed by applyUrl. The analysis is written once
@@ -222,7 +229,8 @@ export class VacancyService {
       return { created: false, attached: false, vacancy: existing };
     }
 
-    const analysis = { ...toAnalysis(input), fullText: input.fullText };
+    const fullText = usablePostingText(input.fullText);
+    const analysis = { ...toAnalysis(input), fullText };
     const at = new Date();
     if (existing) {
       const vacancy = await db.$transaction((db) => writeAnalysis(db, existing.id, analysis, at));
@@ -237,7 +245,7 @@ export class VacancyService {
             title: input.title,
             applyUrl,
             ...matchKeys(input.company, input.title),
-            fullText: input.fullText,
+            fullText,
             ...firstStatus(at),
           },
           select: { id: true },
@@ -346,7 +354,6 @@ export class VacancyService {
             ? where
             : { OR: [where, { id: cursor }] },
         orderBy: ORDER_BY[filters.sort ?? 'newest'],
-        ...(filters.offset && { skip: filters.offset }),
         ...cursorArgs(cursor, limit),
         select: LIST_SELECT,
       }),
@@ -359,20 +366,50 @@ export class VacancyService {
 
   /** Moves the vacancy to `status` through writeStatus — a repeated pipeline status is
    * an event, a repeated triage one throws SameStatusError. `comment`, when not blank,
-   * becomes a USER comment in the same transaction (Save for later's note). Throws
-   * VacancyNotFoundError when no vacancy has this id. */
+   * becomes a `source` comment in the same transaction (Save for later's note) — USER
+   * from the web, AGENT from an API key. Throws VacancyNotFoundError when no vacancy has
+   * this id. */
   updateStatus(
     userId: string,
     id: number,
     status: VacancyStatus,
     comment?: string,
+    source: CommentSource = 'USER',
   ): Promise<VacancyDetail> {
     return forUser(this.db, userId).$transaction(async (db) => {
       await writeStatus(db, id, status);
-      const data = commentOn(comment, 'USER');
+      const data = commentOn(comment, source);
       return toDetail(
         await orNotFound(db.vacancy.update({ where: { id }, data, include: DETAIL_INCLUDE }), id),
       );
     });
+  }
+
+  /** Postings that no longer take applications (ADR-0040), in one transaction: a vacancy
+   * still in the queue (OPEN_QUEUE) moves to UNAVAILABLE, its `reason` a `source`
+   * comment. Any other — moved by the user since the caller read the list, unknown,
+   * another user's — is skipped and left untouched. */
+  markUnavailable(
+    userId: string,
+    items: { id: number; reason: string }[],
+    source: CommentSource = 'AGENT',
+  ): Promise<{ moved: number[]; skipped: number[] }> {
+    return forUser(this.db, userId).$transaction(
+      async (db) => {
+        const moved: number[] = [];
+        const skipped: number[] = [];
+        for (const { id, reason } of items) {
+          if (await writeStatus(db, id, 'UNAVAILABLE', undefined, OPEN_QUEUE)) {
+            await db.vacancy.update({ where: { id }, data: commentOn(reason, source) });
+            moved.push(id);
+          } else {
+            skipped.push(id);
+          }
+        }
+        return { moved, skipped };
+      },
+      // The intake batch's ceiling: 100 items over a remote DB.
+      { timeout: 60_000 },
+    );
   }
 }

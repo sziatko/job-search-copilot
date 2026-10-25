@@ -149,9 +149,10 @@ vite.config.ts.timestamp-*
 *.config.mjs.map
 *.config.d.mts
 
-# Local Claude Code config — machine-specific, so it never belongs in the repo.
-.claude/settings.json
-.claude/settings.local.json
+# The owner's Claude Code setup — local config, and agent rules kept in the private
+# skills repo (skills/claude-code/), linked in from here.
+.claude/
+CLAUDE.md
 
 # Playwright (e2e/): its output, the api built for it, the signed-in cookie.
 test-results/
@@ -159,7 +160,7 @@ playwright-report/
 e2e/.api/
 e2e/.auth/
 
-# The user's job-search skills: a separate private repo, cloned here (CLAUDE.md).
+# The user's job-search skills: a separate private repo, cloned here.
 skills/
 
 # A phase's plan is the agent's working file, never committed (docs/README.md).

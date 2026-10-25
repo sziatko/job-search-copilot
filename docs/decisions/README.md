@@ -31,7 +31,7 @@ choice (a status code, an index type) is a section of
 | [0025](0025-vacancies-list-search-server-side.md) | The vacancies list: server-side search, a derived company count |
 | [0027](0027-linkedin-site-rule.md) | LinkedIn site rule: one key per job id, locale host merged |
 | [0029](0029-one-vacancy-table.md) | One `Vacancy` table: one status, a `StatusChange` journal, comments with a `source` |
-| [0030](0030-cursor-paging.md) | The web's tables page by a Prisma cursor; MCP keeps offset |
+| [0030](0030-cursor-paging.md) | Every list pages by a Prisma cursor |
 | [0031](0031-stats-endpoint.md) | One stats endpoint; the funnel counts the journal |
 | [0032](0032-same-company-normalised-name.md) | Same company = an equal normalised name |
 | [0033](0033-unscored-vacancies-in-one-table.md) | Unscored vacancies live in `Vacancy`: `NEW` and `FILTERED_OUT` |
@@ -40,6 +40,7 @@ choice (a status code, an index type) is a section of
 | [0037](0037-e2e-playwright.md) | End-to-end tests: Playwright on its own database, run on demand |
 | [0038](0038-multi-user-shared-schema.md) | Multi-user: one schema, `userId` on `Vacancy`, every query through `forUser` |
 | [0039](0039-api-keys-per-user.md) | API keys per user, for n8n and MCP |
+| [0040](0040-machine-moves-queue-to-unavailable.md) | A machine moves only the queue, to `UNAVAILABLE` |
 
 A missing number (0017, 0018, 0021, 0026, 0028, 0036) is a deleted ADR. The one that
 replaced it names it on its `Replaces:` line; `git log --all -- 'docs/decisions/NNNN-*'`

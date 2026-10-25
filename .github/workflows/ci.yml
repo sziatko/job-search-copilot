@@ -65,10 +65,14 @@ jobs:
       - run: npm run build
 
   # Playwright over the real api, web and DB (ADR-0037). Pull requests only: minutes,
-  # not seconds, and a push to main has passed it on its PR.
+  # not seconds, and a push to main has passed it on its PR. In the image the visual
+  # tests' baselines come from (e2e/Dockerfile — keep the two tags equal).
   e2e:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --ipc=host
 
     services:
       postgres:
@@ -88,7 +92,8 @@ jobs:
 
     env:
       # Every variable of .env.e2e (gitignored, so CI has none) — fake values.
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/job_search_copilot_e2e
+      # In a container job a service is reached by its name, not localhost.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/job_search_copilot_e2e
       BETTER_AUTH_SECRET: e2e-secret-at-least-32-characters-long
       BETTER_AUTH_URL: http://localhost:3100
       WEB_ORIGIN: http://localhost:5174
@@ -103,11 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
+      # The image's own Node and Chromium: no setup-node, no `playwright install`.
       - run: npm ci
 
       - name: Generate Prisma client
@@ -117,9 +118,13 @@ jobs:
       - name: Build core
         run: npm run build --workspace=@job-search-copilot/core
 
-      - run: npx playwright install --with-deps chromium
-
       - run: npm run test:e2e
+
+      # What `npm run test:visual` runs in its container (docker-compose.yml `visual`).
+      - name: Visual tests
+        run: npx playwright test -c e2e
+        env:
+          E2E_VISUAL: '1'
 
       - uses: actions/upload-artifact@v4
         if: failure()

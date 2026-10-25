@@ -1,6 +1,6 @@
-import type { PrismaClient, VacancyStatus } from '@prisma/client';
+import type { VacancyStatus } from '@prisma/client';
 import { ApplicationService } from '../applications/application.service';
-import { forUser } from '../db/for-user';
+import { forUser, type Unscoped } from '../db/for-user';
 import { PIPELINE_STATUSES, statusAfterAnalysis } from '../domain/status';
 import { VacancyIntakeService } from '../intake/vacancy-intake.service';
 import { VacancyService } from '../vacancies/vacancy.service';
@@ -18,17 +18,22 @@ const DISPOSABLE_DB = /_(e2e|test|demo)$/;
  * SEED_VACANCIES through the services as that user, so the journal and the comments are
  * the ones the app itself writes. Users, sessions and other users' vacancies are left
  * alone. Then every date is moved back
- * relative to now — the last move `daysAgo` days ago, one day per earlier step — so the
- * timeout rule gives the same answer on every run. Refuses, before any write, a database
- * whose name (asked of the connection itself) does not end in `_e2e`, `_test` or `_demo`.
+ * relative to `now` — the last move `daysAgo` days ago, one day per earlier step — so the
+ * timeout rule gives the same answer on every run. `now` is a parameter so the visual
+ * tests can pin it (`e2e/clock.ts`). Refuses, before any write, a database whose name
+ * (asked of the connection itself) does not end in `_e2e`, `_test` or `_demo`.
  */
-export async function resetToSeed(prisma: PrismaClient, userId: string): Promise<void> {
-  const [{ name }] = await prisma.$queryRaw<{ name: string }[]>`SELECT current_database() AS name`;
+export async function resetToSeed(
+  prisma: Unscoped,
+  userId: string,
+  now = new Date(),
+): Promise<void> {
+  const db = forUser(prisma, userId);
+  const [{ name }] = await db.$queryRaw<{ name: string }[]>`SELECT current_database() AS name`;
   if (!DISPOSABLE_DB.test(name)) {
     throw new Error(`resetToSeed refuses "${name}": only a *_e2e, *_test or *_demo database`);
   }
 
-  const db = forUser(prisma, userId);
   await db.vacancy.deleteMany();
   const vacancies = new VacancyService(prisma);
   const applications = new ApplicationService(prisma);
@@ -97,9 +102,8 @@ export async function resetToSeed(prisma: PrismaClient, userId: string): Promise
     rows.filter((row) => row.vacancyId === vacancyId).map((row) => row.id);
 
   // The new dates, as (ids, dates) column pairs: three UPDATEs instead of one per row
-  // (about 700, seconds against Docker on Windows). Raw SQL is outside forUser: the ids
+  // (about 700, seconds against Docker on Windows). Raw SQL is not scoped by forUser: the ids
   // were read through it, and the Vacancy UPDATE checks the owner as well.
-  const now = Date.now();
   const dated = {
     change: { ids: [] as number[], at: [] as string[] },
     comment: { ids: [] as number[], at: [] as string[] },
@@ -109,7 +113,7 @@ export async function resetToSeed(prisma: PrismaClient, userId: string): Promise
     const steps = journals[i].length;
     // A minute apart per vacancy, so no two share a date.
     const at = (step: number) =>
-      new Date(now - (v.daysAgo + steps - 1 - step) * DAY - i * MINUTE).toISOString();
+      new Date(now.getTime() - (v.daysAgo + steps - 1 - step) * DAY - i * MINUTE).toISOString();
     for (const [step, id] of byVacancy(changes, ids[i]).entries()) {
       dated.change.ids.push(id);
       dated.change.at.push(at(step));
@@ -122,14 +126,15 @@ export async function resetToSeed(prisma: PrismaClient, userId: string): Promise
     dated.vacancy.movedAt.push(at(steps - 1));
   }
   const { change, comment, vacancy } = dated;
-  await prisma.$transaction([
-    prisma.$executeRaw`UPDATE "StatusChange" AS t SET "createdAt" = d.at
+  await db.$transaction([
+    db.$executeRaw`UPDATE "StatusChange" AS t SET "createdAt" = d.at
       FROM unnest(${change.ids}::int[], ${change.at}::timestamp(3)[]) AS d(id, at)
       WHERE t.id = d.id`,
-    prisma.$executeRaw`UPDATE "Comment" AS t SET "createdAt" = d.at
+    db.$executeRaw`UPDATE "Comment" AS t SET "createdAt" = d.at
       FROM unnest(${comment.ids}::int[], ${comment.at}::timestamp(3)[]) AS d(id, at)
       WHERE t.id = d.id`,
-    prisma.$executeRaw`UPDATE "Vacancy" AS t SET "createdAt" = d.c, "statusChangedAt" = d.m
+    db.$executeRaw`UPDATE "Vacancy" AS t SET "createdAt" = d.c, "statusChangedAt" = d.m,
+        "updatedAt" = d.m
       FROM unnest(${vacancy.ids}::int[], ${vacancy.createdAt}::timestamp(3)[],
         ${vacancy.movedAt}::timestamp(3)[]) AS d(id, c, m)
       WHERE t.id = d.id AND t."userId" = ${userId}`,

@@ -1,14 +1,21 @@
-import { useRef } from 'react';
-import { IconEdit, IconHistory } from '@/components/icons';
+import { ApplicationStatusSelect } from '@/components/applications/ApplicationStatusSelect';
+import { IconEdit } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 import { DetailsLink } from '@/components/ui/DetailsLink';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ScorePill } from '@/components/ui/ScorePill';
-import { SkeletonRows } from '@/components/ui/SkeletonRows';
-import { useVirtualRows } from '@/components/useVirtualRows';
-import { isSafeExternalUrl } from '@/lib/url';
-import { daysSinceLastMove } from '../constants';
-import type { ApplicationListItem, ApplicationStatus } from '../types';
-import { ApplicationStatusSelect } from './ApplicationStatusSelect';
-import { CopyApplicationButton } from './CopyApplicationButton';
+import { type Column, Table } from '@/components/ui/Table';
+import {
+  CompanyHistoryButton,
+  DateCell,
+  RoleMeta,
+  RoleTitle,
+  RowError,
+} from '@/components/ui/TableCells';
+import { Tip } from '@/components/ui/Tip';
+import { CopyVacancyButton } from '@/components/vacancies/CopyVacancyButton';
+import { daysSinceLastMove } from '@/lib/applications/constants';
+import type { ApplicationListItem, ApplicationStatus } from '@/lib/applications/types';
 import { MergedComment } from './MergedComment';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -17,19 +24,8 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
   year: '2-digit',
 });
 
-const COL_COUNT = 8;
-
-/**
- * These px widths are authoritative because the table sets `table-fixed` — in
- * auto layout they would only be hints the cell content can override, which is
- * what made the columns resize as the data changed.
- *
- * Fixed layout also means content can never widen a column; it wraps instead.
- * So each fixed width has to fit its own content PLUS the cell's 36px of
- * horizontal padding. Role and Comment are deliberately left without a width:
- * the two of them split whatever is left, down the middle.
- */
-
+/** The rows of /applications. Role and Comment have no width: the two split what the
+ * others leave. */
 export function ApplicationsTable({
   loading,
   items,
@@ -42,7 +38,6 @@ export function ApplicationsTable({
   filterKey,
   emptyMessage,
 }: {
-  /** The first page is on its way — VacancyTable's `loading`. */
   loading: boolean;
   items: ApplicationListItem[];
   savingIds: Set<number>;
@@ -50,164 +45,112 @@ export function ApplicationsTable({
   onStatusChange: (id: number, status: ApplicationStatus) => void;
   onEdit: (item: ApplicationListItem) => void;
   onShowCompanyHistory: (company: string, vacancyId: number) => void;
-  /** The next page, when the last loaded row scrolls into the window (ADR-0030). */
   onEndReached?: () => void;
   /** The page's filter: a change scrolls the box back to the top. */
   filterKey: string;
   emptyMessage: string;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const { virtualItems, paddingTop, paddingBottom, measureElement } = useVirtualRows(
-    scrollRef,
-    items.length,
-    onEndReached,
-    filterKey,
-  );
+  const columns: Column<ApplicationListItem>[] = [
+    {
+      header: 'Date',
+      width: 110,
+      cell: (item) => (
+        <DateCell
+          date={item.appliedAt ? dateFormatter.format(new Date(item.appliedAt)) : '—'}
+          quietDays={item.timedOut ? daysSinceLastMove(item) : undefined}
+          // Same stamp the hourglass reads; shown only once the row has actually
+          // moved, or it would just repeat the date above.
+          updated={
+            item.statusChangedAt !== item.appliedAt
+              ? dateFormatter.format(new Date(item.statusChangedAt))
+              : undefined
+          }
+        />
+      ),
+    },
+    {
+      header: 'Role',
+      cell: (item) => (
+        <>
+          <RoleTitle title={item.title} href={item.applyUrl} />
+          <RoleMeta company={item.company} id={item.id}>
+            <CompanyHistoryButton
+              company={item.company}
+              matchCount={item.companyMatchCount}
+              onClick={() => onShowCompanyHistory(item.company, item.id)}
+            />
+          </RoleMeta>
+        </>
+      ),
+    },
+    { header: 'Score', width: 90, cell: (item) => <ScorePill score={item.matchScore} /> },
+    {
+      header: 'Salary',
+      width: 120,
+      cell: (item) => (
+        <div className="font-mono text-sm tabular-nums">{item.salaryInApplication ?? '—'}</div>
+      ),
+    },
+    {
+      header: 'CV',
+      width: 80,
+      cell: (item) => (
+        <div className="text-sm text-ink-muted">{item.usedTailoredResume ? '✓' : '—'}</div>
+      ),
+    },
+    { header: 'Comment', cell: (item) => <MergedComment comments={item.comments} /> },
+    {
+      header: 'Action',
+      width: 136,
+      // Icons, labelled by their `Tip`s — the /vacancies Action column's
+      // pattern. Edit waits while the row saves.
+      cell: (item) => (
+        <div className="flex items-center gap-1.5">
+          <CopyVacancyButton
+            id={item.id}
+            company={item.company}
+            title={item.title}
+            applyUrl={item.applyUrl}
+          />
+          <Button
+            variant="icon"
+            aria-label={`Edit ${item.title} at ${item.company}`}
+            disabled={savingIds.has(item.id)}
+            onClick={() => onEdit(item)}
+          >
+            <IconEdit />
+            <Tip>Edit</Tip>
+          </Button>
+          <DetailsLink id={item.id} />
+        </div>
+      ),
+    },
+    {
+      header: 'Status',
+      width: 190,
+      cell: (item) => (
+        <>
+          <ApplicationStatusSelect
+            label={`Status of ${item.title} at ${item.company}`}
+            value={item.status}
+            disabled={savingIds.has(item.id)}
+            onChange={(status) => onStatusChange(item.id, status)}
+          />
+          <RowError>{rowErrors.get(item.id)}</RowError>
+        </>
+      ),
+    },
+  ];
 
   return (
-    <div ref={scrollRef} className="table-body-scroll">
-      <table className="min-w-[1210px] table-fixed" aria-busy={loading}>
-        <thead>
-          <tr>
-            <th style={{ width: 110 }}>Date</th>
-            <th>Role</th>
-            <th style={{ width: 90 }}>Score</th>
-            <th style={{ width: 120 }}>Salary</th>
-            <th style={{ width: 80 }}>CV</th>
-            <th>Comment</th>
-            <th style={{ width: 136 }}>Action</th>
-            <th style={{ width: 190 }}>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading && <SkeletonRows rows={8} cols={COL_COUNT} />}
-          {!loading && items.length === 0 && (
-            <tr>
-              <td colSpan={COL_COUNT}>
-                <div className="empty-state">{emptyMessage}</div>
-              </td>
-            </tr>
-          )}
-          {/* Spacer rows that stand in for the rows the virtualizer isn't
-              rendering. p-0 because `tbody td` would otherwise pad them and the
-              height would no longer match what the virtualizer assumes. */}
-          {paddingTop > 0 && (
-            <tr aria-hidden className="hover:bg-transparent">
-              <td colSpan={COL_COUNT} className="border-0 p-0" style={{ height: paddingTop }} />
-            </tr>
-          )}
-          {virtualItems.map((virtualRow) => {
-            const item = items[virtualRow.index];
-            const linkable = isSafeExternalUrl(item.applyUrl);
-            const moved = item.statusChangedAt !== item.appliedAt;
-            // As on /vacancies: 1 means "no siblings" — the count includes this row.
-            const others = (item.companyMatchCount ?? 0) - 1;
-            return (
-              <tr
-                key={item.id}
-                data-index={virtualRow.index}
-                ref={measureElement}
-                className="hover:bg-surface-alt"
-              >
-                <td className="date-cell">
-                  {item.timedOut && (
-                    <span className="timeout-mark mr-[4px]">
-                      ⏳
-                      <span className="tip">{daysSinceLastMove(item)} days since last update</span>
-                    </span>
-                  )}
-                  {item.appliedAt ? dateFormatter.format(new Date(item.appliedAt)) : '—'}
-                  {/* Same stamp the hourglass reads; hidden until the row has
-                      actually moved, or it would just repeat the date above. */}
-                  {moved && (
-                    <div className="date-upd">
-                      upd: {dateFormatter.format(new Date(item.statusChangedAt))}
-                    </div>
-                  )}
-                </td>
-                <td>
-                  {linkable ? (
-                    <a
-                      href={item.applyUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="role-title role-link"
-                    >
-                      {item.title}
-                    </a>
-                  ) : (
-                    <span className="role-title">{item.title}</span>
-                  )}
-                  <div className="role-meta">
-                    {item.company} <span className="id">#{item.id}</span>
-                    {others >= 1 && (
-                      <button
-                        type="button"
-                        onClick={() => onShowCompanyHistory(item.company, item.id)}
-                        className="meta-btn"
-                      >
-                        <IconHistory />
-                        <span aria-hidden>{others}</span>
-                        <span className="tip">
-                          {others} other {others === 1 ? 'vacancy' : 'vacancies'} at {item.company}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <ScorePill score={item.matchScore} />
-                </td>
-                <td className="mono text-[12px]">{item.salaryInApplication ?? '—'}</td>
-                <td className="text-[12px] text-ink-muted">
-                  {item.usedTailoredResume ? '✓' : '—'}
-                </td>
-                <td>
-                  <MergedComment comments={item.comments} />
-                </td>
-                <td>
-                  {/* Icons, labelled by their `.tip` bubbles — the /vacancies Action
-                      column's pattern. Edit waits while the row saves. */}
-                  <div className="flex items-center gap-[6px]">
-                    <CopyApplicationButton
-                      id={item.id}
-                      company={item.company}
-                      title={item.title}
-                      applyUrl={item.applyUrl}
-                    />
-                    <button
-                      type="button"
-                      aria-label={`Edit ${item.title} at ${item.company}`}
-                      disabled={savingIds.has(item.id)}
-                      onClick={() => onEdit(item)}
-                      className="icon-btn disabled:opacity-50"
-                    >
-                      <IconEdit />
-                      <span className="tip">Edit</span>
-                    </button>
-                    <DetailsLink id={item.id} />
-                  </div>
-                </td>
-                <td>
-                  <ApplicationStatusSelect
-                    value={item.status}
-                    disabled={savingIds.has(item.id)}
-                    onChange={(status) => onStatusChange(item.id, status)}
-                  />
-                  {rowErrors.has(item.id) && (
-                    <p className="mt-[4px] text-[11.5px] text-bad">{rowErrors.get(item.id)}</p>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-          {paddingBottom > 0 && (
-            <tr aria-hidden className="hover:bg-transparent">
-              <td colSpan={COL_COUNT} className="border-0 p-0" style={{ height: paddingBottom }} />
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <Table
+      label="Applications"
+      columns={columns}
+      items={items}
+      loading={loading}
+      empty={<EmptyState>{emptyMessage}</EmptyState>}
+      minWidth={1210}
+      virtual={{ onEndReached, resetKey: filterKey }}
+    />
   );
 }

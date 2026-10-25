@@ -1,7 +1,10 @@
-import { useId } from 'react';
-import { Select, type SelectOption } from '@/components/ui/Select';
-import { STATUS_LABELS } from '../constants';
-import { STATUS_FILTER_ALL, type StatusFilterValue, statusFilterValues } from '../types';
+import { FilterSelect, type SelectOption } from '@/components/ui/Select';
+import { STATUS_LABELS } from '@/lib/vacancies/constants';
+import {
+  STATUS_FILTER_ALL,
+  type StatusFilterValue,
+  statusFilterValues,
+} from '@/lib/vacancies/types';
 
 // The page's own statuses (its context); the pipeline is /applications'.
 const LABELS: Record<StatusFilterValue, string> = {
@@ -24,17 +27,5 @@ export function StatusFilterSelect({
   value: StatusFilterValue;
   onChange: (value: StatusFilterValue) => void;
 }) {
-  const id = useId();
-  return (
-    <div className="filter-group">
-      <label htmlFor={id}>Status</label>
-      <Select
-        id={id}
-        className="filter-select"
-        value={value}
-        options={OPTIONS}
-        onChange={onChange}
-      />
-    </div>
-  );
+  return <FilterSelect label="Status" value={value} options={OPTIONS} onChange={onChange} />;
 }

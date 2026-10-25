@@ -39,12 +39,12 @@ const LONG = 'A very long analysis comment '.repeat(5);
 
 describe('ExpandableText', () => {
   it('shows no control when the text fits', () => {
-    render(<ExpandableText text="short" />);
+    render(<ExpandableText>short</ExpandableText>);
     expect(screen.queryByRole('button')).toBeNull();
   });
 
   it('expands on click and re-clamps on Escape', () => {
-    render(<ExpandableText text={LONG} />);
+    render(<ExpandableText>{LONG}</ExpandableText>);
     const button = screen.getByRole('button', { name: /show more/i });
     expect(button).toHaveAttribute('aria-expanded', 'false');
 
@@ -57,7 +57,7 @@ describe('ExpandableText', () => {
   });
 
   it('collapses on Escape, and not on blur', () => {
-    render(<ExpandableText text={LONG} />);
+    render(<ExpandableText>{LONG}</ExpandableText>);
     const button = screen.getByRole('button');
     fireEvent.click(button);
     expect(button).toHaveAttribute('aria-expanded', 'true');

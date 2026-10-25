@@ -33,7 +33,7 @@ async function queued(url: string, fullText?: string): Promise<number> {
     title: url,
     fullText,
   });
-  return (await getPrisma().vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
+  return (await getPrisma().vacancy.findFirstOrThrow({ where: { userId, applyUrl: url } })).id;
 }
 
 const validArgs = {
@@ -56,7 +56,7 @@ describe('job-search-copilot MCP server', () => {
   });
 
   afterEach(async () => {
-    await prisma.vacancy.deleteMany();
+    await prisma.vacancy.deleteMany({ where: { userId } });
   });
 
   afterAll(async () => {
@@ -93,7 +93,7 @@ describe('job-search-copilot MCP server', () => {
       arguments: { ...validArgs, recommendation: 'ПОДАВАТИСЯ' },
     });
     expect(result.isError).toBe(true);
-    expect(await prisma.vacancy.count()).toBe(0);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(0);
   });
 
   it('sends the cross-tool rules as its instructions', async () => {
@@ -342,7 +342,7 @@ describe('job-search-copilot MCP server', () => {
       arguments: {
         applications: [
           { company: 'Batch Co', title: 'Backend Engineer' },
-          { company: 'Batch Co', title: 'Frontend Engineer', matchScore: 65 },
+          { company: 'Batch Co', title: 'Frontend Engineer', status: 'INTERVIEW' },
         ],
       },
     });
@@ -456,7 +456,7 @@ describe('job-search-copilot MCP server', () => {
     expect(applicationsAt501.isError).toBe(true);
   });
 
-  it('list_vacancies pages with limit and offset without shrinking total', async () => {
+  it('list_vacancies pages through by nextCursor without shrinking total', async () => {
     const client = await connectedClient();
     await client.callTool({
       name: 'save_vacancies_batch',
@@ -469,18 +469,23 @@ describe('job-search-copilot MCP server', () => {
       },
     });
 
-    const page = await client.callTool({
-      name: 'list_vacancies',
-      arguments: { limit: 2, offset: 1 },
-    });
-    const body = JSON.parse(textOf(page));
+    const titles: string[] = [];
+    let cursor: number | undefined;
+    for (let call = 0; call < 3; call += 1) {
+      const page = await client.callTool({
+        name: 'list_vacancies',
+        arguments: { limit: 2, cursor },
+      });
+      const body = JSON.parse(textOf(page));
+      // `total` is the match count, not the size of the page — the same contract the
+      // web app leans on to use `limit=1` as a count endpoint.
+      expect(body.total).toBe(5);
+      titles.push(...body.items.map((item: { title: string }) => item.title));
+      cursor = body.nextCursor ?? undefined;
+    }
 
-    // `total` is the match count, not the size of the page — the same contract the
-    // web app leans on to use `limit=1` as a count endpoint.
-    expect(body.items).toHaveLength(2);
-    expect(body.total).toBe(5);
-    // The web's cursor paging (ADR-0030) does not leak into the tool's output.
-    expect(Object.keys(body)).toEqual(['items', 'total']);
+    expect(titles).toEqual(['Role 5', 'Role 4', 'Role 3', 'Role 2', 'Role 1']);
+    expect(cursor).toBeUndefined();
   });
 
   it('update_vacancy_status triages a vacancy; list_vacancies filters by several statuses', async () => {
@@ -526,10 +531,11 @@ describe('job-search-copilot MCP server', () => {
     expect(JSON.parse(textOf(applications)).total).toBe(0);
   });
 
-  it('record_application creates a placeholder vacancy when nothing matches', async () => {
+  it('record_application creates an unanalysed placeholder, a score passed or not', async () => {
     const client = await connectedClient();
     const result = await client.callTool({
       name: 'record_application',
+      // Not in the schema any more: stripped, so only the analyzer writes a score.
       arguments: { company: 'Never Analyzed Co', title: 'Staff Engineer', matchScore: 72 },
     });
     const parsed = JSON.parse(textOf(result));
@@ -542,8 +548,8 @@ describe('job-search-copilot MCP server', () => {
       arguments: { company: 'Never Analyzed Co' },
     });
     const { items } = JSON.parse(textOf(list));
-    expect(items[0].matchScore).toBe(72);
-    expect(items[0].recommendation).toBe('APPLY');
+    expect(items[0].hasAnalysis).toBe(false);
+    expect(items[0].recommendation).toBeNull();
   });
 
   it('record_application links to an analyzed vacancy and moves it to APPLIED', async () => {
@@ -920,7 +926,7 @@ describe('job-search-copilot MCP server', () => {
       arguments: { url, company: 'Acme', title: 'Engineer', source: 'linkedin' },
     });
     expect(JSON.parse(textOf(first))).toEqual({ new: true });
-    expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
+    expect(await prisma.vacancy.findFirstOrThrow({ where: { userId } })).toMatchObject({
       status: 'NEW',
       source: 'linkedin',
       recommendation: null,
@@ -945,7 +951,7 @@ describe('job-search-copilot MCP server', () => {
         true,
       );
     }
-    expect(await prisma.vacancy.count()).toBe(0);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(0);
   });
 
   it('intake_vacancies_batch returns the raw urls of the new entries', async () => {
@@ -980,7 +986,7 @@ describe('job-search-copilot MCP server', () => {
       });
       expect(result.isError).toBe(true);
     }
-    expect(await prisma.vacancy.count()).toBe(0);
+    expect(await prisma.vacancy.count({ where: { userId } })).toBe(0);
   });
 
   it('intake_vacancies_batch rejects an empty or oversized array', async () => {

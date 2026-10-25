@@ -1,6 +1,13 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { VacancyNotFoundError } from '../domain/errors';
 
+/**
+ * The raw client as a service holds it: `$extends` only, so the one thing it can do is
+ * become `forUser`'s scoped client — `this.db.vacancy` or `this.db.$transaction` does not
+ * compile. A `PrismaClient` is one, so callers still pass theirs.
+ */
+export type Unscoped = Pick<PrismaClient, '$extends'>;
+
 /** The `Vacancy` operations `forUser` knows: each gets the owner added to its `where`. */
 const VACANCY_FILTERED = new Set([
   'findUnique',
@@ -17,7 +24,7 @@ const VACANCY_FILTERED = new Set([
 type Args = {
   where?: object;
   cursor?: object;
-  data?: { userId?: unknown; vacancyId?: unknown };
+  data?: Record<string, unknown>;
 };
 
 function unknownOperation(model: string, operation: string): Error {
@@ -29,51 +36,64 @@ function unknownOperation(model: string, operation: string): Error {
  * invariant 11): a client that only sees `userId`'s rows. A `Vacancy` query gets
  * `userId` added to its `where` (and its `cursor`), so another user's row reads as
  * missing — null, a zero count, P2025 on an update. A `Vacancy` create must carry this
- * `userId`. `StatusChange` and `Comment` have no owner column: a read is scoped through
- * its vacancy, a create connects to a vacancy of this user's (P2025 otherwise). Any
- * other operation throws — a new one is added here, scoped, before a service uses it.
- * The extension stays on inside `$transaction(async (tx) => …)`: `tx` is scoped too.
+ * `userId`; its `data` nests only a `create`. `StatusChange` and `Comment` have no owner
+ * column: a read is scoped through its vacancy, a create connects to a vacancy of this
+ * user's (P2025 otherwise). Any other operation, and any other model, throws — a new one
+ * is added here, scoped, before a service uses it. The extension stays on inside
+ * `$transaction(async (tx) => …)`: `tx` is scoped too.
  *
  * Raw SQL (`$queryRaw`, `$executeRaw`) is not scoped: it filters by `userId` itself.
  */
-export function forUser(db: PrismaClient, userId: string) {
+export function forUser(db: Unscoped, userId: string) {
   if (!userId) throw new Error('forUser needs a userId');
   return db.$extends({
     name: 'forUser',
     query: {
-      vacancy: {
+      $allModels: {
         $allOperations({ model, operation, args, query }) {
           const a = (args ?? {}) as Args;
-          if (operation === 'create') {
-            if (a.data?.userId !== userId) {
-              throw new Error(`forUser: a ${model} create must carry the scoped userId`);
-            }
-          } else if (VACANCY_FILTERED.has(operation)) {
-            a.where = { ...a.where, userId };
-            if (a.cursor) a.cursor = { ...a.cursor, userId };
-          } else {
-            throw unknownOperation(model, operation);
+          switch (model) {
+            case 'Vacancy':
+              return query(scopeVacancy(operation, a, userId) as typeof args);
+            case 'StatusChange':
+            case 'Comment':
+              return query(scopeChild(model, operation, a, userId) as typeof args);
+            default:
+              throw unknownOperation(model, operation);
           }
-          return query(a as typeof args);
-        },
-      },
-      statusChange: {
-        $allOperations({ model, operation, args, query }) {
-          return query(scopeChild(model, operation, args, userId) as typeof args);
-        },
-      },
-      comment: {
-        $allOperations({ model, operation, args, query }) {
-          return query(scopeChild(model, operation, args, userId) as typeof args);
         },
       },
     },
   });
 }
 
+function scopeVacancy(operation: string, a: Args, userId: string): Args {
+  if (operation === 'create') {
+    if (a.data?.userId !== userId) {
+      throw new Error('forUser: a Vacancy create must carry the scoped userId');
+    }
+  } else if (VACANCY_FILTERED.has(operation)) {
+    a.where = { ...a.where, userId };
+    if (a.cursor) a.cursor = { ...a.cursor, userId };
+    if (a.data && ('userId' in a.data || 'user' in a.data)) {
+      throw new Error('forUser: a Vacancy update cannot change its owner');
+    }
+  } else {
+    throw unknownOperation('Vacancy', operation);
+  }
+  // A nested `create` adds a row to this vacancy, so it is this user's; a `connect`,
+  // `update`, `set`… could reach another user's row.
+  for (const [field, value] of Object.entries(a.data ?? {})) {
+    const nested = value !== null && typeof value === 'object' && !(value instanceof Date);
+    if (nested && Object.keys(value).some((key) => key !== 'create')) {
+      throw new Error(`forUser: a Vacancy ${operation} nests only a create (${field})`);
+    }
+  }
+  return a;
+}
+
 /** `StatusChange` / `Comment`: through the vacancy they belong to. */
-function scopeChild(model: string, operation: string, args: unknown, userId: string): Args {
-  const a = (args ?? {}) as Args;
+function scopeChild(model: string, operation: string, a: Args, userId: string): Args {
   if (operation === 'findMany') {
     return { ...a, where: { AND: [a.where ?? {}, { vacancy: { userId } }] } };
   }

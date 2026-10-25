@@ -1,5 +1,5 @@
-import type { PrismaClient, VacancyStatus } from '@prisma/client';
-import { forUser } from '../db/for-user';
+import type { VacancyStatus } from '@prisma/client';
+import { forUser, type Unscoped } from '../db/for-user';
 import { getPrisma } from '../db/prisma-client';
 import {
   OPEN_PIPELINE_STATUSES,
@@ -56,7 +56,7 @@ export interface Stats {
 export class StatsService {
   /** @param db defaults (on construction, not import) to the lazy process-wide client —
    *   same rationale as VacancyService. Nest passes its managed client. */
-  constructor(private readonly db: PrismaClient = getPrisma()) {}
+  constructor(private readonly db: Unscoped = getPrisma()) {}
 
   /** One user's numbers (`forUser`, ADR-0038). @param now the timeout clock's "today"; a
    * parameter so a test can pin it. */

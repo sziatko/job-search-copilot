@@ -2,7 +2,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createPrismaClient, resetToSeed } from '@job-search-copilot/core';
 import type { FullConfig } from '@playwright/test';
-import { env, takeSnapshot } from './db';
+import { VISUAL_NOW, visualRun } from './clock';
+import { emptyVacancies, env, takeSnapshot } from './db';
 import { e2eAuth, sessionCookie } from './session';
 
 /**
@@ -22,8 +23,10 @@ export default async function globalSetup(config: FullConfig) {
         { email, name: 'E2E User', emailVerified: true },
         { method: 'admin' },
       ));
+    // Ids from 1 on every run: the visual tests' screenshots show them.
+    await emptyVacancies(db);
     // Refuses a database not named *_e2e / *_test / *_demo.
-    await resetToSeed(db, user.id);
+    await resetToSeed(db, user.id, visualRun ? VISUAL_NOW : undefined);
     await db.session.deleteMany(); // the last run's
     const cookie = await sessionCookie(auth, user.id);
 

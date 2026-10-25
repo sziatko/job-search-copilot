@@ -18,7 +18,7 @@ Source of truth: [`packages/core/prisma/schema.prisma`](../packages/core/prisma/
 | **journal** | `StatusChange`: one row per status move. `status` on the vacancy is its cache. |
 | **event** | A pipeline status written again — a second interview round. Journaled; a triage repeat is refused. |
 | **timeout** | An open pipeline status with no move for 30 days. Derived, never stored. |
-| **placeholder** | A vacancy `record_application` created because no match existed: no posting text, an analysis only if a score was passed. |
+| **placeholder** | A vacancy `record_application` created because no match existed: no posting text, no analysis. |
 | **context** | The statuses one web page lists (`STATUS_CONTEXT`); `ALL` in its filter means those, not the whole table. |
 | **owner** | The user a vacancy belongs to (`userId`). Every query is scoped to one. |
 
@@ -42,11 +42,11 @@ pipeline.
 | `applyUrl` | `String`, `@@unique([userId, applyUrl])` | **The natural key, per user** — two users may track one posting. The unique constraint is what enforces analyze-once at the DB level. Stored **canonicalized** — `normalizeApplyUrl()` drops the query string, the fragment and a trailing slash, so the spellings one posting arrives in share one row. Exception: a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept. → [ADR-0023](decisions/0023-canonical-applyurl.md) |
 | `companyKey` / `titleKey` | `String?` | The posting's match by name — intake's second match, and `record()` / `updateStatusByVacancy`'s lookup: `normalizeCompanyKey` / `normalizeTitleKey` (`identity.ts` — lowercase, punctuation collapsed, company legal suffixes stripped). `@@index([userId, companyKey, titleKey])`. Written on every create (intake, `save()`, `record()` — `matchKeys`); `null` only when the name normalizes to nothing (`—`), and such a row is matched by url only. Not `companyGroupKey()` — ADR-0032's company identity, which also drops places and notes, and is not stored (`identity.ts` says why the two differ). |
 | `source` | `String?` | Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source needs no migration; `null` on rows from `save()` and `record()`. |
-| `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet (intake without text, a placeholder). A list item carries `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
+| `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet (intake without text, a placeholder). Text too short to be a posting is stored as `null` on every path (`posting-text.ts`). A list item carries `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
 | `matchScore` | `Int?` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. `null` = not analysed yet. |
 | `recommendation` | `Recommendation?` enum | **The analyzer's call.** `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`; `null` = not analysed yet — with `matchScore`, both or neither (a CHECK). |
 | `comments` | `Comment[]` | Every note on the vacancy — see [`Comment`](#comment) below. The analyzer's reasoning is its `ANALYZER` row: reads still return it as `estimationComment` (`string \| null`), derived from the first one. |
-| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (one exception: the analysis moves it out of `NEW`, below). A cache of the latest [`StatusChange`](#statuschange). The values are in the table below. |
+| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (two machine moves from the queue: the analysis's out of `NEW`, a closed posting's to `UNAVAILABLE` — below). A cache of the latest [`StatusChange`](#statuschange). The values are in the table below. |
 | `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. Timeout and the `/applications` sort read it. |
 | `salaryInApplication` | `String?` | Free text ("130 PLN/h"), entered when applying. |
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
@@ -82,14 +82,16 @@ This is the central modelling decision. The analyzer's suggestion and the user's
 decision are **different things on different axes**:
 
 - `recommendation` — set once, with `matchScore`, from the analyzer (`save()`,
-  `submitAnalysis()`, or a placeholder given a score). Never changed afterwards; `null`
-  until then.
+  `submitAnalysis()`). Never changed afterwards; `null` until then.
 - `status` — set only through `writeStatus()`, from the user (or an agent acting for
   them). Starts at `NEW`. Never inferred from `recommendation` — **with one exception**:
   the analysis moves a vacancy out of `NEW` in the transaction that writes it, `SKIP` →
   `FILTERED_OUT`, anything else → `NOT_REVIEWED` (`statusAfterAnalysis` in `status.ts`;
   the rule is `core`'s, never an agent's). It only fires from `NEW`, so it never
   clobbers the user's progress ([ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)).
+  One more machine move, not from `recommendation`: a posting found closed goes from the queue (`NEW`,
+  `NOT_REVIEWED`, `SAVED_FOR_LATER`) to `UNAVAILABLE`, any other row untouched
+  ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)).
 
 **Status lifecycle** (enforced by the UI, not the DB — the API allows any move,
 including back to `NOT_REVIEWED`; the one DB rule is "an analysed row is never `NEW`",
@@ -207,10 +209,8 @@ zone: its `id` is the vacancy's, and applying moves the vacancy's own `status`.
 - **Record-or-link** (`record`, one transaction): link by `vacancyId` (web), or (MCP) to
   the vacancy with the passed `applyUrl`, else a unique `(companyKey, titleKey)` match —
   intake's match, an unknown url falling through to the name; zero matches → **create** a
-  placeholder `Vacancy` (`fullText` `null`; no analysis unless the caller passed a
-  `matchScore` — then `recommendation` is the caller's or derived from it, written once
-  the row has left `NEW`; an `ANALYZER` comment only when one was passed); more than
-  one → `AmbiguousVacancyMatchError`. Every vacancy is a candidate, the `NEW` and
+  placeholder `Vacancy` (`fullText` `null`, no analysis and no `ANALYZER` comment — the
+  analyzer may score it later); more than one → `AmbiguousVacancyMatchError`. Every vacancy is a candidate, the `NEW` and
   `FILTERED_OUT` ones included. A vacancy already in the pipeline →
   `AlreadyAppliedError`; one set back to triage can be applied to again. Then
   `writeStatus(APPLIED)` — and `writeStatus(status)` when the caller records it further
@@ -247,10 +247,8 @@ One note on a `Vacancy`, whoever wrote it — [ADR-0029](decisions/0029-one-vaca
 The writers, by source:
 
 - **`ANALYZER`** — with the analysis, through `writeAnalysis` (`VacancyService.save()`
-  and `submitAnalysis()`; a save on an analysed row writes nothing: analyze-once), and
-  `record()` when it creates a placeholder and was given an `estimationComment`. At most
-  one per vacancy in practice; reads take the first — so a placeholder created with a
-  note and scored later by `submitAnalysis` still shows the note.
+  and `submitAnalysis()`; a save on an analysed row writes nothing: analyze-once). At
+  most one per vacancy; reads take the first.
 - **`USER`** — `record()`'s and `update()`'s `comment`, and `updateStatus()` over REST.
 - **`AGENT`** — `updateStatus()` / `updateStatusByVacancy()` over MCP.
 
@@ -272,11 +270,13 @@ How a posting enters `Vacancy` before any analysis — `VacancyIntakeService`
 ## Analyze-once
 
 A vacancy can exist before its analysis, so the rule is "the analysis is written
-once". One function writes it, `writeAnalysis` (`vacancy.service.ts`), in
-the caller's transaction: first a conditional write (`WHERE recommendation IS NULL`,
-which takes the row lock — a concurrent analysis waits, then finds the row analysed),
-then from `NEW` the rule's status through `writeStatus`, then the analysis and its
-`ANALYZER` comment. Any status but `NEW` is left as it is (a pipeline placeholder).
+once". `save()` and `submitAnalysis()` write it through `writeAnalysis`
+(`vacancy.service.ts`), in the caller's transaction: first a conditional write
+(`WHERE recommendation IS NULL`, which takes the row lock — a concurrent analysis waits,
+then finds the row analysed), then from `NEW` the rule's status through `writeStatus`,
+then the analysis and its `ANALYZER` comment. Any status but `NEW` is left as it is (a
+pipeline placeholder). There is no other writer: `record()` creates its placeholder
+unanalysed.
 
 - `save()`: *find by the user's `applyUrl`* — none → create it in `NEW` and write the analysis
   (`created: true`); found without an analysis (intake took it in) → attach this one,
@@ -318,8 +318,8 @@ Added by hand in `--create-only` migrations — see
   `Vacancy_analysis_both_or_neither` — `("matchScore" IS NULL) = ("recommendation" IS NULL)`;
   `Vacancy_new_is_unanalysed` — `"status" <> 'NEW' OR "recommendation" IS NULL`.
   > Breaks if you change it: an insert or update that writes an analysis on a `NEW` row,
-  > or one field of it, is rejected — `save()` and `record()` create the row unanalysed,
-  > move it out of `NEW`, then write the analysis.
+  > or one field of it, is rejected — `save()` creates the row unanalysed, moves it out
+  > of `NEW`, then writes the analysis.
 - **`matchScore` CHECK** (`20260909224918_add_match_score_check`):
   `CHECK ("matchScore" >= 0 AND "matchScore" <= 100)`. The app validates 0–100 too
   (DTO, MCP zod); the DB does not rely on it.

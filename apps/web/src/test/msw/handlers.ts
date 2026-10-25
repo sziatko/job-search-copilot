@@ -3,9 +3,9 @@ import {
   type ApplicationListItem,
   isPipelineStatus,
   type UpdateApplicationInput,
-} from '@/pages/applications/types';
-import type { Stats } from '@/pages/dashboard/types';
-import type { VacancyDetail, VacancyListItem, VacancyStatus } from '@/pages/vacancies/types';
+} from '@/lib/applications/types';
+import type { Stats } from '@/lib/stats/types';
+import type { VacancyDetail, VacancyListItem, VacancyStatus } from '@/lib/vacancies/types';
 
 export const API_URL = 'http://localhost:3000/api/v1';
 

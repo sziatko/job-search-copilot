@@ -4,7 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, signIn } from './test-app';
+import { createTestApp, deleteTestUsers, signIn } from './test-app';
 
 // JSC as an OAuth 2.1 authorization server for MCP clients (ADR-0035).
 describe('OAuth authorization server (e2e)', () => {
@@ -13,6 +13,9 @@ describe('OAuth authorization server (e2e)', () => {
   const issuer = `${process.env.BETTER_AUTH_URL}/api/auth`;
   const mcpUrl = process.env.MCP_PUBLIC_URL ?? '';
   const redirectUri = 'http://localhost:6274/oauth/callback'; // the MCP Inspector's
+
+  /** The clients `register` made; anonymous, so no user's cascade deletes them. */
+  const clients: string[] = [];
 
   /**
    * RFC 7591, as the MCP Inspector does it: anonymous, public (PKCE, no secret), and
@@ -28,6 +31,7 @@ describe('OAuth authorization server (e2e)', () => {
         application_type: 'native',
       })
       .expect(201);
+    clients.push(res.body.client_id);
     return res.body as { client_id: string; client_secret?: string };
   }
 
@@ -36,8 +40,8 @@ describe('OAuth authorization server (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.oauthClient.deleteMany();
-    await prisma.user.deleteMany();
+    await prisma.oauthClient.deleteMany({ where: { clientId: { in: clients } } });
+    await deleteTestUsers();
     await app.close();
     await prisma.$disconnect();
   });
@@ -72,9 +76,13 @@ describe('OAuth authorization server (e2e)', () => {
 
   it('publishes a public signing key at the JWKS endpoint, to anyone', async () => {
     const { body } = await request(app.getHttpServer()).get('/api/auth/jwks').expect(200);
-    expect(body.keys).toHaveLength(1);
-    expect(body.keys[0]).toMatchObject({ kid: expect.any(String), alg: expect.any(String) });
-    expect(body.keys[0]).not.toHaveProperty('d'); // no private part
+    // At least one: the key is made on first use, and test files signing in at the same
+    // time on a fresh database can each make one.
+    expect(body.keys.length).toBeGreaterThan(0);
+    for (const key of body.keys) {
+      expect(key).toMatchObject({ kid: expect.any(String), alg: expect.any(String) });
+      expect(key).not.toHaveProperty('d'); // no private part
+    }
   });
 
   // The whole flow an MCP client runs, ending in what the MCP server checks.

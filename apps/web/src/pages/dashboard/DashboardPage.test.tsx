@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
 import { createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { Stats } from '@/lib/stats/types';
 import { routeTree } from '@/router';
 import {
   API_URL,
@@ -15,17 +16,10 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { expectLoadedPage, expectSkeletonPage } from '@/test/skeleton';
-import { timeAgo } from './DashboardPage';
-import type { Stats } from './types';
 
 // The server counts (ADR-0031); what is left here is how the numbers are shown — the
 // funnel's labels and conversions, the response rate — and that the review queue is
 // asked of the server in its order.
-const NOW = new Date('2026-09-21T12:00:00.000Z');
-
-function daysAgo(days: number): string {
-  return new Date(NOW.getTime() - days * 86_400_000).toISOString();
-}
 
 function renderIndex() {
   const router = createRouter({
@@ -44,17 +38,17 @@ function renderDashboard(stats: Stats = fakeStats(), vacancies = [fakeVacancy()]
 /** Each funnel row's text: label, value, conversion. */
 async function funnelRows() {
   await screen.findByRole('heading', { name: /pipeline funnel/i });
-  return Array.from(document.querySelectorAll('.funnel-row')).map((row) =>
-    Array.from(row.children).map((cell) => cell.textContent),
-  );
+  return screen
+    .getAllByTestId('funnel-row')
+    .map((row) => Array.from(row.children).map((cell) => cell.textContent));
 }
 
 /** Each "Dropped out" row's text: label, value. */
 async function droppedRows() {
   await screen.findByRole('heading', { name: /dropped out/i });
-  return Array.from(document.querySelectorAll('.fact-row')).map((row) =>
-    Array.from(row.children).map((cell) => cell.textContent),
-  );
+  return screen
+    .getAllByTestId('fact-row')
+    .map((row) => Array.from(row.children).map((cell) => cell.textContent));
 }
 
 describe('DashboardPage', () => {
@@ -102,7 +96,10 @@ describe('DashboardPage', () => {
   it('shows how many vacancies await their analysis', async () => {
     renderDashboard(fakeStats({ logged: 30, awaitingAnalysis: 12 }));
 
-    const tile = (await screen.findByText('Awaiting analysis')).closest('.kpi-tile');
+    await screen.findByText('Awaiting analysis');
+    const tile = screen
+      .getAllByTestId('kpi-tile')
+      .find((t) => within(t).queryByText('Awaiting analysis'));
     expect(tile).toHaveTextContent('12');
     expect(tile).toHaveTextContent('in the inbox, not yet scored');
   });
@@ -139,8 +136,11 @@ describe('DashboardPage', () => {
     ]);
 
     await screen.findByText('Apply me');
-    const titles = Array.from(document.querySelectorAll('.attn-title')).map((t) => t.textContent);
-    expect(titles).toEqual(['Apply me', 'Skip me']);
+    // Each Review link is named "Review <title>".
+    const titles = within(screen.getByRole('list', { name: 'Needs your review' }))
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('aria-label'));
+    expect(titles).toEqual(['Review Apply me', 'Review Skip me']);
     expect(requests.map((q) => Object.fromEntries(q))).toEqual([
       { status: 'NOT_REVIEWED', sort: 'recommended', limit: '10' },
     ]);
@@ -154,7 +154,8 @@ describe('DashboardPage', () => {
     );
 
     await screen.findByText('Role 12');
-    expect(document.querySelectorAll('.review-scroll .attn-item')).toHaveLength(10);
+    const queue = screen.getByRole('list', { name: 'Needs your review' });
+    expect(within(queue).getAllByRole('listitem')).toHaveLength(10);
   });
 
   it('lists recent moves from the stats', async () => {
@@ -180,26 +181,26 @@ describe('DashboardPage', () => {
       'href',
       '/vacancies/1',
     );
-    expect(document.querySelector('.activity-sub')).toHaveTextContent(
+    const activity = screen.getByRole('list', { name: 'Recent activity' });
+    expect(within(activity).getByRole('listitem')).toHaveTextContent(
       'Backend Engineer · Interview',
     );
   });
 
-  it('draws skeleton tiles and cards while it loads, the numbers after', async () => {
+  it('draws skeleton tiles while it loads, the numbers after', async () => {
     const hold = holdGet('/stats');
     mswServer.use(hold.handler, ...buildHandlers([fakeVacancy()]), statsHandler(fakeStats()));
     renderIndex();
 
     const page = await expectSkeletonPage();
-    const tiles = page.querySelectorAll('.kpi-tile').length;
-    const cards = page.querySelectorAll('.card').length;
+    const tiles = within(page).getAllByTestId('kpi-tile').length;
     hold.release();
 
     expect(await screen.findByRole('heading', { name: /pipeline funnel/i })).toBeInTheDocument();
     expectLoadedPage();
-    // A skeleton for each tile and card the page draws, so a new one is not missed.
-    expect(document.querySelectorAll('.kpi-tile')).toHaveLength(tiles);
-    expect(document.querySelectorAll('.card')).toHaveLength(cards);
+    // A skeleton for each tile the page draws, so a new one is not missed. The cards'
+    // shapes are the visual tests' to compare.
+    expect(screen.getAllByTestId('kpi-tile')).toHaveLength(tiles);
   });
 
   it('surfaces a load error instead of throwing', async () => {
@@ -212,40 +213,5 @@ describe('DashboardPage', () => {
     expect(
       await screen.findByText(/failed to load the dashboard: .*HTTP 500/i),
     ).toBeInTheDocument();
-  });
-});
-
-describe('timeAgo', () => {
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(NOW);
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('reads minutes below an hour, hours below a day, days above', () => {
-    expect(timeAgo(NOW.toISOString())).toBe('this minute');
-    expect(timeAgo(daysAgo(5 / (24 * 60)))).toBe('5 minutes ago');
-    expect(timeAgo(daysAgo(90 / (24 * 60)))).toBe('2 hours ago');
-    expect(timeAgo(daysAgo(3))).toBe('3 days ago');
-  });
-
-  it('fails open on an unparseable timestamp instead of throwing', () => {
-    // `Intl.RelativeTimeFormat.format(NaN, …)` throws `RangeError`, and NaN passes
-    // every `<` comparison, so without the guard this reaches format() — and with no
-    // `errorComponent` in the router, one bad stamp would take the whole dashboard
-    // render with it. /applications' `daysSinceLastMove` fails open the same way.
-    expect(timeAgo('garbage')).toBe('unknown');
-    expect(timeAgo('')).toBe('unknown');
-  });
-
-  it('clamps a future timestamp to "this minute" rather than a negative number', () => {
-    // Server and browser clocks disagree; the row is stamped by the server, so a
-    // browser a little behind will see a timestamp in its own future. Without the
-    // clamp this renders "in 60 minutes" for something that already happened.
-    const oneHourAhead = new Date(NOW.getTime() + 3_600_000).toISOString();
-    expect(timeAgo(oneHourAhead)).toBe('this minute');
   });
 });

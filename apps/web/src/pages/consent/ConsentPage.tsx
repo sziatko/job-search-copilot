@@ -2,7 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation } from '@tanstack/react-router';
 import { useState } from 'react';
 import { JscLogo } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
+import { CenterColumn } from '@/components/ui/CenterColumn';
 import { authClient } from '@/lib/auth';
+import { queryKeys } from '@/lib/queryKeys';
 
 /**
  * "Allow this app to use JSC?" — where the API sends a signed-in user when an MCP client
@@ -20,7 +23,7 @@ export function ConsentPage() {
 
   // A client registers itself (RFC 7591) and names itself; the name is its own claim.
   const client = useQuery({
-    queryKey: ['oauth-client', clientId],
+    queryKey: queryKeys.oauthClient(clientId),
     queryFn: async () =>
       (await authClient.oauth2.publicClient({ query: { client_id: clientId } })).data,
   });
@@ -38,7 +41,7 @@ export function ConsentPage() {
   }
 
   return (
-    <main className="soon-wrap">
+    <CenterColumn as="main">
       <JscLogo size={52} />
       <h2>{name} wants to use Job Search Copilot</h2>
       <p>
@@ -50,19 +53,14 @@ export function ConsentPage() {
           {error}
         </p>
       )}
-      <div className="flex w-full flex-col gap-[10px]">
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={busy}
-          onClick={() => answer(true)}
-        >
+      <div className="flex w-full flex-col gap-2.5">
+        <Button variant="primary" disabled={busy} onClick={() => answer(true)}>
           Allow
-        </button>
-        <button type="button" className="btn" disabled={busy} onClick={() => answer(false)}>
+        </Button>
+        <Button disabled={busy} onClick={() => answer(false)}>
           Deny
-        </button>
+        </Button>
       </div>
-    </main>
+    </CenterColumn>
   );
 }

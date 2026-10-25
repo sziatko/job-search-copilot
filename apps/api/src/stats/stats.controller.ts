@@ -1,8 +1,14 @@
 import { StatsService } from '@job-search-copilot/core';
-import { Controller, Get } from '@nestjs/common';
-import { CurrentUserId } from '../auth/api-key.guard';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
+import { ApiKeyGuard, CurrentUserId } from '../auth/api-key.guard';
 
+/** A session or an API key (ADR-0039). */
 @Controller('stats')
+@AllowAnonymous()
+@UseGuards(ApiKeyGuard)
+@ApiBearerAuth()
 export class StatsController {
   constructor(private readonly stats: StatsService) {}
 

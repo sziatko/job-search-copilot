@@ -2,7 +2,13 @@ import 'reflect-metadata';
 import { getPrisma } from '@job-search-copilot/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { type Api, createTestApp, signedInAgent } from './test-app';
+import {
+  type Api,
+  createTestApp,
+  deleteTestUsers,
+  deleteTestVacancies,
+  signedInAgent,
+} from './test-app';
 
 /** [source, body] per comment, in the order the API returned them. */
 const notes = (item: { comments: { source: string; body: string }[] }) =>
@@ -40,12 +46,10 @@ describe('Applications (e2e)', () => {
     api = await signedInAgent(app);
   });
 
-  afterEach(async () => {
-    await prisma.vacancy.deleteMany();
-  });
+  afterEach(deleteTestVacancies);
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    await deleteTestUsers();
     await app.close();
     await prisma.$disconnect();
   });
@@ -168,11 +172,10 @@ describe('Applications (e2e)', () => {
       expect(second.body).toMatchObject({ items: [{ id: a }], total: 2, nextCursor: null });
     });
 
-    it('400s for limit above 500, a status outside the pipeline, a bad state, or cursor with offset', async () => {
+    it('400s for limit above 500, a status outside the pipeline, or a bad state', async () => {
       await api.get('/api/v1/applications?limit=1000').expect(400);
       await api.get('/api/v1/applications?status=DECLINED').expect(400);
       await api.get('/api/v1/applications?state=TIMEOUT').expect(400);
-      await api.get('/api/v1/applications?cursor=5&offset=0').expect(400);
     });
   });
 

@@ -1,168 +1,25 @@
-import { Link } from '@tanstack/react-router';
-import { KpiTile } from '@/components/ui/KpiTile';
-import { SkeletonCard } from '@/components/ui/SkeletonCard';
-import { APPLICATION_STATUS_LABELS } from '../applications/constants';
-import type { ApplicationStatus } from '../applications/types';
-import type { VacancyListItem } from '../vacancies/types';
-import type { RecentMove } from './types';
+import { Card, CardHead, CardSub, CardTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Fact, FactList } from '@/components/ui/FactList';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import { SplitGrid } from '@/components/ui/SplitGrid';
+import { View } from '@/components/ui/View';
+import { DashboardSkeleton } from './DashboardSkeleton';
+import { Funnel, type FunnelStep } from './Funnel';
+import { RecentActivity } from './RecentActivity';
+import { ReviewQueue } from './ReviewQueue';
 import { useDashboard } from './useDashboard';
-
-/** What each status change reads as in the activity feed, and its dot colour. */
-const ACTIVITY: Record<ApplicationStatus, { verb: string; dot: 'good' | 'warn' | 'accent' }> = {
-  APPLIED: { verb: 'Applied', dot: 'accent' },
-  ACTION_NEEDED: { verb: 'Action needed', dot: 'good' },
-  INTERVIEW: { verb: 'Interview scheduled', dot: 'good' },
-  AWAITING: { verb: 'Awaiting their reply', dot: 'accent' },
-  OFFER: { verb: 'Offer received', dot: 'good' },
-  REJECTED: { verb: 'Rejected', dot: 'warn' },
-};
-
-const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-/** Exported for its boundaries: a future timestamp (server/browser clock skew) has
- * to clamp to "this minute" rather than render a negative number, and an
- * unparseable one has to fail open like `daysSinceLastMove` — `relative.format` on
- * NaN throws `RangeError`, and there is no error boundary in the router, so one bad
- * stamp would take the whole dashboard render with it. */
-export function timeAgo(iso: string): string {
-  const elapsed = Date.now() - new Date(iso).getTime();
-  // Not `elapsed < HOUR`: NaN fails every comparison below and would reach format().
-  if (!Number.isFinite(elapsed)) return 'unknown';
-  if (elapsed < HOUR) return relative.format(-Math.max(Math.round(elapsed / MINUTE), 0), 'minute');
-  if (elapsed < DAY) return relative.format(-Math.round(elapsed / HOUR), 'hour');
-  return relative.format(-Math.round(elapsed / DAY), 'day');
-}
-
-interface FunnelStep {
-  label: string;
-  value: number;
-}
-
-/**
- * Five stages, each bar scaled against the first and each label against the one
- * above it. Each stage has its own colour (`--funnel-1…5` in index.css, by row).
- */
-function Funnel({ steps }: { steps: FunnelStep[] }) {
-  const baseline = steps[0]?.value ?? 0;
-
-  return (
-    <div className="funnel">
-      {steps.map((step, i) => {
-        const previous = steps[i - 1];
-        const width = baseline > 0 ? (step.value / baseline) * 100 : 0;
-        const conversion = !previous
-          ? 'baseline'
-          : previous.value > 0
-            ? `${Math.round((step.value / previous.value) * 100)}% of ${previous.label.toLowerCase()}`
-            : '—';
-
-        return (
-          <div className="funnel-row" key={step.label}>
-            <div className="funnel-name">{step.label}</div>
-            <div className="funnel-track">
-              <div className="funnel-fill" style={{ width: `${width}%` }} />
-            </div>
-            <div className="funnel-value">{step.value}</div>
-            <div className="funnel-conv">{conversion}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ReviewQueue({ items }: { items: VacancyListItem[] }) {
-  if (items.length === 0) {
-    return <div className="empty-state">Everything is triaged. Nice.</div>;
-  }
-
-  return (
-    <div className="attn-list">
-      {items.map((item) => (
-        <div className="attn-item" key={item.id}>
-          <div className="attn-score">{item.matchScore === null ? '—' : `${item.matchScore}%`}</div>
-          <div className="attn-body">
-            <div className="attn-title">{item.title}</div>
-            <div className="attn-sub">{item.company}</div>
-          </div>
-          <Link to="/vacancies/$id" params={{ id: String(item.id) }} className="attn-go">
-            Review
-          </Link>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function RecentActivity({ items }: { items: RecentMove[] }) {
-  if (items.length === 0) {
-    return <div className="empty-state">No status changes yet.</div>;
-  }
-
-  return (
-    <div className="activity-list">
-      {items.map((item) => (
-        <div className="activity-item" key={item.id}>
-          <div className={`activity-dot ${ACTIVITY[item.status].dot}`} />
-          <div className="activity-body">
-            <div className="activity-title">
-              {ACTIVITY[item.status].verb} — {item.company}
-            </div>
-            <div className="activity-sub">
-              <Link
-                to="/vacancies/$id"
-                params={{ id: String(item.vacancyId) }}
-                className="role-link"
-              >
-                {item.title}
-              </Link>{' '}
-              · {APPLICATION_STATUS_LABELS[item.status]}
-            </div>
-          </div>
-          <div className="activity-time">{timeAgo(item.createdAt)}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** The page while it loads: its KPI tiles and its cards, as bars. */
-function DashboardSkeleton() {
-  return (
-    <section className="view" aria-busy="true">
-      <span className="sr-only">Loading…</span>
-      <div aria-hidden className="kpi-row">
-        {Array.from({ length: 6 }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
-          <div key={i} className="kpi-tile">
-            <span className="skeleton h-[11px] w-[60%]" />
-            <span className="skeleton mt-[12px] h-[28px] w-[40%]" />
-            <span className="skeleton mt-[8px] h-[11px] w-[80%]" />
-          </div>
-        ))}
-      </div>
-      <div className="dash-grid">
-        <SkeletonCard lines={14} />
-        <SkeletonCard lines={9} />
-      </div>
-      <SkeletonCard lines={5} className="mt-[16px]" />
-    </section>
-  );
-}
 
 export function DashboardPage() {
   const { loading, loadError, stats, responseRate, reviewQueue } = useDashboard();
 
   if (loadError) {
     return (
-      <section className="view">
-        <div className="card">
-          <div className="empty-state">Failed to load the dashboard: {loadError}</div>
-        </div>
-      </section>
+      <View>
+        <Card>
+          <EmptyState>Failed to load the dashboard: {loadError}</EmptyState>
+        </Card>
+      </View>
     );
   }
 
@@ -190,8 +47,8 @@ export function DashboardPage() {
   ];
 
   return (
-    <section className="view">
-      <div className="kpi-row">
+    <View>
+      <KpiRow>
         <KpiTile label="Logged" value={stats.logged} note="postings seen, deduped by URL" />
         <KpiTile
           label="Awaiting analysis"
@@ -201,7 +58,7 @@ export function DashboardPage() {
         <KpiTile
           label="Awaiting triage"
           value={stats.awaitingTriage}
-          variant="accent"
+          tone="accent"
           note="scored, not yet decided"
         />
         <KpiTile label="Recommended" value={stats.recommended} note="analyzer says apply" />
@@ -213,58 +70,61 @@ export function DashboardPage() {
         <KpiTile
           label="Interviews"
           value={stats.interview}
-          variant="good"
+          tone="good"
           note={`${stats.actionNeeded} need your reply`}
         />
-      </div>
+      </KpiRow>
 
-      <div className="dash-grid">
-        <div className="card">
-          <div className="card-head">
+      <SplitGrid>
+        <Card>
+          <CardHead>
             <div>
-              <h2>Pipeline funnel</h2>
-              <div className="count">From logged to interview</div>
+              <CardTitle>Pipeline funnel</CardTitle>
+              <CardSub>From logged to interview</CardSub>
             </div>
-          </div>
+          </CardHead>
           <Funnel steps={steps} />
-          <div className="card-head border-t border-border">
+          <CardHead className="border-t border-border">
             <div>
-              <h2>Dropped out</h2>
-              <div className="count">Where the rest went</div>
+              <CardTitle>Dropped out</CardTitle>
+              <CardSub>Where the rest went</CardSub>
             </div>
-          </div>
-          <div className="fact-list">
+          </CardHead>
+          <FactList>
             {dropped.map((row) => (
-              <div className="fact-row" key={row.label}>
-                <span className="fact-label">{row.label}</span>
-                <span className="fact-value">{row.value}</span>
-              </div>
+              <Fact key={row.label} label={row.label}>
+                {row.value}
+              </Fact>
             ))}
-          </div>
-        </div>
+          </FactList>
+        </Card>
 
-        <div className="card flex flex-col">
-          <div className="card-head">
+        <Card className="flex flex-col">
+          <CardHead>
             <div>
-              <h2>Needs your review</h2>
-              <div className="count">Top recommended, not yet triaged</div>
+              <CardTitle>Needs your review</CardTitle>
+              <CardSub>Top recommended, not yet triaged</CardSub>
             </div>
-          </div>
-          <div className="review-scroll">
+          </CardHead>
+          {/* The grid stretches both cards to one row height. `contain-size` keeps the
+              list out of that height, so the funnel card alone sets it, and the list
+              fills what is left under its heading and scrolls. Stacked, the card is a
+              row of its own and sizes to its list again. */}
+          <div className="min-h-0 flex-1 overflow-y-auto contain-size stacked:contain-none">
             <ReviewQueue items={reviewQueue} />
           </div>
-        </div>
-      </div>
+        </Card>
+      </SplitGrid>
 
-      <div className="card mt-[16px]">
-        <div className="card-head">
+      <Card className="mt-4">
+        <CardHead>
           <div>
-            <h2>Recent activity</h2>
-            <div className="count">Latest status changes across applications</div>
+            <CardTitle>Recent activity</CardTitle>
+            <CardSub>Latest status changes across applications</CardSub>
           </div>
-        </div>
+        </CardHead>
         <RecentActivity items={stats.recent} />
-      </div>
-    </section>
+      </Card>
+    </View>
   );
 }

@@ -17,16 +17,16 @@ theme. Several of these are agreements between files that no compiler checks.
      `useTheme().toggle`: a click stores and applies the opposite of the theme on
      screen. Nothing stored means no attribute. One module-level store
      (`useSyncExternalStore`), so the toggle and the toaster see the same click;
-   - `apps/web/src/index.css` — `:root` follows the OS media query;
-     `data-theme="light"` blocks it, `data-theme="dark"` overrides it.
+   - `apps/web/src/index.css` — every colour is one `light-dark()` pair; `:root`'s
+     `color-scheme: light dark` picks the OS's side, and `data-theme` pins it.
 2. **The shell is a parent route**, `RootLayout` (sidebar, topbar), around every
    signed-in page.
 3. **Route chrome is declared on the route**: `staticData` of type `RouteMeta`
    (`title`, `rail`). `rail` starts the table-heavy pages with the sidebar collapsed
    to an icon rail.
 4. **`/` is the dashboard**, counted by `GET /stats` ([ADR-0031](0031-stats-endpoint.md)).
-5. **A page not built yet** renders `SoonPage`, and its sidebar item carries a `SOON`
-   badge (part of `/profile` today).
+5. **A feature not built yet** shows a `ComingSoon` panel where it will be (the rest of
+   `/profile` today).
 
 ## Why this and not the alternatives
 - **The theme applied in React on mount** — the first paint happens before hydration,
@@ -53,8 +53,7 @@ theme. Several of these are agreements between files that no compiler checks.
   `type="module"` (the flash returns), and private mode makes `localStorage` throw.
 - **A page outside `RootLayout`** loses the navigation, the theme toggle and the scroll
   reset at once.
-- **A placeholder that becomes real** → remove its `SOON` badge in
-  `components/shell/Sidebar.tsx` and its `SoonPage`.
+- **A placeholder that becomes real** → remove its `ComingSoon`.
 
 ## Related
 [ADR-0020](0020-web-router-tanstack.md), [ADR-0031](0031-stats-endpoint.md).

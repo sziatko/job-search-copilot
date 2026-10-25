@@ -1,16 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
-import { listVacanciesPage } from '../vacancies/api';
-import { VACANCY_ACTION } from '../vacancies/types';
-import { fetchStats } from './api';
+import { queryKeys } from '@/lib/queryKeys';
+import { fetchStats } from '@/lib/stats/api';
+import { listVacanciesPage } from '@/lib/vacancies/api';
+import { VACANCY_ACTION } from '@/lib/vacancies/types';
 
 /** Enough to fill the funnel card's height on a desktop; the rest scrolls in the card. */
 const REVIEW_QUEUE_SIZE = 10;
 
 /** Two requests: the numbers, and the top of the triage queue in the server's order. */
 export function useDashboard() {
-  const stats = useQuery({ queryKey: ['stats'], queryFn: fetchStats });
+  const stats = useQuery({ queryKey: queryKeys.stats(), queryFn: fetchStats });
   const reviewQueue = useQuery({
-    queryKey: ['dashboard', 'review-queue'],
+    queryKey: queryKeys.dashboard('review-queue'),
     queryFn: () =>
       listVacanciesPage({
         status: [VACANCY_ACTION.NOT_REVIEWED],

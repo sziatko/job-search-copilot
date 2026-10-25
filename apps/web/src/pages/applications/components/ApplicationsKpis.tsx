@@ -1,5 +1,9 @@
-import { KpiTile } from '@/components/ui/KpiTile';
-import { APPLICATION_STATUS_LABELS, APPLICATION_STATUS_ORDER, FILTER_LABELS } from '../constants';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import {
+  APPLICATION_STATUS_LABELS,
+  APPLICATION_STATUS_ORDER,
+  FILTER_LABELS,
+} from '@/lib/applications/constants';
 import {
   type ApplicationStatus,
   type ApplicationStatusFilter,
@@ -7,10 +11,10 @@ import {
   STATUS_FILTER_ACTIVE,
   STATUS_FILTER_ALL,
   STATUS_FILTER_TIMEOUT,
-} from '../types';
+} from '@/lib/applications/types';
 
 // Which tiles get a coloured value, mirroring the mockup's tracker tiles.
-const KPI_VARIANTS: Partial<Record<ApplicationStatus, 'good' | 'bad'>> = {
+const KPI_TONES: Partial<Record<ApplicationStatus, 'good' | 'bad'>> = {
   OFFER: 'good',
   INTERVIEW: 'good',
   REJECTED: 'bad',
@@ -47,11 +51,11 @@ export function ApplicationsKpis({
     .sort((a, b) => APPLICATION_STATUS_ORDER[a] - APPLICATION_STATUS_ORDER[b]);
 
   return (
-    <div className="kpi-row">
+    <KpiRow>
       <KpiTile
         label="Total"
         value={stats.total}
-        variant="accent"
+        tone="accent"
         selected={filter === STATUS_FILTER_ALL}
         onClick={() => onFilterChange(STATUS_FILTER_ALL)}
       />
@@ -64,7 +68,7 @@ export function ApplicationsKpis({
       <KpiTile
         label={FILTER_LABELS[STATUS_FILTER_TIMEOUT]}
         value={stats.timedOut}
-        variant="warn"
+        tone="warn"
         selected={filter === STATUS_FILTER_TIMEOUT}
         onClick={() => onFilterChange(STATUS_FILTER_TIMEOUT)}
       />
@@ -73,11 +77,11 @@ export function ApplicationsKpis({
           key={status}
           label={APPLICATION_STATUS_LABELS[status]}
           value={stats.byStatus[status] ?? 0}
-          variant={KPI_VARIANTS[status]}
+          tone={KPI_TONES[status]}
           selected={filter === status}
           onClick={() => onFilterChange(status)}
         />
       ))}
-    </div>
+    </KpiRow>
   );
 }

@@ -198,20 +198,18 @@ describe('ApplicationService', () => {
       expect(result.application.id).toBe(vacancy.id);
     });
 
-    it('creates a placeholder vacancy when nothing matches', async () => {
+    it('creates an unanalysed placeholder vacancy when nothing matches', async () => {
       const result = await applications.record(userId, {
         company: 'Never Analyzed Co',
         title: 'Staff Engineer',
-        matchScore: 72,
-        estimationComment: 'From tracker notes.',
       });
 
       expect(result.resolution).toBe('created-vacancy');
       expect(result.vacancyCreated).toBe(true);
-      expect(result.application.matchScore).toBe(72);
-      expect(result.application.recommendation).toBe('APPLY'); // derived from 72
+      expect(result.application.matchScore).toBeNull();
+      expect(result.application.recommendation).toBeNull();
       expect(result.application.applyUrl).toMatch(/^tracker:\/\//);
-      expect(notes(result.application)).toEqual([['ANALYZER', 'From tracker notes.']]);
+      expect(result.application.comments).toEqual([]);
 
       const created = await vacancies.getById(userId, result.application.id);
       expect(created?.fullText).toBeNull();
@@ -221,24 +219,13 @@ describe('ApplicationService', () => {
       await expectCacheInStep(result.application.id);
     });
 
-    it('writes no ANALYZER comment for a placeholder given none', async () => {
+    it('adds no comment for a blank one', async () => {
       const result = await applications.record(userId, {
         company: 'Silent Co',
         title: 'Dev',
         comment: ' ',
       });
       expect(result.application.comments).toEqual([]);
-    });
-
-    it('creates no analysis without a matchScore, a recommendation alone ignored', async () => {
-      const result = await applications.record(userId, {
-        company: 'Blank Co',
-        title: 'Dev',
-        recommendation: 'SKIP',
-      });
-      expect(result.application.matchScore).toBeNull();
-      expect(result.application.recommendation).toBeNull();
-      expect(await journal(result.application.id)).toEqual(['NEW', 'APPLIED']);
     });
 
     it('throws AmbiguousVacancyMatchError on more than one match', async () => {
@@ -375,15 +362,21 @@ describe('ApplicationService', () => {
       expect((await applications.list(userId, { company: 'acme', title: 'lead' })).total).toBe(0);
     });
 
-    it('respects limit/offset', async () => {
-      const page = await applications.list(userId, { limit: 1, offset: 1 });
-      expect(page.items).toHaveLength(1);
-      expect(page.total).toBe(2);
+    it('respects limit, and pages on by nextCursor', async () => {
+      const first = await applications.list(userId, { limit: 1 });
+      const second = await applications.list(userId, {
+        limit: 1,
+        cursor: first.nextCursor ?? -1,
+      });
+      expect([first.items.length, second.items.length]).toEqual([1, 1]);
+      expect(second.items[0].id).not.toBe(first.items[0].id);
+      expect([first.total, second.total, second.nextCursor]).toEqual([2, 2, null]);
     });
 
     it('orders rows that share one statusChangedAt, so two pages do not overlap', async () => {
-      // Rows can share one date (a batch written at once), so a tie is a normal case. Read as windows, an unstable order serves one row twice and skips
-      // another; `id desc` is what makes them disjoint.
+      // Rows can share one date (a batch written at once), so a tie is a normal case. Paged
+      // over an unstable order, one row is served twice and another skipped; `id desc` is
+      // what makes the pages disjoint.
       const stamp = new Date('2099-01-01');
       for (const company of ['Tie One', 'Tie Two', 'Tie Three']) {
         const vacancy = await seedVacancy({ company, title: 'Same Stamp' });
@@ -395,7 +388,10 @@ describe('ApplicationService', () => {
       }
 
       const first = await applications.list(userId, { limit: 3 });
-      const second = await applications.list(userId, { limit: 3, offset: 3 });
+      const second = await applications.list(userId, {
+        limit: 3,
+        cursor: first.nextCursor ?? -1,
+      });
 
       const tiedIds = first.items.map((item) => item.id);
       expect(first.items.every((item) => item.statusChangedAt.getTime() === stamp.getTime())).toBe(
@@ -818,7 +814,7 @@ describe('ApplicationService', () => {
       const existing = await seedVacancy({ company: 'Batch Co', title: 'Dev' });
       const { results } = await applications.recordMany(userId, [
         { vacancyId: existing.id },
-        { company: 'Fresh Co', title: 'Engineer', matchScore: 65 },
+        { company: 'Fresh Co', title: 'Engineer' },
       ]);
       expect(results.map((r) => r.resolution)).toEqual(['linked-by-id', 'created-vacancy']);
       expect((await applications.list(userId)).total).toBe(2);

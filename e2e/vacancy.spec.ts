@@ -9,20 +9,26 @@ const pick = async (db: PrismaClient, where: Where) =>
   db.vacancy.findFirstOrThrow({ where, orderBy: { id: 'asc' } });
 
 const statusSelect = (page: Page) => page.getByRole('combobox', { name: 'Status' });
-const timeline = (page: Page) => page.locator('.status-timeline .timeline-label');
+const timeline = (page: Page) => page.getByTestId('timeline-status');
+/** The page's own heading — the shell's <h1> is the other one. */
+const vacancyTitle = (page: Page, title: string) =>
+  page.getByRole('heading', { level: 1, name: title, exact: true });
+/** A vacancy's id as the page shows it: `#42`. */
+const ID = /^#\d+$/;
 
 test('the header, and "Not analysed yet" for a vacancy with no analysis', async ({ page, db }) => {
   const analysed = await pick(db, { status: 'NOT_REVIEWED', recommendation: 'APPLY' });
   await page.goto(`/vacancies/${analysed.id}`);
-  await expect(page.locator('.detail-title')).toHaveText(analysed.title);
-  await expect(page.locator('.detail-company-name')).toHaveText(analysed.company);
-  await expect(page.locator('.detail-id-tag')).toHaveText(`#${analysed.id}`);
-  await expect(page.locator('.detail-meta-row').getByText('Apply', { exact: true })).toBeVisible();
+  await expect(vacancyTitle(page, analysed.title)).toBeVisible();
+  await expect(page.getByText(analysed.company, { exact: true })).toBeVisible();
+  // The header's, and the Details card's.
+  await expect(page.getByText(`#${analysed.id}`, { exact: true })).toHaveCount(2);
+  await expect(page.getByText('Apply', { exact: true })).toHaveCount(2);
   await expect(page.getByText('Not analysed yet')).toHaveCount(0);
 
   const fresh = await pick(db, { status: 'NEW', recommendation: null });
   await page.goto(`/vacancies/${fresh.id}`);
-  await expect(page.locator('.detail-title')).toHaveText(fresh.title);
+  await expect(vacancyTitle(page, fresh.title)).toBeVisible();
   await expect(page.getByText('Not analysed yet')).toBeVisible();
 });
 
@@ -53,7 +59,7 @@ test('Save for later with a comment', async ({ page, db }) => {
   await dialog.getByRole('button', { name: 'Save for later' }).click();
   await expect(page.getByText('Moved to Saved for later')).toBeVisible();
   await expect(statusSelect(page)).toHaveValue('SAVED_FOR_LATER');
-  await expect(page.locator('.history-text', { hasText: comment })).toBeVisible();
+  await expect(page.getByText(comment)).toBeVisible();
 });
 
 test('Decline: Cancel keeps the status, Decline moves it', async ({ page, db }) => {
@@ -82,7 +88,7 @@ test('Apply through the dialog turns the select into the pipeline one', async ({
   await dialog.getByRole('button', { name: 'OK' }).click();
   await expect(page.getByText('Application submitted!')).toBeVisible();
   await expect(statusSelect(page)).toHaveValue('APPLIED');
-  await expect(statusSelect(page).locator('option')).toHaveText([
+  await expect(statusSelect(page).getByRole('option')).toHaveText([
     'Applied',
     'Action needed',
     'Interview',
@@ -90,7 +96,7 @@ test('Apply through the dialog turns the select into the pipeline one', async ({
     'Offer',
     'Rejected',
   ]);
-  await expect(page.locator('.fact-row', { hasText: 'Salary' })).toContainText('68k EUR / year');
+  await expect(page.getByText('68k EUR / year', { exact: true })).toBeVisible();
 });
 
 test("an application's pipeline select moves it on", async ({ page, db }) => {
@@ -116,13 +122,12 @@ test('Show full description / Show less', async ({ page, db }) => {
 
   const more = page.getByRole('button', { name: 'Show full description' });
   await expect(more).toHaveAttribute('aria-expanded', 'false');
-  const clamped = await page.locator('.desc-body').evaluate((el) => el.clientHeight);
+  const text = page.getByText(paragraph.trim());
+  const clamped = await text.evaluate((el) => el.clientHeight);
   await more.click();
   const less = page.getByRole('button', { name: 'Show less' });
   await expect(less).toHaveAttribute('aria-expanded', 'true');
-  expect(await page.locator('.desc-body').evaluate((el) => el.clientHeight)).toBeGreaterThan(
-    clamped,
-  );
+  expect(await text.evaluate((el) => el.clientHeight)).toBeGreaterThan(clamped);
 
   await less.click();
   await expect(more).toBeVisible();
@@ -137,7 +142,11 @@ test('Add comment', async ({ page, db }) => {
   await box.fill(body);
   await page.getByRole('button', { name: 'Add comment' }).click();
   await expect(page.getByText('Comment added')).toBeVisible();
-  await expect(page.locator('.history-item', { hasText: body })).toContainText('You');
+  const comment = page
+    .getByRole('list', { name: 'Comments' })
+    .getByRole('listitem')
+    .filter({ hasText: body });
+  await expect(comment).toContainText('You');
   await expect(box).toHaveValue('');
 });
 
@@ -147,16 +156,20 @@ test("Other vacancies lists the company's others and opens one", async ({ page, 
   expect(others).toBeGreaterThan(0);
   await page.goto(`/vacancies/${id}`);
 
-  const card = page.locator('.card', { hasText: `Other vacancies at ${company}` });
-  await expect(card.locator('.count')).toHaveText(`${others} vacancies`);
-  const rows = card.locator('tbody tr');
+  await expect(page.getByRole('heading', { name: `Other vacancies at ${company}` })).toBeVisible();
+  await expect(page.getByText(`${others} vacancies`, { exact: true })).toBeVisible();
+  // The page's one table; its header row has no id.
+  const rows = page
+    .getByRole('table')
+    .getByRole('row')
+    .filter({ has: page.getByText(ID) });
   await expect(rows).toHaveCount(others);
-  await expect(rows.locator('.id', { hasText: new RegExp(`^#${id}$`) })).toHaveCount(0);
+  await expect(rows.getByText(`#${id}`, { exact: true })).toHaveCount(0);
 
-  const otherId = (await rows.first().locator('.id').textContent())?.slice(1);
+  const otherId = (await rows.first().getByText(ID).textContent())?.slice(1);
   await rows.first().getByRole('link', { name: 'Open vacancy details' }).click();
   await expect(page).toHaveURL(new RegExp(`/vacancies/${otherId}$`));
-  await expect(page.locator('.detail-id-tag')).toHaveText(`#${otherId}`);
+  await expect(page.getByText(`#${otherId}`, { exact: true })).toHaveCount(2);
 });
 
 test('"Vacancy not found" for an unknown id; Back goes to /vacancies', async ({ page }) => {

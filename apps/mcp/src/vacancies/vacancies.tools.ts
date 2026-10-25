@@ -1,7 +1,7 @@
 import { ANALYSIS_BATCH_MAX, type VacancyService } from '@job-search-copilot/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { BATCH_MAX, pagination } from '../common/schemas';
+import { BATCH_MAX, PAGING_NOTE, pagination } from '../common/schemas';
 import { json, ref, toolError, withDomainErrors } from '../common/tool-result';
 import {
   RecommendationEnum,
@@ -164,7 +164,7 @@ export function registerVacancyTools(
         'case-insensitive; applyUrl — the vacancy with that posting link, raw is fine ' +
         '(normalized as saved). Each item carries hasAnalysis and hasText; matchScore and ' +
         'recommendation are null until analysed. Does not include fullText — use ' +
-        'get_vacancy / get_vacancies_batch for that.',
+        `get_vacancy / get_vacancies_batch for that. ${PAGING_NOTE}`,
       inputSchema: {
         recommendation: RecommendationEnum.optional(),
         status: z.array(VacancyStatusEnum).optional(),
@@ -175,10 +175,6 @@ export function registerVacancyTools(
         ...pagination(VACANCY_LIST_MAX),
       },
     },
-    async (filters) => {
-      // `nextCursor` is the web's (ADR-0030); this tool pages by offset.
-      const { items, total } = await vacancies.list(userId, filters);
-      return json({ items, total });
-    },
+    async (filters) => json(await vacancies.list(userId, filters)),
   );
 }

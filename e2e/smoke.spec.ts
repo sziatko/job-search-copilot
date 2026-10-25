@@ -5,9 +5,9 @@ test('the dashboard shows the seed’s numbers', async ({ page }) => {
   await page.goto('/');
   const tile = (label: string) =>
     page
-      .locator('.kpi-tile')
+      .getByTestId('kpi-tile')
       .filter({ has: page.getByText(label, { exact: true }) })
-      .locator('.kpi-value');
+      .getByTestId('kpi-value');
   const applied = SEED_VACANCIES.filter((v) => v.moves.some((m) => m.to === 'APPLIED'));
 
   await expect(tile('Logged')).toHaveText(String(SEED_VACANCIES.length));

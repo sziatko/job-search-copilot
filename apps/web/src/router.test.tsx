@@ -119,7 +119,6 @@ describe('router', () => {
     const title = await screen.findByRole('heading', { level: 1, name: 'Analyzed vacancies' });
     const header = screen.getByRole('banner');
     expect(header).toContainElement(title);
-    expect(header.querySelector('.topbar-sub')).toBeNull();
     expect(screen.queryByText(/review the analyzer's shortlist/i)).not.toBeInTheDocument();
   });
 
@@ -127,7 +126,8 @@ describe('router', () => {
     mswServer.use(...buildHandlers([]));
     const { container } = renderAt('/vacancies');
     await screen.findByRole('heading', { level: 1, name: 'Analyzed vacancies' });
-    const main = container.querySelector('.main') as HTMLElement;
+    // The shell's main column carries the state; `data-compact` is the CSS hook.
+    const compact = () => container.querySelector('[data-compact]');
     // Any scroll box, not only the window: scroll does not bubble, the shell
     // listens in the capture phase.
     const box = document.createElement('div');
@@ -138,11 +138,11 @@ describe('router', () => {
     };
 
     scrollTo(30);
-    expect(main).toHaveAttribute('data-compact');
+    expect(compact()).not.toBeNull();
     scrollTo(10); // inside the gap: stays compact
-    expect(main).toHaveAttribute('data-compact');
+    expect(compact()).not.toBeNull();
     scrollTo(0);
-    expect(main).not.toHaveAttribute('data-compact');
+    expect(compact()).toBeNull();
     box.remove();
   });
 });

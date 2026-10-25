@@ -2,7 +2,13 @@ import 'reflect-metadata';
 import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { type Api, createTestApp, signedInAgent } from './test-app';
+import {
+  type Api,
+  createTestApp,
+  deleteTestUsers,
+  deleteTestVacancies,
+  signedInAgent,
+} from './test-app';
 
 // End-to-end: boots the real Nest app (same ValidationPipe as setup-app.ts) against
 // the real test database, and hits it over HTTP via supertest. This is what
@@ -17,7 +23,7 @@ describe('Vacancies (e2e)', () => {
     company: 'Acme',
     title: 'Backend Engineer',
     applyUrl: 'https://example.com/jobs/1',
-    fullText: 'Full vacancy text goes here.',
+    fullText: 'Full vacancy text goes here. '.padEnd(200, 'x'),
     matchScore: 80,
     recommendation: 'APPLY',
     estimationComment: 'Strong match.',
@@ -30,7 +36,8 @@ describe('Vacancies (e2e)', () => {
       company: 'Queued Co',
       title: url,
     });
-    return (await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
+    return (await prisma.vacancy.findFirstOrThrow({ where: { userId: api.userId, applyUrl: url } }))
+      .id;
   }
 
   beforeAll(async () => {
@@ -38,12 +45,10 @@ describe('Vacancies (e2e)', () => {
     api = await signedInAgent(app);
   });
 
-  afterEach(async () => {
-    await prisma.vacancy.deleteMany();
-  });
+  afterEach(deleteTestVacancies);
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    await deleteTestUsers();
     await app.close();
     await prisma.$disconnect();
   });
@@ -93,7 +98,7 @@ describe('Vacancies (e2e)', () => {
           .send({ ...validPayload, applyUrl })
           .expect(400);
       }
-      expect(await prisma.vacancy.count()).toBe(0);
+      expect(await prisma.vacancy.count({ where: { userId: api.userId } })).toBe(0);
     });
 
     it('attaches the analysis to a row intake took in: 200, no Location', async () => {
@@ -114,7 +119,9 @@ describe('Vacancies (e2e)', () => {
         { url: raw, company: 'Acme Sp. z o.o.', title: 'Senior Dev', source: 'linkedin' },
       ]).expect(200);
       expect(first.body).toEqual({ new: [raw] });
-      expect(await prisma.vacancy.findFirstOrThrow()).toMatchObject({
+      expect(
+        await prisma.vacancy.findFirstOrThrow({ where: { userId: api.userId } }),
+      ).toMatchObject({
         applyUrl: 'https://www.linkedin.com/jobs/view/3900000001',
         status: 'NEW',
         recommendation: null,
@@ -127,7 +134,7 @@ describe('Vacancies (e2e)', () => {
         { url: 'https://acme.com/careers/42', company: 'Acme', title: 'Senior Dev!' },
       ]).expect(200);
       expect(again.body).toEqual({ new: [] });
-      expect(await prisma.vacancy.count()).toBe(1);
+      expect(await prisma.vacancy.count({ where: { userId: api.userId } })).toBe(1);
     });
 
     it('fills the posting text on a second call, and nothing else', async () => {
@@ -136,7 +143,9 @@ describe('Vacancies (e2e)', () => {
       const res = await intake([{ ...entry, source: 'justjoin', fullText }]).expect(200);
       expect(res.body).toEqual({ new: [] });
       expect(
-        await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: entry.url } }),
+        await prisma.vacancy.findFirstOrThrow({
+          where: { userId: api.userId, applyUrl: entry.url },
+        }),
       ).toMatchObject({ fullText, source: null, status: 'NEW' });
     });
 
@@ -156,7 +165,7 @@ describe('Vacancies (e2e)', () => {
       await intake(
         Array.from({ length: 101 }, (_, i) => ({ ...entry, url: `https://a.com/${i}` })),
       ).expect(400);
-      expect(await prisma.vacancy.count()).toBe(0);
+      expect(await prisma.vacancy.count({ where: { userId: api.userId } })).toBe(0);
     });
 
     it('accepts a ~1 MB body', async () => {
@@ -195,6 +204,38 @@ describe('Vacancies (e2e)', () => {
         .post(`/api/v1/vacancies/${id}/analysis`)
         .send({ ...analysis, recommendation: 'MAYBE' })
         .expect(400);
+    });
+  });
+
+  describe('POST /api/v1/vacancies/unavailable', () => {
+    const mark = (items: unknown[]) => api.post('/api/v1/vacancies/unavailable').send({ items });
+
+    it('moves the queue, skips a row the user moved since', async () => {
+      const open = await queued('https://example.com/q/1');
+      const declined = await queued('https://example.com/q/2');
+      await api.patch(`/api/v1/vacancies/${declined}/status`).send({ status: 'DECLINED' });
+
+      const res = await mark([
+        { id: open, reason: 'Closed on LinkedIn.' },
+        { id: declined, reason: 'Closed on LinkedIn.' },
+      ]).expect(200);
+
+      expect(res.body).toEqual({ moved: [open], skipped: [declined] });
+      const statuses = await prisma.vacancy.findMany({
+        where: { id: { in: [open, declined] } },
+        orderBy: { id: 'asc' },
+        select: { status: true },
+      });
+      expect(statuses.map((v) => v.status)).toEqual(['UNAVAILABLE', 'DECLINED']);
+    });
+
+    it('400s on an empty batch, more than 100, or an item without a reason', async () => {
+      await mark([]).expect(400);
+      await mark(Array.from({ length: 101 }, (_, i) => ({ id: i + 1, reason: 'Gone.' }))).expect(
+        400,
+      );
+      await mark([{ id: 1 }]).expect(400);
+      await mark([{ id: 1, reason: '' }]).expect(400);
     });
   });
 
@@ -314,8 +355,7 @@ describe('Vacancies (e2e)', () => {
       expect(next.body).toMatchObject({ items: [{ company: 'Co 1' }], total: 3, nextCursor: null });
     });
 
-    it('400s on cursor with offset, a bad cursor, or an unknown sort', async () => {
-      await api.get('/api/v1/vacancies?cursor=5&offset=0').expect(400);
+    it('400s on a bad cursor or an unknown sort', async () => {
       await api.get('/api/v1/vacancies?cursor=abc').expect(400);
       await api.get('/api/v1/vacancies?sort=oldest').expect(400);
     });

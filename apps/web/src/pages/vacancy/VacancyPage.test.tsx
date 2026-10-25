@@ -38,10 +38,9 @@ function recordWrites(): string[] {
   return writes;
 }
 
-/** The card whose heading matches `name`. */
+/** The card whose heading matches `name` — a region it names. */
 async function card(name: RegExp) {
-  const heading = await screen.findByRole('heading', { name });
-  return within(heading.closest('.card') as HTMLElement);
+  return within(await screen.findByRole('region', { name }));
 }
 
 const applied = () =>
@@ -93,7 +92,7 @@ describe('VacancyPage', () => {
 
     const details = await card(/^details$/i);
     // What the user entered when applying, not necessarily the listing's figure.
-    expect(details.getByText('Salary').closest('.fact-row')).toHaveTextContent('130 PLN/h');
+    expect(details.getByText('130 PLN/h')).toBeInTheDocument();
     expect(details.getByText('example.com')).toBeInTheDocument();
 
     // The company's others, this one left out.
@@ -128,7 +127,7 @@ describe('VacancyPage', () => {
     );
 
     const page = await expectSkeletonPage();
-    const facts = page.querySelectorAll('.fact-row').length;
+    const facts = within(page).getAllByTestId('fact-row').length;
     hold.release();
 
     expect(
@@ -138,7 +137,7 @@ describe('VacancyPage', () => {
     await (await card(/other vacancies at acme/i)).findByText('Frontend Engineer');
     expectLoadedPage();
     // A skeleton row for each fact the details card lists.
-    expect(document.querySelectorAll('.fact-row')).toHaveLength(facts);
+    expect(screen.getAllByTestId('fact-row')).toHaveLength(facts);
   });
 
   it('draws skeleton rows under the other vacancies header while they load', async () => {
@@ -174,18 +173,18 @@ describe('VacancyPage', () => {
     ]);
 
     await screen.findByRole('heading', { level: 1, name: 'Backend Engineer' });
-    const meta = document.querySelector('.detail-meta-row') as HTMLElement;
-    expect(within(meta).getByText('Not analysed yet')).toBeInTheDocument();
-    expect(meta.querySelector('.pill')).toBeNull();
+    expect(screen.getByText('Not analysed yet')).toBeInTheDocument();
+    // No score anywhere: the Details card draws a dash.
+    expect(screen.queryByText(/^\d+%$/)).not.toBeInTheDocument();
   });
 
   it('shows the score, not "Not analysed yet", once there is an analysis', async () => {
     renderAt('/vacancies/1', [fakeVacancy({ id: 1, matchScore: 80 })]);
 
     await screen.findByRole('heading', { level: 1, name: 'Backend Engineer' });
-    const meta = document.querySelector('.detail-meta-row') as HTMLElement;
-    expect(within(meta).getByText('80%')).toBeInTheDocument();
-    expect(within(meta).queryByText('Not analysed yet')).not.toBeInTheDocument();
+    // The header's score, and the Details card's.
+    expect(screen.getAllByText('80%')).toHaveLength(2);
+    expect(screen.queryByText('Not analysed yet')).not.toBeInTheDocument();
   });
 
   it('says so for an unknown id', async () => {

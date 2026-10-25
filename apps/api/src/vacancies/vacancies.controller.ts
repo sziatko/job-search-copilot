@@ -1,6 +1,5 @@
-import { VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
+import { type CommentSource, VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -17,14 +16,19 @@ import {
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Response } from 'express';
-import { ApiKeyGuard, CurrentUserId } from '../auth/api-key.guard';
+import { ApiKeyGuard, CallerSource, CurrentUserId } from '../auth/api-key.guard';
 import { IntakeVacanciesDto } from './dto/intake-vacancies.dto';
 import { ListVacanciesQueryDto } from './dto/list-vacancies.dto';
+import { MarkUnavailableDto } from './dto/mark-unavailable.dto';
 import { SaveVacancyDto } from './dto/save-vacancy.dto';
 import { SubmitAnalysesDto, SubmitAnalysisDto } from './dto/submit-analysis.dto';
 import { UpdateVacancyStatusDto } from './dto/update-vacancy-status.dto';
 
+/** A session or an API key (ADR-0039). */
 @Controller('vacancies')
+@AllowAnonymous()
+@UseGuards(ApiKeyGuard)
+@ApiBearerAuth()
 export class VacanciesController {
   constructor(
     private readonly vacancies: VacancyService,
@@ -60,9 +64,6 @@ export class VacanciesController {
    * the entry's). 200, not 201 — a batch can be all duplicates.
    */
   @Post('intake')
-  @AllowAnonymous()
-  @UseGuards(ApiKeyGuard)
-  @ApiBearerAuth()
   @HttpCode(200)
   intake(@CurrentUserId() userId: string, @Body() dto: IntakeVacanciesDto) {
     return this.intakeService.intakeMany(userId, dto.entries);
@@ -74,9 +75,6 @@ export class VacanciesController {
    * 409, unknown id → 404 (DomainExceptionFilter).
    */
   @Post(':id/analysis')
-  @AllowAnonymous()
-  @UseGuards(ApiKeyGuard)
-  @ApiBearerAuth()
   @HttpCode(200)
   submitAnalysis(
     @CurrentUserId() userId: string,
@@ -88,20 +86,30 @@ export class VacanciesController {
 
   /** Up to ANALYSIS_BATCH_MAX analyses, all or none → 200 and the rows, in order. */
   @Post('analysis')
-  @AllowAnonymous()
-  @UseGuards(ApiKeyGuard)
-  @ApiBearerAuth()
   @HttpCode(200)
   submitAnalyses(@CurrentUserId() userId: string, @Body() dto: SubmitAnalysesDto) {
     return this.vacancies.submitAnalyses(userId, dto.analyses);
   }
 
-  /** `{ items, total, nextCursor }`; paged by `offset` or `cursor`, not both (ADR-0030). */
+  /**
+   * n8n's dead-posting check (ADR-0040): each vacancy still in the queue (NEW,
+   * NOT_REVIEWED, SAVED_FOR_LATER) → UNAVAILABLE with its `reason` as a comment; any
+   * other id — moved since, unknown, another user's — is skipped. 200
+   * `{ moved: id[], skipped: id[] }`.
+   */
+  @Post('unavailable')
+  @HttpCode(200)
+  markUnavailable(
+    @CurrentUserId() userId: string,
+    @Body() dto: MarkUnavailableDto,
+    @CallerSource() source: CommentSource,
+  ) {
+    return this.vacancies.markUnavailable(userId, dto.items, source);
+  }
+
+  /** `{ items, total, nextCursor }`; paged by `cursor` (ADR-0030). */
   @Get()
   list(@CurrentUserId() userId: string, @Query() query: ListVacanciesQueryDto) {
-    if (query.cursor !== undefined && query.offset !== undefined) {
-      throw new BadRequestException('cursor and offset cannot be combined');
-    }
     return this.vacancies.list(userId, query);
   }
 
@@ -119,7 +127,8 @@ export class VacanciesController {
     @CurrentUserId() userId: string,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateVacancyStatusDto,
+    @CallerSource() source: CommentSource,
   ) {
-    return this.vacancies.updateStatus(userId, id, dto.status, dto.comment);
+    return this.vacancies.updateStatus(userId, id, dto.status, dto.comment, source);
   }
 }

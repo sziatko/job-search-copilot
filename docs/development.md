@@ -72,6 +72,8 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 | `npm run mcp:inspect` | the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) web UI over the MCP server (stdio, needs `.env`) — browse the tools and call them |
 | `npm test` / `npm run test:watch` | Vitest across all workspaces (needs the test DB) |
 | `npm run test:e2e` | Playwright end-to-end over its own api, web and `job_search_copilot_e2e` ([ADR-0037](decisions/0037-e2e-playwright.md)); not part of `npm test` |
+| `npm run test:visual` | the visual tests (`e2e/visual.spec.ts`) in the Playwright Linux image, through `docker compose run visual`; extra arguments go to Playwright |
+| `npm run test:visual:update` | the same, rewriting the baselines it differs from |
 | `npm run screenshots` | retake the README's screenshots (`docs/screenshots/`) on the e2e seed, light and dark |
 | `npm run seed` | reset the e2e database to the made-up seed (refuses any DB not named `*_e2e` / `*_test` / `*_demo`) |
 | `npm run lint` / `npm run lint:fix` / `npm run format` | Biome |
@@ -84,15 +86,49 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
 Postgres service on every push and PR; on a PR a second job, `e2e`, runs
-`npm run test:e2e` ([ADR-0037](decisions/0037-e2e-playwright.md)).
+`npm run test:e2e` and the visual tests in the Playwright image ([ADR-0037](decisions/0037-e2e-playwright.md)).
 
 Database and migration conventions:
 [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
 
+## Testing
+
+How a test finds an element, in the web tests and the Playwright specs alike:
+
+- **By role, label or text** — `getByRole`, `getByLabel(Text)`, `getByText`, narrowed with
+  `within` or a parent locator. When nothing names the element, give the component the
+  name a screen-reader user would want too (a labelled list or region, a control named
+  for its row) rather than a test hook.
+- **`data-testid` only where nothing accessible exists** — a number in a KPI tile, a
+  funnel or fact row, a timeline step. A state shown only by style is a `data-*`
+  attribute that names it (`data-source`, `data-compact`).
+- **Never by CSS class.** Classes belong to styling and can be renamed without a test
+  noticing.
+
+A DB-backed test (core, api, mcp) makes its own users — `createUser()` in core,
+`signIn` / `signedInAgent` / `createApiKey` in api — and its rows hang off them; cleanup
+deletes only those users, and the rest goes by cascade. Files run in parallel on the one
+test DB, so every delete, count and lookup a test makes filters by its user: a bare
+`count()` or `findFirst()` sees another file's rows, and passes only when the file runs
+alone. Why: [ADR-0015](decisions/0015-testing-strategy.md).
+
+Visual tests (`npm run test:visual`) compare every page, dialog and empty state with a
+baseline PNG in `e2e/visual.spec.ts-snapshots/`, at a desktop and a phone width, light
+and dark. They run only in the Playwright image (`e2e/Dockerfile`, the image CI's `e2e`
+job runs in): font rendering differs on Windows and macOS, so a baseline from the host
+would never match. Like `test:e2e`, they read core's `dist/` (the stack's `core`
+watcher, or `npm run build --workspace=@job-search-copilot/core`).
+
+When a change is meant to look different: `npm run test:visual:update`, open the
+changed PNGs in the diff, and commit them with the change. `npm run test:visual --
+-g dashboard` narrows a run. A failed run's diffs are in `playwright-report/`
+(`npx playwright show-report`). A new page, dialog or empty state gets a test there.
+
 ## Gotchas
 
 - **`npm test` can pass while `core` does not build.** Vitest strips types without
-  checking them; `npm run typecheck` is the one thing that typechecks `core`. Read a
+  checking them; `npm run typecheck` is the one thing that typechecks `core`, its specs
+  included (`packages/core/tsconfig.spec.json` — the build leaves them out). Read a
   build's exit code, not its output files: `tsc` emits JS even when it fails.
 - **`npm install -w <workspace> <pkg>` crashes** here (arborist, `reading 'location'`).
   Add the dependency to the workspace's `package.json`, then run `npm install` at the
@@ -101,8 +137,16 @@ Database and migration conventions:
   -- --name <name>`. Through the root script npm eats `--name`, and Prisma then waits
   on its prompt holding the advisory lock. More in
   [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
+- **Vitest from Git Bash after `cd /c/...`** fails every web file with "Vitest failed
+  to find the runner" (the drive letter's case). Run it from PowerShell, or from the
+  default working directory.
+- **Vitest's first run can fail with "Failed to start forks worker"** — a cold-start
+  timeout, not a test failure; the rerun passes.
+- **A full visual run is slow on Windows** (vite dev over the bind mount), and the first
+  one builds the image. Don't run `npm test` beside it: the load can time a screenshot
+  out.
 - **CSS is invisible to the web tests.** `index.css` never loads in jsdom, so layout,
-  hover and placement need a browser (Playwright, `npm run test:e2e`).
+  hover and placement need a browser (Playwright, `npm run test:e2e`, `npm run test:visual`).
 - **MSW in the web tests:** a later `server.use()` wins, but inside one call the first
   handler wins; `passthrough()` sends the *real* request (to the dev API on :3000), it
   is not "try the next handler".

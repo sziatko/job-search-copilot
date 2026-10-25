@@ -12,7 +12,7 @@ The field-level detail lives in one place each, not here:
 - **MCP** — each tool's description and `.describe()`d fields, in
   `apps/mcp/src/*/*.tools.ts` and `*.schemas.ts`. `npm run mcp:inspect` shows them as
   a client sees them.
-- **Web** — the zod schemas in `apps/web/src/pages/*/types.ts`.
+- **Web** — the zod schemas in `apps/web/src/lib/*/types.ts`.
 
 ## REST API
 
@@ -22,17 +22,19 @@ coerces types. JSON bodies up to 5 MB (intake carries posting text).
 
 **Auth** ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)). Every route wants a
 session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` is anonymous.
-The three n8n routes — `POST /vacancies/intake`, `POST /vacancies/analysis`,
-`POST /vacancies/:id/analysis` — also take `Authorization: Bearer jsc_…`, an API key
-from `/profile` ([ADR-0039](decisions/0039-api-keys-per-user.md)); on any other route a
-key is a `401`. Swagger is outside Nest's router, so the guard does not cover it.
+The domain routes — `/vacancies`, `/applications`, `/stats` — also take
+`Authorization: Bearer jsc_…`, an API key from `/profile`
+([ADR-0039](decisions/0039-api-keys-per-user.md)); a comment a key writes is `AGENT`,
+a session's `USER`. A key over its rate limit (1000 requests an hour) is a `429`, here
+and on the HTTP MCP. Swagger is outside Nest's router, so the guard does
+not cover it.
 
 **One user per request** ([ADR-0038](decisions/0038-multi-user-shared-schema.md)) — the
 session's, or the key's owner. Another user's id answers `404`, as an unknown one.
 
-**Lists** ([ADR-0030](decisions/0030-cursor-paging.md)) take `cursor` (the last row's
-`id`) or `offset`, not both (`400`), and answer `{ items, total, nextCursor }`. `total`
-is the count matching the filter, not the page size.
+**Lists** ([ADR-0030](decisions/0030-cursor-paging.md)) take `cursor` (the previous
+page's `nextCursor`) and answer `{ items, total, nextCursor }`. `total` is the count
+matching the filter, not the page size.
 
 | Route | Does | Success |
 | --- | --- | --- |
@@ -43,7 +45,8 @@ is the count matching the filter, not the page size.
 | `POST /vacancies/analysis` | The same for 1–10, one transaction | `200` the vacancies, in input order |
 | `GET /vacancies` | List: filters `recommendation`, `status` (a list), `company`, `search` (company or title), `sameCompanyAs`, `hasText`; `sort` `newest` \| `recommended` | items without `fullText`, with `companyMatchCount`, `hasAnalysis`, `hasText` |
 | `GET /vacancies/:id` | One vacancy | with `comments`, `estimationComment`, `timeline` |
-| `PATCH /vacancies/:id/status` | Move to any status, an optional `USER` comment | `200` as `GET /:id` |
+| `PATCH /vacancies/:id/status` | Move to any status, an optional comment | `200` as `GET /:id` |
+| `POST /vacancies/unavailable` | Closed postings (1–100, `{ id, reason }`): a row still in the queue → `UNAVAILABLE`, `reason` a comment; any other skipped ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)) | `200 { moved: id[], skipped: id[] }`; one transaction |
 | `POST /applications` | Record an application on a vacancy by id | `201 { application, resolution, vacancyCreated }` |
 | `GET /applications` | The pipeline: `status`, `state` (`active` \| `timedOut`), `search`, `sameCompanyAs` | items with `appliedAt`, `timedOut`, `comments`, `companyMatchCount` |
 | `GET /applications/:id` | One application | `404` if not in the pipeline |
@@ -64,12 +67,13 @@ query that finds nothing (`getById`) answers `null` and the controller sends Nes
 `trustedOrigins`.
 
 > **What this constrains — breaks if you change it**
-> - `POST /vacancies/intake`'s body or result, or the `Bearer jsc_…` header → the n8n
+> - `POST /vacancies/intake`'s or `POST /vacancies/unavailable`'s body or result, or
+>   the `Bearer jsc_…` header → the n8n
 >   workflows (outside the repo) and `apps/api/test/vacancies.e2e.spec.ts`.
 > - A path, the prefix or the version → `apps/web/src/lib/api.ts` (`API_BASE`), the
 >   features' `api.ts`, the MSW handlers, the api e2e specs.
 > - `POST /applications`' envelope → `recordApplicationResponseSchema` in
->   `apps/web/src/pages/applications/types.ts`, `useVacancies.ts`.
+>   `apps/web/src/lib/applications/types.ts`, `useVacancyRows.ts`.
 > - A status code → the api e2e assertions, [ADR-0005](decisions/0005-analyze-once.md).
 > - A list-item field → the core type and select, **and** the web schema, by hand
 >   ([ADR-0012](decisions/0012-web-hand-written-contract.md)). The field reaches MCP
@@ -95,7 +99,7 @@ text just sent.
 | Save analysed | `save_vacancy`, `save_vacancies_batch` (not transactional) |
 | Intake | `intake_vacancy`, `intake_vacancies_batch` (no posting text over MCP) |
 | The analysis queue | `list_vacancies` (`status: ['NEW'], hasText: true`) → `get_vacancies_batch` (1–10) → `submit_analysis` / `submit_analyses_batch` (1–10, one transaction) |
-| Read | `get_vacancy`, `list_vacancies`, `list_applications` (`offset` paging only) |
+| Read | `get_vacancy`, `list_vacancies`, `list_applications` (`cursor` paging, as REST) |
 | Applications | `record_application`, `record_applications_batch` (one transaction), `update_application`, `update_vacancy_status`, `add_comment` |
 
 Rules that span tools go to the client as the server's `instructions`
@@ -129,7 +133,7 @@ every client shows.
 
 ## Web ↔ API contract
 
-`apps/web/src/pages/*/types.ts` hold zod schemas of the API's JSON; the types are
+`apps/web/src/lib/*/types.ts` hold zod schemas of the API's JSON; the types are
 `z.infer`red from them, and every response goes through `parseResponse()`
 (`apps/web/src/lib/api.ts`). A mismatch throws a short "unexpected format" message,
 logged in full to the console. Dates cross as strings.

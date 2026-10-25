@@ -1,15 +1,11 @@
-import type { PrismaClient } from '@prisma/client';
-import { forUser, type UserTx } from '../db/for-user';
+import { forUser, type Unscoped, type UserTx } from '../db/for-user';
 import { getPrisma } from '../db/prisma-client';
 import { InvalidIntakeEntryError } from '../domain/errors';
 import { matchKeys } from '../domain/identity';
+import { usablePostingText } from '../domain/posting-text';
 import { firstStatus } from '../domain/status';
 import { normalizeApplyUrl } from '../domain/url';
 import type { VacancyIntakeInput } from './vacancy-intake';
-
-/** Shorter posting text, trimmed, is taken as none: a login wall or captcha page, not a
- * posting. Text is never overwritten, so storing it would block the real one. */
-const MIN_TEXT_LENGTH = 200;
 
 interface PreparedEntry {
   applyUrl: string;
@@ -34,8 +30,7 @@ function prepare(entry: VacancyIntakeInput): PreparedEntry | null {
     title,
     ...matchKeys(company, title),
     source: entry.source?.trim() || null,
-    fullText:
-      entry.fullText && entry.fullText.trim().length >= MIN_TEXT_LENGTH ? entry.fullText : null,
+    fullText: usablePostingText(entry.fullText),
   };
 }
 
@@ -47,7 +42,7 @@ function prepare(entry: VacancyIntakeInput): PreparedEntry | null {
 export class VacancyIntakeService {
   /** @param db defaults (on construction, not import) to the lazy process-wide client —
    *   same rationale as VacancyService. Nest passes its managed client. */
-  constructor(private readonly db: PrismaClient = getPrisma()) {}
+  constructor(private readonly db: Unscoped = getPrisma()) {}
 
   /** One posting. An entry without an http(s) url, a company or a title is an error,
    * not a silent skip: the caller must not read "not taken in" as "duplicate". */

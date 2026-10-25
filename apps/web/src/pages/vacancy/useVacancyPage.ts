@@ -1,21 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { recordApplication, updateApplicationStatus } from '../applications/api';
-import type { ApplicationStatus } from '../applications/types';
-import { addComment, getVacancy, listVacanciesPage, updateVacancyStatus } from '../vacancies/api';
-import type { ApplyDetails } from '../vacancies/components/ApplyDialog';
-import { toastMoved } from '../vacancies/constants';
-import type { RowAction } from '../vacancies/types';
-
-/** Every cache a write on this page can make stale — this record, the tables that list
- * it, the company views, the dashboard's counts. */
-const AFFECTED_KEYS = [
-  ['vacancies'],
-  ['applications'],
-  ['application-company'],
-  ['vacancy-company'],
-  ['stats'],
-] as const;
+import { recordApplication, updateApplicationStatus } from '@/lib/applications/api';
+import type { ApplicationStatus, ApplyDetails } from '@/lib/applications/types';
+import { queryKeys, staleAfter } from '@/lib/queryKeys';
+import {
+  addComment,
+  getVacancy,
+  listVacanciesPage,
+  updateVacancyStatus,
+} from '@/lib/vacancies/api';
+import { toastMoved } from '@/lib/vacancies/constants';
+import type { RowAction } from '@/lib/vacancies/types';
 
 /**
  * One vacancy and its company's others, and the page's writes. Not optimistic, unlike
@@ -26,7 +21,7 @@ export function useVacancyPage(id: number) {
   const queryClient = useQueryClient();
 
   const vacancy = useQuery({
-    queryKey: ['vacancy', id],
+    queryKey: queryKeys.vacancy(id),
     queryFn: () => getVacancy(id),
     enabled: Number.isInteger(id),
   });
@@ -34,28 +29,27 @@ export function useVacancyPage(id: number) {
   const company = vacancy.data?.company;
   // The key CompanyHistoryModal uses for the same request, so the two share a cache.
   const others = useQuery({
-    queryKey: ['vacancy-company', company],
+    queryKey: queryKeys.vacancyCompany(company),
     queryFn: () => listVacanciesPage({ sameCompanyAs: company, limit: 100 }),
     enabled: company !== undefined,
   });
 
-  function refetchAffected() {
-    void queryClient.invalidateQueries({ queryKey: ['vacancy', id] });
-    for (const queryKey of AFFECTED_KEYS) {
+  const refetch = (keys: readonly QueryKey[]) => () => {
+    for (const queryKey of keys) {
       void queryClient.invalidateQueries({ queryKey });
     }
-  }
+  };
 
   // Three requests move the status — which one depends on where the vacancy is — so
   // the mutation takes the request itself and they share one pending / error state.
   const statusWrite = useMutation({
     mutationFn: (request: () => Promise<unknown>) => request(),
-    onSettled: refetchAffected,
+    onSettled: refetch(staleAfter.statusWrite),
   });
 
   const commentWrite = useMutation({
     mutationFn: (body: string) => addComment(id, body),
-    onSettled: refetchAffected,
+    onSettled: refetch(staleAfter.edit),
   });
 
   // The controls are drawn from the loaded vacancy, so its data is there by now.

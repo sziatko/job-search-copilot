@@ -48,12 +48,15 @@ async function journal(vacancyId: number) {
   return rows.map((row) => row.status);
 }
 
+/** Posting text long enough to be stored (MIN_TEXT_LENGTH). */
+const FULL_TEXT = 'Full vacancy text goes here. '.padEnd(200, 'x');
+
 function input(overrides: Partial<SaveVacancyInput> = {}): SaveVacancyInput {
   return {
     company: 'Acme',
     title: 'Backend Engineer',
     applyUrl: 'https://example.com/jobs/1',
-    fullText: 'Full vacancy text goes here.',
+    fullText: FULL_TEXT,
     matchScore: 80,
     recommendation: 'APPLY',
     estimationComment: 'Strong match.',
@@ -157,8 +160,8 @@ describe('VacancyService', () => {
         'First pass.',
       );
       expect(all.items[0].estimationComment).toBe('First pass.');
-      expect(await getPrisma().comment.count()).toBe(1);
-      expect(await getPrisma().statusChange.count()).toBe(2);
+      expect(await getPrisma().comment.count({ where: { vacancy: { userId } } })).toBe(1);
+      expect(await getPrisma().statusChange.count({ where: { vacancy: { userId } } })).toBe(2);
     });
 
     it('writes the estimationComment as one ANALYZER comment', async () => {
@@ -200,11 +203,11 @@ describe('VacancyService', () => {
         matchScore: 80,
         recommendation: 'SKIP',
         status: 'FILTERED_OUT',
-        fullText: 'Full vacancy text goes here.',
+        fullText: FULL_TEXT,
       });
       expect(await journal(vacancy.id)).toEqual(['NEW', 'FILTERED_OUT']);
       expect((await service.getById(userId, vacancy.id))?.estimationComment).toBe('Strong match.');
-      expect(await getPrisma().vacancy.count()).toBe(1);
+      expect(await getPrisma().vacancy.count({ where: { userId } })).toBe(1);
     });
 
     it('keeps the text a row intake took in already has', async () => {
@@ -218,6 +221,38 @@ describe('VacancyService', () => {
       const { attached, vacancy } = await service.save(userId, input());
       expect(attached).toBe(true);
       expect(vacancy.fullText).toBe(fullText);
+    });
+
+    it('stores a blank text as none, so intake can still fill it in', async () => {
+      const { vacancy } = await service.save(userId, input({ fullText: '' }));
+      expect(vacancy.fullText).toBeNull();
+      expect((await service.list(userId)).items[0].hasText).toBe(false);
+
+      await intake.intake(userId, {
+        url: 'https://example.com/jobs/1',
+        company: 'Acme',
+        title: 'Backend Engineer',
+        fullText: FULL_TEXT,
+      });
+      expect((await service.getById(userId, vacancy.id))?.fullText).toBe(FULL_TEXT);
+    });
+
+    it('takes text under 200 characters as none, created or attached', async () => {
+      const short = 'Please sign in to see this job.';
+      const created = await service.save(userId, input({ fullText: short }));
+      expect(created.vacancy.fullText).toBeNull();
+
+      await intake.intake(userId, {
+        url: 'https://example.com/jobs/2',
+        company: 'Acme',
+        title: 'Dev',
+      });
+      const attached = await service.save(
+        userId,
+        input({ applyUrl: 'https://example.com/jobs/2', title: 'Dev', fullText: short }),
+      );
+      expect(attached.attached).toBe(true);
+      expect(attached.vacancy.fullText).toBeNull();
     });
 
     it('collapses two tracking variants of one posting into a single row', async () => {
@@ -415,7 +450,7 @@ describe('VacancyService', () => {
         status: 'NOT_REVIEWED',
       });
       expect(await journal(id)).toEqual(['NEW', 'NOT_REVIEWED']);
-      expect(await getPrisma().comment.count()).toBe(1);
+      expect(await getPrisma().comment.count({ where: { vacancy: { userId } } })).toBe(1);
     });
 
     it('scores a pipeline placeholder and leaves its status alone', async () => {
@@ -584,10 +619,12 @@ describe('VacancyService', () => {
       expect(items[0].title).toBe('Frontend Lead');
     });
 
-    it('respects limit/offset', async () => {
-      const page = await service.list(userId, { limit: 1, offset: 1 });
-      expect(page.items).toHaveLength(1);
-      expect(page.total).toBe(2);
+    it('respects limit, and pages on by nextCursor', async () => {
+      const first = await service.list(userId, { limit: 1 });
+      const second = await service.list(userId, { limit: 1, cursor: first.nextCursor ?? -1 });
+      expect([first.items.length, second.items.length]).toEqual([1, 1]);
+      expect(second.items[0].id).not.toBe(first.items[0].id);
+      expect([first.total, second.total, second.nextCursor]).toEqual([2, 2, null]);
     });
 
     it('filters by hasText, and marks each item', async () => {
@@ -849,27 +886,6 @@ describe('VacancyService', () => {
         expect(items[0].hasAnalysis).toBe(false);
         expect(items[0].estimationComment).toBeNull();
       });
-
-      it('reads the recommendation, not the analyzer comment', async () => {
-        const applications = new ApplicationService();
-        await applications.record(userId, {
-          company: 'Noted Co',
-          title: 'Imported Role',
-          estimationComment: 'From tracker notes.',
-        });
-        await applications.record(userId, {
-          company: 'Scored Co',
-          title: 'Imported Role',
-          matchScore: 60,
-        });
-        const noted = (await service.list(userId, { company: 'Noted Co' })).items[0];
-        expect(noted).toMatchObject({
-          hasAnalysis: false,
-          estimationComment: 'From tracker notes.',
-        });
-        const scored = (await service.list(userId, { company: 'Scored Co' })).items[0];
-        expect(scored).toMatchObject({ hasAnalysis: true, estimationComment: null });
-      });
     });
 
     describe('search', () => {
@@ -1006,7 +1022,7 @@ describe('VacancyService', () => {
           data: { ...row, userId, matchScore: 50, recommendation: 'APPLY' },
         }),
       ).rejects.toThrow(/Vacancy_new_is_unanalysed/);
-      expect(await getPrisma().vacancy.count()).toBe(0);
+      expect(await getPrisma().vacancy.count({ where: { userId } })).toBe(0);
     });
   });
 
@@ -1142,7 +1158,7 @@ describe('VacancyService', () => {
       await expect(
         service.updateStatus(userId, 999_999, 'SAVED_FOR_LATER', 'note'),
       ).rejects.toBeInstanceOf(VacancyNotFoundError);
-      expect(await getPrisma().comment.count()).toBe(0);
+      expect(await getPrisma().comment.count({ where: { vacancy: { userId } } })).toBe(0);
     });
 
     it('writes no comment when the move is refused', async () => {
@@ -1152,6 +1168,70 @@ describe('VacancyService', () => {
         service.updateStatus(userId, vacancy.id, 'SAVED_FOR_LATER', 'Again.'),
       ).rejects.toThrow(SameStatusError);
       expect(await getPrisma().comment.count({ where: { vacancyId: vacancy.id } })).toBe(1);
+    });
+  });
+
+  describe('markUnavailable', () => {
+    it('moves the queue to UNAVAILABLE with an AGENT comment, and skips the rest untouched', async () => {
+      const fresh = await queued(1); // NEW
+      const { vacancy: unseen } = await service.save(userId, input()); // NOT_REVIEWED
+      const { vacancy: later } = await service.save(
+        userId,
+        input({ applyUrl: 'https://acme.com/later' }),
+      );
+      await service.updateStatus(userId, later.id, 'SAVED_FOR_LATER');
+      const { vacancy: declined } = await service.save(
+        userId,
+        input({ applyUrl: 'https://acme.com/no' }),
+      );
+      await service.updateStatus(userId, declined.id, 'DECLINED');
+      const ids = [fresh, unseen.id, later.id, declined.id, 999_999];
+
+      const result = await service.markUnavailable(
+        userId,
+        ids.map((id) => ({ id, reason: '  No longer accepting applications.  ' })),
+      );
+
+      expect(result).toEqual({
+        moved: [fresh, unseen.id, later.id],
+        skipped: [declined.id, 999_999],
+      });
+      const moved = await service.getById(userId, unseen.id);
+      expect(moved?.status).toBe('UNAVAILABLE');
+      expect(moved?.comments.at(-1)).toMatchObject({
+        source: 'AGENT',
+        body: 'No longer accepting applications.',
+      });
+      expect(await journal(later.id)).toEqual([
+        'NEW',
+        'NOT_REVIEWED',
+        'SAVED_FOR_LATER',
+        'UNAVAILABLE',
+      ]);
+      // The user's DECLINED stands: no move, no journal row, no comment.
+      expect(await journal(declined.id)).toEqual(['NEW', 'NOT_REVIEWED', 'DECLINED']);
+      expect(await getPrisma().comment.count({ where: { vacancyId: declined.id } })).toBe(1);
+    });
+
+    it('skips one already UNAVAILABLE, and the second copy of an id in one batch', async () => {
+      const id = await queued(1);
+      const reason = 'Closed.';
+      expect(
+        await service.markUnavailable(userId, [
+          { id, reason },
+          { id, reason },
+        ]),
+      ).toEqual({
+        moved: [id],
+        skipped: [id],
+      });
+      expect(await journal(id)).toEqual(['NEW', 'UNAVAILABLE']);
+    });
+
+    it('writes the comment with the source given', async () => {
+      const id = await queued(1);
+      await service.markUnavailable(userId, [{ id, reason: 'Gone.' }], 'USER');
+      expect((await service.getById(userId, id))?.comments.at(-1)?.source).toBe('USER');
     });
   });
 });

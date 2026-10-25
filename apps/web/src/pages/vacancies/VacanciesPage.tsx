@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { ApplyDialog } from './components/ApplyDialog';
-import { CompanyHistoryModal } from './components/CompanyHistoryModal';
-import { ConfirmDialog } from './components/ConfirmDialog';
-import { SaveForLaterDialog } from './components/SaveForLaterDialog';
-import { SearchModal } from './components/SearchModal';
+import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ListCount, ListFrame } from '@/components/ui/ListFrame';
+import { View } from '@/components/ui/View';
+import { ApplyDialog } from '@/components/vacancies/ApplyDialog';
+import { CompanyHistoryModal } from '@/components/vacancies/CompanyHistoryModal';
+import { ConfirmDialog } from '@/components/vacancies/ConfirmDialog';
+import { SaveForLaterDialog } from '@/components/vacancies/SaveForLaterDialog';
+import { SearchModal } from '@/components/vacancies/SearchModal';
+import { VacancyTable } from '@/components/vacancies/VacancyTable';
+import { STATUS_CONTEXT } from '@/lib/vacancies/types';
 import { StatusFilterSelect } from './components/StatusFilterSelect';
-import { VacancyTable } from './components/VacancyTable';
-import { STATUS_CONTEXT } from './types';
 import { useVacancies } from './useVacancies';
 
 export function VacanciesPage() {
@@ -42,31 +46,26 @@ export function VacanciesPage() {
   const [searching, setSearching] = useState(false);
 
   return (
-    <section className="view view-fill">
-      <div className="card">
-        {/* Same shape as /applications' card: the page title is the shell's, so there
-            is no head here and the toolbar carries the top padding. The status
-            filter goes to the server, so the count is the server's match count —
-            the loaded rows catch up with it as the table scrolls. Gated like the
-            /applications': "Showing 0 of 0" during the first load is a claim about the
-            data, and there is no data yet. Search is a modal with its own results
-            (SearchModal); it never filters this table. */}
-        <div className="toolbar">
-          {!loadError && !loading && (
-            <span className="toolbar-count">
-              Showing {items.length} of {total}
-            </span>
-          )}
-          <button type="button" className="btn ml-auto" onClick={() => setSearching(true)}>
-            Search
-          </button>
-          <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
-        </div>
-
+    <View fill>
+      {/* The status filter goes to the server, so the count is the server's match count.
+          Gated: "Showing 0 of 0" during the first load is a claim about the data, and
+          there is no data yet. Search is a modal with its own results (SearchModal); it
+          never filters this table. */}
+      <ListFrame
+        toolbar={
+          <>
+            {!loadError && !loading && <ListCount shown={items.length} total={total} />}
+            <Button className="ml-auto" onClick={() => setSearching(true)}>
+              Search
+            </Button>
+            <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
+          </>
+        }
+      >
         {loadError ? (
-          <div className="empty-state">Failed to load vacancies: {loadError}</div>
+          <EmptyState>Failed to load vacancies: {loadError}</EmptyState>
         ) : !loading && items.length === 0 ? (
-          <div className="empty-state">No vacancies match this filter.</div>
+          <EmptyState>No vacancies match this filter.</EmptyState>
         ) : (
           <VacancyTable
             loading={loading}
@@ -79,7 +78,7 @@ export function VacanciesPage() {
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
           />
         )}
-      </div>
+      </ListFrame>
 
       {pendingDecline && (
         <ConfirmDialog
@@ -126,6 +125,6 @@ export function VacanciesPage() {
           onConfirm={confirmApply}
         />
       )}
-    </section>
+    </View>
   );
 }

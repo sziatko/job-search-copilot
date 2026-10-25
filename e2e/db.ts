@@ -27,6 +27,12 @@ const tablesOf = async (db: PrismaClient, schema: string) =>
       WHERE schemaname = ${schema} AND tablename <> '_prisma_migrations'`
   ).map((row) => `"${row.name}"`);
 
+/** Empties the vacancy tables and restarts their ids, so every run's seed gets the same ids. */
+export async function emptyVacancies(db: PrismaClient): Promise<void> {
+  await assertE2eDb(db);
+  await db.$executeRaw`TRUNCATE "Vacancy" RESTART IDENTITY CASCADE`;
+}
+
 /** Copies every table (the seed, the user, the session) into the `e2e_snapshot` schema. */
 export async function takeSnapshot(db: PrismaClient): Promise<void> {
   await assertE2eDb(db);

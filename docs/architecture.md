@@ -66,6 +66,44 @@ needs it, into `domain/`; plumbing over Prisma with no domain meaning, into `db/
 spec sits next to its file; `isolation.spec.ts`, across every service, stays at the
 root.
 
+### Inside `apps/web/src`
+
+```
+src/
+  main.tsx, App.tsx  boot and the providers; router.tsx is the route tree
+  index.css          the design tokens (@theme), the custom variants (narrow,
+                     rail, compact, …), the base styles; no component classes
+  pages/<route>/     one folder per route: the page, the sections it is split
+                     into, its hooks, its own components/
+  components/ui/     the UI library: primitives that own their styles
+  components/<feature>/  domain widgets more than one page shows: the vacancy
+                     table and dialogs, the status tags and selects
+  components/        the shell (RootLayout.tsx, shell/), the icons, the
+                     virtualized rows
+  lib/<feature>/     each API resource's zod schemas (types.ts), calls (api.ts),
+                     labels (constants.ts), and the hooks pages share
+  lib/               the rest that is not UI: the HTTP helper (api.ts), the
+                     cursor-paged query (useInfiniteList.ts, ADR-0030), the row
+                     mutation, the query keys, each route's title (routeMeta.ts)
+```
+
+**A page imports only from its own folder, `components/` and `lib/`** — never from
+another page; and `components/` and `lib/` never import a page. What a second page
+needs moves out to one of them. Biome's `noRestrictedImports` enforces both
+(`biome.json`): inside `pages/`, no `@/pages/…` and no relative path that climbs into a
+sibling folder.
+
+**A file is split by job, not by length**: one that holds several sections, its own
+data writes beside its markup, or a near-copy of a sibling. A page's sections are files
+beside it (`pages/vacancy/Header.tsx`, `Timeline.tsx`, …); its queries and mutations
+are a hook there (`useProfile.ts`). A large file of one uniform kind (`icons.tsx`,
+`router.tsx`) stays whole.
+
+**The UI is built from `components/ui`.** Markup starts from a primitive there, and a
+piece more than one page needs becomes one — never a new component class in
+`index.css`. How to use one and how to add one:
+[`apps/web/src/components/ui/README.md`](../apps/web/src/components/ui/README.md).
+
 ## Request lifecycles
 
 **Analyzer saves a vacancy** (the write path):
@@ -88,7 +126,7 @@ The analysis queue: list_vacancies({ status: ['NEW'], hasText: true })
 **User works through the list** (the read/update path):
 
 ```
-apps/web  useVacancies()  (TanStack Query)
+apps/web  useVacancyRows()  (TanStack Query)
   → GET  /api/v1/vacancies?limit=100        → VacancyService.list()
   → PATCH /api/v1/vacancies/:id/status     → VacancyService.updateStatus() → writeStatus()
         (optimistic cache update in the hook; rollback on error; invalidate on settle)
@@ -101,7 +139,7 @@ apps/web  ApplyDialog "mark as applied"  →  POST /api/v1/applications { vacanc
 apps/mcp  record_application { company, title, ... }
   → ApplicationService.record()   (packages/core, one transaction)
       → resolve the vacancy: link by id / link to a unique (company,title) match /
-        create a placeholder Vacancy (no text; an analysis only if a score was passed)
+        create a placeholder Vacancy (no text, no analysis)
       → already in the pipeline? AlreadyAppliedError
       → writeStatus(APPLIED), then writeStatus(status) if recorded further along
         (each a StatusChange row + the status / statusChangedAt cache)
@@ -113,16 +151,12 @@ Both transports call the same core service methods; there is no business logic i
 `apps/api` or `apps/mcp` beyond input validation and shaping the response. See
 [`contracts.md`](contracts.md) for the exact surfaces.
 
-In `apps/web`, `src/lib/` holds what every page shares: the HTTP helper (`api.ts`:
-`apiFetch`, `parseResponse`, `cursorPageSchema`), the cursor-paged query
-(`useInfiniteList.ts`, [ADR-0030](decisions/0030-cursor-paging.md)) and each route's
-title (`routeMeta.ts`). Presentational pieces are in `src/components/ui/`, the shell in
-`src/components/RootLayout.tsx` + `src/components/shell/`.
-
 ## Dev stack (Docker Compose)
 
 `docker-compose.yml` runs: `postgres`, a `core` build watcher (`tsc --watch`),
-`api`, `mcp`, `mcp-http`, `web`.
+`api`, `mcp`, `mcp-http`, `web`. One more, `visual`, starts only on
+`npm run test:visual`: the visual tests in the Playwright image
+([ADR-0037](decisions/0037-e2e-playwright.md)).
 
 - **File watchers poll.** Bind-mount change events don't reliably reach containers
   on Windows/Docker Desktop, so `tsc --watch`, `nest start --watch`
@@ -170,8 +204,8 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 2. **A vacancy is analysed once.** A vacancy can exist before its analysis (status
    `NEW`, `matchScore` and `recommendation` both `null`); the analysis is written once
    and never overwritten — `writeAnalysis` in `vacancy.service.ts` (`save()`,
-   `submitAnalysis`) is a conditional write (`recommendation IS NULL`), and `record()`
-   writes one only on the vacancy it creates; `save()` returns an analysed row for a
+   `submitAnalysis`) is a conditional write (`recommendation IS NULL`), the only writer
+   of one; `save()` returns an analysed row for a
    given `applyUrl` untouched, `submitAnalysis` refuses one (`AlreadyAnalysedError`).
    Both fields or neither, and never on a `NEW` row: two DB CHECKs.
    Anything that expects re-analysis to update stored fields is wrong.
@@ -180,14 +214,18 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    [`domain-model.md`](domain-model.md)
 3. **`recommendation` is the analyzer's; `status` is the user's.** They are
    independent axes and neither is derived from the other, and they have disjoint
-   writers: `save()` / `submitAnalysis()` (through `writeAnalysis`) and `record()`'s
-   create-vacancy path write the analysis fields
-   (and a new vacancy's first `NEW`); `writeStatus()` alone writes `status`
-   + `statusChangedAt` and the `StatusChange` journal, in one transaction. **One
-   exception:** the analysis moves a vacancy out of `NEW`, through `writeStatus()` in
-   the transaction that writes it — `SKIP` → `FILTERED_OUT`, else `NOT_REVIEWED`
-   (`statusAfterAnalysis`, in `core`, never in an agent). Only from `NEW`, so it never
-   clobbers the user's progress.
+   writers: `save()` / `submitAnalysis()` (through `writeAnalysis`) alone write the
+   analysis fields — `record()` creates its placeholder unanalysed
+   ([ADR-0019](decisions/0019-record-or-create-vacancy.md)); `writeStatus()` alone
+   writes `status` + `statusChangedAt` and the `StatusChange` journal, in one
+   transaction, a new vacancy's first `NEW` (`firstStatus`) aside. **Two
+   exceptions**, both only from statuses the user has not acted on, so neither clobbers
+   the user's progress: the analysis moves a vacancy out of `NEW`, through
+   `writeStatus()` in the transaction that writes it — `SKIP` → `FILTERED_OUT`, else
+   `NOT_REVIEWED` (`statusAfterAnalysis`, in `core`, never in an agent); and
+   `markUnavailable` moves a closed posting from the queue (`NEW`, `NOT_REVIEWED`,
+   `SAVED_FOR_LATER`) to `UNAVAILABLE`, any other row skipped
+   ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)).
    → [`domain-model.md`](domain-model.md),
    [ADR-0029](decisions/0029-one-vacancy-table.md),
    [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)
@@ -200,15 +238,16 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 6. **`apps/api` disables Biome's `useImportType`.** NestJS DI + `class-validator`
    need types used in decorated positions to be *runtime* imports. Turning the
    rule back on silently breaks DI. → [ADR-0014](decisions/0014-biome-and-nest-di-import-type.md)
-7. **Tests run against a real `job_search_copilot_test` database**, sequentially
-   (`fileParallelism: false`), and are integration tests, not Prisma mocks.
+7. **Tests run against a real `job_search_copilot_test` database**, files in parallel,
+   each test cleaning up only its own users' rows; integration tests, not Prisma mocks.
    → [ADR-0015](decisions/0015-testing-strategy.md)
 8. **Env is loaded by the app entrypoint, validated at boot.** `packages/core`
    does not load `.env`; a missing/invalid var fails startup with a readable
    message. → [ADR-0007](decisions/0007-env-config-and-loading.md)
 9. **Every REST route is closed by default.** A global guard
    wants a session; anonymous access is explicit (`@AllowAnonymous()`, `/health` only),
-   machine access is explicit (`ApiKeyGuard`, the three n8n routes only).
+   machine access is explicit (`ApiKeyGuard` on each domain controller's class — a new
+   controller takes no key until it says so).
    An anonymous route has no user to scope its queries to (invariant 11).
    → [ADR-0034](decisions/0034-auth-better-auth-in-core.md),
    [ADR-0039](decisions/0039-api-keys-per-user.md)
@@ -221,10 +260,19 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 11. **Every domain query is scoped to its user.** `Vacancy`
     has a `userId`; core's services take it as their first argument and query only
     through `forUser(db, userId)`, which adds the owner to every `Vacancy`, `Comment`
-    and `StatusChange` query. A query on the raw client reads every user's rows; another
-    user's row answers like a missing one (404, never 403).
+    and `StatusChange` query and throws on any other model. The services hold the raw
+    client as `Unscoped` (`$extends` only), so a query on it does not compile — one
+    would read every user's rows. Another user's row answers like a missing one (404,
+    never 403).
     → [ADR-0038](decisions/0038-multi-user-shared-schema.md),
     [ADR-0039](decisions/0039-api-keys-per-user.md)
+12. **The web UI is built from `components/ui`; a page never imports another page.** A
+    page's markup comes from the primitives there, which own their styles; no new
+    component class goes into `index.css`. Nothing fails when a page styles a
+    `<button>` by hand — it just drifts from every other one. The import rule is the
+    one part a tool checks (Biome's `noRestrictedImports`).
+    → [Inside `apps/web/src`](#inside-appswebsrc),
+    [`components/ui/README.md`](../apps/web/src/components/ui/README.md)
 
 ## Stack
 

@@ -1,12 +1,17 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 import { z } from 'zod';
-import { listVacanciesPage } from '../vacancies/api';
-import { CompanyHistoryModal } from '../vacancies/components/CompanyHistoryModal';
-import { SearchModal } from '../vacancies/components/SearchModal';
-import { VacancyTable } from '../vacancies/components/VacancyTable';
-import { STATUS_CONTEXT } from '../vacancies/types';
-import { useVacancyRows } from '../vacancies/useVacancies';
+import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ListCount, ListFrame } from '@/components/ui/ListFrame';
+import { Tabs } from '@/components/ui/Tabs';
+import { View } from '@/components/ui/View';
+import { CompanyHistoryModal } from '@/components/vacancies/CompanyHistoryModal';
+import { SearchModal } from '@/components/vacancies/SearchModal';
+import { VacancyTable } from '@/components/vacancies/VacancyTable';
+import { listVacanciesPage } from '@/lib/vacancies/api';
+import { STATUS_CONTEXT } from '@/lib/vacancies/types';
+import { useVacancyRows } from '@/lib/vacancies/useVacancyRows';
 
 /** The inbox's tabs, in the URL as `?tab=` — Queue being the absent value. */
 export const inboxTabSchema = z.enum(['queue', 'no-text', 'filtered-out']);
@@ -43,6 +48,8 @@ const TABS: Record<
   },
 };
 
+const TAB_OPTIONS = inboxTabSchema.options.map((value) => ({ value, label: TABS[value].label }));
+
 /** `/inbox` — the vacancies before triage: the analysis queue, the ones still without
  * text, and the ones screened out. Newest first, paged by the server (ADR-0030). */
 export function InboxPage() {
@@ -64,41 +71,29 @@ export function InboxPage() {
   const [searching, setSearching] = useState(false);
 
   return (
-    <section className="view view-fill">
-      <div className="card">
-        <div className="toolbar">
-          <fieldset className="tabs">
-            <legend className="sr-only">Inbox tab</legend>
-            {inboxTabSchema.options.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className="tab"
-                aria-pressed={value === tab}
-                onClick={() =>
-                  void navigate({ search: { tab: value === INBOX_TAB.queue ? undefined : value } })
-                }
-              >
-                {TABS[value].label}
-              </button>
-            ))}
-          </fieldset>
-          <div className="ml-auto flex items-center gap-[10px]">
-            {!loadError && !loading && (
-              <span className="toolbar-count">
-                Showing {items.length} of {total}
-              </span>
-            )}
-            <button type="button" className="btn" onClick={() => setSearching(true)}>
-              Search
-            </button>
-          </div>
-        </div>
-
+    <View fill>
+      <ListFrame
+        toolbar={
+          <>
+            <Tabs
+              legend="Inbox tab"
+              options={TAB_OPTIONS}
+              value={tab}
+              onChange={(value) =>
+                void navigate({ search: { tab: value === INBOX_TAB.queue ? undefined : value } })
+              }
+            />
+            <div className="ml-auto flex items-center gap-2.5">
+              {!loadError && !loading && <ListCount shown={items.length} total={total} />}
+              <Button onClick={() => setSearching(true)}>Search</Button>
+            </div>
+          </>
+        }
+      >
         {loadError ? (
-          <div className="empty-state">Failed to load the inbox: {loadError}</div>
+          <EmptyState>Failed to load the inbox: {loadError}</EmptyState>
         ) : !loading && items.length === 0 ? (
-          <div className="empty-state">{empty}</div>
+          <EmptyState>{empty}</EmptyState>
         ) : (
           <VacancyTable
             loading={loading}
@@ -111,7 +106,7 @@ export function InboxPage() {
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
           />
         )}
-      </div>
+      </ListFrame>
 
       {companyHistory && (
         <CompanyHistoryModal
@@ -124,6 +119,6 @@ export function InboxPage() {
       {searching && (
         <SearchModal context={STATUS_CONTEXT.inbox.options} onClose={() => setSearching(false)} />
       )}
-    </section>
+    </View>
   );
 }

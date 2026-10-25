@@ -21,8 +21,13 @@ functions. What should the tests exercise, and against what?
   `.env.test`'s `DATABASE_URL` is what the tests see; CI sets the same in its job env.
   A shared setup file, first in each project's `setupFiles`, refuses to start unless
   the database name ends in `_test` (`vitest.test-db.ts`).
-- **Serial files.** `fileParallelism: false`: every DB-backed file cleans up with a
-  blanket `deleteMany()` in `afterEach`, so parallel files would wipe each other's rows.
+- **Each test cleans up only its own data, so files run in parallel.** Every DB-backed
+  test owns fresh UUID users (`packages/core/tests/user.ts`, `apps/api/test/test-app.ts`,
+  the MCP specs' own) and deletes only those; their vacancies, comments, status
+  changes, sessions and keys go by `ON DELETE CASCADE`. A test reads and counts only its
+  users' rows. What no user owns — the OAuth clients DCR registers — is deleted by id.
+  With no file touching another's rows, Vitest's default `fileParallelism` stays on;
+  measured, a full `npm test` is clearly faster than one file at a time.
 - **`isolate: false`** in each project: one environment and module cache per project,
   not one per file — about 40% faster. The price: state can leak between files.
 - File names follow each ecosystem: `*.spec.ts` in the back ends, `*.test.ts(x)` in the
@@ -34,8 +39,11 @@ functions. What should the tests exercise, and against what?
   race in `save()`, the trigram search cannot be tested against a mock.
 - **SQLite in memory** — enums, `ILIKE`, `pg_trgm`, `@db.Text` don't map; a different
   database.
-- **A transaction per test, rolled back** — would allow parallel files, but wraps every
-  test, and the services open their own transactions. Not worth it at this size.
+- **A transaction per test, rolled back** — wraps every test, and the services open
+  their own transactions. Scoping to the test's user gives the same parallel files with
+  no wrapper.
+- **One file at a time, blanket `deleteMany()`** — simple, but a full run waits on every
+  DB file in turn, and it hides tests that assume an empty table.
 
 ## Consequences
 - `npm test` needs a running Postgres and a migrated test DB (`npm run
@@ -44,12 +52,16 @@ functions. What should the tests exercise, and against what?
 - A new migration must reach the test DB, or the suite fails.
 
 ## What this constrains — breaks if you change it
-- `fileParallelism` on → DB files race on cleanup; flaky failures.
+- A test that deletes, counts or looks up without its user's filter (`deleteMany()`,
+  `count()`, `findFirst()` bare) → it wipes or sees a parallel file's rows; flaky
+  failures that vanish when the file runs alone.
+- A global table no user owns (`Jwks`, an anonymous `OauthClient`) is shared by every
+  file: assert on what the test made, never on the table's size.
 - With `isolate: false`, a `vi.mock`, a stubbed global or module state left by one file
   is still there for the next. A test that fails in the full run but passes alone is
   the symptom: clean up in the file that set it.
 - The `_test` guard removed from `setupFiles` → a missing `.env.test` points the tests'
-  `deleteMany()` at the dev DB.
+  deletes at the dev DB.
 - `apps/api/tsconfig.build.json` (or its `test` / spec excludes) removed → `nest build`
   pulls in `test/**` and fails on `rootDir: ./src`.
 

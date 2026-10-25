@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { IconMenu } from '@/components/icons';
+import { Button } from '@/components/ui/Button';
 import { authClient } from '@/lib/auth';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -19,33 +20,32 @@ function SignOutButton() {
     queryClient.clear();
     await navigate({ to: '/login' });
   }
-  return (
-    <button type="button" className="btn" onClick={signOut}>
-      Sign out
-    </button>
-  );
+  return <Button onClick={signOut}>Sign out</Button>;
 }
 
 /**
  * `title` is an <h1> rather than the mockup's <div> — same rendering (preflight
- * inherits font-size/weight, and `.topbar-title` sets both), but keeps a real
+ * inherits font-size/weight, and its classes set both), but keeps a real
  * page heading for screen readers and for the router test.
  */
 export function Topbar({ title, onOpenMobile }: { title: string; onOpenMobile: () => void }) {
   return (
-    <header className="topbar">
-      <div className="flex items-center gap-[12px]">
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-border bg-[color-mix(in_srgb,var(--color-bg)_88%,transparent)] px-7 py-4 backdrop-blur-sm transition-[padding] duration-180 narrow:px-4 narrow:py-3.5 compact:py-2">
+      <div className="flex items-center gap-3">
         <button
           type="button"
-          className="menu-toggle"
+          className="hidden size-8.5 flex-none cursor-pointer items-center justify-center rounded-md border border-border bg-surface text-ink-soft narrow:inline-flex"
           onClick={onOpenMobile}
           aria-label="Open navigation"
         >
           <IconMenu />
         </button>
-        <h1 className="topbar-title">{title}</h1>
+        {/* 16px on a phone keeps "Application tracker" on one line at 390px. */}
+        <h1 className="text-3xl font-extrabold tracking-[-0.01em] transition-[font-size] duration-180 narrow:text-xl compact:text-xl">
+          {title}
+        </h1>
       </div>
-      <div className="flex items-center gap-[14px]">
+      <div className="flex items-center gap-3.5">
         <ThemeToggle />
         <SignOutButton />
       </div>

@@ -1,35 +1,24 @@
-import {
-  type InfiniteData,
-  type QueryKey,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { useInfiniteList } from '@/lib/useInfiniteList';
-import { fetchStats } from '@/pages/dashboard/api';
-import { toastMoved } from '@/pages/vacancies/constants';
 import {
-  type ApplicationPage,
   listApplicationsPage,
   updateApplication,
   updateApplicationStatus,
-} from './api';
+} from '@/lib/applications/api';
 import {
   type ApplicationListItem,
   type ApplicationStatus,
   type ApplicationStatusFilter,
   STATUS_FILTER_ALL,
   type UpdateApplicationInput,
-} from './types';
-
-const APPLICATIONS_KEY = ['applications'] as const;
-/** The dashboard's key: the KPI strip reads the same `GET /stats`. */
-const STATS_KEY = ['stats'] as const;
-
-type CachedPages = InfiniteData<ApplicationPage, number | undefined>;
+} from '@/lib/applications/types';
+import { queryKeys, staleAfter } from '@/lib/queryKeys';
+import { fetchStats } from '@/lib/stats/api';
+import { useInfiniteList } from '@/lib/useInfiniteList';
+import { useRowMutation } from '@/lib/useRowMutation';
+import { toastMoved } from '@/lib/vacancies/constants';
 
 interface StatusChange {
   id: number;
@@ -37,7 +26,6 @@ interface StatusChange {
 }
 
 export function useApplications() {
-  const queryClient = useQueryClient();
   const search = useSearch({ from: '/_app/applications' });
   const navigate = useNavigate({ from: '/applications' });
 
@@ -53,17 +41,19 @@ export function useApplications() {
   // new list from its first page. Writes below go through the prefix. Search is the
   // search modal's, never this table's.
   const { query, items, total, loadMore } = useInfiniteList(
-    [...APPLICATIONS_KEY, statusFilter],
+    queryKeys.applications(statusFilter),
     (cursor) => listApplicationsPage({ filter: statusFilter, cursor }),
   );
   const loading = query.isPending;
   const loadError = query.error ? query.error.message : null;
 
-  // The strip counts the whole pipeline on the server (ADR-0031), not the loaded rows.
-  const stats = useQuery({ queryKey: STATS_KEY, queryFn: fetchStats }).data?.pipeline;
+  // The strip counts the whole pipeline on the server (ADR-0031), not the loaded rows —
+  // the dashboard's `GET /stats`, under its key.
+  const stats = useQuery({ queryKey: queryKeys.stats(), queryFn: fetchStats }).data?.pipeline;
 
-  const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
-  const [rowErrors, setRowErrors] = useState<Map<number, string>>(new Map());
+  const { savingIds, rowErrors, rowMutation } = useRowMutation<ApplicationListItem>(
+    queryKeys.applications(),
+  );
 
   // The server's order — the last move first, `id` breaking a tie — kept here so an
   // optimistic move jumps to the top before the refetch lands.
@@ -77,74 +67,14 @@ export function useApplications() {
     [items],
   );
 
-  /**
-   * One optimistic row write: patch the row in every cached page at once, roll them
-   * back if the server refuses, show the error under that row, and refetch either
-   * way. Status and edit are the same shape; only the request and the patch differ.
-   * A row that leaves the filter keeps its place until the refetch drops it.
-   */
-  function rowMutation<V extends { id: number }>(
-    request: (vars: V) => Promise<ApplicationListItem>,
-    patch: (item: ApplicationListItem, vars: V) => ApplicationListItem,
-  ) {
-    return {
-      mutationFn: request,
-      onMutate: async (vars: V) => {
-        await queryClient.cancelQueries({ queryKey: APPLICATIONS_KEY });
-        setSavingIds((prev) => new Set(prev).add(vars.id));
-        setRowErrors((prev) => {
-          const next = new Map(prev);
-          next.delete(vars.id);
-          return next;
-        });
-        const previous = queryClient.getQueriesData<CachedPages>({ queryKey: APPLICATIONS_KEY });
-        queryClient.setQueriesData<CachedPages>({ queryKey: APPLICATIONS_KEY }, (old) =>
-          old
-            ? {
-                ...old,
-                pages: old.pages.map((page) => ({
-                  ...page,
-                  items: page.items.map((item) => (item.id === vars.id ? patch(item, vars) : item)),
-                })),
-              }
-            : old,
-        );
-        return { previous };
-      },
-      onError: (
-        err: Error,
-        { id }: V,
-        context?: { previous: [QueryKey, CachedPages | undefined][] },
-      ) => {
-        for (const [key, data] of context?.previous ?? []) {
-          queryClient.setQueryData(key, data);
-        }
-        setRowErrors((prev) => new Map(prev).set(id, err.message || 'Failed to save'));
-      },
-      onSettled: (_data: unknown, _err: unknown, { id }: V) => {
-        setSavingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        void queryClient.invalidateQueries({ queryKey: APPLICATIONS_KEY });
-        // The strip and the dashboard count these rows.
-        void queryClient.invalidateQueries({ queryKey: STATS_KEY });
-        // Same rows: /vacancies tags each with its real pipeline status.
-        void queryClient.invalidateQueries({ queryKey: ['vacancies'] });
-        void queryClient.invalidateQueries({ queryKey: ['vacancy'] });
-      },
-    };
-  }
-
   const statusMutation = useMutation(
-    rowMutation<StatusChange>(
-      ({ id, status }) => updateApplicationStatus(id, status),
+    rowMutation({
+      mutationFn: ({ id, status }: StatusChange) => updateApplicationStatus(id, status),
       // Mirror writeStatus() server-side, or the row keeps its old last-move stamp
       // (and its place) until the refetch lands.
       // A new APPLIED journal row is the new applied date too, and a move restarts
       // the timeout clock.
-      (item, { status }) => {
+      patch: (item, { status }) => {
         const now = new Date().toISOString();
         return {
           ...item,
@@ -154,15 +84,17 @@ export function useApplications() {
           appliedAt: status === 'APPLIED' ? now : item.appliedAt,
         };
       },
-    ),
+      invalidates: staleAfter.statusWrite,
+    }),
   );
 
   const editMutation = useMutation(
-    rowMutation<{ id: number; input: UpdateApplicationInput }>(
-      ({ id, input }) => updateApplication(id, input),
+    rowMutation({
+      mutationFn: ({ id, input }: { id: number; input: UpdateApplicationInput }) =>
+        updateApplication(id, input),
       // As on the server: absent is untouched, blank clears, and a non-blank comment
       // is appended.
-      (item, { input }) => {
+      patch: (item, { input }) => {
         const text = (value: string | null | undefined, current: string | null) =>
           value === undefined ? current : value?.trim() || null;
         const comment = input.comment?.trim();
@@ -185,7 +117,8 @@ export function useApplications() {
             : item.comments,
         };
       },
-    ),
+      invalidates: staleAfter.edit,
+    }),
   );
 
   return {

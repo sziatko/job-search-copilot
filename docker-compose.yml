@@ -153,5 +153,23 @@ services:
       - '5173:5173'
     volumes: *repo-volumes
 
+  # The visual tests (`npm run test:visual`, ADR-0037): Playwright in its Linux image, so
+  # the baselines match CI's. Started only by `docker compose run visual`; the rest of
+  # the e2e env comes from .env.e2e, which playwright.config.ts loads.
+  visual:
+    build:
+      context: .
+      dockerfile: e2e/Dockerfile
+    profiles: [visual]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/job_search_copilot_e2e
+      E2E_VISUAL: '1'
+    ipc: host # Chromium's shared memory, as Playwright's Docker guide asks
+    entrypoint: [npx, playwright, test, -c, e2e]
+    volumes: *repo-volumes
+
 volumes:
   postgres_data:

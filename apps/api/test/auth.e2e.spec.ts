@@ -5,10 +5,16 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { CurrentUserId } from '../src/auth/api-key.guard';
-import { createApiKey, createTestApp, signIn } from './test-app';
+import {
+  createApiKey,
+  createTestApp,
+  deleteTestUsers,
+  deleteTestVacancies,
+  signIn,
+} from './test-app';
 
-// Every route is closed by default (ADR-0034); n8n's three are open to an API key too
-// (ADR-0039). /health's anonymity is health.e2e.spec.ts's.
+// Every route is closed by default (ADR-0034); the domain routes are open to an API key
+// too (ADR-0039). /health's anonymity is health.e2e.spec.ts's.
 describe('Auth (e2e)', () => {
   let app: NestExpressApplication;
   const prisma = getPrisma();
@@ -22,19 +28,17 @@ describe('Auth (e2e)', () => {
       company: 'Queued Co',
       title: url,
     });
-    return (await prisma.vacancy.findFirstOrThrow({ where: { applyUrl: url } })).id;
+    return (await prisma.vacancy.findFirstOrThrow({ where: { userId, applyUrl: url } })).id;
   }
 
   beforeAll(async () => {
     app = await createTestApp();
   });
 
-  afterEach(async () => {
-    await prisma.vacancy.deleteMany();
-  });
+  afterEach(deleteTestVacancies);
 
   afterAll(async () => {
-    await prisma.user.deleteMany(); // their keys go with them (cascade)
+    await deleteTestUsers(); // their sessions, keys and vacancies go with them
     await app.close();
     await prisma.$disconnect();
   });
@@ -48,22 +52,18 @@ describe('Auth (e2e)', () => {
       await request(server).get('/api/v1/vacancies').set('Cookie', `${cookie}x`).expect(401);
       await request(server).get('/api/v1/vacancies').set('Cookie', cookie).expect(200);
     });
-
-    it('is not opened by an API key on a read route', async () => {
-      const { key } = await createKey();
-      await request(app.getHttpServer())
-        .get('/api/v1/vacancies')
-        .set('Authorization', `Bearer ${key}`)
-        .expect(401);
-    });
   });
 
-  describe('an API key, on the three n8n routes', () => {
-    /** [route, (the key owner's id) → [path, body]]: the owner's vacancies, so 200. */
-    const routes: [string, (userId: string) => Promise<[string, object]>][] = [
+  describe('an API key, on the domain routes', () => {
+    /** [route, (the key owner's id) → [method, path, body?]]: the owner's rows, so 200. */
+    const routes: [string, (userId: string) => Promise<['get' | 'post', string, object?]>][] = [
+      ['GET /vacancies', async () => ['get', '/api/v1/vacancies']],
+      ['GET /applications', async () => ['get', '/api/v1/applications']],
+      ['GET /stats', async () => ['get', '/api/v1/stats']],
       [
         'POST /vacancies/intake',
         async () => [
+          'post',
           '/api/v1/vacancies/intake',
           { entries: [{ url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' }] },
         ],
@@ -71,6 +71,7 @@ describe('Auth (e2e)', () => {
       [
         'POST /vacancies/:id/analysis',
         async (userId) => [
+          'post',
           `/api/v1/vacancies/${await queued(userId, 'https://acme.com/q/1')}/analysis`,
           analysis,
         ],
@@ -78,8 +79,17 @@ describe('Auth (e2e)', () => {
       [
         'POST /vacancies/analysis',
         async (userId) => [
+          'post',
           '/api/v1/vacancies/analysis',
           { analyses: [{ id: await queued(userId, 'https://acme.com/q/2'), ...analysis }] },
+        ],
+      ],
+      [
+        'POST /vacancies/unavailable',
+        async (userId) => [
+          'post',
+          '/api/v1/vacancies/unavailable',
+          { items: [{ id: await queued(userId, 'https://acme.com/q/3'), reason: 'Gone.' }] },
         ],
       ],
     ];
@@ -90,16 +100,64 @@ describe('Auth (e2e)', () => {
         const { key, userId } = await createKey();
         const revoked = await createKey();
         await prisma.apikey.delete({ where: { id: revoked.id } }); // what Revoke does
-        const [path, body] = await setup(userId);
-        const post = () => request(app.getHttpServer()).post(path).send(body);
+        const [method, path, body] = await setup(userId);
+        const call = () => request(app.getHttpServer())[method](path).send(body);
 
-        await post().expect(401);
-        await post().set('Authorization', 'Bearer jsc_not-a-key').expect(401);
-        await post().set('Authorization', `Bearer ${revoked.key}`).expect(401);
-        await post().set('Authorization', key).expect(401); // no scheme
-        await post().set('Authorization', `Bearer ${key}`).expect(200);
+        await call().expect(401);
+        await call().set('Authorization', 'Bearer jsc_not-a-key').expect(401);
+        await call().set('Authorization', `Bearer ${revoked.key}`).expect(401);
+        await call().set('Authorization', key).expect(401); // no scheme
+        await call().set('Authorization', `Bearer ${key}`).expect(200);
       },
     );
+
+    /** [route, (a queued vacancy's id) → [method, path, body]] — each writes a comment. */
+    const commenting: [string, (id: number) => ['post' | 'patch', string, object]][] = [
+      [
+        'PATCH /vacancies/:id/status',
+        (id) => ['patch', `/api/v1/vacancies/${id}/status`, { status: 'SAVED_FOR_LATER' }],
+      ],
+      [
+        'PATCH /applications/:id/status',
+        (id) => ['patch', `/api/v1/applications/${id}/status`, { status: 'INTERVIEW' }],
+      ],
+      ['POST /applications', (id) => ['post', '/api/v1/applications', { vacancyId: id }]],
+      ['PATCH /applications/:id', (id) => ['patch', `/api/v1/applications/${id}`, {}]],
+    ];
+
+    it.each(commenting)('%s: writes the comment as AGENT', async (route, setup) => {
+      const { key, userId } = await createKey();
+      const slug = route.replace(/\W+/g, '-').toLowerCase();
+      const [method, path, body] = setup(await queued(userId, `https://acme.com/c/${slug}`));
+      const res = await request(app.getHttpServer())
+        [method](path)
+        .set('Authorization', `Bearer ${key}`)
+        .send({ ...body, comment: 'From n8n.' })
+        .expect(method === 'post' ? 201 : 200);
+      // POST /applications answers an envelope, the rest the row.
+      const row = res.body.application ?? res.body;
+      expect(row.comments.at(-1)).toMatchObject({ body: 'From n8n.', source: 'AGENT' });
+    });
+
+    it('answers 429 once the key is over its rate limit', async () => {
+      const { key, id } = await createKey();
+      await prisma.apikey.update({ where: { id }, data: { rateLimitMax: 1 } });
+      const get = () =>
+        request(app.getHttpServer()).get('/api/v1/stats').set('Authorization', `Bearer ${key}`);
+      await get().expect(200);
+      await get().expect(429);
+    });
+
+    it("leaves a session's comment USER", async () => {
+      const { cookie, userId } = await signIn(app);
+      const id = await queued(userId, 'https://acme.com/q/session');
+      const { body } = await request(app.getHttpServer())
+        .patch(`/api/v1/vacancies/${id}/status`)
+        .set('Cookie', cookie)
+        .send({ status: 'SAVED_FOR_LATER', comment: 'Later.' })
+        .expect(200);
+      expect(body.comments.at(-1)).toMatchObject({ body: 'Later.', source: 'USER' });
+    });
 
     it('lets a session through too', async () => {
       await request(app.getHttpServer())

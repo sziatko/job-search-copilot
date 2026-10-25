@@ -6,6 +6,7 @@ import { delay, HttpResponse, http } from 'msw';
 import { createElement } from 'react';
 import { toast } from 'sonner';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { VacancyListItem } from '@/lib/vacancies/types';
 import { routeTree } from '@/router';
 import {
   buildHandlers,
@@ -15,8 +16,8 @@ import {
   vacanciesResolver,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import { companyOrder } from '@/test/rows';
 import { expectLoadedTable, expectSkeletonTable } from '@/test/skeleton';
-import type { VacancyListItem } from './types';
 
 const vacancy = fakeVacancy;
 
@@ -42,17 +43,6 @@ function renderVacancies(path = '/vacancies') {
       createElement(QueryClientProvider, { client }, createElement(RouterProvider, { router })),
     ),
   };
-}
-
-/** The company out of each rendered row's meta cell. Reading it from the cell
- * rather than off a text node: the cell also carries the id, and matching text
- * nodes couples the test to how JSX happens to lay out whitespace. */
-function rowCompanies() {
-  return screen
-    .getAllByRole('row')
-    .map((row) => row.querySelector('.role-meta')?.textContent)
-    .filter((cell): cell is string => Boolean(cell))
-    .map((cell) => cell.replace(/\s*#\d+$/, ''));
 }
 
 /** One row's own controls, scoped by company: the toolbar holds a `<select>`, and
@@ -167,13 +157,7 @@ describe('VacanciesPage / useVacancies', () => {
       'All',
     ]);
 
-    const companies = () =>
-      screen
-        .getAllByRole('row')
-        .map((row) => row.querySelector('.role-meta')?.textContent ?? '')
-        .filter(Boolean)
-        .map((cell) => cell.replace(/\s*#\d+$/, ''))
-        .sort();
+    const companies = () => companyOrder().sort();
     await user.selectOptions(filter, 'ALL');
     await screen.findByText('Closed Co');
     expect(companies()).toEqual(['Closed Co', 'Declined Co', 'Fresh Co', 'Saved Co']);
@@ -200,7 +184,7 @@ describe('VacanciesPage / useVacancies', () => {
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
 
     await waitFor(() =>
-      expect(rowCompanies()).toEqual(['High Co', 'Low Co', 'Caveats Co', 'Skip Co']),
+      expect(companyOrder()).toEqual(['High Co', 'Low Co', 'Caveats Co', 'Skip Co']),
     );
   });
 
@@ -279,7 +263,7 @@ describe('VacanciesPage / useVacancies', () => {
     await screen.findByText('Showing 100 of 130');
 
     // jsdom lays nothing out: set the offset the virtualizer reads, then tell it.
-    const scroller = document.querySelector('.table-body-scroll') as HTMLElement;
+    const scroller = screen.getByRole('region', { name: 'Vacancies' });
     Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 10_000_000 });
     fireEvent.scroll(scroller);
     await screen.findByText('Showing 130 of 130');
@@ -312,9 +296,7 @@ describe('VacanciesPage / useVacancies', () => {
       screen.queryByRole('heading', { level: 2, name: 'Analyzed vacancies' }),
     ).not.toBeInTheDocument();
     // 2 of 2: the status filter is the server's now, so `total` counts it too.
-    // The count leads the toolbar; the table has no foot.
-    expect(screen.getByText('Showing 2 of 2').closest('.toolbar')).not.toBeNull();
-    expect(document.querySelector('.table-foot')).toBeNull();
+    expect(screen.getByText('Showing 2 of 2')).toBeInTheDocument();
   });
 
   it('draws skeleton rows under its header while the first page loads', async () => {
@@ -372,9 +354,9 @@ describe('VacanciesPage / useVacancies', () => {
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
 
-    // Scoped by `.tag`: the Status column, not a button's bubble.
-    expect(rowOf('Acme').getByText('Saved for later', { selector: '.tag' })).toBeInTheDocument();
-    expect(rowOf('Beta Corp').getByText('Declined', { selector: '.tag' })).toBeInTheDocument();
+    // Within the row only the Status column's tag says it: no row offers its own status.
+    expect(rowOf('Acme').getByText('Saved for later')).toBeInTheDocument();
+    expect(rowOf('Beta Corp').getByText('Declined')).toBeInTheDocument();
   });
 
   it('opens a dialog for Save for later; an empty one sends no comment, and says so', async () => {
@@ -430,7 +412,7 @@ describe('VacanciesPage / useVacancies', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Acme').getByText('Not reviewed')).toBeInTheDocument();
     expect(bodies).toEqual([]);
   });
 
@@ -450,7 +432,7 @@ describe('VacanciesPage / useVacancies', () => {
     await waitFor(() => expect(screen.queryByText('Acme')).not.toBeInTheDocument());
 
     await user.selectOptions(screen.getByLabelText('Status'), 'UNAVAILABLE');
-    expect(await rowOf('Acme').findByText('Unavailable', { selector: '.tag' })).toBeInTheDocument();
+    expect(await rowOf('Acme').findByText('Unavailable')).toBeInTheDocument();
     expect(screen.queryByText('Beta Corp')).not.toBeInTheDocument();
   });
 
@@ -464,13 +446,11 @@ describe('VacanciesPage / useVacancies', () => {
 
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Status'), 'ALL');
-    expect(rowOf('Acme').getByText('Saved for later', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Acme').getByText('Saved for later')).toBeInTheDocument();
 
     await user.click(rowOf('Acme').getByRole('button', { name: 'Mark not reviewed' }));
 
-    await waitFor(() =>
-      expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(rowOf('Acme').getByText('Not reviewed')).toBeInTheDocument());
   });
 
   it('offers every status but the one the row already has', async () => {
@@ -535,7 +515,7 @@ describe('VacanciesPage / useVacancies', () => {
     // there too, with every control disabled by the save. Its status moves on
     // /applications; copying it is still useful here.
     await waitFor(() => {
-      expect(rowOf('Acme').getByText('Applied', { selector: '.tag' })).toBeInTheDocument();
+      expect(rowOf('Acme').getByText('Applied')).toBeInTheDocument();
       expect(rowOf('Acme').getByRole('button', { name: /^Copy / })).toBeEnabled();
     });
     // A pipeline row counts as Applied.
@@ -587,9 +567,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(rowOf('Acme').getByRole('button', { name: /^Copy / })).toBeDisabled();
     });
 
-    await waitFor(() =>
-      expect(rowOf('Acme').getByText('Saved for later', { selector: '.tag' })).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(rowOf('Acme').getByText('Saved for later')).toBeInTheDocument());
   });
 
   it('requires confirmation before persisting DECLINED', async () => {
@@ -623,7 +601,7 @@ describe('VacanciesPage / useVacancies', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByText('Decline this vacancy?')).not.toBeInTheDocument();
-    expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Acme').getByText('Not reviewed')).toBeInTheDocument();
   });
 
   it('requires confirmation before persisting APPLIED, then records the application', async () => {
@@ -704,7 +682,7 @@ describe('VacanciesPage / useVacancies', () => {
       // The row's own line, carrying the server's message rather than `HTTP 422`…
       await screen.findByText('Already recorded.');
       // …and the row is back where it was, not optimistically applied.
-      expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+      expect(rowOf('Acme').getByText('Not reviewed')).toBeInTheDocument();
       expect(success).not.toHaveBeenCalledWith('Application submitted!');
     } finally {
       success.mockRestore();
@@ -766,7 +744,7 @@ describe('VacanciesPage / useVacancies', () => {
     );
     expect(client.getQueryData(['vacancies', 'ALL'])).toBeUndefined();
     // …and the frozen page is still what is on screen, unchanged.
-    expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Acme').getByText('Not reviewed')).toBeInTheDocument();
 
     gate.state.release();
   });
@@ -832,7 +810,7 @@ describe('VacanciesPage / useVacancies', () => {
     // The optimistic write put the row out of the NOT_REVIEWED view; the rollback
     // has to bring it back, tag and all.
     await screen.findByText(/Failed to update vacancy 1/);
-    expect(rowOf('Acme').getByText('Not reviewed', { selector: '.tag' })).toBeInTheDocument();
+    expect(rowOf('Acme').getByText('Not reviewed')).toBeInTheDocument();
     expect(success).not.toHaveBeenCalledWith('Moved to Saved for later', expect.anything());
   });
 
@@ -871,9 +849,9 @@ describe('VacanciesPage / useVacancies', () => {
         screen.queryByRole('button', { name: /other vacancies? at Beta Corp/i }),
       ).not.toBeInTheDocument();
 
-      // The sentence is a `.tip` bubble like the Action column's, not a native
+      // The sentence is a hover bubble like the Action column's, not a native
       // `title` — the count alone is what the button shows.
-      expect(buttons[0].querySelector('.tip')).toHaveTextContent('1 other vacancy at Acme');
+      expect(within(buttons[0]).getByText('1 other vacancy at Acme')).toBeInTheDocument();
       expect(buttons[0]).not.toHaveAttribute('title');
       // Exact, so it fails if the count stops being hidden: that name would then
       // read "1 1 other vacancy at Acme", which the regex above still matches.
@@ -898,8 +876,8 @@ describe('VacanciesPage / useVacancies', () => {
       // The vacancy's own status, not a join against the applications query.
       const modalRow = (title: string) =>
         within(modal.getByText(title).closest('tr') as HTMLElement);
-      expect(modalRow('Backend Engineer').getByText('Not reviewed')).toHaveClass('tag');
-      expect(modalRow('Data Engineer').getByText('Interview')).toHaveClass('tag');
+      expect(modalRow('Backend Engineer').getByText('Not reviewed')).toBeInTheDocument();
+      expect(modalRow('Data Engineer').getByText('Interview')).toBeInTheDocument();
       expect(
         modalRow('Data Engineer').getByRole('link', { name: /open vacancy details/i }),
       ).toHaveAttribute('href', '/vacancies/2');
@@ -921,8 +899,8 @@ describe('VacanciesPage / useVacancies', () => {
         .click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[0]);
       const modal = within(await screen.findByRole('dialog'));
       const table = await expectSkeletonTable('Vacancy', modal);
-      // The subtitle keeps its visible "Loading…" too.
-      expect(modal.getByText('Loading…', { selector: '.dialog-sub' })).toBeInTheDocument();
+      // The subtitle keeps its visible "Loading…" too, beside the table's hidden one.
+      expect(modal.getAllByText('Loading…')).toHaveLength(2);
       hold.release();
       await expectLoadedTable(table, 'Data Engineer');
     });
@@ -947,14 +925,12 @@ describe('VacanciesPage / useVacancies', () => {
 
       await saveForLater(user, 'Backend Engineer');
       await waitFor(() =>
-        expect(
-          rowOf('Backend Engineer').getByText('Saved for later', { selector: '.tag' }),
-        ).toBeInTheDocument(),
+        expect(rowOf('Backend Engineer').getByText('Saved for later')).toBeInTheDocument(),
       );
 
       modal = await openModal();
       const row = within(modal.getByText('Backend Engineer').closest('tr') as HTMLElement);
-      expect(await row.findByText('Saved for later')).toHaveClass('tag');
+      expect(await row.findByText('Saved for later')).toBeInTheDocument();
     });
 
     it('shows the statuses when the applications request fails', async () => {
@@ -1027,8 +1003,8 @@ describe('VacanciesPage / useVacancies', () => {
 
       const modal = within(await screen.findByRole('dialog'));
       const mark = await modal.findByText('⏳');
-      // The same `.tip` bubble the action buttons wear, not a native `title`.
-      expect(mark.querySelector('.tip')).toHaveTextContent('45 days since last update');
+      // The same hover bubble the action buttons wear, not a native `title`.
+      expect(within(mark).getByText('45 days since last update')).toBeInTheDocument();
       expect(mark).not.toHaveAttribute('title');
     });
 
@@ -1105,7 +1081,6 @@ describe('VacanciesPage / useVacancies', () => {
 
       const modal = within(await screen.findByRole('dialog'));
       const marked = modal.getByText('Current').closest('tr');
-      expect(marked).toHaveClass('row-current');
       expect(within(marked as HTMLElement).getByText('Backend Engineer')).toBeInTheDocument();
       expect(modal.getAllByText('Current')).toHaveLength(1);
     });
@@ -1183,20 +1158,6 @@ describe('VacanciesPage / useVacancies', () => {
       await modal.findByText('Data Engineer II');
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
     });
-
-    it('caps its own height, so a long history still fits the viewport', async () => {
-      mswServer.use(...buildHandlers(companyFixtures()));
-      renderVacancies();
-      await screen.findByText('Backend Engineer');
-
-      const user = userEvent.setup();
-      await user.click(screen.getAllByRole('button', { name: /other vacancy at Acme/i })[0]);
-
-      // jsdom has no layout, so this asserts the box that does the capping rather
-      // than a height — that the modal actually fits is the browser pass's check.
-      const modal = within(await screen.findByRole('dialog'));
-      expect(modal.getByRole('table').parentElement).toHaveClass('max-h-[60vh]', 'overflow-y-auto');
-    });
   });
 
   describe('the action column', () => {
@@ -1206,7 +1167,7 @@ describe('VacanciesPage / useVacancies', () => {
       await screen.findByText('Acme');
 
       // The controls are icons now, so the bubble is their only visible label.
-      // Scoped by `.tip`: the Rec. column's tag also reads "Apply".
+      // Inside a control: the Rec. column's tag also reads "Apply".
       const row = rowOf('Acme');
       for (const label of [
         'Copy',
@@ -1216,7 +1177,8 @@ describe('VacanciesPage / useVacancies', () => {
         'Mark unavailable',
         'Details',
       ]) {
-        expect(row.getByText(label, { selector: '.tip' })).toBeInTheDocument();
+        const inControl = row.getAllByText(label).filter((el) => el.closest('button, a'));
+        expect(inControl, label).toHaveLength(1);
       }
     });
 
@@ -1233,15 +1195,16 @@ describe('VacanciesPage / useVacancies', () => {
       renderVacancies();
       await screen.findByText('Acme');
 
-      expect(rowOf('Acme').getByText('Copy', { selector: '.tip' })).toBeInTheDocument();
+      const bubble = () =>
+        within(rowOf('Acme').getByRole('button', { name: /^Copy / })).getByRole('status');
+      expect(bubble()).toHaveTextContent(/^Copy$/);
 
       const user = userEvent.setup();
       await user.click(rowOf('Acme').getByRole('button', { name: /^Copy / }));
 
       // Same bubble, the other half of the pair: "Copied" alone would pass even if
       // only the bubble's opacity changed.
-      expect(rowOf('Acme').getByText('Copied', { selector: '.tip' })).toBeInTheDocument();
-      expect(rowOf('Acme').queryByText('Copy', { selector: '.tip' })).not.toBeInTheDocument();
+      expect(bubble()).toHaveTextContent(/^Copied$/);
     });
   });
 });

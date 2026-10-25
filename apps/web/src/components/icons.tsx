@@ -2,8 +2,8 @@
  * Every icon in the app, as stroke-based SVGs. `currentColor` throughout, so
  * each one picks up the text colour of its container and therefore the theme.
  *
- * Sizing is left to the consumer (the `.nav-item svg`, `.icon-btn svg` etc.
- * rules in index.css already size the ones that sit in chrome).
+ * Sizing is left to the consumer: the control an icon sits in sizes its `svg` (an
+ * icon `Button`, a nav item).
  *
  * All of these are decorative — the button, link or heading around them carries
  * the label — so the single <svg> below is aria-hidden. That is also why they

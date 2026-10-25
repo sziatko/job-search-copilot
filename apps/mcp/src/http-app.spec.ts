@@ -26,12 +26,16 @@ function token(audience = mcpUrl) {
     .sign(privateKey);
 }
 
+/** The key owners `apiKey` made, deleted in `afterAll`. */
+const owners: string[] = [];
+
 /** What /profile's "Create" does: an API key for a new user, through the API's auth. */
 async function apiKey(): Promise<string> {
   const prisma = getPrisma();
   const user = await prisma.user.create({
     data: { id: randomUUID(), name: 'Key Owner', email: `${randomUUID()}@example.com` },
   });
+  owners.push(user.id);
   const provider = { clientId: 'test-client-id', clientSecret: 'test-client-secret' };
   const auth = createAuth(prisma, {
     secret: 'test-secret-at-least-32-characters-long',
@@ -60,7 +64,7 @@ describe('MCP over HTTP', () => {
 
   afterAll(async () => {
     server.close();
-    await getPrisma().user.deleteMany(); // their keys go with them (cascade)
+    await getPrisma().user.deleteMany({ where: { id: { in: owners } } }); // keys cascade
   });
 
   const initialize = (headers: Record<string, string> = {}) =>
@@ -128,6 +132,16 @@ describe('MCP over HTTP', () => {
     const res = await initialize({ Authorization: 'Bearer jsc_not-a-key' });
     expect(res.status).toBe(401);
     expect(res.headers.get('www-authenticate')).toContain('error="invalid_token"');
+  });
+
+  it('answers 429 to an API key over its rate limit', async () => {
+    const key = await apiKey();
+    await getPrisma().apikey.updateMany({
+      where: { referenceId: owners.at(-1) },
+      data: { rateLimitMax: 1 },
+    });
+    expect((await initialize({ Authorization: `Bearer ${key}` })).status).toBe(200);
+    expect((await initialize({ Authorization: `Bearer ${key}` })).status).toBe(429);
   });
 
   it('refuses a token issued for another audience', async () => {
