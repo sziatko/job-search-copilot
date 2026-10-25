@@ -45,7 +45,8 @@ matching the filter, not the page size.
 | `POST /vacancies/analysis` | The same for 1–10, one transaction | `200` the vacancies, in input order |
 | `GET /vacancies` | List: filters `recommendation`, `status` (a list), `company`, `search` (company or title), `sameCompanyAs`, `hasText`; `sort` `newest` \| `recommended` | items without `fullText`, with `companyMatchCount`, `hasAnalysis`, `hasText` |
 | `GET /vacancies/:id` | One vacancy | with `comments`, `estimationComment`, `timeline` |
-| `PATCH /vacancies/:id/status` | Move to any status, an optional `USER` comment | `200` as `GET /:id` |
+| `PATCH /vacancies/:id/status` | Move to any status, an optional comment | `200` as `GET /:id` |
+| `POST /vacancies/unavailable` | Closed postings (1–100, `{ id, reason }`): a row still in the queue → `UNAVAILABLE`, `reason` a comment; any other skipped ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)) | `200 { moved: id[], skipped: id[] }`; one transaction |
 | `POST /applications` | Record an application on a vacancy by id | `201 { application, resolution, vacancyCreated }` |
 | `GET /applications` | The pipeline: `status`, `state` (`active` \| `timedOut`), `search`, `sameCompanyAs` | items with `appliedAt`, `timedOut`, `comments`, `companyMatchCount` |
 | `GET /applications/:id` | One application | `404` if not in the pipeline |
@@ -66,7 +67,8 @@ query that finds nothing (`getById`) answers `null` and the controller sends Nes
 `trustedOrigins`.
 
 > **What this constrains — breaks if you change it**
-> - `POST /vacancies/intake`'s body or result, or the `Bearer jsc_…` header → the n8n
+> - `POST /vacancies/intake`'s or `POST /vacancies/unavailable`'s body or result, or
+>   the `Bearer jsc_…` header → the n8n
 >   workflows (outside the repo) and `apps/api/test/vacancies.e2e.spec.ts`.
 > - A path, the prefix or the version → `apps/web/src/lib/api.ts` (`API_BASE`), the
 >   features' `api.ts`, the MSW handlers, the api e2e specs.

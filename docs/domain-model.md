@@ -46,7 +46,7 @@ pipeline.
 | `matchScore` | `Int?` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. `null` = not analysed yet. |
 | `recommendation` | `Recommendation?` enum | **The analyzer's call.** `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`; `null` = not analysed yet — with `matchScore`, both or neither (a CHECK). |
 | `comments` | `Comment[]` | Every note on the vacancy — see [`Comment`](#comment) below. The analyzer's reasoning is its `ANALYZER` row: reads still return it as `estimationComment` (`string \| null`), derived from the first one. |
-| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (one exception: the analysis moves it out of `NEW`, below). A cache of the latest [`StatusChange`](#statuschange). The values are in the table below. |
+| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (two machine moves from the queue: the analysis's out of `NEW`, a closed posting's to `UNAVAILABLE` — below). A cache of the latest [`StatusChange`](#statuschange). The values are in the table below. |
 | `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. Timeout and the `/applications` sort read it. |
 | `salaryInApplication` | `String?` | Free text ("130 PLN/h"), entered when applying. |
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
@@ -89,6 +89,9 @@ decision are **different things on different axes**:
   `FILTERED_OUT`, anything else → `NOT_REVIEWED` (`statusAfterAnalysis` in `status.ts`;
   the rule is `core`'s, never an agent's). It only fires from `NEW`, so it never
   clobbers the user's progress ([ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)).
+  One more machine move, not from `recommendation`: a posting found closed goes from the queue (`NEW`,
+  `NOT_REVIEWED`, `SAVED_FOR_LATER`) to `UNAVAILABLE`, any other row untouched
+  ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)).
 
 **Status lifecycle** (enforced by the UI, not the DB — the API allows any move,
 including back to `NOT_REVIEWED`; the one DB rule is "an analysed row is never `NEW`",

@@ -207,6 +207,38 @@ describe('Vacancies (e2e)', () => {
     });
   });
 
+  describe('POST /api/v1/vacancies/unavailable', () => {
+    const mark = (items: unknown[]) => api.post('/api/v1/vacancies/unavailable').send({ items });
+
+    it('moves the queue, skips a row the user moved since', async () => {
+      const open = await queued('https://example.com/q/1');
+      const declined = await queued('https://example.com/q/2');
+      await api.patch(`/api/v1/vacancies/${declined}/status`).send({ status: 'DECLINED' });
+
+      const res = await mark([
+        { id: open, reason: 'Closed on LinkedIn.' },
+        { id: declined, reason: 'Closed on LinkedIn.' },
+      ]).expect(200);
+
+      expect(res.body).toEqual({ moved: [open], skipped: [declined] });
+      const statuses = await prisma.vacancy.findMany({
+        where: { id: { in: [open, declined] } },
+        orderBy: { id: 'asc' },
+        select: { status: true },
+      });
+      expect(statuses.map((v) => v.status)).toEqual(['UNAVAILABLE', 'DECLINED']);
+    });
+
+    it('400s on an empty batch, more than 100, or an item without a reason', async () => {
+      await mark([]).expect(400);
+      await mark(Array.from({ length: 101 }, (_, i) => ({ id: i + 1, reason: 'Gone.' }))).expect(
+        400,
+      );
+      await mark([{ id: 1 }]).expect(400);
+      await mark([{ id: 1, reason: '' }]).expect(400);
+    });
+  });
+
   describe('POST /api/v1/vacancies/analysis', () => {
     const analysis = { matchScore: 80, recommendation: 'APPLY', estimationComment: 'Fits.' };
 

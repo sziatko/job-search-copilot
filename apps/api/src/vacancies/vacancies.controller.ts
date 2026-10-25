@@ -19,6 +19,7 @@ import type { Response } from 'express';
 import { ApiKeyGuard, CallerSource, CurrentUserId } from '../auth/api-key.guard';
 import { IntakeVacanciesDto } from './dto/intake-vacancies.dto';
 import { ListVacanciesQueryDto } from './dto/list-vacancies.dto';
+import { MarkUnavailableDto } from './dto/mark-unavailable.dto';
 import { SaveVacancyDto } from './dto/save-vacancy.dto';
 import { SubmitAnalysesDto, SubmitAnalysisDto } from './dto/submit-analysis.dto';
 import { UpdateVacancyStatusDto } from './dto/update-vacancy-status.dto';
@@ -88,6 +89,22 @@ export class VacanciesController {
   @HttpCode(200)
   submitAnalyses(@CurrentUserId() userId: string, @Body() dto: SubmitAnalysesDto) {
     return this.vacancies.submitAnalyses(userId, dto.analyses);
+  }
+
+  /**
+   * n8n's dead-posting check (ADR-0040): each vacancy still in the queue (NEW,
+   * NOT_REVIEWED, SAVED_FOR_LATER) → UNAVAILABLE with its `reason` as a comment; any
+   * other id — moved since, unknown, another user's — is skipped. 200
+   * `{ moved: id[], skipped: id[] }`.
+   */
+  @Post('unavailable')
+  @HttpCode(200)
+  markUnavailable(
+    @CurrentUserId() userId: string,
+    @Body() dto: MarkUnavailableDto,
+    @CallerSource() source: CommentSource,
+  ) {
+    return this.vacancies.markUnavailable(userId, dto.items, source);
   }
 
   /** `{ items, total, nextCursor }`; paged by `cursor` (ADR-0030). */

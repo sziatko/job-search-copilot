@@ -218,11 +218,14 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    analysis fields — `record()` creates its placeholder unanalysed
    ([ADR-0019](decisions/0019-record-or-create-vacancy.md)); `writeStatus()` alone
    writes `status` + `statusChangedAt` and the `StatusChange` journal, in one
-   transaction, a new vacancy's first `NEW` (`firstStatus`) aside. **One
-   exception:** the analysis moves a vacancy out of `NEW`, through `writeStatus()` in
-   the transaction that writes it — `SKIP` → `FILTERED_OUT`, else `NOT_REVIEWED`
-   (`statusAfterAnalysis`, in `core`, never in an agent). Only from `NEW`, so it never
-   clobbers the user's progress.
+   transaction, a new vacancy's first `NEW` (`firstStatus`) aside. **Two
+   exceptions**, both only from statuses the user has not acted on, so neither clobbers
+   the user's progress: the analysis moves a vacancy out of `NEW`, through
+   `writeStatus()` in the transaction that writes it — `SKIP` → `FILTERED_OUT`, else
+   `NOT_REVIEWED` (`statusAfterAnalysis`, in `core`, never in an agent); and
+   `markUnavailable` moves a closed posting from the queue (`NEW`, `NOT_REVIEWED`,
+   `SAVED_FOR_LATER`) to `UNAVAILABLE`, any other row skipped
+   ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)).
    → [`domain-model.md`](domain-model.md),
    [ADR-0029](decisions/0029-one-vacancy-table.md),
    [ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)

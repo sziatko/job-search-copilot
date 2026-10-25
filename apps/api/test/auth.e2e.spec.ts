@@ -84,6 +84,14 @@ describe('Auth (e2e)', () => {
           { analyses: [{ id: await queued(userId, 'https://acme.com/q/2'), ...analysis }] },
         ],
       ],
+      [
+        'POST /vacancies/unavailable',
+        async (userId) => [
+          'post',
+          '/api/v1/vacancies/unavailable',
+          { items: [{ id: await queued(userId, 'https://acme.com/q/3'), reason: 'Gone.' }] },
+        ],
+      ],
     ];
 
     it.each(routes)(

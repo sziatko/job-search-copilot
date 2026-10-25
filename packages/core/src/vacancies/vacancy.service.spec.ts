@@ -1170,4 +1170,68 @@ describe('VacancyService', () => {
       expect(await getPrisma().comment.count({ where: { vacancyId: vacancy.id } })).toBe(1);
     });
   });
+
+  describe('markUnavailable', () => {
+    it('moves the queue to UNAVAILABLE with an AGENT comment, and skips the rest untouched', async () => {
+      const fresh = await queued(1); // NEW
+      const { vacancy: unseen } = await service.save(userId, input()); // NOT_REVIEWED
+      const { vacancy: later } = await service.save(
+        userId,
+        input({ applyUrl: 'https://acme.com/later' }),
+      );
+      await service.updateStatus(userId, later.id, 'SAVED_FOR_LATER');
+      const { vacancy: declined } = await service.save(
+        userId,
+        input({ applyUrl: 'https://acme.com/no' }),
+      );
+      await service.updateStatus(userId, declined.id, 'DECLINED');
+      const ids = [fresh, unseen.id, later.id, declined.id, 999_999];
+
+      const result = await service.markUnavailable(
+        userId,
+        ids.map((id) => ({ id, reason: '  No longer accepting applications.  ' })),
+      );
+
+      expect(result).toEqual({
+        moved: [fresh, unseen.id, later.id],
+        skipped: [declined.id, 999_999],
+      });
+      const moved = await service.getById(userId, unseen.id);
+      expect(moved?.status).toBe('UNAVAILABLE');
+      expect(moved?.comments.at(-1)).toMatchObject({
+        source: 'AGENT',
+        body: 'No longer accepting applications.',
+      });
+      expect(await journal(later.id)).toEqual([
+        'NEW',
+        'NOT_REVIEWED',
+        'SAVED_FOR_LATER',
+        'UNAVAILABLE',
+      ]);
+      // The user's DECLINED stands: no move, no journal row, no comment.
+      expect(await journal(declined.id)).toEqual(['NEW', 'NOT_REVIEWED', 'DECLINED']);
+      expect(await getPrisma().comment.count({ where: { vacancyId: declined.id } })).toBe(1);
+    });
+
+    it('skips one already UNAVAILABLE, and the second copy of an id in one batch', async () => {
+      const id = await queued(1);
+      const reason = 'Closed.';
+      expect(
+        await service.markUnavailable(userId, [
+          { id, reason },
+          { id, reason },
+        ]),
+      ).toEqual({
+        moved: [id],
+        skipped: [id],
+      });
+      expect(await journal(id)).toEqual(['NEW', 'UNAVAILABLE']);
+    });
+
+    it('writes the comment with the source given', async () => {
+      const id = await queued(1);
+      await service.markUnavailable(userId, [{ id, reason: 'Gone.' }], 'USER');
+      expect((await service.getById(userId, id))?.comments.at(-1)?.source).toBe('USER');
+    });
+  });
 });

@@ -70,6 +70,9 @@ const ORDER_BY = {
   recommended: [{ recommendation: 'asc' }, { matchScore: 'desc' }, { id: 'desc' }],
 } satisfies Record<VacancySort, Prisma.VacancyOrderByWithRelationInput[]>;
 
+/** The vacancies nobody has acted on yet — the only ones markUnavailable moves. */
+const OPEN_QUEUE: readonly VacancyStatus[] = ['NEW', 'NOT_REVIEWED', 'SAVED_FOR_LATER'];
+
 const LIST_SELECT = {
   id: true,
   createdAt: true,
@@ -380,5 +383,33 @@ export class VacancyService {
         await orNotFound(db.vacancy.update({ where: { id }, data, include: DETAIL_INCLUDE }), id),
       );
     });
+  }
+
+  /** Postings that no longer take applications (ADR-0040), in one transaction: a vacancy
+   * still in the queue (OPEN_QUEUE) moves to UNAVAILABLE, its `reason` a `source`
+   * comment. Any other — moved by the user since the caller read the list, unknown,
+   * another user's — is skipped and left untouched. */
+  markUnavailable(
+    userId: string,
+    items: { id: number; reason: string }[],
+    source: CommentSource = 'AGENT',
+  ): Promise<{ moved: number[]; skipped: number[] }> {
+    return forUser(this.db, userId).$transaction(
+      async (db) => {
+        const moved: number[] = [];
+        const skipped: number[] = [];
+        for (const { id, reason } of items) {
+          if (await writeStatus(db, id, 'UNAVAILABLE', undefined, OPEN_QUEUE)) {
+            await db.vacancy.update({ where: { id }, data: commentOn(reason, source) });
+            moved.push(id);
+          } else {
+            skipped.push(id);
+          }
+        }
+        return { moved, skipped };
+      },
+      // The intake batch's ceiling: 100 items over a remote DB.
+      { timeout: 60_000 },
+    );
   }
 }

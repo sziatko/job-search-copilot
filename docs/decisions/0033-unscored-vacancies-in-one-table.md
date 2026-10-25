@@ -25,11 +25,12 @@ when the name normalizes to nothing (`—`), and such a row is matched by url on
 - `FILTERED_OUT` — screened out before triage, by the analyzer's `SKIP` or by the user.
   Not `DECLINED`, which is "I read the analysis and chose not to apply".
 
-**The one exception to "`recommendation` is the analyzer's, `status` the user's":** the
+**An exception to "`recommendation` is the analyzer's, `status` the user's":** the
 analysis moves a status only out of `NEW`, in the transaction that writes it: `SKIP` →
 `FILTERED_OUT`, anything else → `NOT_REVIEWED` (`statusAfterAnalysis` in `status.ts`;
 the rule is core's, never an agent's). Only from `NEW`, so it never clobbers the user's
-progress.
+progress. (The other machine move, a closed posting to `UNAVAILABLE`, is
+[ADR-0040](0040-machine-moves-queue-to-unavailable.md)'s.)
 
 **Two DB CHECKs** (hand-written, invisible to Prisma): the analysis is both fields or
 neither (`Vacancy_analysis_both_or_neither`); an analysed row is never `NEW`

@@ -66,6 +66,16 @@ const cases: [string, () => Promise<unknown>][] = [
       ),
   ],
   [
+    'VacancyService.markUnavailable — skipped, not moved',
+    async () =>
+      expect(
+        await vacancies.markUnavailable(b, [
+          { id: ids.queued, reason: 'Gone.' },
+          { id: ids.analysed, reason: 'Gone.' },
+        ]),
+      ).toEqual({ moved: [], skipped: [ids.queued, ids.analysed] }),
+  ],
+  [
     'VacancyService.submitAnalysis — a NEW row of A',
     () =>
       expect(vacancies.submitAnalysis(b, { id: ids.queued, ...analysis })).rejects.toBeInstanceOf(
