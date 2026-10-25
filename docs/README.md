@@ -6,7 +6,7 @@ it: [`development.md`](development.md).
 | Doc | What's in it |
 | --- | --- |
 | [`architecture.md`](architecture.md) | The system map: the four packages, the request paths, the dev stack, the invariants. Start here. |
-| [`domain-model.md`](domain-model.md) | The terms, `Vacancy`, its two independent fields (`recommendation`, `status`), the status journal, the DB rules. |
+| [`domain-model.md`](domain-model.md) | The [glossary](domain-model.md#glossary), `Vacancy`, its two independent fields (`recommendation`, `status`), the status journal, the DB rules. |
 | [`contracts.md`](contracts.md) | The surfaces other code depends on: the REST API, the MCP tools, the web↔API schema. |
 | [`development.md`](development.md) | Running it locally: the Docker stack, the databases, the MCP server, API keys, scripts, gotchas. |
 | [`decisions/`](decisions/) | One ADR per decision other code depends on. |

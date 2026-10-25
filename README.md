@@ -80,7 +80,8 @@ Vacancies get in two ways:
 
 A vacancy has two independent fields: the **recommendation** is Claude's opinion and
 never changes after the analysis; the **status** is mine. A vacancy is analysed once.
-More in [`docs/domain-model.md`](docs/domain-model.md).
+More in [`docs/domain-model.md`](docs/domain-model.md); the words the docs use are in its
+[glossary](docs/domain-model.md#glossary).
 
 Two parts live outside this repo, because they hold personal data and are set up by
 hand: the n8n workflows that collect vacancies, and the Claude skills that score them
