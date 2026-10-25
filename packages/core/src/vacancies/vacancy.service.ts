@@ -1,4 +1,4 @@
-import type { Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
+import type { CommentSource, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { forUser, orNotFound, type Unscoped, type UserDb, type UserTx } from '../db/for-user';
 import { textFilters } from '../db/like';
@@ -363,17 +363,19 @@ export class VacancyService {
 
   /** Moves the vacancy to `status` through writeStatus — a repeated pipeline status is
    * an event, a repeated triage one throws SameStatusError. `comment`, when not blank,
-   * becomes a USER comment in the same transaction (Save for later's note). Throws
-   * VacancyNotFoundError when no vacancy has this id. */
+   * becomes a `source` comment in the same transaction (Save for later's note) — USER
+   * from the web, AGENT from an API key. Throws VacancyNotFoundError when no vacancy has
+   * this id. */
   updateStatus(
     userId: string,
     id: number,
     status: VacancyStatus,
     comment?: string,
+    source: CommentSource = 'USER',
   ): Promise<VacancyDetail> {
     return forUser(this.db, userId).$transaction(async (db) => {
       await writeStatus(db, id, status);
-      const data = commentOn(comment, 'USER');
+      const data = commentOn(comment, source);
       return toDetail(
         await orNotFound(db.vacancy.update({ where: { id }, data, include: DETAIL_INCLUDE }), id),
       );

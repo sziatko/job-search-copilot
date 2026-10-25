@@ -6,7 +6,7 @@ export class UpdateApplicationStatusDto {
   @IsEnum(VacancyStatus)
   status!: VacancyStatus;
 
-  /** Added as a USER comment on the vacancy. */
+  /** Added as a comment on the vacancy: USER, or AGENT from an API key. */
   @IsOptional()
   @IsString()
   comment?: string;

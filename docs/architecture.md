@@ -243,7 +243,8 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    message. → [ADR-0007](decisions/0007-env-config-and-loading.md)
 9. **Every REST route is closed by default.** A global guard
    wants a session; anonymous access is explicit (`@AllowAnonymous()`, `/health` only),
-   machine access is explicit (`ApiKeyGuard`, the three n8n routes only).
+   machine access is explicit (`ApiKeyGuard` on each domain controller's class — a new
+   controller takes no key until it says so).
    An anonymous route has no user to scope its queries to (invariant 11).
    → [ADR-0034](decisions/0034-auth-better-auth-in-core.md),
    [ADR-0039](decisions/0039-api-keys-per-user.md)

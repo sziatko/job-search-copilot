@@ -22,10 +22,11 @@ coerces types. JSON bodies up to 5 MB (intake carries posting text).
 
 **Auth** ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)). Every route wants a
 session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` is anonymous.
-The three n8n routes — `POST /vacancies/intake`, `POST /vacancies/analysis`,
-`POST /vacancies/:id/analysis` — also take `Authorization: Bearer jsc_…`, an API key
-from `/profile` ([ADR-0039](decisions/0039-api-keys-per-user.md)); on any other route a
-key is a `401`. Swagger is outside Nest's router, so the guard does not cover it.
+The domain routes — `/vacancies`, `/applications`, `/stats` — also take
+`Authorization: Bearer jsc_…`, an API key from `/profile`
+([ADR-0039](decisions/0039-api-keys-per-user.md)); a comment a key writes is `AGENT`,
+a session's `USER`. Swagger is outside Nest's router, so the guard does
+not cover it.
 
 **One user per request** ([ADR-0038](decisions/0038-multi-user-shared-schema.md)) — the
 session's, or the key's owner. Another user's id answers `404`, as an unknown one.

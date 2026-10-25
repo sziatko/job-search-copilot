@@ -14,8 +14,9 @@ OAuth — Claude Desktop through `mcp-remote`, a script — needs a credential t
 Better Auth's `@better-auth/api-key` plugin in `createAuth`: keys owned by a user
 (`referenceId`), stored hashed, prefix `jsc_`, shown once, managed on `/profile`
 (create, list, revoke). No expiry, no per-key scopes, rate limit off. A key is accepted:
-- on the three machine REST routes (`POST /vacancies/intake`, `/vacancies/analysis`,
-  `/vacancies/:id/analysis`), by `ApiKeyGuard`, as `Authorization: Bearer jsc_…`;
+- on the domain REST routes (`/vacancies`, `/applications`, `/stats`), by `ApiKeyGuard`
+  on each controller's class, as `Authorization: Bearer jsc_…`; a comment a key writes
+  is `AGENT`;
 - by the HTTP MCP, as a bearer next to the OAuth JWT (a `jsc_` prefix picks the path);
 - by the stdio MCP, from `JSC_API_KEY`, verified once at boot.
 
@@ -35,6 +36,9 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
 - **The plugin's rate limit** — 10 requests a day by default, copied onto each key at
   creation; a scoring run is about a hundred MCP calls. It does nothing against a
   leaked key; revoking does.
+- **Keys on the three n8n write routes only** — what this ADR first said, as hygiene.
+  A key already reads and writes everything through MCP, so the narrow scope protected
+  nothing, and n8n could not read the queue it was meant to clean up.
 - **The MCP verifies keys by calling the API** — a network hop per request, and a
   second way to reach the DB's data.
 
@@ -44,13 +48,15 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
 - A key checked at boot stays valid in a running stdio process until it restarts.
 
 ## What this constrains — breaks if you change it
-- **A key is full access to its owner's data through MCP** (`list_vacancies`,
-  `get_vacancy` read everything). Keeping keys off the REST reads is hygiene, not the
-  security boundary; do not argue from it.
+- **A key is full access to its owner's data**, through MCP and REST alike. The
+  boundary is the owner (invariant 11) and revoking; a route without a key is not one.
+- `ApiKeyGuard` sits on the domain controllers' classes, not app-wide: a new
+  controller is closed to keys until it opts in.
 - **stdio + a key is identity, not security.** Whoever runs stdio holds `DATABASE_URL`
   and can read every user's rows. stdio is for the owner's own machine; anyone else
   uses the HTTP MCP with a key.
-- Turning on `enableSessionForAPIKeys` lets a key into every REST route.
+- Turning on `enableSessionForAPIKeys` lets a key into every REST route, `/api/auth/*`
+  and any new controller included.
 - The HTTP MCP must give a key an `authInfo.expiresAt` (now + 60 s): the SDK's
   `requireBearerAuth` refuses one without it.
 - The verify-only Better Auth instance in `core` uses a random `secret`; it must never

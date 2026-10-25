@@ -100,12 +100,17 @@ export class ApplicationService {
    * Record that the user applied to a role. In one transaction: resolve the vacancy
    * (link by id, link to a unique (company,title) match, or create a minimal
    * placeholder row, unanalysed), move it to APPLIED (then to
-   * `status`, if given), and set salary / CV / comment. Throws a DomainError on blank
-   * input, an unknown id, an ambiguous (company,title) match, or a vacancy already in
-   * the pipeline.
+   * `status`, if given), and set salary / CV / comment — a `source` comment: USER (the
+   * user's note, from the web or MCP), AGENT from a REST API key. Throws a DomainError on
+   * blank input, an unknown id, an ambiguous (company,title) match, or a vacancy already
+   * in the pipeline.
    */
-  record(userId: string, input: RecordApplicationInput): Promise<RecordApplicationResult> {
-    return forUser(this.db, userId).$transaction((db) => recordWithin(db, userId, input));
+  record(
+    userId: string,
+    input: RecordApplicationInput,
+    source: CommentSource = 'USER',
+  ): Promise<RecordApplicationResult> {
+    return forUser(this.db, userId).$transaction((db) => recordWithin(db, userId, input, source));
   }
 
   /**
@@ -119,7 +124,7 @@ export class ApplicationService {
     return forUser(this.db, userId).$transaction(async (db) => {
       const results: RecordApplicationResult[] = [];
       for (const input of inputs) {
-        results.push(await recordWithin(db, userId, input));
+        results.push(await recordWithin(db, userId, input, 'USER'));
       }
       return { results };
     });
@@ -195,7 +200,7 @@ export class ApplicationService {
    * repeated pipeline status is an event, a repeated triage one throws SameStatusError.
    * `note`, when not blank, becomes a new `source`
    * comment in the same transaction. `source` is the
-   * caller's: AGENT over MCP, USER over REST. Throws VacancyNotFoundError for an unknown id.
+   * caller's: AGENT over MCP or a REST API key, USER from the web. Throws VacancyNotFoundError for an unknown id.
    */
   updateStatus(
     userId: string,
@@ -212,16 +217,22 @@ export class ApplicationService {
 
   /**
    * Edit what was entered when applying — the apply modal re-opened. A field left
-   * out is untouched; a blank string clears it. A non-blank `comment` adds a USER
-   * comment — it edits none. Throws VacancyNotFoundError for an unknown id.
+   * out is untouched; a blank string clears it. A non-blank `comment` adds a `source`
+   * comment (USER from the web, AGENT from an API key) — it edits none. Throws
+   * VacancyNotFoundError for an unknown id.
    */
-  update(userId: string, id: number, input: UpdateApplicationInput): Promise<ApplicationListItem> {
+  update(
+    userId: string,
+    id: number,
+    input: UpdateApplicationInput,
+    source: CommentSource = 'USER',
+  ): Promise<ApplicationListItem> {
     const text = (value: string | null | undefined) =>
       value === undefined ? undefined : value?.trim() || null;
     return updateRow(forUser(this.db, userId), id, {
       salaryInApplication: text(input.salaryInApplication),
       usedTailoredResume: input.usedTailoredResume,
-      ...commentOn(input.comment, 'USER'),
+      ...commentOn(input.comment, source),
     });
   }
 
@@ -384,6 +395,7 @@ async function recordWithin(
   db: UserTx,
   userId: string,
   input: RecordApplicationInput,
+  source: CommentSource,
 ): Promise<RecordApplicationResult> {
   const at = new Date();
   const { vacancy, resolution, vacancyCreated } = await resolveVacancy(db, userId, input, at);
@@ -403,7 +415,7 @@ async function recordWithin(
     data: {
       salaryInApplication: input.salaryInApplication?.trim() || null,
       usedTailoredResume: input.usedTailoredResume ?? false,
-      ...commentOn(input.comment, 'USER'),
+      ...commentOn(input.comment, source),
     },
     select: APPLICATION_SELECT,
   });

@@ -1,4 +1,4 @@
-import { verifyApiKey } from '@job-search-copilot/core';
+import { type CommentSource, verifyApiKey } from '@job-search-copilot/core';
 import {
   type CanActivate,
   createParamDecorator,
@@ -20,7 +20,7 @@ type AuthedRequest = Request & {
  * n8n's and scripts' way in (ADR-0039): a session, else `Authorization: Bearer jsc_…`,
  * a key from /profile. Pair it with `@AllowAnonymous()` — the global AuthGuard runs
  * first and would 401 a key; with it, that guard only looks the session up.
- * Write routes only: keys stay off the REST reads.
+ * Set on each domain controller's class, so a new controller stays closed to keys.
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -46,3 +46,9 @@ export const CurrentUserId = createParamDecorator((_: unknown, context: Executio
   if (!id) throw new UnauthorizedException();
   return id;
 });
+
+/** Who a comment written by this request is from: a session → USER, a key → AGENT. */
+export const CallerSource = createParamDecorator(
+  (_: unknown, context: ExecutionContext): CommentSource =>
+    context.switchToHttp().getRequest<AuthedRequest>().user ? 'USER' : 'AGENT',
+);
