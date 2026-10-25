@@ -161,6 +161,20 @@ The repo is set up so an AI agent can work on it for weeks without losing the th
 - **No personal data.** Tests, the seed and these screenshots use made-up companies, and
   a git hook blocks a commit or a push that carries my real data.
 
+## Known limits
+
+- **No deploy yet.** It runs on my machine; the [roadmap](#roadmap) covers the rest.
+- **One real user: me.** Several users are supported and tested — a test runs every
+  core method as a second user — but nobody else has used it day to day.
+- **Owner scoping lives in the app, not in Postgres.** Every query in `packages/core`
+  goes through `forUser`, which adds the owner filter. Row-level security would also
+  catch raw SQL; `forUser` does not, so a raw query must filter by user itself
+  ([ADR-0038](docs/decisions/0038-multi-user-shared-schema.md)).
+- **Sized for one person's search.** The "same company" counts read every company name
+  on each list call, and paging the list sorted by recommendation reads every row after
+  the cursor. Fine at a few hundred companies and a few thousand vacancies per user,
+  not past that; each spot has a `Limit:` comment.
+
 ## Roadmap
 
 - **Deploy** to a small VPS with HTTPS, so claude.ai can reach the MCP server and the
