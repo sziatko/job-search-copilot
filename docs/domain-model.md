@@ -6,21 +6,25 @@ Source of truth: [`packages/core/prisma/schema.prisma`](../packages/core/prisma/
 [`status.ts`](../packages/core/src/domain/status.ts). The shape as a whole:
 [ADR-0029](decisions/0029-one-vacancy-table.md).
 
-## Terms
+## Glossary
 
 | Term | Meaning |
 | --- | --- |
-| **analyzer** | Claude, scoring a vacancy through the MCP tools, driven by the owner's skills (not in this repo). |
-| **analysis** | What the analyzer writes once: `matchScore`, `recommendation`, and its reasoning as an `ANALYZER` comment (read back as `estimationComment`). |
-| **intake** | Taking a posting in before any analysis: n8n's `POST /vacancies/intake` or the MCP `intake_*` tools. The posting lands in `NEW`. |
-| **triage** | The user's first decision on an analysed vacancy: apply, decline, save for later. The statuses before the pipeline. |
-| **pipeline** | The statuses after applying, `APPLIED` … `REJECTED`. An *application* is a vacancy in the pipeline, not a row of its own. |
-| **journal** | `StatusChange`: one row per status move. `status` on the vacancy is its cache. |
-| **event** | A pipeline status written again — a second interview round. Journaled; a triage repeat is refused. |
-| **timeout** | An open pipeline status with no move for 30 days. Derived, never stored. |
-| **placeholder** | A vacancy `record_application` created because no match existed: no posting text, no analysis. |
-| **context** | The statuses one web page lists (`STATUS_CONTEXT`); `ALL` in its filter means those, not the whole table. |
-| **owner** | The user a vacancy belongs to (`userId`). Every query is scoped to one. |
+| **vacancy** | One job posting the user tracks, one row per posting and user, from intake to an offer — [`Vacancy`](#vacancy). |
+| **analyzer** | Claude, scoring a vacancy through the MCP tools, driven by the owner's skills (not in this repo) — [Analyze-once](#analyze-once). |
+| **analysis** | What the analyzer writes once: `matchScore`, `recommendation`, and its reasoning as an `ANALYZER` comment (read back as `estimationComment`) — [Analyze-once](#analyze-once). |
+| **recommendation** | The analyzer's call, `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`, never changed after the analysis and never the user's — [Two independent axes](#two-independent-axes-recommendation-vs-status). |
+| **intake** | Taking a posting in before any analysis, through n8n's `POST /vacancies/intake` or the MCP `intake_*` tools, so it lands in `NEW` — [Intake](#intake). |
+| **queue** | The analysis queue is `NEW`, the triage queue is `NOT_REVIEWED`, and "the queue" alone (`OPEN_QUEUE`) is the three the user has not acted on: those two and `SAVED_FOR_LATER` — [the statuses](#two-independent-axes-recommendation-vs-status). |
+| **triage** | The user's first decision on an analysed vacancy (apply, decline, save for later), and the statuses before the pipeline — [the statuses](#two-independent-axes-recommendation-vs-status). |
+| **pipeline** | The statuses after applying, `APPLIED` … `REJECTED`; an *application* is a vacancy in the pipeline, not a row of its own — [Applications](#applications-the-pipeline-view). |
+| **journal** | `StatusChange`, one row per status move, of which `status` on the vacancy is the cache — [`StatusChange`](#statuschange). |
+| **event** | A pipeline status written again, such as a second interview round: journaled, while a triage repeat is refused — [`StatusChange`](#statuschange). |
+| **timeout** | An open pipeline status with no move for 30 days, derived and never stored — [`StatusChange`](#statuschange). |
+| **placeholder** | A vacancy `record_application` created because no match existed: no posting text, no analysis — [Applications](#applications-the-pipeline-view). |
+| **comment source** | Who wrote a note on a vacancy: `ANALYZER`, `USER` or `AGENT` (an agent acting for the user) — [`Comment`](#comment). |
+| **context** | The statuses one web page lists (`STATUS_CONTEXT`), which `ALL` in its filter means rather than the whole table — [the statuses](#two-independent-axes-recommendation-vs-status). |
+| **owner** | The user a vacancy belongs to (`userId`), to whom every query is scoped — [`Vacancy`](#vacancy). |
 
 ## `Vacancy`
 
