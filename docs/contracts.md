@@ -137,7 +137,9 @@ every client shows.
 `z.infer`red from them, and every response goes through `parseResponse()`
 (`apps/web/src/lib/api.ts`). A mismatch throws a short "unexpected format" message,
 logged in full to the console. Dates cross as strings.
-`API_BASE = ${VITE_API_URL ?? 'http://localhost:3000'}/api/v1`.
+`API_BASE = ${VITE_API_URL ?? 'http://localhost:3000'}/api/v1`. The production image
+builds with it empty (`apps/web/Dockerfile`): a relative `/api/v1`, the web and the API
+on one origin.
 
 The schemas are written by hand, never imported from `core`
 ([ADR-0012](decisions/0012-web-hand-written-contract.md)).

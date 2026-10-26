@@ -28,21 +28,24 @@ export function configureApp(app: NestExpressApplication, config: ConfigService<
 
   // Swagger UI at /api/docs, the raw document at /api/docs-json. The DTO and comment
   // metadata comes from the CLI plugin in nest-cli.json, so it is there under
-  // `nest build` / `nest start` only, not under vitest's SWC.
-  SwaggerModule.setup(
-    'docs',
-    app,
-    SwaggerModule.createDocument(
+  // `nest build` / `nest start` only, not under vitest's SWC. Not in production: the
+  // docs sit outside the auth guard.
+  if (config.get('NODE_ENV', { infer: true }) !== 'production') {
+    SwaggerModule.setup(
+      'docs',
       app,
-      new DocumentBuilder()
-        .setTitle('Job Search Copilot API')
-        .setVersion('1')
-        // An API key (`jsc_…`, from /profile) on the domain routes (ADR-0039).
-        .addBearerAuth()
-        .build(),
-    ),
-    { useGlobalPrefix: true },
-  );
+      SwaggerModule.createDocument(
+        app,
+        new DocumentBuilder()
+          .setTitle('Job Search Copilot API')
+          .setVersion('1')
+          // An API key (`jsc_…`, from /profile) on the domain routes (ADR-0039).
+          .addBearerAuth()
+          .build(),
+      ),
+      { useGlobalPrefix: true },
+    );
+  }
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new DomainExceptionFilter());
