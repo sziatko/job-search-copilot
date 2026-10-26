@@ -36,7 +36,8 @@ On a push to `main` and every PR: Ubuntu, Node 24, a Postgres service, then `npm
 - **`mcp` as a long-running server** — one session at a time, and a cold start past
   the connect timeout.
 - **`docker build` in CI** — would catch Dockerfile regressions; minutes per run.
-  A backlog row.
+  Added with the deploy (phase 8.2): `images.yml` builds the production stages on
+  every PR and publishes them to GHCR.
 
 ## Consequences
 - One `docker compose up -d` gives a working stack.

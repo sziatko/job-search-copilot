@@ -33,7 +33,6 @@ that no longer applies.
 | Item | Notes |
 | --- | --- |
 | **`core` dev-loop friction** | A `core` edit needs a rebuild and an app restart. Candidates: tsconfig `paths` → `src` with an swc / tsx runner, or TS project references. [ADR-0003](decisions/0003-core-consumed-as-dist.md). |
-| **CI `docker build` step** | Build the production Dockerfile stages in CI, to catch `COPY` / dependency regressions. [ADR-0016](decisions/0016-docker-dev-stack-and-ci.md). |
 | **MCP SDK v2** | The SDK is split into v2 packages (`@modelcontextprotocol/server`, `/express`, `/node`). Moving touches every `*.tools.ts`, `server.ts`, `http-app.ts` and the tests. |
 | **`record_application` by name meets old filtered-out rows** | Every vacancy is a record-or-link candidate, the never-analysed `FILTERED_OUT` ones included, so `AmbiguousVacancyMatchError` fires more often than it should. Nothing is lost — the error lists the ids, the agent retries with `vacancyId` — but it costs a round-trip. Fix: among several matches, prefer analysed rows, or rows not `FILTERED_OUT`. |
 | **TanStack Form** | At the first genuinely complex form. [ADR-0020](decisions/0020-web-router-tanstack.md). |

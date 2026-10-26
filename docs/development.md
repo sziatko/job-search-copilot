@@ -87,6 +87,9 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
 Postgres service on every push and PR; on a PR a second job, `e2e`, runs
 `npm run test:e2e` and the visual tests in the Playwright image ([ADR-0037](decisions/0037-e2e-playwright.md)).
+`.github/workflows/images.yml` builds the three production images on a PR; on a push
+to `main` or a `phase-*` branch it also publishes them to GHCR as
+`ghcr.io/<owner>/jsc-{api,mcp,web}:sha-<commit>`, plus `latest` on `main`.
 
 Database and migration conventions:
 [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
