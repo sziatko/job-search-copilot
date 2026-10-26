@@ -9,6 +9,7 @@ it: [`development.md`](development.md).
 | [`domain-model.md`](domain-model.md) | The [glossary](domain-model.md#glossary), `Vacancy`, its two independent fields (`recommendation`, `status`), the status journal, the DB rules. |
 | [`contracts.md`](contracts.md) | The surfaces other code depends on: the REST API, the MCP tools, the web↔API schema. |
 | [`development.md`](development.md) | Running it locally: the Docker stack, the databases, the MCP server, API keys, scripts, gotchas. |
+| [`deployment.md`](deployment.md) | The server: its layout, the first start, deploying a version, rolling back. |
 | [`decisions/`](decisions/) | One ADR per decision other code depends on. |
 | [`backlog.md`](backlog.md) | Ideas and fixes not yet planned. |
 | [`design/`](design/) | The HTML mockups the UI started from. Open them in a browser. |

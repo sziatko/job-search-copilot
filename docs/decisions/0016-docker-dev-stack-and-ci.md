@@ -29,15 +29,14 @@ a Windows / Docker Desktop host. CI must prove a change sound before it merges.
 On a push to `main` and every PR: Ubuntu, Node 24, a Postgres service, then `npm ci`
 → `prisma generate` → `prisma migrate deploy` → `lint` → `typecheck` → `test` →
 `build`. On a PR a second job runs the Playwright suite
-([ADR-0037](0037-e2e-playwright.md)).
+([ADR-0037](0037-e2e-playwright.md)). `images.yml` builds the three `production` stages
+on every PR, so a Dockerfile regression fails there, and publishes them to GHCR on a
+push ([ADR-0041](0041-one-origin-images-from-ghcr.md)).
 
 ## Why this and not the alternatives
 - **No polling** — edits on a Windows bind mount silently stop rebuilding.
 - **`mcp` as a long-running server** — one session at a time, and a cold start past
   the connect timeout.
-- **`docker build` in CI** — would catch Dockerfile regressions; minutes per run.
-  Added with the deploy (phase 8.2): `images.yml` builds the production stages on
-  every PR and publishes them to GHCR.
 
 ## Consequences
 - One `docker compose up -d` gives a working stack.
