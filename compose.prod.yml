@@ -1,7 +1,8 @@
 # The server's JSC (docs/deployment.md): the images CI publishes, at JSC_TAG. Postgres
 # and Caddy are the server's shared layer, reached on the external `web` network. No
 # `ports:` — Docker's published ports bypass the firewall; Caddy is the way in.
-# Every value comes from .env beside this file (.env.prod.example).
+# Every value comes from .env beside this file (.env.prod.example); only the api gets
+# all of it.
 #
 # The services carry the project prefix: Compose registers a service's name on every
 # network it joins, and a bare `api` on the shared network would clash with another
@@ -15,7 +16,8 @@ services:
     image: ${JSC_IMAGES:?}/jsc-api:${JSC_TAG:?}
     working_dir: /repo/packages/core
     command: [npx, prisma, migrate, deploy]
-    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?}
     networks: [web]
     mem_limit: 512m
 
@@ -43,8 +45,12 @@ services:
       jsc-api:
         condition: service_healthy
     command: [node, apps/mcp/dist/http.js]
-    env_file: .env
+    # Only what it reads (apps/mcp/src/http.ts): the face on the internet holds none of
+    # the API's secrets.
     environment:
+      DATABASE_URL: ${DATABASE_URL:?}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?}
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:?}
       # Where it fetches the API's JWKS: inside the network, not through Caddy.
       AUTH_URL: http://jsc-api:3000
     networks: [web]
