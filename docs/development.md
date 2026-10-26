@@ -82,6 +82,7 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 | `npm run generate` | regenerate the Prisma client |
 | `npm run migrate:dev` | create + apply a migration on the dev DB |
 | `npm run test:db:migrate` | apply committed migrations to the test DB |
+| `npm run db:pull` | replace the dev DB with a copy of the production one ([`deployment.md`](deployment.md#pull-the-production-database)) |
 | `npm run studio` | Prisma Studio |
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a

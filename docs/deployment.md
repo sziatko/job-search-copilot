@@ -65,6 +65,52 @@ The same, with the previous `JSC_TAG`. Prisma has no down migrations: rolling ba
 past a migration means restoring the backup taken before it (the shared layer's README,
 "Restore one database").
 
+## Pull the production database
+
+    npm run db:pull                  # into the dev DB (POSTGRES_DB)
+    npm run db:pull -- <database>    # into another local database; it must exist
+
+`scripts/db-pull.mjs` streams `pg_dump` from the server over ssh (`PROD_SSH` in the
+local `.env`) into the dev stack's Postgres: `pg_restore --clean` in one transaction,
+so a failed pull changes nothing. Before it, the target is dumped to the temp folder
+(the path is printed) — the way back from a pull into the wrong database. It refuses
+`*_test` and `*_e2e`.
+
+The local data is a copy: the server is the one that counts. Never point local code at
+the production database (an SSH tunnel, a copied `DATABASE_URL`): `migrate:dev` would
+run on it. A new migration runs first on a fresh pull, then deploys.
+
+## Cut-over: the local stack's data moves to the server
+
+Once, when the server takes over from the local stack as the live one. Nothing may
+write to either database meanwhile.
+
+1. Stop every local writer: the local n8n, Claude Desktop's scheduled tasks.
+2. The last local dump, onto the server:
+
+       docker compose exec -T postgres pg_dump -U postgres -Fc job_search_copilot > jsc.dump
+       scp jsc.dump <ssh-host>:~
+
+3. On the server, the dump replaces the database, then the stack starts again —
+   `jsc-migrate` brings the schema up, the api seeds `MCP_PUBLIC_URL`'s resource:
+
+       cd /srv/jsc && docker compose stop jsc-api jsc-mcp-http
+       cd /srv/infra && docker compose exec -T postgres pg_restore -U postgres -d jsc \
+         --clean --if-exists --no-owner --no-acl --role jsc --single-transaction < ~/jsc.dump
+       cd /srv/jsc && docker compose up -d && rm ~/jsc.dump
+
+4. n8n moves with its volume (the shared layer's README); its workflows' API URL becomes
+   `https://jsc.<domain>/api/v1`. The API keys came with the database.
+5. MCP clients move to `https://jsc-mcp.<domain>/mcp`: the claude.ai connector is added
+   again (its OAuth client was in the replaced database), and Claude's skills that name
+   a local URL are updated and uploaded again.
+6. Passkeys are registered again: the restored ones are bound to `localhost`.
+7. The scheduled tasks back on, the local n8n stays off — two would bring every vacancy
+   twice. A server snapshot.
+
+Check: a new vacancy goes n8n → the server, its analysis lands through MCP, the web
+shows it; the next night's backup reports in.
+
 ## Logs and state
 
     docker compose ps
