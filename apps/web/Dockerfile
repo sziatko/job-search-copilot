@@ -2,7 +2,7 @@
 
 FROM node:24-alpine AS base
 WORKDIR /repo
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/core/package.json packages/core/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY apps/mcp/package.json apps/mcp/package.json
@@ -15,8 +15,10 @@ WORKDIR /repo/apps/web
 EXPOSE 5173
 CMD ["npm", "run", "dev"]
 
-# Build: produces the static production bundle.
+# Build: produces the static production bundle. An empty VITE_API_URL → the bundle
+# calls a relative /api/v1: on the server the web and the api share one origin.
 FROM base AS build
+ARG VITE_API_URL=""
 RUN npm ci
 COPY apps/web apps/web
 RUN npm run build --workspace=@job-search-copilot/web

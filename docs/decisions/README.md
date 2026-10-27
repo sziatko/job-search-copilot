@@ -41,6 +41,7 @@ choice (a status code, an index type) is a section of
 | [0038](0038-multi-user-shared-schema.md) | Multi-user: one schema, `userId` on `Vacancy`, every query through `forUser` |
 | [0039](0039-api-keys-per-user.md) | API keys per user, for n8n and MCP |
 | [0040](0040-machine-moves-queue-to-unavailable.md) | A machine moves only the queue, to `UNAVAILABLE` |
+| [0041](0041-one-origin-images-from-ghcr.md) | One origin through Caddy, images from GHCR, the migration as a one-shot service |
 
 A missing number (0017, 0018, 0021, 0026, 0028, 0036) is a deleted ADR. The one that
 replaced it names it on its `Replaces:` line; `git log --all -- 'docs/decisions/NNNN-*'`

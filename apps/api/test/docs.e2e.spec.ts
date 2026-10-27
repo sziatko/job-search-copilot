@@ -31,4 +31,14 @@ describe('API docs (e2e)', () => {
   it('serves the Swagger UI', async () => {
     await request(app.getHttpServer()).get('/api/docs').expect(200);
   });
+
+  it('serves neither in production', async () => {
+    const prod = await createTestApp({ NODE_ENV: 'production' });
+    try {
+      await request(prod.getHttpServer()).get('/api/docs').expect(404);
+      await request(prod.getHttpServer()).get('/api/docs-json').expect(404);
+    } finally {
+      await prod.close();
+    }
+  });
 });

@@ -1,0 +1,67 @@
+# The server's JSC (docs/deployment.md): the images CI publishes, at JSC_TAG. Postgres
+# and Caddy are the server's shared layer, reached on the external `web` network. No
+# `ports:` — Docker's published ports bypass the firewall; Caddy is the way in.
+# Every value comes from .env beside this file (.env.prod.example); only the api gets
+# all of it.
+#
+# The services carry the project prefix: Compose registers a service's name on every
+# network it joins, and a bare `api` on the shared network would clash with another
+# project's.
+name: jsc
+
+services:
+  # One-shot: applies the committed migrations, then exits. The api starts only after
+  # it succeeded, so it never runs against an older schema.
+  jsc-migrate:
+    image: ${JSC_IMAGES:?}/jsc-api:${JSC_TAG:?}
+    working_dir: /repo/packages/core
+    command: [npx, prisma, migrate, deploy]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?}
+    networks: [web]
+    mem_limit: 512m
+
+  jsc-api:
+    image: ${JSC_IMAGES:?}/jsc-api:${JSC_TAG:?}
+    restart: unless-stopped
+    depends_on:
+      jsc-migrate:
+        condition: service_completed_successfully
+    env_file: .env
+    networks: [web]
+    mem_limit: 512m
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://localhost:3000/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # MCP over HTTP (ADR-0035) for claude.ai's connector; the image's default is stdio.
+  jsc-mcp-http:
+    image: ${JSC_IMAGES:?}/jsc-mcp:${JSC_TAG:?}
+    restart: unless-stopped
+    depends_on:
+      jsc-api:
+        condition: service_healthy
+    command: [node, apps/mcp/dist/http.js]
+    # Only what it reads (apps/mcp/src/http.ts): the face on the internet holds none of
+    # the API's secrets.
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?}
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:?}
+      # Where it fetches the API's JWKS: inside the network, not through Caddy.
+      AUTH_URL: http://jsc-api:3000
+    networks: [web]
+    mem_limit: 512m
+
+  jsc-web:
+    image: ${JSC_IMAGES:?}/jsc-web:${JSC_TAG:?}
+    restart: unless-stopped
+    networks: [web]
+    mem_limit: 64m
+
+networks:
+  web:
+    external: true

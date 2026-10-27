@@ -7,6 +7,8 @@ import { z } from 'zod';
  * deep in a request later.
  */
 const envSchema = z.object({
+  /** `production` in the production image (its Dockerfile); turns the Swagger UI off. */
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   DATABASE_URL: z.url(),
   API_PORT: z.coerce.number().int().positive().default(3000),
   /** Signs session cookies (ADR-0034). `openssl rand -base64 32`. */

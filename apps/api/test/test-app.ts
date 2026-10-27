@@ -8,6 +8,7 @@ import { AuthService } from '@thallesp/nestjs-better-auth';
 import { makeSignature } from 'better-auth/crypto';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import type { Env } from '../src/config/env.validation';
 import { configureApp } from '../src/setup-app';
 
 /** The users `signIn` and `createApiKey` made in this file, not yet deleted. */
@@ -25,11 +26,17 @@ export async function deleteTestUsers(): Promise<void> {
   await getPrisma().user.deleteMany({ where: { id: { in: users.splice(0) } } });
 }
 
-/** The app as main.ts boots it: Nest's body parser off (AuthModule owns parsing). */
-export async function createTestApp(): Promise<NestExpressApplication> {
+/** The app as main.ts boots it: Nest's body parser off (AuthModule owns parsing).
+ * `env` overrides what `configureApp` reads, nothing else: the modules keep the test env,
+ * and `process.env` (which the files of a worker share) is not touched. */
+export async function createTestApp(env: Partial<Env> = {}): Promise<NestExpressApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false });
-  configureApp(app, app.get(ConfigService));
+  // A ConfigService reads its own values first, then process.env, which ConfigModule filled.
+  configureApp(
+    app,
+    Object.keys(env).length ? new ConfigService<Env, true>(env) : app.get(ConfigService),
+  );
   await app.init();
   return app;
 }
