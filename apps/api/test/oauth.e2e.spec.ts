@@ -113,8 +113,8 @@ describe('OAuth authorization server (e2e)', () => {
     expect(location).not.toContain('attacker.example');
   });
 
-  // The whole flow an MCP client runs, ending in what the MCP server checks.
-  it('issues a JWT for the MCP resource after sign-in and consent (code + PKCE)', async () => {
+  /** The whole flow an MCP client runs: register, sign-in, consent, code + PKCE → tokens. */
+  async function connect(scope: string) {
     const server = app.getHttpServer();
     const { client_id } = await register();
     const { cookie } = await signIn(app);
@@ -127,7 +127,7 @@ describe('OAuth authorization server (e2e)', () => {
         response_type: 'code',
         client_id,
         redirect_uri: redirectUri,
-        scope: 'openid',
+        scope,
         state: 'xyz',
         code_challenge: challenge,
         code_challenge_method: 'S256',
@@ -162,12 +162,54 @@ describe('OAuth authorization server (e2e)', () => {
         resource: mcpUrl,
       })
       .expect(200);
+    return { client_id, cookie, tokens: token.body as Record<string, string> };
+  }
 
+  /** A refresh, as the client does it when its access token runs out. */
+  function refresh(client_id: string, refresh_token: string) {
+    return request(app.getHttpServer())
+      .post('/api/auth/oauth2/token')
+      .type('form')
+      .send({ grant_type: 'refresh_token', refresh_token, client_id, resource: mcpUrl });
+  }
+
+  it('issues a JWT for the MCP resource after sign-in and consent (code + PKCE)', async () => {
+    const { tokens } = await connect('openid');
+    const server = app.getHttpServer();
     const jwks = createLocalJWKSet((await request(server).get('/api/auth/jwks')).body);
-    const { payload } = await jwtVerify(token.body.access_token, jwks, {
+    const { payload } = await jwtVerify(tokens.access_token, jwks, {
       issuer,
       audience: mcpUrl,
     });
     expect(payload.sub).toEqual(expect.any(String));
+  });
+
+  // /profile's "Connected apps": Revoke must end the grant, not only hide the consent.
+  it('revoking a consent ends its refresh grant, and only the owner can revoke it', async () => {
+    const server = app.getHttpServer();
+    const { client_id, cookie, tokens } = await connect('openid offline_access');
+    const { body: consents } = await request(server)
+      .get('/api/auth/oauth2/get-consents')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(consents).toHaveLength(1);
+    expect(consents[0].clientId).toBe(client_id);
+
+    const stranger = await signIn(app);
+    await request(server)
+      .post('/api/auth/oauth2/delete-consent')
+      .set('Cookie', stranger.cookie)
+      .set('Origin', process.env.WEB_ORIGIN ?? '')
+      .send({ id: consents[0].id })
+      .expect(401);
+    const refreshed = await refresh(client_id, tokens.refresh_token).expect(200);
+
+    await request(server)
+      .post('/api/auth/oauth2/delete-consent')
+      .set('Cookie', cookie)
+      .set('Origin', process.env.WEB_ORIGIN ?? '')
+      .send({ id: consents[0].id })
+      .expect(200);
+    await refresh(client_id, refreshed.body.refresh_token).expect(400);
   });
 });

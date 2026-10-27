@@ -4,7 +4,7 @@ import { passkey } from '@better-auth/passkey';
 import type { PrismaClient } from '@prisma/client';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import { jwt } from 'better-auth/plugins';
 import { API_KEY_OPTIONS } from './api-key';
 
@@ -87,6 +87,26 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
           },
         },
       },
+    },
+    hooks: {
+      // /profile's "Revoke" on a connected app. The plugin deletes only the consent row,
+      // and its refresh grant never looks at consents: the app would keep refreshing.
+      // Its tokens for this user go first; an issued access token (a JWT) lives to `exp`.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/oauth2/delete-consent') return;
+        const session = await getSessionFromCtx(ctx);
+        if (!session) return; // the endpoint answers 401 itself
+        const userId = session.user.id;
+        const consent = await prisma.oauthConsent.findFirst({
+          where: { id: ctx.body?.id, userId },
+        });
+        if (!consent) return; // another user's or none: the endpoint's 401 / 404
+        const grant = { clientId: consent.clientId, userId };
+        await prisma.$transaction([
+          prisma.oauthRefreshToken.deleteMany({ where: grant }),
+          prisma.oauthAccessToken.deleteMany({ where: grant }),
+        ]);
+      }),
     },
     // The jwt plugin's own GET /token hands a session's JWT to the browser; the OAuth
     // provider issues tokens at /oauth2/token instead (Better Auth's docs disable it).

@@ -27,6 +27,7 @@ export const queryKeys = {
   dashboard: (...rest: ['review-queue'] | []) => ['dashboard', ...rest] as const,
   passkeys: () => ['passkeys'] as const,
   apiKeys: () => ['api-keys'] as const,
+  connectedApps: () => ['connected-apps'] as const,
   oauthClient: (clientId: string) => ['oauth-client', clientId] as const,
 };
 
