@@ -1,4 +1,4 @@
-import type { ApplicationService } from '@job-search-copilot/core';
+import { type ApplicationService, MAX_LENGTH } from '@job-search-copilot/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BATCH_MAX, PAGING_NOTE, pagination } from '../common/schemas';
@@ -88,10 +88,10 @@ export function registerApplicationTools(
         PAGING_NOTE,
       inputSchema: {
         status: PipelineStatusEnum.optional(),
-        search: z.string().optional(),
-        company: z.string().optional(),
-        title: z.string().optional(),
-        applyUrl: z.string().optional(),
+        search: z.string().max(MAX_LENGTH.name).optional(),
+        company: z.string().max(MAX_LENGTH.name).optional(),
+        title: z.string().max(MAX_LENGTH.name).optional(),
+        applyUrl: z.string().max(MAX_LENGTH.url).optional(),
         ...pagination(APPLICATION_LIST_MAX),
       },
     },
@@ -128,10 +128,10 @@ export function registerApplicationTools(
         '{ success: true, vacancy: { id, company, title } }.',
       inputSchema: {
         id: z.number().int().optional(),
-        company: z.string().min(1).optional(),
-        title: z.string().min(1).optional(),
+        company: z.string().min(1).max(MAX_LENGTH.name).optional(),
+        title: z.string().min(1).max(MAX_LENGTH.name).optional(),
         status: VacancyStatusEnum,
-        comment: z.string().optional(),
+        comment: z.string().max(MAX_LENGTH.note).optional(),
       },
     },
     withDomainErrors(async ({ id, company, title, status, comment }) => {
@@ -168,7 +168,7 @@ export function registerApplicationTools(
         '{ success: true, application: { id, company, title } }.',
       inputSchema: {
         id: z.number().int(),
-        salaryInApplication: z.string().optional(),
+        salaryInApplication: z.string().max(MAX_LENGTH.name).optional(),
         usedTailoredResume: z.boolean().optional(),
       },
     },
@@ -194,7 +194,7 @@ export function registerApplicationTools(
         'Returns { success: true, vacancy: { id, company, title } }.',
       inputSchema: {
         id: z.number().int(),
-        body: z.string().min(1),
+        body: z.string().min(1).max(MAX_LENGTH.note),
         source: z.enum(['USER', 'AGENT']).default('AGENT'),
       },
     },

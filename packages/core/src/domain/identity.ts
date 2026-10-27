@@ -68,7 +68,8 @@ const PLACE_SUFFIX =
  * (`contoso Polska`) dropped too. A name that is nothing but those keeps itself.
  */
 export function companyGroupKey(company: string): string {
-  let key = normalizeCompanyKey(company.replace(/\([^)]*\)/g, ' ')) ?? '';
+  // `[^()]`, not `[^)]`: a run of `(` with no `)` would rescan to the end from each one.
+  let key = normalizeCompanyKey(company.replace(/\([^()]*\)/g, ' ')) ?? '';
   // `Acme Polska Sp. z o.o.` carries both, in either order.
   for (let prev = ''; prev !== key; ) {
     prev = key;

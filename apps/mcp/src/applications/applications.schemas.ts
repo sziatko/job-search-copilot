@@ -1,5 +1,6 @@
 import {
   InvalidApplicationInputError,
+  MAX_LENGTH,
   PIPELINE_STATUSES,
   type RecordApplicationInput,
 } from '@job-search-copilot/core';
@@ -17,11 +18,12 @@ export const RecordApplicationItemSchema = z.object({
       'The vacancy, when you know its id (from list_vacancies / list_applications — e.g. ' +
         'after an ambiguous match). Give this or company + title, not both.',
     ),
-  company: z.string().min(1).optional(),
-  title: z.string().min(1).optional(),
-  applyUrl: z.url().optional(),
+  company: z.string().min(1).max(MAX_LENGTH.name).optional(),
+  title: z.string().min(1).max(MAX_LENGTH.name).optional(),
+  applyUrl: z.url().max(MAX_LENGTH.url).optional(),
   salaryInApplication: z
     .string()
+    .max(MAX_LENGTH.name)
     .optional()
     .describe(
       'What the applicant entered in the application form — not the salary in the ' +
@@ -33,6 +35,7 @@ export const RecordApplicationItemSchema = z.object({
     .describe('True when the resume was tailored to this posting.'),
   comment: z
     .string()
+    .max(MAX_LENGTH.note)
     .optional()
     .describe(
       "The applicant's own words about this application, added as a USER comment — " +

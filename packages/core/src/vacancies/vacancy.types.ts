@@ -32,6 +32,20 @@ export interface SubmitAnalysisInput {
  * transports. */
 export const ANALYSIS_BATCH_MAX = 10;
 
+/** Upper bounds on the free strings a caller sends, enforced by the transports (zod on
+ * MCP, class-validator on REST): far above any real value, low enough that no input
+ * bloats a row or feeds a regex something huge. */
+export const MAX_LENGTH = {
+  /** company, title, salary, a search or filter term, a source */
+  name: 300,
+  /** a posting link */
+  url: 2048,
+  /** a comment, a reason, an estimation */
+  note: 20_000,
+  /** a posting's whole text */
+  fullText: 200_000,
+} as const;
+
 /** getById / updateStatus: the whole row and every comment, oldest first, plus the
  * analyzer's (the first `ANALYZER` one), or null when there is none; `timeline` is
  * every `StatusChange`, oldest first. */

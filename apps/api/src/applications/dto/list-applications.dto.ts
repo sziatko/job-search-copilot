@@ -1,11 +1,12 @@
 import {
   APPLICATION_STATES,
   type ApplicationState,
+  MAX_LENGTH,
   PIPELINE_STATUSES,
   type PipelineStatus,
 } from '@job-search-copilot/core';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class ListApplicationsQueryDto {
   @IsOptional()
@@ -19,11 +20,13 @@ export class ListApplicationsQueryDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.name)
   search?: string;
 
   /** Every row of this name's company, whatever its spelling (ADR-0032). */
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.name)
   sameCompanyAs?: string;
 
   @IsOptional()

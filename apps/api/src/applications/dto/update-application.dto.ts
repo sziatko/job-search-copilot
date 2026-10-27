@@ -1,4 +1,5 @@
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { MAX_LENGTH } from '@job-search-copilot/core';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /** The apply modal's fields, re-opened for editing. A field left out is untouched;
  * `null` or a blank string clears it (ApplicationService.update). `comment` is not a
@@ -6,6 +7,7 @@ import { IsBoolean, IsOptional, IsString } from 'class-validator';
 export class UpdateApplicationDto {
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.name)
   salaryInApplication?: string | null;
 
   @IsOptional()
@@ -14,5 +16,6 @@ export class UpdateApplicationDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.note)
   comment?: string | null;
 }

@@ -1,5 +1,5 @@
-import { VacancyStatus } from '@job-search-copilot/core';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { MAX_LENGTH, VacancyStatus } from '@job-search-copilot/core';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateVacancyStatusDto {
   @IsEnum(VacancyStatus)
@@ -9,5 +9,6 @@ export class UpdateVacancyStatusDto {
    * API key. */
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.note)
   comment?: string;
 }
