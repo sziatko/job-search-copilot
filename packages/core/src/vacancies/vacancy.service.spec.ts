@@ -667,7 +667,8 @@ describe('VacancyService', () => {
         };
         for (const [company, date] of Object.entries(dates)) {
           await getPrisma().vacancy.updateMany({
-            where: { company },
+            // userId: files run in parallel on one database, and others have an Acme too.
+            where: { userId, company },
             data: { createdAt: new Date(date) },
           });
         }
