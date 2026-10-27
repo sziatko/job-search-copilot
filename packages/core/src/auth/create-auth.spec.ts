@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { getPrisma } from '../db/prisma-client';
 import { RateLimitedError } from '../domain/errors';
 import { verifyApiKey } from './api-key';
-import { createAuth } from './create-auth';
+import { createAuth, isAllowedRedirectUri } from './create-auth';
 
 const prisma = getPrisma();
 const provider = { clientId: 'test-client-id', clientSecret: 'test-client-secret' };
@@ -45,6 +45,17 @@ describe('createAuth', () => {
     ).toBe(0);
   });
 
+  it('refuses to sign up an allowed email the provider has not verified', async () => {
+    const ctx = await auth.$context;
+    await expect(
+      ctx.internalAdapter.createOAuthUser(
+        { email: 'me@example.com', name: 'Someone', emailVerified: false },
+        { providerId: 'linkedin', accountId: 'li-unverified' },
+      ),
+    ).rejects.toThrow('This email may not sign up');
+    expect(await prisma.user.count({ where: { email: 'me@example.com' } })).toBe(0);
+  });
+
   it('signs up an allowed email, whatever its case, and writes a session for it', async () => {
     const { user } = await signUpWithGoogle('ME@example.com');
     expect(user.email).toBe('me@example.com');
@@ -70,6 +81,29 @@ describe('createAuth', () => {
     });
     expect(result.error).toBe('account not linked');
     expect(await prisma.account.count({ where: { user: { email: 'me@example.com' } } })).toBe(1);
+  });
+});
+
+describe('isAllowedRedirectUri', () => {
+  it.each([
+    'https://claude.ai/api/mcp/auth_callback',
+    'https://claude.com/api/mcp/auth_callback',
+    'http://localhost:6274/oauth/callback',
+    'http://127.0.0.1:46544/callback',
+    'http://[::1]:8080/cb',
+  ])('accepts %s', (uri) => {
+    expect(isAllowedRedirectUri(uri)).toBe(true);
+  });
+
+  it.each([
+    'https://attacker.example/api/mcp/auth_callback',
+    'https://claude.ai/other',
+    'https://claude.ai.attacker.example/api/mcp/auth_callback',
+    'https://localhost/cb',
+    'http://localhost.attacker.example/cb',
+    'not a url',
+  ])('refuses %s', (uri) => {
+    expect(isAllowedRedirectUri(uri)).toBe(false);
   });
 });
 

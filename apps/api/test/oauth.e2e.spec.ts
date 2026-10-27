@@ -85,6 +85,34 @@ describe('OAuth authorization server (e2e)', () => {
     }
   });
 
+  // Registration is open, so a stranger can register; the code still never reaches them.
+  it('never sends a signed-in user to consent for a callback off the allowed list', async () => {
+    const server = app.getHttpServer();
+    const evil = 'https://attacker.example/api/mcp/auth_callback';
+    const res = await request(server)
+      .post('/api/auth/oauth2/register')
+      .send({ client_name: 'Claude', redirect_uris: [evil], token_endpoint_auth_method: 'none' })
+      .expect(201);
+    clients.push(res.body.client_id);
+    const { cookie } = await signIn(app);
+
+    const authorize = await request(server)
+      .get('/api/auth/oauth2/authorize')
+      .query({
+        response_type: 'code',
+        client_id: res.body.client_id,
+        redirect_uri: evil,
+        scope: 'openid',
+        code_challenge: createHash('sha256').update('v').digest('base64url'),
+        code_challenge_method: 'S256',
+        resource: mcpUrl,
+      })
+      .set('Cookie', cookie);
+    const location = authorize.headers.location ?? '';
+    expect(location).not.toContain('/consent');
+    expect(location).not.toContain('attacker.example');
+  });
+
   // The whole flow an MCP client runs, ending in what the MCP server checks.
   it('issues a JWT for the MCP resource after sign-in and consent (code + PKCE)', async () => {
     const server = app.getHttpServer();

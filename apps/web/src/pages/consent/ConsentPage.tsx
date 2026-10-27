@@ -18,6 +18,10 @@ export function ConsentPage() {
   const search = new URLSearchParams(useLocation().searchStr);
   const clientId = search.get('client_id') ?? '';
   const scopes = search.get('scope')?.split(' ') ?? [];
+  // Where Allow sends the code: the API accepts only known callbacks, and the user sees
+  // which one, since the client's name proves nothing.
+  const redirectUri = search.get('redirect_uri') ?? '';
+  const redirectHost = URL.canParse(redirectUri) ? new URL(redirectUri).host : null;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -47,6 +51,7 @@ export function ConsentPage() {
       <p>
         It will act as you through the MCP tools: read and change your vacancies and applications.
       </p>
+      {redirectHost && <p className="text-ink-muted">Allow returns you to {redirectHost}.</p>}
       {scopes.length > 0 && <p className="text-ink-muted">Requested scopes: {scopes.join(', ')}</p>}
       {error && (
         <p role="alert" className="text-bad">

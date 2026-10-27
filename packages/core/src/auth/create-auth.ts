@@ -32,6 +32,26 @@ export interface AuthConfig {
   mcpUrl: string;
 }
 
+const CLAUDE_CALLBACKS = new Set([
+  'https://claude.ai/api/mcp/auth_callback',
+  'https://claude.com/api/mcp/auth_callback',
+]);
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Where an authorization code may be sent. Registration is open (RFC 7591), so without
+ * this a stranger could register a client named "Claude" with a callback on their own
+ * host and send the user an authorize link: one Allow would hand them a token. Only
+ * claude.ai's callback passes, and loopback — a client on the user's own machine
+ * (Claude Code, the MCP Inspector). Another MCP client's callback goes in the set.
+ */
+export function isAllowedRedirectUri(uri: string): boolean {
+  if (CLAUDE_CALLBACKS.has(uri)) return true;
+  if (!URL.canParse(uri)) return false;
+  const { protocol, hostname } = new URL(uri);
+  return protocol === 'http:' && LOOPBACK_HOSTS.has(hostname);
+}
+
 /**
  * The Better Auth instance, on `core`'s Prisma client: every query it makes runs inside
  * `core` (invariant 1). Sign-in is Google / LinkedIn (OIDC), then passkeys; no password.
@@ -58,9 +78,10 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
       user: {
         create: {
           // No open sign-up: a new account is someone added to the allowlist; it starts
-          // with no data of its own (ADR-0038).
+          // with no data of its own (ADR-0038). The provider must vouch for the email,
+          // or an identity merely claiming an allowed address would take it first.
           before: async (user) => {
-            if (!allowed.has(user.email.toLowerCase())) {
+            if (!user.emailVerified || !allowed.has(user.email.toLowerCase())) {
               throw new APIError('FORBIDDEN', { message: 'This email may not sign up' });
             }
           },
@@ -80,9 +101,11 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
         loginPage: `${config.webOrigin}/login`,
         consentPage: `${config.webOrigin}/consent`,
         // RFC 7591, open: an MCP client (Claude, the Inspector) registers itself without
-        // a session. A client still gets no token until the user signs in and consents.
+        // a session. A client still gets no token until the user signs in and consents,
+        // and the code goes only to a callback `isAllowedRedirectUri` accepts.
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
+        validateRedirectUri: (uri, _registered, matches) => matches && isAllowedRedirectUri(uri),
         // A token is a JWT only when the client asks for this resource (RFC 8707), as MCP
         // clients do; every registered client may.
         // `allowedScopes` spelled out: left out, the plugin writes null, which Prisma

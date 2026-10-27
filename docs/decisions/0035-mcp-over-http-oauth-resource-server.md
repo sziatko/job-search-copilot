@@ -11,8 +11,10 @@ token.
 
 ## Decision
 JSC's API is the authorization server: Better Auth's `jwt` + `oauthProvider` plugins
-([ADR-0034](0034-auth-better-auth-in-core.md)), dynamic client registration on, a
-`/consent` page in the web. `apps/mcp/src/http.ts` serves the same `createServer()` as
+([ADR-0034](0034-auth-better-auth-in-core.md)), dynamic client registration on and
+open, a `/consent` page in the web that names the callback host. Since anyone may
+register a client and name it anything, a code goes only to a known callback:
+claude.ai's, or loopback (`isAllowedRedirectUri` in `create-auth.ts`). `apps/mcp/src/http.ts` serves the same `createServer()` as
 Streamable HTTP:
 
 - `/.well-known/oauth-protected-resource` names the API as the authorization server;
@@ -47,6 +49,8 @@ Stdio stays, as the owner of `JSC_API_KEY`.
 - Both entrypoints share `createServer()`; a tool registered in only one diverges
   ([ADR-0010](0010-mcp-server-factory.md)).
 - Rotating the JWKS key invalidates every outstanding token.
+- A new remote MCP client (another host than claude.ai) cannot finish OAuth until its
+  callback is added to `isAllowedRedirectUri`.
 
 ## Related
 [ADR-0010](0010-mcp-server-factory.md), [ADR-0034](0034-auth-better-auth-in-core.md),
