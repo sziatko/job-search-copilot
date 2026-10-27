@@ -14,6 +14,7 @@
  * with its own name.
  */
 import type { ReactNode, SVGProps } from 'react';
+import { isDevServer } from '@/lib/dev-server';
 
 function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: ReactNode }) {
   return (
@@ -33,8 +34,10 @@ function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: Reac
   );
 }
 
-/** The brand mark. Colours are fixed on purpose: the same look in light and dark themes. */
+/** The brand mark. Colours are fixed on purpose: the same look in light and dark themes.
+ * Red on the dev server, so the local copy can't pass for production. */
 export function JscLogo({ size = 30, className }: { size?: number; className?: string }) {
+  const dev = isDevServer();
   return (
     <svg
       width={size}
@@ -42,10 +45,10 @@ export function JscLogo({ size = 30, className }: { size?: number; className?: s
       viewBox="0 0 48 48"
       fill="none"
       role="img"
-      aria-label="Job Search Copilot"
+      aria-label={dev ? 'Job Search Copilot (dev)' : 'Job Search Copilot'}
       className={className}
     >
-      <rect width="48" height="48" rx="12" fill="#2E5CD6" />
+      <rect width="48" height="48" rx="12" fill={dev ? '#DC3D3D' : '#2E5CD6'} />
       <path
         d="M11.6 24.9 32.4 15.6 23.1 36.4 20.9 27.1Z"
         fill="#FFFFFF"

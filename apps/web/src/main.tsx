@@ -13,6 +13,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import { App } from './App';
+import { DevMarker } from './components/ui/DevMarker';
 import './index.css';
 import { queryClient } from './lib/queryClient';
 import { useTheme } from './lib/theme';
@@ -34,6 +35,7 @@ createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <App />
       <ThemedToaster />
+      <DevMarker />
     </QueryClientProvider>
   </StrictMode>,
 );
