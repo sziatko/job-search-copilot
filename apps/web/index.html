@@ -16,7 +16,10 @@
 
          It only writes an attribute for an explicit choice. With nothing stored
          it stays out of the way entirely, and `color-scheme: light dark`
-         in index.css themes the page natively — no JS in the default path. -->
+         in index.css themes the page natively — no JS in the default path.
+
+         The reverse proxy's Content-Security-Policy allows this script by its
+         sha256 hash: any edit to it, whitespace included, needs a new hash there. -->
     <script>
       try {
         const stored = localStorage.getItem('jsc-theme');
