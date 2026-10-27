@@ -73,7 +73,8 @@ export default defineConfig({
       timeout: 180_000,
     },
     {
-      command: `npm run dev --workspace=@job-search-copilot/web -- --port ${new URL(webOrigin).port}`,
+      // --mode e2e: no dev marker (red logo, favicon, "DEV" tab), so the screenshots are prod's.
+      command: `npm run dev --workspace=@job-search-copilot/web -- --port ${new URL(webOrigin).port} --mode e2e`,
       cwd: root,
       url: webOrigin,
       env: { VITE_API_URL: apiOrigin },
