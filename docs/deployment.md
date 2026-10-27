@@ -74,7 +74,9 @@ past a migration means restoring the backup taken before it (the shared layer's 
 local `.env`) into the dev stack's Postgres: `pg_restore --clean` in one transaction,
 so a failed pull changes nothing. Before it, the target is dumped to the temp folder
 (the path is printed) — the way back from a pull into the wrong database. It refuses
-`*_test` and `*_e2e`.
+`*_test` and `*_e2e`. After it, the `Jwks` rows are deleted: the jwt plugin's private key
+is encrypted with the `BETTER_AUTH_SECRET` of the side that made it, so a moved key turns
+every signed-in `get-session` into a 500. Better Auth makes a new one on demand.
 
 The local data is a copy: the server is the one that counts. Never point local code at
 the production database (an SSH tunnel, a copied `DATABASE_URL`): `migrate:dev` would
@@ -97,7 +99,10 @@ write to either database meanwhile.
        cd /srv/jsc && docker compose stop jsc-api jsc-mcp-http
        cd /srv/infra && docker compose exec -T postgres pg_restore -U postgres -d jsc \
          --clean --if-exists --no-owner --no-acl --role jsc --single-transaction < ~/jsc.dump
+       docker compose exec -T postgres psql -U postgres -d jsc -c 'DELETE FROM "Jwks"'
        cd /srv/jsc && docker compose up -d && rm ~/jsc.dump
+
+   The `DELETE`: the local signing key is encrypted with the local secret (§ Pull).
 
 4. n8n moves with its volume (the shared layer's README); its workflows' API URL becomes
    `https://jsc.<domain>/api/v1`. The API keys came with the database.

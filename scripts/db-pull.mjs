@@ -49,6 +49,9 @@ const restore = local(
 );
 dump.stdout.pipe(restore.stdin);
 await Promise.all([run(dump), run(restore)]);
+// The jwt plugin's private key is encrypted with the server's BETTER_AUTH_SECRET: kept,
+// every local get-session would 500. Without one, Better Auth makes a new key on demand.
+await run(local('psql', '-U', user, '-d', target, '-c', 'DELETE FROM "Jwks"'));
 console.log(`"${target}" now holds the production database`);
 
 /** Resolves when `child` exits with 0 and `out`, if given, has its stdout on disk. */
