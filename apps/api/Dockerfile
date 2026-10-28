@@ -41,4 +41,6 @@ COPY --from=build /repo/packages/core/prisma.config.ts packages/core/prisma.conf
 COPY --from=build /repo/apps/api/dist apps/api/dist
 RUN npm run generate --workspace=@job-search-copilot/core
 EXPOSE 3000
+# Built as root, run as the image's `node` user: nothing at runtime writes to /repo.
+USER node
 CMD ["node", "apps/api/dist/main.js"]

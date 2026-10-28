@@ -10,7 +10,7 @@ JSC runs on one VPS, shared with other projects. Why it is shaped this way:
 Caddy ── jsc.<domain>      /api/*, /.well-known/*  → jsc-api:3000
       │                    everything else         → jsc-web:80 (nginx)
       └─ jsc-mcp.<domain>                          → jsc-mcp-http:3001
-Postgres ← role and database `jsc`
+Postgres ← database `jsc`: owner `jsc` (migrations), runtime role `jsc_app`
 ```
 
 - **The shared layer** — Caddy (HTTPS, a block per subdomain), one Postgres and the
@@ -26,8 +26,9 @@ Postgres ← role and database `jsc`
 
 ## First start
 
-1. The database: role and database `jsc`, by the shared layer's README. The first
-   migration creates `pg_trgm`, a trusted extension, so the owner may.
+1. The database: role and database `jsc`, by the shared layer's README, then the
+   runtime role (§ The database roles). The first migration creates `pg_trgm`, a
+   trusted extension, so the owner may.
 2. `git clone https://github.com/<owner>/job-search-copilot /srv/jsc`, then `.env` from
    `.env.prod.example` with the real values.
 3. The two Caddy blocks, then a Caddy reload:
@@ -47,6 +48,30 @@ Postgres ← role and database `jsc`
 The OAuth apps (Google, LinkedIn) need the redirect URI
 `https://jsc.<domain>/api/auth/callback/{google,linkedin}`. A passkey is bound to
 `PASSKEY_RP_ID`: one registered on another domain does not work here.
+
+## The database roles
+
+`jsc` owns the database, and only `jsc-migrate` connects as it (`.env.migrate`). The api
+and the MCP server connect as `jsc_app` (`.env`'s `DATABASE_URL`): rows only, no DDL —
+an injection or a bug can delete data, not drop a table. As `postgres`, in `/srv/infra`:
+
+    docker compose exec postgres psql -U postgres -d jsc <<'SQL'
+    CREATE ROLE jsc_app LOGIN PASSWORD '<password>';
+    GRANT CONNECT ON DATABASE jsc TO jsc_app;
+    GRANT USAGE ON SCHEMA public TO jsc_app;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO jsc_app;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO jsc_app;
+    -- Tables and sequences later migrations create, as `jsc`:
+    ALTER DEFAULT PRIVILEGES FOR ROLE jsc IN SCHEMA public
+      GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO jsc_app;
+    ALTER DEFAULT PRIVILEGES FOR ROLE jsc IN SCHEMA public
+      GRANT USAGE, SELECT ON SEQUENCES TO jsc_app;
+    SQL
+
+Then in `/srv/jsc`: `.env.migrate` (`chmod 600`) gets the owner's URL as
+`DATABASE_URL`, `.env`'s `DATABASE_URL` becomes `jsc_app`'s, and `docker compose up -d`.
+After a restore (`--no-acl` drops the grants a dump carries), run the `GRANT` and
+`ALTER DEFAULT PRIVILEGES` lines again: they are idempotent, `CREATE ROLE` is not.
 
 ## Deploy a version
 

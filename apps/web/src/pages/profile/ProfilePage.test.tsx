@@ -4,7 +4,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
 import { createElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { toast } from 'sonner';
+import { describe, expect, it, vi } from 'vitest';
 import { routeTree } from '@/router';
 import { AUTH_URL } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
@@ -37,6 +38,7 @@ function apiKeyHandlers() {
   ];
   return [
     http.get(`${AUTH_URL}/passkey/list-user-passkeys`, () => HttpResponse.json([])),
+    http.get(`${AUTH_URL}/oauth2/get-consents`, () => HttpResponse.json([])),
     http.get(`${AUTH_URL}/api-key/list`, () =>
       HttpResponse.json({ apiKeys: keys, total: keys.length }),
     ),
@@ -98,5 +100,39 @@ describe('/profile: API keys', () => {
     const row = (await screen.findByText('n8n')).closest('li') as HTMLElement;
     await user.click(within(row).getByRole('button', { name: 'Revoke' }));
     expect(await screen.findByText(/No API keys yet/)).toBeVisible();
+  });
+});
+
+/** The oauth-provider's consent endpoints over one in-memory list; the client named by
+ * its public endpoint. Put before `apiKeyHandlers()`: the first match wins. */
+function consentHandlers() {
+  let consents = [
+    { id: 'c1', clientId: 'claude-1', scopes: ['openid'], createdAt: '2026-09-03T00:00:00.000Z' },
+  ];
+  return [
+    http.get(`${AUTH_URL}/oauth2/get-consents`, () => HttpResponse.json(consents)),
+    http.get(`${AUTH_URL}/oauth2/public-client`, () =>
+      HttpResponse.json({ client_name: 'Claude' }),
+    ),
+    http.post(`${AUTH_URL}/oauth2/delete-consent`, async ({ request }) => {
+      const { id } = (await request.json()) as { id: string };
+      consents = consents.filter((c) => c.id !== id);
+      return HttpResponse.json(null);
+    }),
+  ];
+}
+
+describe('/profile: connected apps', () => {
+  it('lists each app by its name, and revokes one', async () => {
+    const user = userEvent.setup();
+    const failed = vi.spyOn(toast, 'error');
+    mswServer.use(...consentHandlers(), ...apiKeyHandlers());
+    renderProfile();
+
+    const row = (await screen.findByText('Claude')).closest('li') as HTMLElement;
+    expect(row).toHaveTextContent(/connected/);
+    await user.click(within(row).getByRole('button', { name: 'Revoke' }));
+    expect(await screen.findByText(/No apps connected/)).toBeVisible();
+    expect(failed).not.toHaveBeenCalled();
   });
 });

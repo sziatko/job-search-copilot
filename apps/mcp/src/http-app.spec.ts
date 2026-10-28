@@ -105,6 +105,15 @@ describe('MCP over HTTP', () => {
     );
   });
 
+  it('reads no body before the caller is known: malformed JSON without a token is a 401', async () => {
+    const res = await fetch(`${base}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{not json',
+    });
+    expect(res.status).toBe(401);
+  });
+
   it('lists the tools for a valid token', async () => {
     const client = new Client({ name: 'test-client', version: '0.0.0' });
     await client.connect(

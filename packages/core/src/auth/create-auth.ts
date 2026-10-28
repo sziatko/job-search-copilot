@@ -4,7 +4,7 @@ import { passkey } from '@better-auth/passkey';
 import type { PrismaClient } from '@prisma/client';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import { jwt } from 'better-auth/plugins';
 import { API_KEY_OPTIONS } from './api-key';
 
@@ -30,6 +30,37 @@ export interface AuthConfig {
    * access tokens are issued for, their `aud` (ADR-0035).
    */
   mcpUrl: string;
+}
+
+const CLAUDE_CALLBACKS = new Set([
+  'https://claude.ai/api/mcp/auth_callback',
+  'https://claude.com/api/mcp/auth_callback',
+]);
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Where an authorization code may be sent. Registration is open (RFC 7591), so without
+ * this a stranger could register a client named "Claude" with a callback on their own
+ * host and send the user an authorize link: one Allow would hand them a token. Only
+ * claude.ai's callback passes, and loopback — a client on the user's own machine
+ * (Claude Code, the MCP Inspector). Another MCP client's callback goes in the set.
+ */
+export function isAllowedRedirectUri(uri: string): boolean {
+  if (CLAUDE_CALLBACKS.has(uri)) return true;
+  if (!URL.canParse(uri)) return false;
+  const { protocol, hostname } = new URL(uri);
+  return protocol === 'http:' && LOOPBACK_HOSTS.has(hostname);
+}
+
+/** A passkey sign-in whose authenticator did not verify the user is refused. */
+export function requireUserVerified({
+  verification,
+}: {
+  verification: { authenticationInfo: { userVerified: boolean } };
+}): void {
+  if (!verification.authenticationInfo.userVerified) {
+    throw new APIError('UNAUTHORIZED', { message: 'The passkey did not verify you' });
+  }
 }
 
 /**
@@ -58,20 +89,50 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
       user: {
         create: {
           // No open sign-up: a new account is someone added to the allowlist; it starts
-          // with no data of its own (ADR-0038).
+          // with no data of its own (ADR-0038). The provider must vouch for the email,
+          // or an identity merely claiming an allowed address would take it first.
           before: async (user) => {
-            if (!allowed.has(user.email.toLowerCase())) {
+            if (!user.emailVerified || !allowed.has(user.email.toLowerCase())) {
               throw new APIError('FORBIDDEN', { message: 'This email may not sign up' });
             }
           },
         },
       },
     },
+    hooks: {
+      // /profile's "Revoke" on a connected app. The plugin deletes only the consent row,
+      // and its refresh grant never looks at consents: the app would keep refreshing.
+      // Its tokens for this user go first; an issued access token (a JWT) lives to `exp`.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/oauth2/delete-consent') return;
+        const session = await getSessionFromCtx(ctx);
+        if (!session) return; // the endpoint answers 401 itself
+        const userId = session.user.id;
+        const consent = await prisma.oauthConsent.findFirst({
+          where: { id: ctx.body?.id, userId },
+        });
+        if (!consent) return; // another user's or none: the endpoint's 401 / 404
+        const grant = { clientId: consent.clientId, userId };
+        await prisma.$transaction([
+          prisma.oauthRefreshToken.deleteMany({ where: grant }),
+          prisma.oauthAccessToken.deleteMany({ where: grant }),
+        ]);
+      }),
+    },
     // The jwt plugin's own GET /token hands a session's JWT to the browser; the OAuth
     // provider issues tokens at /oauth2/token instead (Better Auth's docs disable it).
     disabledPaths: ['/token'],
     plugins: [
-      passkey({ rpID: config.passkeyRpId, rpName: 'Job Search Copilot', origin: config.webOrigin }),
+      passkey({
+        rpID: config.passkeyRpId,
+        rpName: 'Job Search Copilot',
+        origin: config.webOrigin,
+        // A passkey is the whole sign-in, so the authenticator must check it is the user
+        // (PIN, biometrics), not only that the key is there: a lost security key alone is
+        // not enough. The plugin asks for that only as "preferred".
+        authenticatorSelection: { userVerification: 'required' },
+        authentication: { afterVerification: requireUserVerified },
+      }),
       // Signs access tokens with JSC's own key (the `Jwks` table), served at /api/auth/jwks.
       jwt(),
       // JSC as an OAuth 2.1 authorization server for MCP clients (ADR-0035). Its issuer is
@@ -80,9 +141,11 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
         loginPage: `${config.webOrigin}/login`,
         consentPage: `${config.webOrigin}/consent`,
         // RFC 7591, open: an MCP client (Claude, the Inspector) registers itself without
-        // a session. A client still gets no token until the user signs in and consents.
+        // a session. A client still gets no token until the user signs in and consents,
+        // and the code goes only to a callback `isAllowedRedirectUri` accepts.
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
+        validateRedirectUri: (uri, _registered, matches) => matches && isAllowedRedirectUri(uri),
         // A token is a JWT only when the client asks for this resource (RFC 8707), as MCP
         // clients do; every registered client may.
         // `allowedScopes` spelled out: left out, the plugin writes null, which Prisma

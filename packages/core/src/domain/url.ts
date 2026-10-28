@@ -141,11 +141,12 @@ export function normalizeApplyUrl(url: string | null | undefined): string | null
     parsed.search = '';
   }
   parsed.hash = '';
-  // Every trailing slash goes; the `|| '/'` keeps the path from going empty on
-  // the likes of `/jobs///`.
-  if (parsed.pathname.length > 1) {
-    parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
-  }
+  // Every trailing slash goes, keeping the leading one on the likes of `/jobs///`.
+  // A loop, not `/\/+$/`: that rescans from every slash of a long run not at the end.
+  const path = parsed.pathname;
+  let end = path.length;
+  while (end > 1 && path[end - 1] === '/') end--;
+  parsed.pathname = path.slice(0, end);
   return parsed.href;
 }
 

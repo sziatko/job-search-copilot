@@ -12,7 +12,7 @@ import { mswServer } from '@/test/msw/server';
 // What the API's /oauth2/authorize appends to the consent page: the client's request,
 // the list of signed parameters (`ba_param`), the signature.
 const SIGNED =
-  'client_id=c1&scope=openid+offline_access&exp=1&ba_param=client_id&ba_param=exp&ba_param=scope&sig=s1';
+  'client_id=c1&redirect_uri=https%3A%2F%2Fclaude.ai%2Fapi%2Fmcp%2Fauth_callback&scope=openid+offline_access&exp=1&ba_param=client_id&ba_param=exp&ba_param=redirect_uri&ba_param=scope&sig=s1';
 const PATH = `/consent?${SIGNED}`;
 
 function renderConsent() {
@@ -55,6 +55,7 @@ describe('/consent', () => {
         await screen.findByRole('heading', { name: 'Claude wants to use Job Search Copilot' }),
       ).toBeVisible();
       expect(screen.getByText(/openid, offline_access/)).toBeVisible();
+      expect(screen.getByText('Allow returns you to claude.ai.')).toBeVisible();
       await userEvent.click(screen.getByRole('button', { name: button }));
 
       await waitFor(() => expect(body).toBeDefined());

@@ -1,11 +1,22 @@
 import {
+  MAX_LENGTH,
   Recommendation,
   VACANCY_SORTS,
   VacancySort,
   VacancyStatus,
 } from '@job-search-copilot/core';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class ListVacanciesQueryDto {
   @IsOptional()
@@ -20,15 +31,18 @@ export class ListVacanciesQueryDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.name)
   search?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.name)
   company?: string;
 
   /** Every row of this name's company, whatever its spelling (ADR-0032). */
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.name)
   sameCompanyAs?: string;
 
   /** `true` / `false` — with or without posting text. Anything else is a 400. */

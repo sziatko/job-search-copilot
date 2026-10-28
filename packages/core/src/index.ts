@@ -56,4 +56,4 @@ export type {
   VacancyListItem,
   VacancySort,
 } from './vacancies/vacancy.types';
-export { ANALYSIS_BATCH_MAX, VACANCY_SORTS } from './vacancies/vacancy.types';
+export { ANALYSIS_BATCH_MAX, MAX_LENGTH, VACANCY_SORTS } from './vacancies/vacancy.types';

@@ -218,6 +218,13 @@ describe('normalizeApplyUrl', () => {
       expect(normalizeApplyUrl('https://acme.com/jobs/123///')).toBe('https://acme.com/jobs/123');
     });
 
+    it('stays linear on a long run of slashes not at the end', () => {
+      // Quadratic, 50k slashes took seconds: a caller could stall the process.
+      const started = performance.now();
+      normalizeApplyUrl(`https://acme.com/${'/'.repeat(50_000)}x`);
+      expect(performance.now() - started).toBeLessThan(200);
+    });
+
     it('keeps the slash that is the whole path', () => {
       expect(normalizeApplyUrl('https://acme.com/')).toBe('https://acme.com/');
     });

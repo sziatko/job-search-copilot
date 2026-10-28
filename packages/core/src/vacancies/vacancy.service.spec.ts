@@ -74,6 +74,13 @@ function countsByCompany(items: VacancyListItem[]): Record<string, number> {
 // Made-up names, one per rule: a country or region, a note, a legal form, case and
 // punctuation join; a substring, a prefix or a shared first word do not.
 describe('companyGroupKey', () => {
+  it('stays linear on a long run of "(" with no ")"', () => {
+    // Quadratic, 50k took seconds — on every list, for every stored name.
+    const started = performance.now();
+    companyGroupKey('('.repeat(50_000));
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
   it.each([
     ['Contoso', 'Contoso Polska'],
     ['Globex Polska', 'Globex Poland'],

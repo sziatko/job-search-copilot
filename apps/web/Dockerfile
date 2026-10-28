@@ -24,7 +24,9 @@ COPY apps/web apps/web
 RUN npm run build --workspace=@job-search-copilot/web
 
 # Production: just the static files behind nginx — no Node runtime needed at all.
-FROM nginx:alpine AS production
+# Runs as nginx (uid 101), not root. Port 80 still binds: Docker lets a container's
+# unprivileged processes take any port (`ip_unprivileged_port_start=0`).
+FROM nginxinc/nginx-unprivileged:alpine AS production
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 # SPA fallback: without it, reloading /applications hits nginx's 404 (see nginx.conf).
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf

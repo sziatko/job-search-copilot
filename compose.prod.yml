@@ -9,16 +9,27 @@
 # project's.
 name: jsc
 
+# Every service: no Linux capabilities (none needs one: the ports are unprivileged in a
+# container, the processes run as a non-root user), and no gaining privileges later.
+x-hardened: &hardened
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
 services:
   # One-shot: applies the committed migrations, then exits. The api starts only after
-  # it succeeded, so it never runs against an older schema.
+  # it succeeded, so it never runs against an older schema. It alone connects as the
+  # database's owner: `.env.migrate`'s DATABASE_URL overrides `.env`'s, the runtime
+  # role's (docs/deployment.md, "The database roles"). Without the file, `.env`'s.
   jsc-migrate:
     image: ${JSC_IMAGES:?}/jsc-api:${JSC_TAG:?}
     working_dir: /repo/packages/core
     command: [npx, prisma, migrate, deploy]
-    environment:
-      DATABASE_URL: ${DATABASE_URL:?}
+    env_file:
+      - .env
+      - path: .env.migrate
+        required: false
     networks: [web]
+    <<: *hardened
     mem_limit: 512m
 
   jsc-api:
@@ -29,6 +40,7 @@ services:
         condition: service_completed_successfully
     env_file: .env
     networks: [web]
+    <<: *hardened
     mem_limit: 512m
     healthcheck:
       test: ['CMD-SHELL', 'wget -q -O - http://localhost:3000/health || exit 1']
@@ -54,12 +66,14 @@ services:
       # Where it fetches the API's JWKS: inside the network, not through Caddy.
       AUTH_URL: http://jsc-api:3000
     networks: [web]
+    <<: *hardened
     mem_limit: 512m
 
   jsc-web:
     image: ${JSC_IMAGES:?}/jsc-web:${JSC_TAG:?}
     restart: unless-stopped
     networks: [web]
+    <<: *hardened
     mem_limit: 64m
 
 networks:

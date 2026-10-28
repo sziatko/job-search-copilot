@@ -2,6 +2,7 @@ import { IconPerson } from '@/components/icons';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 import { View } from '@/components/ui/View';
 import { ApiKeysCard } from './ApiKeysCard';
+import { ConnectedAppsCard } from './ConnectedAppsCard';
 import { PasskeysCard } from './PasskeysCard';
 
 export function ProfilePage() {
@@ -10,6 +11,7 @@ export function ProfilePage() {
       <div className="space-y-4 narrow:space-y-3">
         <PasskeysCard />
         <ApiKeysCard />
+        <ConnectedAppsCard />
         <ComingSoon
           icon={IconPerson}
           title="Profile & forms — coming soon"

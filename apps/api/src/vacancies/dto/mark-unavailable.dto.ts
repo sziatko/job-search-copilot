@@ -1,3 +1,4 @@
+import { MAX_LENGTH } from '@job-search-copilot/core';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -6,6 +7,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -18,6 +20,7 @@ export class MarkUnavailableItemDto {
   /** Why the posting is gone ("LinkedIn: no longer accepting applications"); the comment. */
   @IsString()
   @IsNotEmpty()
+  @MaxLength(MAX_LENGTH.note)
   reason!: string;
 }
 

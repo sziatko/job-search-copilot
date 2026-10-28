@@ -18,7 +18,8 @@ The field-level detail lives in one place each, not here:
 
 Everything is under `/api/v1` except `/health` ([ADR-0008](decisions/0008-api-prefix-and-versioning.md)).
 `ValidationPipe({ whitelist: true, transform: true })` strips unknown fields and
-coerces types. JSON bodies up to 5 MB (intake carries posting text).
+coerces types. JSON bodies up to 5 MB (intake carries posting text); no form bodies.
+Free strings are capped by `MAX_LENGTH` (core), the same caps as MCP's inputs.
 
 **Auth** ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)). Every route wants a
 session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` is anonymous.
@@ -121,7 +122,8 @@ every client shows.
   sends `resource=<MCP_PUBLIC_URL>` (RFC 8707). A bad or missing token → `401` with
   `WWW-Authenticate … resource_metadata`; the API unreachable → `500`.
 - Stateless: a server per `POST`, no session id; `GET` / `DELETE /mcp` → `405`. Bodies
-  up to 5 MB. The `Host` header must be `MCP_PUBLIC_URL`'s host, else `403`.
+  up to 5 MB, read only once the token or key checks out. The `Host` header must be
+  `MCP_PUBLIC_URL`'s host, else `403`.
 
 > **What this constrains — breaks if you change it**
 > - A tool's name, input or output → the owner's skills (outside the repo, re-uploaded

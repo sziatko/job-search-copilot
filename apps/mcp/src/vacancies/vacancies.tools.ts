@@ -1,4 +1,4 @@
-import { ANALYSIS_BATCH_MAX, type VacancyService } from '@job-search-copilot/core';
+import { ANALYSIS_BATCH_MAX, MAX_LENGTH, type VacancyService } from '@job-search-copilot/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BATCH_MAX, PAGING_NOTE, pagination } from '../common/schemas';
@@ -169,9 +169,9 @@ export function registerVacancyTools(
         recommendation: RecommendationEnum.optional(),
         status: z.array(VacancyStatusEnum).optional(),
         hasText: z.boolean().optional(),
-        company: z.string().optional(),
-        title: z.string().optional(),
-        applyUrl: z.string().optional(),
+        company: z.string().max(MAX_LENGTH.name).optional(),
+        title: z.string().max(MAX_LENGTH.name).optional(),
+        applyUrl: z.string().max(MAX_LENGTH.url).optional(),
         ...pagination(VACANCY_LIST_MAX),
       },
     },

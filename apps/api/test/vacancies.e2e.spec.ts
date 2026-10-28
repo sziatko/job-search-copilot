@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
+import { getPrisma, MAX_LENGTH, VacancyIntakeService } from '@job-search-copilot/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -112,6 +112,23 @@ describe('Vacancies (e2e)', () => {
   describe('POST /api/v1/vacancies/intake', () => {
     const intake = (entries: unknown[]) => api.post('/api/v1/vacancies/intake').send({ entries });
     const entry = { url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' };
+
+    it('refuses a company over MAX_LENGTH.name: 400, nothing taken in', async () => {
+      await intake([{ ...entry, company: 'A'.repeat(MAX_LENGTH.name + 1) }]).expect(400);
+      expect(await prisma.vacancy.count({ where: { userId: api.userId } })).toBe(0);
+    });
+
+    // A form is the one cross-site POST the session cookie still rides on: not parsed.
+    it('refuses a form body (no urlencoded parser): 400, nothing taken in', async () => {
+      await api
+        .post('/api/v1/vacancies/intake')
+        .type('form')
+        .send(
+          'entries[0][url]=https://acme.com/jobs/9&entries[0][company]=Acme&entries[0][title]=Dev',
+        )
+        .expect(400);
+      expect(await prisma.vacancy.count({ where: { userId: api.userId } })).toBe(0);
+    });
 
     it('takes a new posting in as NEW (200, the url as sent); a repeat by url or by name is not new', async () => {
       const raw = 'https://pl.linkedin.com/jobs/view/dev-at-acme-3900000001?trk=x';

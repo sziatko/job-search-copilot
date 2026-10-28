@@ -39,4 +39,6 @@ COPY --from=build /repo/packages/core/prisma packages/core/prisma
 COPY --from=build /repo/packages/core/prisma.config.ts packages/core/prisma.config.ts
 COPY --from=build /repo/apps/mcp/dist apps/mcp/dist
 RUN npm run generate --workspace=@job-search-copilot/core
+# Built as root, run as the image's `node` user: nothing at runtime writes to /repo.
+USER node
 CMD ["node", "apps/mcp/dist/index.js"]

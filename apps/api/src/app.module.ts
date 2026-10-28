@@ -43,7 +43,9 @@ import { VacanciesModule } from './vacancies/vacancies.module';
           // Nest's own parser is off (bodyParser: false — Better Auth reads the raw body
           // on /api/auth/*); the module re-adds it for every other route. Express' default
           // is 100 KB; POST /vacancies/intake takes up to 100 postings with their text.
-          bodyParser: { json: { limit: '5mb' } },
+          // No urlencoded parser (the module's default is on): every route takes JSON,
+          // and a form is the one cross-site POST the session cookie still rides on.
+          bodyParser: { json: { limit: '5mb' }, urlencoded: { enabled: false } },
           // CORS is configureApp's, one config for every route (it also allows PATCH).
           disableTrustedOriginsCors: true,
         };

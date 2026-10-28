@@ -11,8 +11,10 @@ token.
 
 ## Decision
 JSC's API is the authorization server: Better Auth's `jwt` + `oauthProvider` plugins
-([ADR-0034](0034-auth-better-auth-in-core.md)), dynamic client registration on, a
-`/consent` page in the web. `apps/mcp/src/http.ts` serves the same `createServer()` as
+([ADR-0034](0034-auth-better-auth-in-core.md)), dynamic client registration on and
+open, a `/consent` page in the web that names the callback host. Since anyone may
+register a client and name it anything, a code goes only to a known callback:
+claude.ai's, or loopback (`isAllowedRedirectUri` in `create-auth.ts`). `apps/mcp/src/http.ts` serves the same `createServer()` as
 Streamable HTTP:
 
 - `/.well-known/oauth-protected-resource` names the API as the authorization server;
@@ -33,7 +35,10 @@ Stdio stays, as the owner of `JSC_API_KEY`.
 
 ## Consequences
 - Any MCP client that speaks the spec connects with no JSC-specific setup.
-- A JWT cannot be revoked before it expires: access tokens are short-lived.
+- A JWT cannot be revoked before it expires: access tokens are short-lived (an hour).
+  /profile's "Connected apps" revokes a grant — the consent and the client's tokens for
+  that user. The plugin deletes only the consent and its refresh grant never checks
+  one, so a `hooks.before` in `create-auth.ts` deletes the tokens.
 - claude.ai calls from Anthropic's servers, so it needs a public HTTPS URL (the deploy
   row). Locally, the MCP Inspector and Claude Code test it.
 - A client gets a JWT only when it sends `resource=<MCP_PUBLIC_URL>` (RFC 8707); dynamic
@@ -47,6 +52,13 @@ Stdio stays, as the owner of `JSC_API_KEY`.
 - Both entrypoints share `createServer()`; a tool registered in only one diverges
   ([ADR-0010](0010-mcp-server-factory.md)).
 - Rotating the JWKS key invalidates every outstanding token.
+- A new remote MCP client (another host than claude.ai) cannot finish OAuth until its
+  callback is added to `isAllowedRedirectUri`.
+- Scopes are not enforced: one resource, and every tool acts as the user — what
+  `/consent` says. A read-only client would need a JSC scope checked in `http-app.ts`.
+- The MCP does not check `Origin`: auth is a bearer header, never a cookie, it sends no
+  CORS headers, and `Host` is validated (DNS rebinding). A cookie or CORS on it would
+  need an `Origin` allowlist first.
 
 ## Related
 [ADR-0010](0010-mcp-server-factory.md), [ADR-0034](0034-auth-better-auth-in-core.md),

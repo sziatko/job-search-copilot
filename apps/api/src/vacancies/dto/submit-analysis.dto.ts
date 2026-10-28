@@ -1,4 +1,4 @@
-import { ANALYSIS_BATCH_MAX, Recommendation } from '@job-search-copilot/core';
+import { ANALYSIS_BATCH_MAX, MAX_LENGTH, Recommendation } from '@job-search-copilot/core';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -9,6 +9,7 @@ import {
   IsNotEmpty,
   IsString,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -26,6 +27,7 @@ export class SubmitAnalysisDto {
   /** Stored as the ANALYZER comment. */
   @IsString()
   @IsNotEmpty()
+  @MaxLength(MAX_LENGTH.note)
   estimationComment!: string;
 }
 

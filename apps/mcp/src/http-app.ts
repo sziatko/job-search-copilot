@@ -84,8 +84,6 @@ export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
   const app = express();
   // DNS-rebinding protection: only the host clients are told to call.
   app.use(hostHeaderValidation([url.hostname]));
-  // A save_vacancies / intake_vacancies batch carries full texts — the API's limit too.
-  app.use(express.json({ limit: '5mb' }));
 
   // RFC 9728, at the path-inserted URL the 401's WWW-Authenticate points to.
   app.get(new URL(resourceMetadataUrl).pathname, (_req, res) => {
@@ -96,7 +94,9 @@ export function createHttpApp({ mcpUrl, issuer, jwks }: HttpAppConfig) {
     });
   });
 
-  app.post(url.pathname, auth, async (req, res) => {
+  // The body is parsed only once the caller is known: a stranger's 5 MB costs nothing.
+  // A save_vacancies / intake_vacancies batch carries full texts — the API's limit too.
+  app.post(url.pathname, auth, express.json({ limit: '5mb' }), async (req, res) => {
     const server = createServer({ userId: String(req.auth?.extra?.sub) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on('close', () => {

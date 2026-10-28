@@ -1,4 +1,4 @@
-import type { VacancyIntakeService } from '@job-search-copilot/core';
+import { MAX_LENGTH, type VacancyIntakeService } from '@job-search-copilot/core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BATCH_MAX } from '../common/schemas';
@@ -7,11 +7,12 @@ import { json, withDomainErrors } from '../common/tool-result';
 // All three required and checked here: core skips an entry without them, which a caller
 // would read as a duplicate (ADR-0033). The url goes on raw — core normalizes it.
 const IntakeEntrySchema = z.object({
-  url: z.httpUrl(),
-  company: z.string().trim().min(1),
-  title: z.string().trim().min(1),
+  url: z.httpUrl().max(MAX_LENGTH.url),
+  company: z.string().trim().min(1).max(MAX_LENGTH.name),
+  title: z.string().trim().min(1).max(MAX_LENGTH.name),
   source: z
     .string()
+    .max(MAX_LENGTH.name)
     .optional()
     .describe('Where the posting was found: linkedin, justjoin, indeed, email, …'),
 });

@@ -1,3 +1,4 @@
+import { MAX_LENGTH } from '@job-search-copilot/core';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -7,6 +8,7 @@ import {
   IsString,
   IsUrl,
   Matches,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -25,20 +27,24 @@ class IntakeEntryDto {
 
   @IsString()
   @Matches(/\S/, { message: NOT_BLANK })
+  @MaxLength(MAX_LENGTH.name)
   company!: string;
 
   @IsString()
   @Matches(/\S/, { message: NOT_BLANK })
+  @MaxLength(MAX_LENGTH.name)
   title!: string;
 
   /** Where it was found (`justjoin`, `linkedin`, …). */
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.name)
   source?: string;
 
   /** The posting text: stored on a new vacancy, or on a match that has none. */
   @IsOptional()
   @IsString()
+  @MaxLength(MAX_LENGTH.fullText)
   fullText?: string;
 }
 

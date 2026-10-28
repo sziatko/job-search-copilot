@@ -18,7 +18,8 @@ route by default.
   `/profile`. No password, no email sending.
 - A session is a DB row behind an `HttpOnly; SameSite=Lax` cookie (the BFF pattern):
   the browser never holds a token.
-- Sign-up only for `AUTH_ALLOWED_EMAILS` (a `user.create.before` hook).
+- Sign-up only for `AUTH_ALLOWED_EMAILS`, with the email verified by the provider (a
+  `user.create.before` hook).
 - Accounts link across providers only on an email the provider has verified.
 
 ## Why this and not the alternatives

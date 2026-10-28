@@ -56,3 +56,33 @@ export function useApiKeys(onCreated: () => void) {
   });
   return { keys, create, revoke };
 }
+
+/** The MCP clients the signed-in user has let in (OAuth consents, ADR-0035), each with
+ * the name it gave itself; revoke deletes the consent and, server-side, its tokens. */
+export function useConnectedApps() {
+  const queryClient = useQueryClient();
+  const apps = useQuery({
+    queryKey: queryKeys.connectedApps(),
+    queryFn: async () => {
+      const consents = orThrow(await authClient.oauth2.getConsents());
+      return Promise.all(
+        consents.map(async (consent) => {
+          const { data } = await authClient.oauth2.publicClient({
+            query: { client_id: consent.clientId },
+          });
+          return { ...consent, name: data?.client_name };
+        }),
+      );
+    },
+  });
+  const revoke = useMutation({
+    // Answers with no body: `data` is null on success, so only `error` counts.
+    mutationFn: async (id: string) => {
+      const { error } = await authClient.oauth2.deleteConsent({ id });
+      if (error) throw new Error(error.message ?? 'The request failed');
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.connectedApps() }),
+    onError,
+  });
+  return { apps, revoke };
+}

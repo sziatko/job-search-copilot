@@ -15,9 +15,12 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   /** The API's public origin; OAuth callbacks are built from it. */
   BETTER_AUTH_URL: z.url(),
-  /** The web's origin, exactly: the CORS allowlist and Better Auth's trustedOrigins. */
-  WEB_ORIGIN: z.url().refine((url) => new URL(url).origin === url, {
-    message: 'must be a bare origin, e.g. http://localhost:5173 (no path, no trailing slash)',
+  /** The web's origin, exactly: the CORS allowlist and Better Auth's trustedOrigins. No
+   * `*`: `URL` takes `https://*.example.com` as an origin, and Better Auth would read it
+   * as a wildcard. */
+  WEB_ORIGIN: z.url().refine((url) => new URL(url).origin === url && !url.includes('*'), {
+    message:
+      'must be one bare origin, e.g. http://localhost:5173 (no path, no trailing slash, no *)',
   }),
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
