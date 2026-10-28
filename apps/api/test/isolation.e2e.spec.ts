@@ -66,6 +66,32 @@ describe('Isolation between users (e2e)', () => {
     expect((await a.get(`/api/v1/vacancies/${vacancy.id}`).expect(200)).body).toEqual(before);
   });
 
+  it("refuses B every write on A's row taken in by intake: analysis, unavailable, application", async () => {
+    const url = 'https://acme.com/jobs/7';
+    await a
+      .post('/api/v1/vacancies/intake')
+      .send({ entries: [{ url, company: 'Acme', title: 'Dev' }] })
+      .expect(200);
+    const { body: list } = await a.get('/api/v1/vacancies').expect(200);
+    const id = list.items[0].id;
+    const analysis = { matchScore: 90, recommendation: 'APPLY', estimationComment: 'Mine.' };
+
+    await b.post(`/api/v1/vacancies/${id}/analysis`).send(analysis).expect(404);
+    await b
+      .post('/api/v1/vacancies/analysis')
+      .send({ analyses: [{ id, ...analysis }] })
+      .expect(404);
+    const { body: unavailable } = await b
+      .post('/api/v1/vacancies/unavailable')
+      .send({ items: [{ id, reason: 'Gone.' }] })
+      .expect(200);
+    expect(unavailable).toEqual({ moved: [], skipped: [id] });
+    await b.post('/api/v1/applications').send({ vacancyId: id }).expect(404);
+
+    const { body: row } = await a.get(`/api/v1/vacancies/${id}`).expect(200);
+    expect(row).toMatchObject({ status: 'NEW', matchScore: null, comments: [] });
+  });
+
   it("lands an intake with B's key in B: new to B though A has the same url, unseen by A", async () => {
     const entries = [{ url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' }];
     await a.post('/api/v1/vacancies/intake').send({ entries }).expect(200);

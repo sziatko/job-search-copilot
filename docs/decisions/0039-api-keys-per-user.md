@@ -55,6 +55,8 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
 - The window restarts only after an hour with no request at all — each request moves
   `lastRequest` — so the limit is 1000 calls per busy stretch, not per clock hour.
 - A key checked at boot stays valid in a running stdio process until it restarts.
+- The limit is a key's: an OAuth client on the HTTP MCP (claude.ai) has none. A looping
+  agent there is stopped by revoking it on `/profile` (Connected apps), not by a 429.
 
 ## What this constrains — breaks if you change it
 - **A key is full access to its owner's data**, through MCP and REST alike. The

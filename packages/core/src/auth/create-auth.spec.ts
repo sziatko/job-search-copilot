@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { getPrisma } from '../db/prisma-client';
 import { RateLimitedError } from '../domain/errors';
 import { verifyApiKey } from './api-key';
-import { createAuth, isAllowedRedirectUri } from './create-auth';
+import { createAuth, isAllowedRedirectUri, requireUserVerified } from './create-auth';
 
 const prisma = getPrisma();
 const provider = { clientId: 'test-client-id', clientSecret: 'test-client-secret' };
@@ -104,6 +104,20 @@ describe('isAllowedRedirectUri', () => {
     'not a url',
   ])('refuses %s', (uri) => {
     expect(isAllowedRedirectUri(uri)).toBe(false);
+  });
+});
+
+describe('requireUserVerified', () => {
+  const verified = (userVerified: boolean) => ({
+    verification: { authenticationInfo: { userVerified } },
+  });
+
+  it('lets a verified passkey sign in', () => {
+    expect(() => requireUserVerified(verified(true))).not.toThrow();
+  });
+
+  it('refuses one whose authenticator only saw the key (no PIN, no biometrics)', () => {
+    expect(() => requireUserVerified(verified(false))).toThrow('The passkey did not verify you');
   });
 });
 

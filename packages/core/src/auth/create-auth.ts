@@ -52,6 +52,17 @@ export function isAllowedRedirectUri(uri: string): boolean {
   return protocol === 'http:' && LOOPBACK_HOSTS.has(hostname);
 }
 
+/** A passkey sign-in whose authenticator did not verify the user is refused. */
+export function requireUserVerified({
+  verification,
+}: {
+  verification: { authenticationInfo: { userVerified: boolean } };
+}): void {
+  if (!verification.authenticationInfo.userVerified) {
+    throw new APIError('UNAUTHORIZED', { message: 'The passkey did not verify you' });
+  }
+}
+
 /**
  * The Better Auth instance, on `core`'s Prisma client: every query it makes runs inside
  * `core` (invariant 1). Sign-in is Google / LinkedIn (OIDC), then passkeys; no password.
@@ -112,7 +123,16 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
     // provider issues tokens at /oauth2/token instead (Better Auth's docs disable it).
     disabledPaths: ['/token'],
     plugins: [
-      passkey({ rpID: config.passkeyRpId, rpName: 'Job Search Copilot', origin: config.webOrigin }),
+      passkey({
+        rpID: config.passkeyRpId,
+        rpName: 'Job Search Copilot',
+        origin: config.webOrigin,
+        // A passkey is the whole sign-in, so the authenticator must check it is the user
+        // (PIN, biometrics), not only that the key is there: a lost security key alone is
+        // not enough. The plugin asks for that only as "preferred".
+        authenticatorSelection: { userVerification: 'required' },
+        authentication: { afterVerification: requireUserVerified },
+      }),
       // Signs access tokens with JSC's own key (the `Jwks` table), served at /api/auth/jwks.
       jwt(),
       // JSC as an OAuth 2.1 authorization server for MCP clients (ADR-0035). Its issuer is

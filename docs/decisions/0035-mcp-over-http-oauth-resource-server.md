@@ -54,6 +54,11 @@ Stdio stays, as the owner of `JSC_API_KEY`.
 - Rotating the JWKS key invalidates every outstanding token.
 - A new remote MCP client (another host than claude.ai) cannot finish OAuth until its
   callback is added to `isAllowedRedirectUri`.
+- Scopes are not enforced: one resource, and every tool acts as the user — what
+  `/consent` says. A read-only client would need a JSC scope checked in `http-app.ts`.
+- The MCP does not check `Origin`: auth is a bearer header, never a cookie, it sends no
+  CORS headers, and `Host` is validated (DNS rebinding). A cookie or CORS on it would
+  need an `Origin` allowlist first.
 
 ## Related
 [ADR-0010](0010-mcp-server-factory.md), [ADR-0034](0034-auth-better-auth-in-core.md),
