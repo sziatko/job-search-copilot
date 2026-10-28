@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 WORKDIR /repo
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/core/package.json packages/core/package.json
@@ -27,7 +27,7 @@ RUN npm run build --workspace=@job-search-copilot/mcp
 
 # Production: only prod deps + compiled output. Talks over stdio, so it's meant to be
 # run per-session (e.g. `docker run --rm -i`), not left running like the api service.
-FROM node:24-alpine AS production
+FROM node:26-alpine AS production
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./

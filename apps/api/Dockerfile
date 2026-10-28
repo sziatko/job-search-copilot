@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 WORKDIR /repo
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/core/package.json packages/core/package.json
@@ -28,7 +28,7 @@ RUN npm run build --workspace=@job-search-copilot/core
 RUN npm run build --workspace=@job-search-copilot/api
 
 # Production: only prod deps + compiled output, ready to deploy anywhere Docker runs.
-FROM node:24-alpine AS production
+FROM node:26-alpine AS production
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
