@@ -3,8 +3,9 @@ node_modules
 dist
 **/dist
 **/*.tsbuildinfo
-.env
-.env.*
+**/.env
+**/.env.*
+.claude
 playwright-report
 test-results
 e2e/.api

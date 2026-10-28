@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Reads the repo, writes nothing to GitHub.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest

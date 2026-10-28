@@ -25,7 +25,11 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository_owner }}/jsc-${{ matrix.app }}
 
     steps:
+      # The token stays out of .git: PR code runs in the build, and this job's token can
+      # push packages.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
