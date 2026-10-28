@@ -17,13 +17,17 @@ x-hardened: &hardened
 
 services:
   # One-shot: applies the committed migrations, then exits. The api starts only after
-  # it succeeded, so it never runs against an older schema.
+  # it succeeded, so it never runs against an older schema. It alone connects as the
+  # database's owner: `.env.migrate`'s DATABASE_URL overrides `.env`'s, the runtime
+  # role's (docs/deployment.md, "The database roles"). Without the file, `.env`'s.
   jsc-migrate:
     image: ${JSC_IMAGES:?}/jsc-api:${JSC_TAG:?}
     working_dir: /repo/packages/core
     command: [npx, prisma, migrate, deploy]
-    environment:
-      DATABASE_URL: ${DATABASE_URL:?}
+    env_file:
+      - .env
+      - path: .env.migrate
+        required: false
     networks: [web]
     <<: *hardened
     mem_limit: 512m

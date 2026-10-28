@@ -1,0 +1,20 @@
+# Version updates for what npm's security updates do not cover: the workflows' actions
+# (pinned to commits — Dependabot moves the pin and its version comment) and the
+# Dockerfiles' base images. npm itself gets security updates only (repo settings).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directories: [/apps/api, /apps/mcp, /apps/web]
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ['*']
