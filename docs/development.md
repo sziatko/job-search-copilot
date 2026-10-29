@@ -155,7 +155,7 @@ changed PNGs in the diff, and commit them with the change. `npm run test:visual 
   handler wins; `passthrough()` sends the *real* request (to the dev API on :3000), it
   is not "try the next handler".
 - **The MCP Inspector over HTTP:** `mcp-inspector --web --transport http --server-url
-  http://localhost:3001/mcp`. Claude Desktop cannot reach `localhost` over HTTP (its
-  connectors call from Anthropic's servers), so it stays on stdio until a deploy.
+  http://localhost:3001/mcp`. Claude's connectors call from Anthropic's servers and
+  cannot reach `localhost`: against the local stack, Claude Desktop uses stdio.
 - **Better Auth logs an `ERROR` for every rejected API key**, and a "Base URL is not
   set" `WARN` once. Noise, not failures.

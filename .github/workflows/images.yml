@@ -4,7 +4,8 @@ name: Images
 # them only, so a Dockerfile regression fails there. A push to main or a phase-* branch
 # also publishes them to GHCR: `sha-<commit>`, plus `latest` on main. phase-* too: a
 # phase deploys before it merges. The packages are public — the server pulls with no
-# login, so nothing secret goes into an image.
+# login, so nothing secret goes into an image. A push to main then deploys them
+# (`deploy`).
 on:
   push:
     branches: [main, 'phase-*']
@@ -53,3 +54,31 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  # Runs the server's deploy.sh with this commit (docs/deployment.md). The key can do
+  # nothing else: authorized_keys pins it to that script. One deploy at a time, in
+  # merge order.
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: {}
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    timeout-minutes: 20
+    steps:
+      - name: Deploy
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          # The server's host key, `ssh-keyscan` output checked by hand: no trust on
+          # first use from a runner.
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          # user@host
+          TARGET: ${{ secrets.DEPLOY_SSH_TARGET }}
+        run: |
+          install -m 600 /dev/null ~/deploy_key
+          echo "$SSH_KEY" > ~/deploy_key
+          echo "$KNOWN_HOSTS" > ~/known_hosts
+          ssh -i ~/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o UserKnownHostsFile="$HOME/known_hosts" "$TARGET" "$GITHUB_SHA"
