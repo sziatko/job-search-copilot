@@ -56,11 +56,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
 
   # Runs the server's deploy.sh with this commit (docs/deployment.md). The key can do
-  # nothing else: authorized_keys pins it to that script. One deploy at a time, in
-  # merge order.
+  # nothing else: authorized_keys pins it to that script. Its secrets live in the
+  # `production` environment, which only main may use — a workflow on another branch
+  # cannot read them, whatever its `if:`. One deploy at a time, in merge order.
   deploy:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
     runs-on: ubuntu-latest
     permissions: {}
     concurrency:

@@ -91,9 +91,11 @@ its `authorized_keys` line:
 
     command="/srv/jsc/deploy.sh",restrict ssh-ed25519 AAAA… jsc-deploy
 
-GitHub's secrets for the job: `DEPLOY_SSH_KEY` (the private key),
-`DEPLOY_SSH_TARGET` (`user@host`), `DEPLOY_KNOWN_HOSTS` (the server's `ssh-keyscan`
-line, checked against the server's own host key).
+The job's secrets are in the GitHub environment `production`, which only `main` may
+deploy from: `DEPLOY_SSH_KEY` (the private key, kept nowhere else — rotating it means a
+new key there and in `authorized_keys`), `DEPLOY_SSH_TARGET` (`user@host`),
+`DEPLOY_KNOWN_HOSTS` (the server's `ssh-keyscan` line, checked against the server's own
+host key).
 
 ## Roll back
 
