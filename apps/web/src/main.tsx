@@ -1,3 +1,5 @@
+// Before any import that builds a zod schema — see the module.
+import './lib/zod-config';
 // Self-hosted, not Google Fonts: the same files on every machine, so the visual tests'
 // screenshots match (ADR-0037).
 import '@fontsource/ibm-plex-mono/400.css';

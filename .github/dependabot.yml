@@ -15,6 +15,11 @@ updates:
     directories: [/apps/api, /apps/mcp, /apps/web]
     schedule:
       interval: weekly
+    # A Node major moves CI and local dev too (ci.yml's node-version), so it is a
+    # planned change, not a bot PR.
+    ignore:
+      - dependency-name: node
+        update-types: [version-update:semver-major]
     groups:
       base-images:
         patterns: ['*']
