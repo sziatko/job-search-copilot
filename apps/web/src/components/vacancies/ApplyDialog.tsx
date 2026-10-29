@@ -60,7 +60,7 @@ export function ApplyDialog({
               type="text"
               value={salary}
               onChange={(e) => setSalary(e.target.value)}
-              placeholder="e.g. 130 PLN/hour"
+              placeholder="e.g. 150 PLN/hour"
             />
           </div>
 
