@@ -75,20 +75,31 @@ After a restore (`--no-acl` drops the grants a dump carries), run the `GRANT` an
 
 ## Deploy a version
 
-    cd /srv/jsc
-    git pull                         # compose.prod.yml may have changed
-    # JSC_TAG=sha-<commit> in .env
-    docker compose pull && docker compose up -d
+A merge into `main` deploys itself: `images.yml`'s `deploy` job, after the images are
+pushed, runs the server's [`deploy.sh`](../deploy.sh) with the commit's sha. By hand,
+the same:
 
-A version with a migration: run the backup first (`sudo systemctl start
-backup.service`). Prisma migrations are not transactional — one that fails halfway
-stays half applied.
+    /srv/jsc/deploy.sh <commit sha>
+
+It pulls the repo (`compose.prod.yml` may have changed) and the images, runs the
+backup (Prisma migrations are not transactional — one that fails halfway stays half
+applied), writes `JSC_TAG` into `.env` and starts the stack, waiting for it to be
+healthy. A failed deploy turns the job red; the log is in the Actions run.
+
+The job's ssh key logs in as the server's admin user but can only run that script —
+its `authorized_keys` line:
+
+    command="/srv/jsc/deploy.sh",restrict ssh-ed25519 AAAA… jsc-deploy
+
+GitHub's secrets for the job: `DEPLOY_SSH_KEY` (the private key),
+`DEPLOY_SSH_TARGET` (`user@host`), `DEPLOY_KNOWN_HOSTS` (the server's `ssh-keyscan`
+line, checked against the server's own host key).
 
 ## Roll back
 
-The same, with the previous `JSC_TAG`. Prisma has no down migrations: rolling back
-past a migration means restoring the backup taken before it (the shared layer's README,
-"Restore one database").
+`deploy.sh` with the previous sha (the last good one is in the Actions history). Prisma
+has no down migrations: rolling back past a migration means restoring the backup
+`deploy.sh` took before it (the shared layer's README, "Restore one database").
 
 ## Pull the production database
 
