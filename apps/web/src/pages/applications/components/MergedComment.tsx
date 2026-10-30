@@ -1,13 +1,14 @@
 import { ExpandableText } from '@/components/ui/ExpandableText';
+import { TONE_TEXT } from '@/components/ui/tone';
 import type { ApplicationComment, CommentSource } from '@/lib/applications/types';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
-/** Who wrote it decides how it reads. */
+/** Who wrote it decides how it reads; the agent's tone matches its badge on the vacancy page. */
 const SOURCE_CLASS: Record<CommentSource, string> = {
   USER: 'text-ink',
   ANALYZER: 'text-ink-muted',
-  AGENT: 'text-accent-ink',
+  AGENT: TONE_TEXT.warn,
 };
 
 /**
