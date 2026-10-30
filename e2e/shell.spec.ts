@@ -63,7 +63,7 @@ test('the topbar goes compact on scroll, and back at the top', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Pipeline funnel' })).toBeVisible();
 
   await page.evaluate(() => window.scrollTo(0, 200));
-  await expect(title(page)).toHaveCSS('font-size', '16px');
+  await expect(title(page)).toHaveCSS('font-size', '15px');
 
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(title(page)).toHaveCSS('font-size', '20px');

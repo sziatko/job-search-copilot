@@ -60,7 +60,7 @@ export function ModalVacancyTable({
           {/* Which of these rows is the one you clicked — a sibling can carry another
               spelling of the company. */}
           {item.id === currentId && (
-            <Tag tone="accent" className="ml-1.75 align-middle">
+            <Tag tone="accent" className="ml-2 align-middle">
               Current
             </Tag>
           )}
@@ -78,7 +78,7 @@ export function ModalVacancyTable({
     {
       header: 'CV',
       cell: (item) => (
-        <div className="text-sm text-ink-muted">
+        <div className="text-small text-ink-muted">
           {applicationsByVacancy.get(item.id)?.usedTailoredResume ? '✓' : '—'}
         </div>
       ),
@@ -86,7 +86,7 @@ export function ModalVacancyTable({
     {
       header: 'Actions',
       cell: (item) => (
-        <div className="flex gap-1.5">
+        <div className="flex gap-2">
           <CopyVacancyButton
             id={item.id}
             company={item.company}

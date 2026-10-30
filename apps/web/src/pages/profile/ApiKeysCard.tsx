@@ -28,7 +28,7 @@ export function ApiKeysCard() {
       <CardHead>
         <CardTitle>API keys</CardTitle>
       </CardHead>
-      <div className="flex flex-col gap-2.5 px-4.5 pb-2.5">
+      <div className="flex flex-col gap-2 px-4 pb-2">
         <form
           className="flex items-end gap-3"
           onSubmit={(e) => {
@@ -61,7 +61,7 @@ export function ApiKeysCard() {
           </div>
         )}
         {keys.isPending && <p className="text-ink-muted">Loading…</p>}
-        {keys.isError && <p className="text-bad">Failed to load API keys</p>}
+        {keys.isError && <p className="text-bad-ink">Failed to load API keys</p>}
         {keys.data?.length === 0 && (
           <p className="text-ink-muted">No API keys yet. Create one for n8n or MCP.</p>
         )}

@@ -1,13 +1,15 @@
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Meta } from '@/components/ui/Meta';
+import { TONE_FILL, type Tone } from '@/components/ui/tone';
 import type { CommentSource, VacancyComment } from '@/lib/vacancies/types';
 import { dateTimeFormatter } from './format';
 
-/** Who wrote a comment, and its badge's colours. */
+/** Who wrote a comment, and its badge's tone. */
 const SOURCE_META = {
-  ANALYZER: { label: 'LLM analysis', badge: 'bg-accent-soft text-accent-ink' },
-  USER: { label: 'You', badge: 'bg-surface-sunken text-ink-muted' },
-  AGENT: { label: 'Agent', badge: 'bg-warn-soft text-warn' },
-} satisfies Record<CommentSource, { label: string; badge: string }>;
+  ANALYZER: { label: 'LLM analysis', tone: 'accent' },
+  USER: { label: 'You', tone: 'neutral' },
+  AGENT: { label: 'Agent', tone: 'warn' },
+} satisfies Record<CommentSource, { label: string; tone: Tone }>;
 
 /** Every comment, oldest first, each with its source's badge and its time. */
 export function Comments({ comments }: { comments: VacancyComment[] }) {
@@ -21,22 +23,22 @@ export function Comments({ comments }: { comments: VacancyComment[] }) {
         return (
           <li
             key={comment.id}
-            className="flex items-start gap-2.75 border-b border-border px-4.5 py-3.25 last:border-b-0"
+            className="flex items-start gap-3 border-b border-border px-4 py-3 last:border-b-0"
           >
             <div
-              className={`flex size-6.5 flex-none items-center justify-center rounded-full ${source.badge}`}
+              className={`flex size-6.5 flex-none items-center justify-center rounded-full ${TONE_FILL[source.tone]}`}
               aria-hidden
             >
               {source.label[0]}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-sm font-bold text-ink">{source.label}</span>
-                <time className="flex-none font-mono text-xs text-ink-faint">
+                <span className="text-small font-bold text-ink">{source.label}</span>
+                <Meta as="time" dateTime={comment.createdAt} className="flex-none">
                   {dateTimeFormatter.format(new Date(comment.createdAt))}
-                </time>
+                </Meta>
               </div>
-              <div className="mt-0.75 whitespace-pre-line text-sm leading-4.75 text-ink-soft">
+              <div className="mt-1 whitespace-pre-line text-small leading-5 text-ink-soft">
                 {comment.body}
               </div>
             </div>

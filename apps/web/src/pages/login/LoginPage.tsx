@@ -52,11 +52,11 @@ export function LoginPage() {
       <JscLogo size={52} />
       <h2>Sign in to Job Search Copilot</h2>
       {shown && (
-        <p role="alert" className="text-bad">
+        <p role="alert" className="text-bad-ink">
           {shown}
         </p>
       )}
-      <div className="flex w-full flex-col gap-2.5">
+      <div className="flex w-full flex-col gap-2">
         <Button disabled={busy} onClick={() => social('google')}>
           Continue with Google
         </Button>

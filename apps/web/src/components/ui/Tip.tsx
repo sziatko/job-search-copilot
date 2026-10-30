@@ -28,7 +28,7 @@ export function Tip({
   return (
     <span
       role={role}
-      className={`pointer-events-none absolute bottom-full z-20 mb-1.5 whitespace-nowrap rounded-sm bg-ink px-1.75 py-0.75 text-2xs font-bold text-bg transition-opacity duration-150 [:focus-visible>&]:opacity-100 [:hover>&]:opacity-100 ${show ? 'opacity-100' : 'opacity-0'} ${ALIGN[align]}`}
+      className={`pointer-events-none absolute bottom-full z-20 mb-2 whitespace-nowrap rounded-sm bg-ink px-2 py-1 text-caption font-bold text-bg transition-opacity [:focus-visible>&]:opacity-100 [:hover>&]:opacity-100 ${show ? 'opacity-100' : 'opacity-0'} ${ALIGN[align]}`}
     >
       {children}
     </span>

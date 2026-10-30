@@ -1,3 +1,8 @@
+import { Meta } from '@/components/ui/Meta';
+
+/** Each stage's colour, by row (`--color-funnel-1…5` in index.css). */
+const BAR = ['bg-funnel-1', 'bg-funnel-2', 'bg-funnel-3', 'bg-funnel-4', 'bg-funnel-5'];
+
 export interface FunnelStep {
   label: string;
   value: number;
@@ -5,7 +10,7 @@ export interface FunnelStep {
 
 /**
  * Five stages, each bar scaled against the first and each label against the one
- * above it. Each stage has its own colour (`--funnel-1…5` in index.css, by row).
+ * above it. Each stage has its own colour (`BAR`).
  * Name · value · conversion, then the bar at the card's full width: on one line the
  * card (~330px at 1100 wide) left the bar nothing. When even the text line is too
  * wide, the conversion wraps under the name — never out of the card.
@@ -14,7 +19,7 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
   const baseline = steps[0]?.value ?? 0;
 
   return (
-    <div className="flex flex-col gap-3 px-4.5 pt-1.5 pb-4.5">
+    <div className="flex flex-col gap-3 px-4 pt-2 pb-4">
       {steps.map((step, i) => {
         const previous = steps[i - 1];
         const width = baseline > 0 ? (step.value / baseline) * 100 : 0;
@@ -26,23 +31,23 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
 
         return (
           <div
-            className="flex flex-wrap items-baseline gap-x-2 gap-y-1.5"
+            className="flex flex-wrap items-baseline gap-2"
             data-testid="funnel-row"
             key={step.label}
           >
-            <div className="whitespace-nowrap text-sm font-bold text-ink-soft">{step.label}</div>
+            <div className="whitespace-nowrap text-small font-bold text-ink-soft">{step.label}</div>
             <div className="order-1 h-7 basis-full overflow-hidden rounded-sm bg-surface-sunken">
               <div
-                className="h-full min-w-[3%] rounded-sm"
-                style={{ width: `${width}%`, background: `var(--funnel-${i + 1})` }}
+                className={`h-full min-w-[3%] rounded-sm ${BAR[i % BAR.length]}`}
+                style={{ width: `${width}%` }}
               />
             </div>
-            <div className="font-mono text-base font-semibold" data-testid="funnel-value">
+            <div className="font-mono text-body font-semibold" data-testid="funnel-value">
               {step.value}
             </div>
-            <div className="ml-auto whitespace-nowrap font-mono text-xs text-ink-faint narrow:hidden">
+            <Meta as="div" className="ml-auto whitespace-nowrap narrow:hidden">
               {conversion}
-            </div>
+            </Meta>
           </div>
         );
       })}

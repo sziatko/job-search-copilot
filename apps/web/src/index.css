@@ -1,12 +1,18 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Design tokens — what a utility may take a size, a corner or a colour from.
-   Tailwind's own text and radius scales are cleared, so `text-sm` and
-   `rounded-md` mean the values below and nothing else; spacing stays Tailwind's
-   4px-step scale (`px-4.5` is 18px). Every size is a whole pixel, line heights
-   included (1.5× the size, rounded): a fractional one puts text on sub-pixels,
-   which Chromium rasterises differently from run to run.
+   Design tokens — what a utility may take a size, a corner or a colour from
+   (the rules for a new page: components/ui/README.md, "Styling a new page").
+
+   Text: Tailwind's scale is cleared; a component names the role of its text
+   (`text-body`, `text-title`…), and the role carries the size, the line height
+   (1.5× the size, a whole pixel: a fractional one puts text on sub-pixels, which
+   Chromium rasterises differently from run to run) and, where it has one, the
+   weight and letter-spacing. A `font-*` beside a role overrides its weight.
+
+   Spacing: Tailwind's 4px scale. Padding, margin, gap and offsets take whole steps
+   (`px-4`, 16px); a size (`size-*`, `w-*`, `h-*`, `leading-*`) may take a half step
+   (`size-3.5`, 14px). `styles.test.ts` holds both lines.
 
    Each colour is written once, as `light-dark(<light>, <dark>)`. Which side applies
    is the element's `color-scheme`: the OS's by default, pinned by `data-theme`
@@ -21,28 +27,45 @@
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 
   --text-*: initial;
-  --text-2xs: 10px;
-  --text-2xs--line-height: 15px;
-  --text-xs: 11px;
-  --text-xs--line-height: 16px;
-  --text-sm: 12px;
-  --text-sm--line-height: 18px;
-  --text-base: 13px;
-  --text-base--line-height: 20px;
-  --text-md: 14px;
-  --text-md--line-height: 21px;
-  --text-lg: 15px;
-  --text-lg--line-height: 22px;
-  --text-xl: 16px;
-  --text-xl--line-height: 24px;
-  --text-2xl: 17px;
-  --text-2xl--line-height: 26px;
-  --text-3xl: 20px;
-  --text-3xl--line-height: 30px;
-  --text-4xl: 22px;
-  --text-4xl--line-height: 33px;
-  --text-5xl: 25px;
-  --text-5xl--line-height: 38px;
+  /* A small uppercase label: a column header, a KPI's name, a nav section. The
+     markup adds `uppercase`. */
+  --text-overline: 11px;
+  --text-overline--line-height: 16px;
+  --text-overline--font-weight: 700;
+  --text-overline--letter-spacing: 0.06em;
+  /* Meta beside the content: a date, an id, a tip, a tag. */
+  --text-caption: 11px;
+  --text-caption--line-height: 16px;
+  /* Secondary text: a sub-line, a filter, a cell's long text. */
+  --text-small: 12px;
+  --text-small--line-height: 18px;
+  /* The reading size: table cells, form controls, body copy. */
+  --text-body: 13px;
+  --text-body--line-height: 20px;
+  /* A card's title, the brand. */
+  --text-title: 15px;
+  --text-title--line-height: 22px;
+  --text-title--font-weight: 800;
+  /* A dialog's title, an empty state's. */
+  --text-heading: 17px;
+  --text-heading--line-height: 26px;
+  --text-heading--font-weight: 800;
+  /* The page's name, in the top bar. */
+  --text-page: 20px;
+  --text-page--line-height: 30px;
+  --text-page--font-weight: 800;
+  --text-page--letter-spacing: -0.01em;
+  /* The subject of a page — a vacancy's title — one step above the page's name. Its
+     line height is tighter than 1.5× on purpose: a long title wraps into a block. */
+  --text-headline: 22px;
+  --text-headline--line-height: 26px;
+  --text-headline--font-weight: 800;
+  --text-headline--letter-spacing: -0.01em;
+  /* A KPI's number. */
+  --text-display: 25px;
+  --text-display--line-height: 38px;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.01em;
 
   /* `rounded-full` is Tailwind's own and stays: the pills. */
   --radius-*: initial;
@@ -61,14 +84,19 @@
   --color-ink-soft: light-dark(#3a4252, #c2c9d6);
   --color-ink-muted: light-dark(#69738a, #8b93a3);
   --color-ink-faint: light-dark(#99a2b4, #5e6577);
+  /* Four hues, four steps each: `{hue}` for a dot, a bar, an icon, a big number;
+     `{hue}-ink` for small text (4.5:1 on its soft fill, both themes); `{hue}-soft`
+     and `{hue}-soft-border` for a tinted box. `components/ui/tone.ts` combines them. */
   --color-accent: light-dark(#2e5cd6, #6e9ee8);
   --color-accent-ink: light-dark(#1f45b0, #9bbef2);
   --color-accent-soft: light-dark(#e6edfc, #22304a);
   --color-accent-soft-border: light-dark(#c2d3f5, #35456a);
   --color-good: light-dark(#17a874, #4cbb87);
+  --color-good-ink: light-dark(#0b7a52, #4cbb87);
   --color-good-soft: light-dark(#e2f6ec, #17301f);
   --color-good-soft-border: light-dark(#bae9d1, #275639);
   --color-warn: light-dark(#b4780a, #dcab3f);
+  --color-warn-ink: light-dark(#946200, #dcab3f);
   --color-warn-soft: light-dark(#fbf0da, #362a0e);
   --color-warn-soft-border: light-dark(#efd79c, #5c481b);
   --color-bad: light-dark(#dc3d3d, #e17575);
@@ -77,11 +105,29 @@
   --color-bad-soft-border: light-dark(#f2c3c3, #5e2e2e);
   /* Behind a dialog, and behind the phone's open sidebar. */
   --color-scrim: rgba(10, 12, 16, 0.4);
+  --color-scroll-thumb: light-dark(#c3cddc, #3f4757);
+  /* The funnel's five stages, one hue each: the dataviz skill's categorical slots
+     1–5 (blue, orange, aqua, yellow, magenta), validated for adjacent-pair
+     colour-blind separation on the funnel track. */
+  --color-funnel-1: light-dark(#2a78d6, #3987e5);
+  --color-funnel-2: light-dark(#eb6834, #d95926);
+  --color-funnel-3: light-dark(#1baf7a, #199e70);
+  --color-funnel-4: light-dark(#eda100, #c98500);
+  --color-funnel-5: light-dark(#e87ba4, #d55181);
+
+  /* The sidebar's two widths: open, and folded to its icon rail. */
+  --spacing-sidebar: 244px;
+  --spacing-rail: 72px;
+
+  --default-transition-duration: 180ms;
 
   /* Named -card/-pop rather than -sm/-md: those two are Tailwind's own theme
      keys, and declaring them here would silently override shadow-sm/shadow-md. */
   --shadow-card: 0 1px 2px light-dark(rgba(18, 21, 30, 0.06), rgba(0, 0, 0, 0.3));
   --shadow-pop: 0 8px 22px light-dark(rgba(18, 21, 30, 0.09), rgba(0, 0, 0, 0.4));
+  /* A sticky table header's bottom line: a border would be painted with the table
+     under `border-collapse` and detach from the header while scrolling. */
+  --shadow-header: inset 0 -1px 0 var(--color-border);
 
   /* A loading bar's sweep (`Skeleton`): its gradient is twice the bar's width and
      repeats, so sliding it one full width is a seamless loop. */
@@ -149,7 +195,7 @@
      the ::-webkit-scrollbar rules below, which are Safari's. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--scroll-thumb) transparent;
+    scrollbar-color: var(--color-scroll-thumb) transparent;
   }
   ::-webkit-scrollbar {
     width: 8px;
@@ -160,7 +206,7 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--scroll-thumb);
+    background: var(--color-scroll-thumb);
     border-radius: 8px;
   }
 }
@@ -170,8 +216,6 @@
      no data-theme    -> follows the OS
      data-theme=light -> pinned light
      data-theme=dark  -> pinned dark
-   Below it, values the components read by name: the rail's width, the scrollbar's
-   thumb, the funnel's colours (`Funnel.tsx`).
 --------------------------------------------------------------------------- */
 :root {
   color-scheme: light dark;
@@ -181,16 +225,4 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-}
-:root {
-  --rail-w: 72px;
-  --scroll-thumb: light-dark(#c3cddc, #3f4757);
-  /* The funnel's five stages, one hue each: the dataviz skill's categorical
-     slots 1–5 (blue, orange, aqua, yellow, magenta), light and dark steps,
-     validated for adjacent-pair colour-blind separation on the funnel track. */
-  --funnel-1: light-dark(#2a78d6, #3987e5);
-  --funnel-2: light-dark(#eb6834, #d95926);
-  --funnel-3: light-dark(#1baf7a, #199e70);
-  --funnel-4: light-dark(#eda100, #c98500);
-  --funnel-5: light-dark(#e87ba4, #d55181);
 }

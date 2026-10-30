@@ -15,9 +15,9 @@ export function ConnectedAppsCard() {
       <CardHead>
         <CardTitle>Connected apps</CardTitle>
       </CardHead>
-      <div className="flex flex-col gap-2.5 px-4.5 pb-2.5">
+      <div className="flex flex-col gap-2 px-4 pb-2">
         {apps.isPending && <p className="text-ink-muted">Loading…</p>}
-        {apps.isError && <p className="text-bad">Failed to load connected apps</p>}
+        {apps.isError && <p className="text-bad-ink">Failed to load connected apps</p>}
         {apps.data?.length === 0 && (
           <p className="text-ink-muted">No apps connected. Claude connects here through MCP.</p>
         )}

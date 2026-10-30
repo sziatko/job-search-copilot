@@ -1187,7 +1187,7 @@ describe('VacanciesPage / useVacancies', () => {
       renderVacancies();
       await screen.findByText('Acme');
 
-      expect(screen.getByRole('columnheader', { name: 'Action' })).toHaveStyle({ width: '246px' });
+      expect(screen.getByRole('columnheader', { name: 'Action' })).toHaveStyle({ width: '252px' });
     });
 
     it('swaps the copy bubble to Copied once the text is on the clipboard', async () => {

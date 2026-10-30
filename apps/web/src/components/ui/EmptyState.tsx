@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
  * could not load. `title` gives it a bold first line. */
 export function EmptyState({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <div className="px-4.5 py-11.5 text-center text-base text-ink-muted">
+    <div className="px-4 py-12 text-center text-body text-ink-muted">
       {title && <p className="mb-1 font-bold text-ink">{title}</p>}
       {children}
     </div>

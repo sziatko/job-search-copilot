@@ -1,4 +1,5 @@
 import { IconCheck, IconCross } from '@/components/icons';
+import { Meta } from '@/components/ui/Meta';
 import { STATUS_LABELS } from '@/lib/vacancies/constants';
 import type { VacancyDetail, VacancyStatus } from '@/lib/vacancies/types';
 import { dateFormatter } from './format';
@@ -39,7 +40,7 @@ const CONNECTOR = {
 /** Fixed, not flex-1: a short timeline stays compact at the left edge, and a long one
  * lays its steps out evenly (the card scrolls sideways). */
 function Connector({ kind }: { kind: keyof typeof CONNECTOR }) {
-  return <div className={`-mx-0.5 mb-5 h-0.5 w-16 ${CONNECTOR[kind]}`} />;
+  return <div className={`mb-5 h-0.5 w-15 ${CONNECTOR[kind]}`} />;
 }
 
 /** Every `StatusChange`, oldest first. The last step is where the vacancy is now:
@@ -49,7 +50,7 @@ export function Timeline({ steps }: { steps: VacancyDetail['timeline'] }) {
   const open = last !== undefined && !CLOSED_BAD.includes(last) && last !== CLOSED_GOOD;
 
   return (
-    <div className="flex items-center overflow-x-auto px-4.5 py-4">
+    <div className="flex items-center overflow-x-auto px-4 py-4">
       {steps.map((step, i) => {
         const bad = CLOSED_BAD.includes(step.status);
         const good = step.status === CLOSED_GOOD;
@@ -59,19 +60,19 @@ export function Timeline({ steps }: { steps: VacancyDetail['timeline'] }) {
           // The journal is append-only, and two moves never share a date and a status.
           <div key={`${step.createdAt}-${step.status}`} className="contents">
             {i > 0 && <Connector kind={bad ? 'bad' : good ? 'good' : 'plain'} />}
-            <div className="flex w-27 flex-none flex-col items-center gap-1.5 text-center">
+            <div className="flex w-27 flex-none flex-col items-center gap-2 text-center">
               <div
-                className={`flex size-6.5 flex-none items-center justify-center rounded-full border-2 text-xs font-bold [&_svg]:size-3 ${node.dot}`}
+                className={`flex size-6.5 flex-none items-center justify-center rounded-full border-2 text-caption font-bold [&_svg]:size-3 ${node.dot}`}
               >
                 {isLast && bad && <IconCross />}
                 {isLast && good && <IconCheck />}
               </div>
-              <div className={`text-xs ${node.label}`} data-testid="timeline-status">
+              <div className={`text-caption ${node.label}`} data-testid="timeline-status">
                 {STATUS_LABELS[step.status]}
               </div>
-              <time className="font-mono text-2xs tabular-nums text-ink-faint">
+              <Meta as="time" dateTime={step.createdAt}>
                 {dateFormatter.format(new Date(step.createdAt))}
-              </time>
+              </Meta>
             </div>
           </div>
         );

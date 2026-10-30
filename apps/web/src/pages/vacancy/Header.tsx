@@ -30,11 +30,11 @@ export function Header({
   return (
     <div className={HEADER_ROW}>
       <div>
-        <div className="mb-1.5 flex items-center gap-2">
-          <div className="text-base font-semibold text-ink-muted">{vacancy.company}</div>
+        <div className="mb-2 flex items-center gap-2">
+          <div className="text-body font-semibold text-ink-muted">{vacancy.company}</div>
         </div>
-        <h1 className="text-4xl font-extrabold leading-6.5 tracking-[-0.01em]">{vacancy.title}</h1>
-        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+        <h1 className="text-headline">{vacancy.title}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-small text-ink-muted">
           <span className="font-mono font-semibold">#{vacancy.id}</span>
           {!analysed && <Tag tone="neutral">Not analysed yet</Tag>}
           {analysed && <ScorePill score={vacancy.matchScore} />}
@@ -53,7 +53,7 @@ export function Header({
               <RecommendationTag recommendation={vacancy.recommendation} />
             ))}
         </div>
-        {page.statusError && <p className="mt-1.5 text-sm text-bad">{page.statusError}</p>}
+        {page.statusError && <p className="mt-2 text-small text-bad-ink">{page.statusError}</p>}
       </div>
       <div className="flex flex-none items-center gap-2 narrow:w-full">
         <StatusControl vacancy={vacancy} page={page} />
@@ -72,7 +72,7 @@ export function Header({
             aria-label="Open original posting"
           >
             <IconExternal />
-            <Tip>Open posting</Tip>
+            <Tip align="end">Open posting</Tip>
           </a>
         )}
       </div>

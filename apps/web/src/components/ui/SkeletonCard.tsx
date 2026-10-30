@@ -11,9 +11,9 @@ export function SkeletonCard({ lines, className }: { lines: number; className?: 
   return (
     <Card aria-hidden className={className}>
       <CardHead>
-        <Skeleton className="h-3.75 w-[35%]" />
+        <Skeleton className="h-4 w-7/20" />
       </CardHead>
-      <div className="flex flex-col gap-2.5 px-4.5 pt-0.5 pb-4.5">
+      <div className="flex flex-col gap-2 px-4 pb-4">
         {Array.from({ length: lines }, (_, i) => (
           <Skeleton
             // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered

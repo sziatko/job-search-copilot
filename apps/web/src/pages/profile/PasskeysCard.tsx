@@ -18,9 +18,9 @@ export function PasskeysCard() {
           Add a passkey
         </Button>
       </CardHead>
-      <div className="flex flex-col gap-2.5 px-4.5 pb-2.5">
+      <div className="flex flex-col gap-2 px-4 pb-2">
         {passkeys.isPending && <p className="text-ink-muted">Loading…</p>}
-        {passkeys.isError && <p className="text-bad">Failed to load passkeys</p>}
+        {passkeys.isError && <p className="text-bad-ink">Failed to load passkeys</p>}
         {passkeys.data?.length === 0 && (
           <p className="text-ink-muted">No passkeys yet. Add one to sign in without Google.</p>
         )}

@@ -21,7 +21,7 @@ export function CommentForm({
 
   return (
     <form
-      className="flex flex-col items-end gap-2 border-t border-border px-4.5 py-3.25"
+      className="flex flex-col items-end gap-2 border-t border-border px-4 py-3"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         submit();
@@ -40,7 +40,7 @@ export function CommentForm({
         }}
         rows={2}
       />
-      {error && <p className="self-start text-sm text-bad">{error}</p>}
+      {error && <p className="self-start text-small text-bad-ink">{error}</p>}
       <Button type="submit" variant="primary" disabled={saving || body.trim() === ''}>
         {saving ? 'Saving…' : 'Add comment'}
       </Button>

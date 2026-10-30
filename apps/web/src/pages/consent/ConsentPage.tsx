@@ -54,11 +54,11 @@ export function ConsentPage() {
       {redirectHost && <p className="text-ink-muted">Allow returns you to {redirectHost}.</p>}
       {scopes.length > 0 && <p className="text-ink-muted">Requested scopes: {scopes.join(', ')}</p>}
       {error && (
-        <p role="alert" className="text-bad">
+        <p role="alert" className="text-bad-ink">
           {error}
         </p>
       )}
-      <div className="flex w-full flex-col gap-2.5">
+      <div className="flex w-full flex-col gap-2">
         <Button variant="primary" disabled={busy} onClick={() => answer(true)}>
           Allow
         </Button>
