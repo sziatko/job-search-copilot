@@ -144,6 +144,12 @@ changed PNGs in the diff, and commit them with the change. `npm run test:visual 
   -- --name <name>`. Through the root script npm eats `--name`, and Prisma then waits
   on its prompt holding the advisory lock. More in
   [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
+- **A Biome override replaces a rule's options, it does not add to them.** When two
+  overrides in `biome.json` set `noRestrictedImports` for the same file, the later one's
+  list is the only one that applies: a ban for all of `apps/web/**` is repeated inside
+  the `pages/**` override and the `components/**`, `lib/**` one. A new ban goes into every override that
+  covers its files. In a ban's `group`, `*` matches one path segment: `pkg/*` lets
+  `pkg/dist/index` through, so a package is banned as `pkg` and `pkg/**`.
 - **Vitest from Git Bash after `cd /c/...`** fails every web file with "Vitest failed
   to find the runner" (the drive letter's case). Run it from PowerShell, or from the
   default working directory.
