@@ -197,7 +197,8 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 
 1. **`packages/core` is the only database client.** `apps/api` and `apps/mcp`
    reach the DB *only* through `core`'s services. A
-   query written in a controller or a tool handler is a bug. Auth is the one other
+   query written in a controller or a tool handler is a bug; Biome's
+   `noRestrictedImports` rejects `@prisma/*` and `pg` imports there. Auth is the one other
    door: the Better Auth instance `createAuth` builds in `core` on `core`'s client; the
    apps mount it, never build their own.
    → [ADR-0002](decisions/0002-core-shared-domain-layer.md),
@@ -234,7 +235,8 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    accepted on the way in (`parseRecommendation`, the MCP and REST validators). Every
    filter/enum downstream assumes English. → [`domain-model.md`](domain-model.md)
 5. **The web app's API contract is a hand-written zod schema**, not a `core`
-   import. `core` pulls in Prisma/pg and must never enter the browser bundle.
+   import. `core` pulls in Prisma/pg and must never enter the browser bundle; Biome's
+   `noRestrictedImports` rejects a `@job-search-copilot/core` import in `apps/web`.
    → [ADR-0012](decisions/0012-web-hand-written-contract.md)
 6. **`apps/api` disables Biome's `useImportType`.** NestJS DI + `class-validator`
    need types used in decorated positions to be *runtime* imports. Turning the
