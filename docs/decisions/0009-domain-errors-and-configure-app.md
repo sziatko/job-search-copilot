@@ -14,7 +14,8 @@ suite that wires its own pipes drifts from production.
   `AmbiguousVacancyMatchError`, `VacancyNotFoundError`, … Not bugs, not infra failures.
 - **REST** — `DomainExceptionFilter` (`@Catch(DomainError)`) answers
   `{ statusCode, error: <name>, message }`: `422`, unless its `STATUS_OF` map says
-  otherwise (`AlreadyAnalysedError` → `409`, `VacancyNotFoundError` → `404`).
+  otherwise (`AlreadyAnalysedError` → `409`, `VacancyNotFoundError` → `404`,
+  `RateLimitedError` → `429`).
 - **MCP** — a tool catches a `DomainError` and returns an `isError` result; anything
   else re-throws.
 - **Not found** — a query (`getById`) answers `null` and the caller decides; a command

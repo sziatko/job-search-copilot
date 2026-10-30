@@ -21,8 +21,8 @@ lockfile, one hoisted `node_modules`, one `tsconfig.base.json` every package ext
 ## Consequences
 - One install, one lockfile, a schema change and all its consumers in one commit.
 - `core` is consumed as `dist/`, with the friction in [ADR-0003](0003-core-consumed-as-dist.md).
-- The Dockerfiles copy every workspace `package.json` before `npm ci`, so the layer
-  cache survives source-only changes.
+- The Dockerfiles copy the `package.json` of each workspace their image needs before
+  `npm ci`, so the layer cache survives source-only changes.
 
 ## What this constrains — breaks if you change it
 - A workspace's name (`@job-search-copilot/*`) → every cross-package import, the

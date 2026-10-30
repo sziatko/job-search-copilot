@@ -17,9 +17,9 @@ leaves keyboard, touch and screen-reader users out, and Biome's a11y rules flag 
 - locks the body's scroll while open.
 
 **`ExpandableText`** (`apps/web/src/components/ui/ExpandableText.tsx`) for long text
-in a cell: clamped to 2 lines; a `ResizeObserver` measures whether it overflows. If it
-fits, a plain `<p>` with no tab stop; if not, one `<button aria-expanded>` that toggles
-"Show more / Show less", and re-clamps on blur and `Escape`.
+in a cell: clamped to 2 lines; a `ResizeObserver` measures whether it overflows. Only
+when it does, a ghost `Button` with `aria-expanded` below it toggles "Show more / Show
+less"; `Escape` on it collapses. Text that fits gets no button and no tab stop.
 
 ## Why this and not the alternatives
 - **A custom hover tooltip with a Biome ignore** — the ignore would hide a real gap:

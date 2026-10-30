@@ -11,9 +11,10 @@ All of it lives in `packages/core`, with no `@nestjs/*`, no MCP SDK, no HTTP. It
 public surface is `src/index.ts`:
 
 - the services (`VacancyService`, `ApplicationService`, `VacancyIntakeService`,
-  `StatsService`) — plain classes, every query goes through them. Each takes a
-  `PrismaClient` (default: a lazy process-wide one), so Nest can inject its own and a
-  test can pass one;
+  `StatsService`) — plain classes, every query goes through them. Each takes an
+  `Unscoped` client (default: a lazy process-wide one; scoped per call by `forUser`,
+  [ADR-0038](0038-multi-user-shared-schema.md)), so Nest can inject its own and a test
+  can pass one;
 - `createPrismaClient(url)` / `getPrisma()`;
 - the domain rules and errors (`parseRecommendation`, `PIPELINE_STATUSES`,
   `DomainError` and its subclasses);
@@ -38,7 +39,8 @@ shape the response.
 - A framework or transport dependency in `core` → the MCP server inherits it, and so
   does every future transport.
 - A Prisma query in a controller or a tool handler → it bypasses the code tested
-  against the real DB and the user scoping (invariants 1 and 11).
+  against the real DB and the user scoping (invariants 1 and 11). The one exception is
+  `/health`'s `SELECT 1`: it reads no user's data.
 - A service method's signature → both transports and their specs.
 
 ## Related

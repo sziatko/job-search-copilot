@@ -75,8 +75,8 @@ export interface ListVacanciesFilters {
   recommendation?: Recommendation;
   /** Any of these (`IN`). */
   status?: VacancyStatus[];
-  /** Matches company OR title, ILIKE '%term%', case-insensitive. For the /vacancies
-   * page's single free-text search box. Independent of `company`/`title` — combined
+  /** Matches company OR title, ILIKE '%term%', case-insensitive. The search
+   * modal's term. Independent of `company`/`title` — combined
    * with them via AND, not OR. */
   search?: string;
   /** ILIKE '%term%', case-insensitive. */

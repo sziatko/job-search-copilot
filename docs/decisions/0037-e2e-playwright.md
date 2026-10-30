@@ -54,8 +54,9 @@ set before a push or a PR; a CI job on pull requests.
   (`npm run test:visual:update`). The first visual run builds its image: minutes.
 
 ## What this constrains — breaks if you change it
-- The restore and `resetToSeed` delete every row: they refuse a database whose name
-  does not end in `_e2e` (`resetToSeed`: also `_test`, `_demo`). Removing the guard
+- The restore and `emptyVacancies` wipe the tables and `resetToSeed` deletes one user's
+  vacancies: they refuse a database whose name does not end in `_e2e` (`resetToSeed`:
+  also `_test`, `_demo`). Removing the guard
   puts the dev DB one wrong `DATABASE_URL` away from being wiped.
 - More than one worker → tests restore the shared DB under each other.
 - The session cookie's name and signature follow Better Auth; an upgrade that changes

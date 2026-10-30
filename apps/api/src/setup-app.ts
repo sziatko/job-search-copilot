@@ -13,8 +13,9 @@ export function configureApp(app: NestExpressApplication, config: ConfigService<
   // The body parsers (JSON up to 5 MB) are AuthModule's — see app.module.ts; the app is
   // created with `bodyParser: false`.
 
-  // The session cookie rides cross-origin from the web (localhost:5173 → :3000), so
-  // credentials, and an exact origin: credentials never go with a reflected one.
+  // In dev the session cookie rides cross-origin from the web (localhost:5173 → :3000),
+  // so credentials, and an exact origin: credentials never go with a reflected one. In
+  // production the web and the API share one origin (ADR-0041) and CORS is idle.
   app.enableCors({ origin: config.get('WEB_ORIGIN', { infer: true }), credentials: true });
 
   // Everything lives under /api except /health, which infra (docker-compose,

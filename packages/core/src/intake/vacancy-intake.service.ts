@@ -76,7 +76,8 @@ export class VacancyIntakeService {
         }
         return { new: fresh };
       },
-      // A fixed ceiling, sized for BATCH_MAX entries over a remote DB.
+      // A fixed ceiling, sized for the transports' batch cap (mcp's BATCH_MAX, the intake
+      // DTO's @ArrayMaxSize) over a remote DB.
       { timeout: 60_000 },
     );
   }

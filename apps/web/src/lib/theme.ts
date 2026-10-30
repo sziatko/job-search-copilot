@@ -2,8 +2,8 @@ import { useSyncExternalStore } from 'react';
 
 /**
  * Two themes, and the OS picks the first:
- *   nothing stored — no data-theme attribute; index.css's prefers-color-scheme
- *                    block decides, and follows the OS live.
+ *   nothing stored — no data-theme attribute; index.css's `color-scheme: light dark`
+ *                    decides, and follows the OS live.
  *   'light' / 'dark' — stored after the first click, pinned by the attribute.
  * There is no way back to "follow the OS" but clearing storage.
  *

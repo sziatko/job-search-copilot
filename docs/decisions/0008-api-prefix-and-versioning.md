@@ -9,8 +9,8 @@ shape without breaking the web app mid-deploy.
 ## Decision
 In `apps/api/src/setup-app.ts`:
 
-- `app.setGlobalPrefix('api', { exclude: ['health'] })` — everything under `/api`
-  but the health check;
+- `app.setGlobalPrefix('api', { exclude: [...] })` — everything under `/api` but the
+  health check and the OAuth metadata at `/.well-known/oauth-authorization-server/api/auth`;
 - `app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' })` — routes
   are `/api/v1/...`; a breaking shape gets a `v2` controller, `v1` stays;
 - `HealthController` is `VERSION_NEUTRAL`: exactly `/health`, a stable probe for the
@@ -34,6 +34,8 @@ In `apps/api/src/setup-app.ts`:
   handlers, every URL in `apps/api/test/*.e2e.spec.ts`.
 - `/health` under the prefix → the Compose `api` healthcheck fails; the container
   reports unhealthy and `web` never starts.
+- The OAuth metadata under the prefix → MCP clients cannot find the authorization
+  server (RFC 8414 puts it at the root).
 
 ## Related
 [`../contracts.md`](../contracts.md), `apps/api/src/health/`.

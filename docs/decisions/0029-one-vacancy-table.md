@@ -19,7 +19,8 @@ on every read.
 - **`StatusChange`** `(vacancyId, status, createdAt)` is the journal: one row per move,
   its `createdAt` the only date of that move. The applied date is the latest
   `APPLIED` row's. `Vacancy.status` / `statusChangedAt` cache the latest row.
-  `writeStatus` alone writes the row and the cache, in the caller's transaction.
+  `writeStatus` alone writes the row and the cache, in the caller's transaction —
+  besides a new vacancy's first `NEW` row, which `firstStatus` writes with the create.
   - A **pipeline** status written again is an event (the next interview round):
     journaled, the date moves. A caller writes once per real event.
   - A **triage** status the vacancy already has carries no event: `writeStatus` throws
@@ -50,8 +51,9 @@ many values is a 1:N table.
 - MCP has one `update_vacancy_status`.
 
 ## What this constrains — breaks if you change it
-- `status` written anywhere but `writeStatus` → the cache and the journal disagree;
-  timeout, the sort and `appliedAt` read the wrong date.
+- `status`, `statusChangedAt` or the journal written anywhere but `writeStatus` (or
+  `firstStatus` on create) → the cache and the journal disagree; timeout, the sort and
+  `appliedAt` read the wrong date.
 - A pipeline repeat turned into a no-op → a second interview round leaves no trace,
   and the timeout clock keeps counting from the first.
 - A new `VacancyStatus` value → the checklist in `domain-model.md`; there is no single

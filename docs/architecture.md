@@ -11,8 +11,8 @@ through them from *new* to *applied* or *declined*, then through the pipeline.
 
 Several users in one database, each signed in with Google / LinkedIn / a passkey and
 seeing only their own vacancies ([ADR-0038](decisions/0038-multi-user-shared-schema.md));
-sign-up is limited to an allowlist. Local-first: Docker Compose on a laptop, Postgres
-in a container.
+sign-up is limited to an allowlist. Developed on Docker Compose on a laptop, Postgres
+in a container; runs on one VPS ([`deployment.md`](deployment.md)).
 
 ## The four packages
 
@@ -34,7 +34,7 @@ apps/web (React SPA)        Claude (the owner's skills)
 | [`packages/core`](../packages/core/README.md) | The only database client. The schema and migrations; `VacancyService`, `ApplicationService`, `VacancyIntakeService`, `StatsService`; `writeStatus`, the only writer of status; the timeout rule; the `DomainError`s; Better Auth and API keys. | `@prisma/client`, `pg`, `better-auth` |
 | `apps/api` | Thin NestJS transport over the core services, for the web app and n8n: DTO validation, versioned routes, a health check. | `core`, `@nestjs/*`, `class-validator` |
 | `apps/mcp` | Thin transport over the *same* services, as tools for Claude ([ADR-0010](decisions/0010-mcp-server-factory.md)). One `createServer()`, two entrypoints: `src/index.ts` (stdio, as the owner of `JSC_API_KEY`) and `src/http.ts` (Streamable HTTP, an OAuth 2.1 resource server or an API key — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md), [ADR-0039](decisions/0039-api-keys-per-user.md)). | `core`, `@modelcontextprotocol/sdk`, `express`, `jose`, `zod` |
-| `apps/web` | React SPA in an app shell, routed by `@tanstack/react-router`: `/` dashboard, `/vacancies`, `/applications`, `/inbox`, `/profile` ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` only, through its **own** hand-written schema of the API — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
+| `apps/web` | React SPA in an app shell, routed by `@tanstack/react-router`: `/` dashboard, `/vacancies`, `/vacancies/$id`, `/applications`, `/inbox`, `/profile`, plus `/login` and `/consent` (the OAuth consent page) ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` only, through its **own** hand-written schema of the API — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 (monorepo), [ADR-0002](decisions/0002-core-shared-domain-layer.md) (core as the
@@ -52,7 +52,8 @@ src/
   index.ts           the package's exports
   db/                Prisma client, forUser scoping, paging, LIKE escaping
   domain/            rules shared by more than one feature: errors, status (writeStatus,
-                     the timeout rule), recommendation, url, identity, company, comments
+                     the timeout rule), recommendation, url, identity, company, comments,
+                     posting text
   vacancies/         VacancyService and its types
   applications/      ApplicationService and its types
   intake/            VacancyIntakeService and its input
@@ -138,8 +139,8 @@ apps/web  useVacancyRows()  (TanStack Query)
 apps/web  ApplyDialog "mark as applied"  →  POST /api/v1/applications { vacancyId, ... }
 apps/mcp  record_application { company, title, ... }
   → ApplicationService.record()   (packages/core, one transaction)
-      → resolve the vacancy: link by id / link to a unique (company,title) match /
-        create a placeholder Vacancy (no text, no analysis)
+      → resolve the vacancy: link by id / by applyUrl / to a unique (company,title)
+        match / create a placeholder Vacancy (no text, no analysis)
       → already in the pipeline? AlreadyAppliedError
       → writeStatus(APPLIED), then writeStatus(status) if recorded further along
         (each a StatusChange row + the status / statusChangedAt cache)
@@ -166,7 +167,7 @@ Both transports call the same core service methods; there is no business logic i
 - **`mcp` idles** on `sleep infinity`. Creating a fresh container on Docker
   Desktop/Windows takes 15–20s — too close to Claude's ~30s MCP connect timeout.
   A session `docker exec`s into the already-running container and starts its own
-  `npm run dev:mcp`.
+  `npm run dev` (the container's workdir is `apps/mcp`).
   > **Breaks if you change it:** giving `mcp` a real long-running `command` →
   > only one MCP session at a time, and `docker exec`-based session startup no
   > longer applies.
@@ -245,9 +246,10 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    does not load `.env`; a missing/invalid var fails startup with a readable
    message. → [ADR-0007](decisions/0007-env-config-and-loading.md)
 9. **Every REST route is closed by default.** A global guard
-   wants a session; anonymous access is explicit (`@AllowAnonymous()`, `/health` only),
-   machine access is explicit (`ApiKeyGuard` on each domain controller's class — a new
-   controller takes no key until it says so).
+   wants a session; anonymous access is explicit (`@AllowAnonymous()`: `/health` and the
+   OAuth metadata at `/.well-known/…`), machine access is explicit (`ApiKeyGuard` on each
+   domain controller's class, beside an `@AllowAnonymous()` that hands the check to it —
+   session or key; a new controller takes no key until it says so).
    An anonymous route has no user to scope its queries to (invariant 11).
    → [ADR-0034](decisions/0034-auth-better-auth-in-core.md),
    [ADR-0039](decisions/0039-api-keys-per-user.md)

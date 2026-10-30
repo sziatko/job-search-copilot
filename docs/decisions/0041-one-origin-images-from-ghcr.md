@@ -34,6 +34,7 @@ start against an older schema; and the server should not build anything.
 
 ## Consequences
 - The web and the API deploy together: a tag is one commit of both.
+- A merge into `main` deploys itself ([`deployment.md` § Deploy a version](../deployment.md#deploy-a-version)).
 - Rolling back past a migration means restoring a backup; there are no down migrations
   ([`deployment.md`](../deployment.md#roll-back)).
 - Locally nothing changes: dev runs on two origins (`localhost:5173`, `:3000`) with CORS.

@@ -36,7 +36,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 
 /** One button per action, in the order they render. Total over `RowAction`, so a
  * new action cannot ship without a control. A status's *tag*
  * text ("Applied") is a state, not an instruction — hence separate verbs. Which ones
- * confirm first is `useVacancies`' call, not this map's. */
+ * confirm first is `useVacancyRows`' call, not this map's. */
 const ROW_BUTTONS: Record<RowAction, { verb: string; Icon: typeof IconCheck; danger?: boolean }> = {
   APPLIED: { verb: 'Apply', Icon: IconCheck },
   DECLINED: { verb: 'Decline', Icon: IconCross, danger: true },

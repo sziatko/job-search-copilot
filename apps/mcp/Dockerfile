@@ -25,8 +25,8 @@ RUN npm run generate --workspace=@job-search-copilot/core
 RUN npm run build --workspace=@job-search-copilot/core
 RUN npm run build --workspace=@job-search-copilot/mcp
 
-# Production: only prod deps + compiled output. Talks over stdio, so it's meant to be
-# run per-session (e.g. `docker run --rm -i`), not left running like the api service.
+# Production: only prod deps + compiled output. The default CMD talks over stdio (run
+# per-session, `docker run --rm -i`); compose.prod.yml runs `http.js` as a service.
 FROM node:24-alpine AS production
 WORKDIR /repo
 ENV NODE_ENV=production

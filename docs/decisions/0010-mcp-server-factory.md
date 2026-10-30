@@ -13,7 +13,8 @@ the same tools.
   transport. The services default to ones on the shared lazy client; a test injects
   its own. The file only composes: each feature registers its tools —
   `registerVacancyTools`, `registerApplicationTools`, `registerIntakeTools`, in
-  `<feature>/<feature>.tools.ts`, with a sibling `*.schemas.ts` for the zod inputs.
+  `<feature>/<feature>.tools.ts`, with a sibling `*.schemas.ts` for zod inputs worth
+  sharing (intake's sit in its tools file).
 - `apps/mcp/src/index.ts` (stdio) — loads env, resolves the owner of `JSC_API_KEY`,
   `createServer({ userId })`, connects a `StdioServerTransport`.
 - `apps/mcp/src/http.ts` (HTTP), over the testable `http-app.ts` — a fresh

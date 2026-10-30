@@ -10,7 +10,8 @@ const envSchema = z.object({
   /** The API's public origin: the tokens' issuer is `${BETTER_AUTH_URL}/api/auth`. */
   BETTER_AUTH_URL: z.url(),
   /** Where this server reaches the API for its JWKS: BETTER_AUTH_URL on the host,
-   * `http://api:3000` inside Docker, where `localhost` is the container itself. */
+   * the API's service inside Docker (`api` in dev, `jsc-api` in prod), where `localhost`
+   * is the container itself. */
   AUTH_URL: z.url(),
   /** This server's URL as clients call it; the tokens' audience. */
   MCP_PUBLIC_URL: z.url(),

@@ -27,8 +27,8 @@ Postgres ← database `jsc`: owner `jsc` (migrations), runtime role `jsc_app`
 ## First start
 
 1. The database: role and database `jsc`, by the shared layer's README, then the
-   runtime role (§ The database roles). The first migration creates `pg_trgm`, a
-   trusted extension, so the owner may.
+   runtime role (§ The database roles). A migration (`…_company_trigram_index`)
+   creates `pg_trgm`, a trusted extension, so the owner may.
 2. `git clone https://github.com/<owner>/job-search-copilot /srv/jsc`, then `.env` from
    `.env.prod.example` with the real values.
 3. The two Caddy blocks, then a Caddy reload:

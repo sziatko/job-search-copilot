@@ -67,8 +67,8 @@ never a status, a source or an analysis. It answers `{ new }`.
 
 ## What this constrains — breaks if you change it
 - An analysis written while the row is `NEW`, or one field without the other → the
-  CHECKs reject it. `save()` and `record()` create the row unanalysed, move it out of
-  `NEW`, then write the analysis.
+  CHECKs reject it. `save()` creates the row unanalysed, moves it out of `NEW`, then
+  writes the analysis; `record()` creates its placeholder with no analysis.
 - A vacancy created without `matchKeys` → neither intake nor `record()` finds it by name.
 - A status moved by the analysis from anything but `NEW` → the analyzer clobbers the
   user's progress.

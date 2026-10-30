@@ -4,9 +4,9 @@ export const API_ORIGIN: string = import.meta.env.VITE_API_URL ?? 'http://localh
 // The API serves everything under /api/v1 (see apps/api setup-app.ts).
 export const API_BASE = `${API_ORIGIN}/api/v1`;
 
-/** `fetch` with the session cookie: every API route wants it (invariant 9). The cookie
- * is the API's (`localhost:3000`), and a cross-origin request carries it only with
- * `credentials: 'include'`.
+/** `fetch` with the session cookie: every API route wants it (invariant 9). In dev the
+ * cookie is the API's (`localhost:3000`), and a cross-origin request carries it only with
+ * `credentials: 'include'`; in production both share one origin (ADR-0041).
  *
  * A 401 means the session ended mid-use: the web goes to /login (the router guard only
  * checks on navigation). Not from /login or /consent themselves — no loop. The session
