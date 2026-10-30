@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from 'react';
 
-const PAD = 'px-7 pt-4 narrow:px-3.5 narrow:pt-3';
+const PAD = 'px-7 pt-4 narrow:px-4 narrow:pt-3';
 
 /**
  * A page's body, under the topbar. `fill` is a list page's: a flex column that runs to
@@ -11,7 +11,7 @@ export function View({ fill, ...props }: HTMLAttributes<HTMLElement> & { fill?: 
   return fill ? (
     <section
       data-view="fill"
-      className={`${PAD} flex flex-1 flex-col pb-6 narrow:pb-4.5`}
+      className={`${PAD} flex flex-1 flex-col pb-6 narrow:pb-4`}
       {...props}
     />
   ) : (

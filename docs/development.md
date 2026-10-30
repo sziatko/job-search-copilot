@@ -116,6 +116,9 @@ test DB, so every delete, count and lookup a test makes filters by its user: a b
 `count()` or `findFirst()` sees another file's rows, and passes only when the file runs
 alone. Why: [ADR-0015](decisions/0015-testing-strategy.md).
 
+`apps/web/src/styles.test.ts` holds the web's styling rules (`components/ui/README.md`,
+"Styling a new page") by reading every source file as text, comments included.
+
 Visual tests (`npm run test:visual`) compare every page, dialog and empty state with a
 baseline PNG in `e2e/visual.spec.ts-snapshots/`, at a desktop and a phone width, light
 and dark. They run only in the Playwright image (`e2e/Dockerfile`, the image CI's `e2e`

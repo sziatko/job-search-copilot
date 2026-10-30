@@ -15,7 +15,7 @@ export function DateCell({
   updated?: string;
 }) {
   return (
-    <div className="whitespace-nowrap text-sm text-ink-soft">
+    <div className="whitespace-nowrap text-small text-ink-soft">
       {quietDays !== undefined && (
         // From the left edge, not centred: the ⏳ leads the first column, where a centred
         // bubble's left half is clipped by the scroll box.
@@ -24,7 +24,7 @@ export function DateCell({
         </span>
       )}
       {date}
-      {updated && <div className="mt-px text-2xs text-ink-faint">upd: {updated}</div>}
+      {updated && <div className="mt-px text-caption text-ink-faint">upd: {updated}</div>}
     </div>
   );
 }
@@ -36,12 +36,12 @@ export function RoleTitle({ title, href }: { title: string; href: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="text-base font-bold text-ink no-underline hover:text-accent-ink hover:underline"
+      className="text-body font-bold text-ink no-underline hover:text-accent-ink hover:underline"
     >
       {title}
     </a>
   ) : (
-    <span className="text-base font-bold text-ink">{title}</span>
+    <span className="text-body font-bold text-ink">{title}</span>
   );
 }
 
@@ -56,7 +56,7 @@ export function RoleMeta({
   children?: ReactNode;
 }) {
   return (
-    <div className="mt-0.5 text-sm text-ink-muted">
+    <div className="text-small text-ink-muted">
       {company} <span className="text-ink-faint">#{id}</span>
       {children}
     </div>
@@ -82,7 +82,7 @@ export function CompanyHistoryButton({
     <button
       type="button"
       onClick={onClick}
-      className="relative ml-1.5 inline-flex cursor-pointer items-center gap-0.75 rounded-sm border border-border-strong px-1.25 py-px align-middle text-xs font-bold text-ink-muted hover:border-accent-soft-border hover:bg-accent-soft hover:text-accent-ink [&_svg]:size-2.75"
+      className="relative ml-2 inline-flex cursor-pointer items-center gap-1 rounded-sm border border-border-strong px-1 py-px align-middle text-caption font-bold text-ink-muted hover:border-accent-soft-border hover:bg-accent-soft hover:text-accent-ink [&_svg]:size-3"
     >
       <IconHistory />
       {/* The count is decoration and the bubble is the label, so the button does not
@@ -97,5 +97,5 @@ export function CompanyHistoryButton({
 
 /** Why a row's last write failed, under its controls; nothing when it did not. */
 export function RowError({ children }: { children: string | undefined }) {
-  return children ? <p className="mt-1 text-xs text-bad">{children}</p> : null;
+  return children ? <p className="mt-1 text-caption text-bad-ink">{children}</p> : null;
 }

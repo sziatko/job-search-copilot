@@ -22,18 +22,18 @@ export function Description({ text }: { text: string | null }) {
       <div className="relative">
         <div
           ref={bodyRef}
-          className={`overflow-hidden whitespace-pre-line px-4.5 pt-0.5 pb-4.5 text-base leading-5.25 text-ink-soft ${expanded ? '' : 'max-h-55'}`}
+          className={`overflow-hidden whitespace-pre-line px-4 pb-4 text-body text-ink-soft ${expanded ? '' : 'max-h-55'}`}
         >
           {text}
         </div>
         {clampable && !expanded && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-[linear-gradient(to_bottom,transparent,var(--color-surface))]" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-b/srgb from-transparent to-surface" />
         )}
       </div>
       {clampable && (
         <button
           type="button"
-          className="mx-4.5 mt-2.5 mb-4 inline-flex cursor-pointer items-center gap-1.25 rounded-md border border-border-strong bg-surface px-2.5 py-1.5 text-sm font-bold text-accent-ink hover:border-accent-soft-border hover:bg-accent-soft"
+          className="mx-4 mt-2 mb-4 inline-flex cursor-pointer items-center gap-1 rounded-md border border-border-strong bg-surface px-2 py-2 text-small font-bold text-accent-ink hover:border-accent-soft-border hover:bg-accent-soft"
           aria-expanded={expanded}
           onClick={() => setExpanded((v) => !v)}
         >

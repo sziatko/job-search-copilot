@@ -5,7 +5,7 @@ import { TONE, type Tone } from './tone';
 export function Pill({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.25 py-0.5 font-mono text-sm font-semibold ${TONE[tone]}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 font-mono text-small leading-4 font-semibold ${TONE[tone]}`}
     >
       {children}
     </span>

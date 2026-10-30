@@ -31,7 +31,7 @@ export function ExpandableText({
   }, []);
 
   return (
-    <div className="max-w-85 text-sm text-ink-soft">
+    <div className="max-w-85 text-small text-ink-soft">
       <div ref={measureRef} className={expanded ? '' : 'line-clamp-2'}>
         {typeof children === 'function' ? children(expanded) : children}
       </div>

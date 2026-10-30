@@ -9,7 +9,7 @@ import type { HTMLAttributes } from 'react';
 export function SplitGrid(props: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 stacked:grid-cols-[minmax(0,1fr)]"
+      className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 stacked:grid-cols-1"
       {...props}
     />
   );

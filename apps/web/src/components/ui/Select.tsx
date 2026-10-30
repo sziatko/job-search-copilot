@@ -30,7 +30,7 @@ export function Select<T extends string>({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as T)}
-      className="rounded-md border border-border-strong bg-surface px-2.5 py-1.75 text-sm font-semibold text-ink disabled:cursor-wait disabled:opacity-50"
+      className="rounded-md border border-border-strong bg-surface px-2 py-2 text-small font-semibold text-ink disabled:cursor-wait disabled:opacity-50"
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -53,7 +53,7 @@ export function FilterSelect<T extends string>({
 }) {
   const id = useId();
   return (
-    <div className="flex items-center gap-1.75 text-sm font-semibold text-ink-muted">
+    <div className="flex items-center gap-2 text-small font-semibold text-ink-muted">
       <label htmlFor={id}>{label}</label>
       <Select id={id} {...props} />
     </div>

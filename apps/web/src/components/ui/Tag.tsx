@@ -13,7 +13,7 @@ export function Tag({
 }) {
   return (
     <span
-      className={`whitespace-nowrap rounded-full border px-2.25 py-0.75 font-sans text-xs font-bold ${TONE[tone]} ${className}`}
+      className={`whitespace-nowrap rounded-full border px-2 py-1 font-sans text-caption font-bold ${TONE[tone]} ${className}`}
     >
       {children}
     </span>

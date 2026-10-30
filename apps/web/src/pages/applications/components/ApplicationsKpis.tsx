@@ -12,13 +12,11 @@ import {
   STATUS_FILTER_ALL,
   STATUS_FILTER_TIMEOUT,
 } from '@/lib/applications/types';
+import { STATUS_TAGS } from '@/lib/vacancies/constants';
 
-// Which tiles get a coloured value, mirroring the mockup's tracker tiles.
-const KPI_TONES: Partial<Record<ApplicationStatus, 'good' | 'bad'>> = {
-  OFFER: 'good',
-  INTERVIEW: 'good',
-  REJECTED: 'bad',
-};
+// Which tiles get a coloured value (mirroring the mockup's tracker tiles), in their
+// status's tone.
+const TONED: ApplicationStatus[] = ['OFFER', 'INTERVIEW', 'REJECTED'];
 
 // Always show these two; then any other status with a non-zero count, so an
 // empty pipeline doesn't render a row of zeros.
@@ -77,7 +75,7 @@ export function ApplicationsKpis({
           key={status}
           label={APPLICATION_STATUS_LABELS[status]}
           value={stats.byStatus[status] ?? 0}
-          tone={KPI_TONES[status]}
+          tone={TONED.includes(status) ? STATUS_TAGS[status].tone : undefined}
           selected={filter === status}
           onClick={() => onFilterChange(status)}
         />

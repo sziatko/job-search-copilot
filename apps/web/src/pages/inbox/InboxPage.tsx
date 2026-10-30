@@ -83,7 +83,7 @@ export function InboxPage() {
                 void navigate({ search: { tab: value === INBOX_TAB.queue ? undefined : value } })
               }
             />
-            <div className="ml-auto flex items-center gap-2.5">
+            <div className="ml-auto flex items-center gap-2">
               {!loadError && !loading && <ListCount shown={items.length} total={total} />}
               <Button onClick={() => setSearching(true)}>Search</Button>
             </div>

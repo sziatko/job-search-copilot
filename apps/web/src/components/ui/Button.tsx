@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 
-const TEXT = 'rounded-md border px-3.5 py-2 text-base';
+const TEXT = 'rounded-md border px-4 py-2 text-body';
 const ICON =
   'relative inline-flex size-7.5 items-center justify-center rounded-md border border-border-strong bg-surface text-ink-muted disabled:opacity-50 [&_svg]:size-3.5';
 
@@ -16,7 +16,7 @@ const VARIANTS = {
   primary: `${TEXT} border-transparent bg-accent text-bg hover:bg-accent-ink`,
   danger: `${TEXT} border-transparent bg-bad text-bg hover:bg-bad-ink`,
   /** Text only, for a toggle inside other text ("Show more"). */
-  ghost: 'pt-0.75 text-sm text-accent',
+  ghost: 'pt-1 text-small text-accent',
   icon: `${ICON} hover:border-accent-soft-border hover:bg-accent-soft hover:text-accent-ink`,
   /** Keeps the red on hover: turning accent would read as harmless on the one
    * control in a row that is not. */

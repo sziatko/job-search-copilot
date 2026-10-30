@@ -5,18 +5,17 @@ import { Skeleton } from './Skeleton';
 /** One column: its header, its width, and what its cell shows for a row. */
 export interface Column<T> {
   header: string;
-  /** In px, the cell's 36px of padding included. Authoritative in a virtualized table
+  /** In px, the cell's 32px of padding included. Authoritative in a virtualized table
    * (fixed layout: content wraps rather than widening it), a hint otherwise. The
    * columns without one split what the others leave. */
   width?: number;
   cell: (item: T) => ReactNode;
 }
 
-const CELL = 'border-b border-border px-4.5 py-3.25 align-top text-base';
-// An inset shadow, not a bottom border: with `border-collapse` the border is painted
-// with the table, so a sticky header would visibly detach from it while scrolling.
+const CELL = 'border-b border-border px-4 py-3 align-top text-body';
+// `shadow-header`, not a bottom border: index.css says why.
 const HEADER =
-  'sticky top-0 z-10 bg-surface px-4.5 py-2.25 text-left text-2xs font-bold uppercase tracking-[.05em] text-ink-faint shadow-[inset_0_-1px_0_var(--color-border)]';
+  'sticky top-0 z-10 bg-surface px-4 py-2 text-left text-overline uppercase text-ink-faint shadow-header';
 // A list page's box: it runs to the window's bottom (its card fills the view — see
 // `View`'s `fill`), 320px at the least. `contain-size` keeps the rows out of its intrinsic
 // height, so the card sizes to that floor rather than to every loaded row. The stable

@@ -30,7 +30,7 @@ function SignOutButton() {
  */
 export function Topbar({ title, onOpenMobile }: { title: string; onOpenMobile: () => void }) {
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-border bg-[color-mix(in_srgb,var(--color-bg)_88%,transparent)] px-7 py-4 backdrop-blur-sm transition-[padding] duration-180 narrow:px-4 narrow:py-3.5 compact:py-2">
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-border bg-bg/88 px-7 py-4 backdrop-blur-sm transition-[padding] narrow:px-4 narrow:py-4 compact:py-2">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -40,12 +40,12 @@ export function Topbar({ title, onOpenMobile }: { title: string; onOpenMobile: (
         >
           <IconMenu />
         </button>
-        {/* 16px on a phone keeps "Application tracker" on one line at 390px. */}
-        <h1 className="text-3xl font-extrabold tracking-[-0.01em] transition-[font-size] duration-180 narrow:text-xl compact:text-xl">
+        {/* The title role (15px) on a phone keeps "Application tracker" on one line at 390px. */}
+        <h1 className="text-page transition-[font-size] narrow:text-title compact:text-title">
           {title}
         </h1>
       </div>
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-4">
         <ThemeToggle />
         <SignOutButton />
       </div>

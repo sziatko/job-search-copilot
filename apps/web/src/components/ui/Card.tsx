@@ -21,7 +21,7 @@ export function Card({
 export function CardHead({ className = '', ...props }: Props) {
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-3 px-4.5 pt-4 pb-3 ${className}`}
+      className={`flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-3 ${className}`}
       {...props}
     />
   );
@@ -29,10 +29,10 @@ export function CardHead({ className = '', ...props }: Props) {
 
 /** The card's heading; its `id` is what a section card's `aria-labelledby` names. */
 export function CardTitle(props: HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className="text-lg font-extrabold" {...props} />;
+  return <h2 className="text-title" {...props} />;
 }
 
 /** The muted line under or beside a card's title: a count, what the card shows. */
 export function CardSub(props: Props) {
-  return <div className="mt-0.5 text-sm text-ink-muted" {...props} />;
+  return <div className="text-small text-ink-muted" {...props} />;
 }

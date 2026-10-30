@@ -72,7 +72,7 @@ export function RootLayout() {
         ref={mainRef}
         // A list page's View fills the window: dvh, as a phone's collapsing URL bar would
         // otherwise leave the page a bar's height to scroll.
-        className="ml-61 flex min-w-0 flex-1 flex-col transition-[margin-left] duration-180 has-[>[data-view=fill]]:h-dvh rail:ml-(--rail-w) narrow:ml-0"
+        className="ml-sidebar flex min-w-0 flex-1 flex-col transition-[margin-left] has-[>[data-view=fill]]:h-dvh rail:ml-rail narrow:ml-0"
       >
         <Topbar title={meta.title ?? ''} onOpenMobile={() => setMobileOpen(true)} />
         <Outlet />

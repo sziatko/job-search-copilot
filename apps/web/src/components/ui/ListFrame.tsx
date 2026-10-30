@@ -7,7 +7,7 @@ import { Card } from './Card';
 export function ListFrame({ toolbar, children }: { toolbar: ReactNode; children: ReactNode }) {
   return (
     <Card className="flex flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-2.5 px-4.5 pt-3 pb-2.5">{toolbar}</div>
+      <div className="flex flex-wrap items-center gap-2 px-4 pt-3 pb-2">{toolbar}</div>
       {children}
     </Card>
   );
@@ -17,7 +17,7 @@ export function ListFrame({ toolbar, children }: { toolbar: ReactNode; children:
  * catch up with it as the table scrolls. */
 export function ListCount({ shown, total }: { shown: number; total: number }) {
   return (
-    <span className="whitespace-nowrap text-sm text-ink-muted">
+    <span className="whitespace-nowrap text-small text-ink-muted">
       Showing {shown} of {total}
     </span>
   );

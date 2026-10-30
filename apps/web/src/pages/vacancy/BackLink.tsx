@@ -7,7 +7,7 @@ export function BackLink() {
   return (
     <button
       type="button"
-      className="mb-3.5 inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-ink-muted no-underline hover:text-accent-ink"
+      className="mb-4 inline-flex cursor-pointer items-center gap-2 text-small font-semibold text-ink-muted no-underline hover:text-accent-ink"
       onClick={() =>
         router.history.canGoBack()
           ? router.history.back()

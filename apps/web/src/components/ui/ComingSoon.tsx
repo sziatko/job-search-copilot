@@ -1,5 +1,6 @@
 import type { ComponentType, SVGProps } from 'react';
 import { CenterColumn } from './CenterColumn';
+import { TONE } from './tone';
 
 /** What a feature with no backend behind it yet will be: its icon, a line, a list. */
 export function ComingSoon({
@@ -15,13 +16,13 @@ export function ComingSoon({
 }) {
   return (
     <CenterColumn>
-      <div className="flex size-13 items-center justify-center rounded-xl border border-accent-soft-border bg-accent-soft text-accent-ink">
+      <div className={`flex size-13 items-center justify-center rounded-xl border ${TONE.accent}`}>
         <Icon className="size-6" />
       </div>
       <h2>{title}</h2>
       <p>{description}</p>
       {items && (
-        <div className="flex w-full flex-col gap-1.25 rounded-lg border border-border bg-surface-alt px-4 py-3 text-left text-sm text-ink-soft">
+        <div className="flex w-full flex-col gap-1 rounded-lg border border-border bg-surface-alt px-4 py-3 text-left text-small text-ink-soft">
           {items.map((item) => (
             <div key={item}>· {item}</div>
           ))}

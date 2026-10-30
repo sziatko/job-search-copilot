@@ -5,11 +5,13 @@ export function FactList(props: HTMLAttributes<HTMLDivElement>) {
   return <div className="flex flex-col" {...props} />;
 }
 
-/** One row of a `FactList`, whatever it holds — a skeleton's bars, say. */
+/** One row of a `FactList`, whatever it holds — a skeleton's bars, say. `py-3`, not the
+ * even `py-2`: the dashboard's review queue scrolls to the height of the column these
+ * rows fill, and keeps its ten rows in view only at this height. */
 export function FactRow({ children }: { children: ReactNode }) {
   return (
     <div
-      className="flex items-center justify-between gap-2.5 border-b border-border px-4.5 py-2.5 text-sm last:border-b-0"
+      className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 text-small last:border-b-0"
       data-testid="fact-row"
     >
       {children}

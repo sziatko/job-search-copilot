@@ -78,7 +78,7 @@ export function SearchModal({
     >
       <DialogTitle id={titleId}>Search vacancies</DialogTitle>
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <SearchInput value={text} onChange={setText} inputRef={searchRef} />
         <fieldset className="flex items-center gap-3">
           <legend className="sr-only">Search in</legend>

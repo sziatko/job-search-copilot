@@ -132,7 +132,7 @@ export function VacancyTable({
     { header: 'Status', width: 150, cell: (item) => <StatusTag status={item.status} /> },
     {
       header: 'Action',
-      width: 246,
+      width: 252,
       cell: (item) => {
         const saving = savingIds.has(item.id);
         // Once applied, the row's status moves on /applications only.
@@ -144,7 +144,7 @@ export function VacancyTable({
                 requestActionChange. Icons rather than text (the `Tip` is the
                 label): words per row, repeated down every row, are what made this
                 column the widest one. */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
               <CopyVacancyButton
                 id={item.id}
                 company={item.company}

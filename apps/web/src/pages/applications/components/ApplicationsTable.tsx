@@ -88,14 +88,14 @@ export function ApplicationsTable({
       header: 'Salary',
       width: 120,
       cell: (item) => (
-        <div className="font-mono text-sm tabular-nums">{item.salaryInApplication ?? '—'}</div>
+        <div className="font-mono text-small tabular-nums">{item.salaryInApplication ?? '—'}</div>
       ),
     },
     {
       header: 'CV',
       width: 80,
       cell: (item) => (
-        <div className="text-sm text-ink-muted">{item.usedTailoredResume ? '✓' : '—'}</div>
+        <div className="text-small text-ink-muted">{item.usedTailoredResume ? '✓' : '—'}</div>
       ),
     },
     { header: 'Comment', cell: (item) => <MergedComment comments={item.comments} /> },
@@ -105,7 +105,7 @@ export function ApplicationsTable({
       // Icons, labelled by their `Tip`s — the /vacancies Action column's
       // pattern. Edit waits while the row saves.
       cell: (item) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <CopyVacancyButton
             id={item.id}
             company={item.company}

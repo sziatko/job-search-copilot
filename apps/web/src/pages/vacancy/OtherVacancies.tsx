@@ -17,7 +17,7 @@ const COLUMNS: Column<VacancyListItem>[] = [
     header: 'Vacancy',
     cell: (item) => (
       <>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <RoleTitle title={item.title} href={item.applyUrl} />
           <DetailsLink id={item.id} />
         </div>

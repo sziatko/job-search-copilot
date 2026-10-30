@@ -6,7 +6,7 @@ export function DevMarker() {
   if (!isDevServer()) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center border-t-3 border-bad">
-      <span className="rounded-b-md bg-bad px-2 font-mono text-2xs font-bold text-bg">
+      <span className="rounded-b-md bg-bad px-2 font-mono text-caption font-bold text-bg">
         DEV · local copy
       </span>
     </div>
