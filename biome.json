@@ -50,6 +50,46 @@
       }
     },
     {
+      "includes": ["apps/api/**", "apps/mcp/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@prisma/*", "pg", "pg/*"],
+                    "message": "packages/core is the only database client (docs/architecture.md § System invariants, 1)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@job-search-copilot/core", "@job-search-copilot/core/*"],
+                    "message": "The web app's API contract is a hand-written zod schema, not a core import (docs/architecture.md § System invariants, 5)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["apps/web/src/pages/**"],
       "linter": {
         "rules": {
@@ -61,6 +101,10 @@
                   {
                     "group": ["@/pages/**", "../*/**"],
                     "message": "A page imports only from its own folder, components/ and lib/ (docs/architecture.md § Inside apps/web/src)."
+                  },
+                  {
+                    "group": ["@job-search-copilot/core", "@job-search-copilot/core/*"],
+                    "message": "The web app's API contract is a hand-written zod schema, not a core import (docs/architecture.md § System invariants, 5)."
                   }
                 ]
               }
@@ -81,6 +125,10 @@
                   {
                     "group": ["@/pages/**"],
                     "message": "components/ and lib/ never import a page (docs/architecture.md § Inside apps/web/src)."
+                  },
+                  {
+                    "group": ["@job-search-copilot/core", "@job-search-copilot/core/*"],
+                    "message": "The web app's API contract is a hand-written zod schema, not a core import (docs/architecture.md § System invariants, 5)."
                   }
                 ]
               }
