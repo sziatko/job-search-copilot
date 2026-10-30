@@ -3,9 +3,9 @@ name: Images
 # The production images (each Dockerfile's `production` stage). A pull request builds
 # them only, so a Dockerfile regression fails there. A push to main or a phase-* branch
 # also publishes them to GHCR: `sha-<commit>`, plus `latest` on main. phase-* too: a
-# phase deploys before it merges. The packages are public — the server pulls with no
-# login, so nothing secret goes into an image. A push to main then deploys them
-# (`deploy`).
+# phase can be deployed by hand (deploy.sh, under main's compose.prod.yml) before it
+# merges. The packages are public — the server pulls with no login, so nothing secret
+# goes into an image. A push to main then deploys them (`deploy`).
 on:
   push:
     branches: [main, 'phase-*']

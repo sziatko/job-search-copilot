@@ -16,8 +16,8 @@ x-watch-env: &watch-env
 
 # This file is for LOCAL DEV ONLY. The postgres credentials default to postgres/postgres
 # and are passed as plain env vars — fine on a laptop, not for a deployed environment.
-# A real deployment should supply secrets via Docker/Compose secrets or the platform's
-# secret manager, and never bake them into an image or commit them.
+# The deployment (compose.prod.yml, docs/deployment.md) reads its secrets from a
+# chmod-600 .env on the server, never from an image or a commit.
 
 services:
   postgres:
@@ -40,9 +40,9 @@ services:
 
   # Rebuilds packages/core into dist/ whenever its source changes, so api/mcp
   # (which depend on the compiled output, not the TS source) stay in sync.
-  # NOTE: api/mcp's own watchers don't react to dist/ changing — after editing
-  # packages/core, `docker compose restart api mcp` if the change doesn't show up.
-  # See packages/core/README.md ("Build strategy") for why and the deferred fix.
+  # NOTE: the apps' own watchers don't react to dist/ changing — after editing
+  # packages/core, restart them (docs/architecture.md § Dev stack). Why, and the
+  # deferred fix: ADR-0003.
   core:
     build:
       context: .
@@ -50,10 +50,10 @@ services:
       target: dev
     restart: unless-stopped
     working_dir: /repo/packages/core
-    # core, api and mcp each regenerate the Prisma client on start: each has its own
-    # node_modules volume, so a client generated on the host or in another container
-    # never reaches it. After a schema.prisma change, `docker compose restart api mcp
-    # core` is the whole fix. `exec` makes the real process PID 1, so it gets SIGTERM.
+    # core, api, mcp and mcp-http each regenerate the Prisma client on start: each has its
+    # own node_modules volume, so a client generated on the host or in another container
+    # never reaches it. After a schema.prisma change, restarting them is the whole fix
+    # (docs/architecture.md § Dev stack). `exec` makes the real process PID 1, so it gets SIGTERM.
     command: sh -c "npm --prefix /repo run generate && exec npm run watch"
     environment:
       <<: *watch-env

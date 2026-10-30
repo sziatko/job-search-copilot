@@ -16,8 +16,8 @@ a Windows / Docker Desktop host. CI must prove a change sound before it merges.
 - **Polling watchers** (`CHOKIDAR_USEPOLLING`, Vite's `server.watch.usePolling`):
   bind-mount change events are unreliable on Docker Desktop for Windows.
 - **`mcp` idles** on `sleep infinity`; a Claude session `docker exec`s in and runs its
-  own `npm run dev:mcp`. A fresh container takes 15–20 s to start, too close to the
-  MCP client's connect timeout.
+  own `npm run dev`. A fresh container takes 15–20 s to start, too close to the MCP
+  client's connect timeout.
 - **Healthchecks gate startup:** `api` and `mcp` wait for `postgres`'s `pg_isready`;
   `web` waits for `api`'s `/health`.
 - **Multi-stage Dockerfiles** (`dev` / `build` / `production`): `dev` installs
@@ -30,8 +30,8 @@ On a push to `main` and every PR: Ubuntu, Node 24, a Postgres service, then `npm
 → `prisma generate` → `prisma migrate deploy` → `lint` → `typecheck` → `test` →
 `build`. On a PR a second job runs the Playwright suite
 ([ADR-0037](0037-e2e-playwright.md)). `images.yml` builds the three `production` stages
-on every PR, so a Dockerfile regression fails there, and publishes them to GHCR on a
-push ([ADR-0041](0041-one-origin-images-from-ghcr.md)).
+on every PR, so a Dockerfile regression fails there; publishing and deploying them:
+[ADR-0041](0041-one-origin-images-from-ghcr.md).
 
 ## Why this and not the alternatives
 - **No polling** — edits on a Windows bind mount silently stop rebuilding.

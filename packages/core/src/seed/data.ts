@@ -1,10 +1,10 @@
 import type { Recommendation, VacancyStatus } from '@prisma/client';
 
 /**
- * The seed (ADR-0037): made-up vacancies for the e2e tests and the public demo.
+ * The seed (ADR-0037): made-up vacancies for the e2e tests and a future public demo.
  * Everything here is invented — companies, titles, links, salaries, notes (invariant 10);
- * the demo publishes it. Changing it changes the demo and every e2e expectation built
- * on these counts.
+ * a demo would publish it. Changing it changes every e2e expectation built on these
+ * counts, the visual baselines and the README screenshots.
  */
 
 /** One status move after intake and the analysis. APPLIED goes through

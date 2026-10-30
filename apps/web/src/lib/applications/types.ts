@@ -70,8 +70,8 @@ export const applicationListItemSchema = z.object({
   applyUrl: z.string(),
   /** Null when the vacancy has no analysis (a row record_application created). */
   matchScore: z.number().nullable(),
-  /** How many vacancies (any status) share this row's company — derived by the list
-   * endpoint only, so optional: the PATCH / POST responses parse through this schema
+  /** How many vacancies (core's SAME_COMPANY_STATUSES) share this row's company —
+   * derived by the list endpoint only, so optional: the PATCH / POST responses parse through this schema
    * too and carry none (the /vacancies schema's trap, ADR-0025). */
   companyMatchCount: z.number().optional(),
 });

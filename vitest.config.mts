@@ -1,6 +1,6 @@
 ﻿import { defineConfig } from 'vitest/config';
 
-// A single entry point that fans out to each workspace's own vitest.config.ts.
+// A single entry point that fans out to each workspace's own vitest.config.mts.
 // `npm test` from the repo root runs all of them; each project keeps its own
 // environment (node vs jsdom) and setup files.
 export default defineConfig({

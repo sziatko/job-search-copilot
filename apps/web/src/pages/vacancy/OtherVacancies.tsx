@@ -33,7 +33,7 @@ const COLUMNS: Column<VacancyListItem>[] = [
   { header: 'Status', width: 150, cell: (item) => <StatusTag status={item.status} /> },
 ];
 
-/** The company's other vacancies, whatever their status. */
+/** The company's other vacancies (as core's SAME_COMPANY_STATUSES counts them). */
 export function OtherVacancies({ items, pending }: { items: VacancyListItem[]; pending: boolean }) {
   if (!pending && items.length === 0) {
     return <EmptyState>No other vacancies</EmptyState>;

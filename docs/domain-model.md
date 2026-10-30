@@ -143,13 +143,13 @@ table:
 >   - core: a migration (`ADD VALUE … AFTER`), `TRIAGE_STATUSES` or `PIPELINE_STATUSES`
 >     in [`status.ts`](../packages/core/src/domain/status.ts), a `StatsService` count if
 >     the dashboard shows it;
->   - MCP: `PipelineStatusEnum` for a pipeline one (`VacancyStatusEnum` follows Prisma),
->     and the tool descriptions and `SERVER_INSTRUCTIONS` that list statuses;
+>   - MCP: the enums follow core and Prisma; touch only the tool descriptions and
+>     `SERVER_INSTRUCTIONS` that list statuses;
 >   - API: `@IsIn(PIPELINE_STATUSES)` follows; `@IsEnum(VacancyStatus)` too;
 >   - web: `vacancyStatusSchema` and the page's `STATUS_CONTEXT`, the `extract` lists
 >     (`VacancyAction`, `RowAction`), `STATUS_LABELS` / `STATUS_TAGS`, `VacancyTable`'s
 >     `ROW_BUTTONS` / `actionsFor` and `StatusFilterSelect` for a `/vacancies` one,
->     `InboxPage`'s `TABS` for an inbox one, `VacancyPage`'s `CLOSED_BAD` if it ends a
+>     `InboxPage`'s `TABS` for an inbox one, `Timeline.tsx`'s `CLOSED_BAD` if it ends a
 >     vacancy, the `APPLICATION_STATUS_*` maps for a pipeline one;
 >   - the skills that list statuses (re-upload them).
 
@@ -164,11 +164,13 @@ The status journal: one row per change of status. Append-only.
 | `status` | `VacancyStatus` | The status moved to. |
 | `vacancyId` | `Int` | FK to `Vacancy`, `onDelete: Cascade`. `@@index([vacancyId, createdAt])`. |
 
-**`writeStatus(tx, vacancyId, status, at = now)` is the only writer of status.** In the
-caller's transaction it moves `status` + `statusChangedAt` and inserts the row, both
-dated `at`. **Every pipeline call is an event** — the status the vacancy already has is
-journaled too and moves the date: the next interview round is `INTERVIEW` again, and the
-timeout clock restarts from it. So a caller writes once per real event (the email sync
+**`writeStatus(tx, vacancyId, status, at = now, from?)` is the only writer of status.** In
+the caller's transaction it moves `status` + `statusChangedAt` and inserts the row, both
+dated `at`. With `from`, only a vacancy in one of those statuses moves; any other is a
+miss, not an error (how `markUnavailable` skips a vacancy that has left the queue).
+**Every pipeline call is an event** — the status the vacancy already has is journaled
+too and moves the date: the next interview round is `INTERVIEW` again, and the timeout
+clock restarts from it. So a caller writes once per real event (the email sync
 skips reminders). **A triage repeat is refused:** a `TRIAGE_STATUSES` status the vacancy
 already has carries no event, so `writeStatus` throws `SameStatusError` (API 422, MCP
 `isError`) and writes nothing; so does `NEW` on an analysed vacancy
@@ -228,7 +230,9 @@ zone: its `id` is the vacancy's, and applying moves the vacancy's own `status`.
 - **`list` (both services)** also takes `applyUrl`, compared exactly after the
   normalization `save` applies (`applyUrlKey`; an unusable url is compared raw, so a
   `tracker://` key still matches) — how an email's posting link finds its application.
-- **`update`** edits salary / CV and appends a `USER` comment.
+- **`update`** edits salary / CV and appends a comment in the caller's source.
+- **`addComment`** appends a dated comment to any vacancy, no status move (the MCP
+  `add_comment`).
 
 > **What this constrains — breaks if you change it**
 > - Adding a field `/applications` needs → `APPLICATION_SELECT` + `flatten()` in
@@ -253,8 +257,10 @@ The writers, by source:
 - **`ANALYZER`** — with the analysis, through `writeAnalysis` (`VacancyService.save()`
   and `submitAnalysis()`; a save on an analysed row writes nothing: analyze-once). At
   most one per vacancy; reads take the first.
-- **`USER`** — `record()`'s and `update()`'s `comment`, and `updateStatus()` over REST.
-- **`AGENT`** — `updateStatus()` / `updateStatusByVacancy()` over MCP.
+- **`USER`** or **`AGENT`**, by the caller: over REST a session writes `USER` and an API
+  key `AGENT` (`@CallerSource()`) — `record()`'s and `update()`'s `comment`, the note of
+  `updateStatus()`, `markUnavailable()`'s `reason`. Over MCP, each tool's description says
+  which source it writes.
 
 `hasAnalysis` on a vacancy list item is `recommendation !== null` (ADR-0033).
 

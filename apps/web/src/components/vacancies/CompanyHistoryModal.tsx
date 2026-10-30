@@ -10,8 +10,9 @@ import { listVacanciesPage } from '@/lib/vacancies/api';
 import { countLine, ModalVacancyTable } from './ModalVacancyTable';
 
 /**
- * Every vacancy of one company with its status — the answer to "have I dealt with
- * these people before?" without leaving the triage screen.
+ * Every vacancy of one company (as core's SAME_COMPANY_STATUSES counts it) with its
+ * status — the answer to "have I dealt with these people before?" without leaving the
+ * triage screen.
  *
  * Fetched when it opens, not with the table: the list only needs
  * `companyMatchCount` to draw the button, and the modal's rows are a different

@@ -6,7 +6,7 @@ with who breaks if it changes.
 The field-level detail lives in one place each, not here:
 
 - **REST** — Swagger UI at `/api/docs`, the OpenAPI document at `/api/docs-json`
-  (requests only; built from the DTOs' `class-validator` decorators and the
+  (not in production; requests only; built from the DTOs' `class-validator` decorators and the
   controllers' JSDoc by the `@nestjs/swagger` CLI plugin, so present under `nest build`
   / `nest start`, not under vitest). Source: `apps/api/src/*/dto/`, the controllers.
 - **MCP** — each tool's description and `.describe()`d fields, in
@@ -16,13 +16,15 @@ The field-level detail lives in one place each, not here:
 
 ## REST API
 
-Everything is under `/api/v1` except `/health` ([ADR-0008](decisions/0008-api-prefix-and-versioning.md)).
+Everything is under `/api/v1` except `/health`, Better Auth's `/api/auth/*` and the
+OAuth metadata at `/.well-known/oauth-authorization-server/api/auth` ([ADR-0008](decisions/0008-api-prefix-and-versioning.md)).
 `ValidationPipe({ whitelist: true, transform: true })` strips unknown fields and
 coerces types. JSON bodies up to 5 MB (intake carries posting text); no form bodies.
 Free strings are capped by `MAX_LENGTH` (core), the same caps as MCP's inputs.
 
 **Auth** ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)). Every route wants a
-session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` is anonymous.
+session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` and the
+`.well-known` metadata are anonymous.
 The domain routes — `/vacancies`, `/applications`, `/stats` — also take
 `Authorization: Bearer jsc_…`, an API key from `/profile`
 ([ADR-0039](decisions/0039-api-keys-per-user.md)); a comment a key writes is `AGENT`,
@@ -40,6 +42,7 @@ matching the filter, not the page size.
 | Route | Does | Success |
 | --- | --- | --- |
 | `GET /health` | DB ping | `200 { status: 'ok', db: 'up' }`, else `503` |
+| `GET /.well-known/oauth-authorization-server/api/auth` | The OAuth server's metadata (RFC 8414), for MCP clients | `200` the metadata |
 | `POST /vacancies` | Save an analysed vacancy | `201` + `Location` when created; `200` when the `applyUrl` exists — the analysis attached if the row had none, else untouched ([ADR-0005](decisions/0005-analyze-once.md)) |
 | `POST /vacancies/intake` | Take postings in, unanalysed (1–100) | `200 { new: string[] }` — the urls created, as sent; one transaction |
 | `POST /vacancies/:id/analysis` | Analyse a vacancy that has none | `200` the vacancy; from `NEW` the status moves by the rule |
@@ -48,16 +51,17 @@ matching the filter, not the page size.
 | `GET /vacancies/:id` | One vacancy | with `comments`, `estimationComment`, `timeline` |
 | `PATCH /vacancies/:id/status` | Move to any status, an optional comment | `200` as `GET /:id` |
 | `POST /vacancies/unavailable` | Closed postings (1–100, `{ id, reason }`): a row still in the queue → `UNAVAILABLE`, `reason` a comment; any other skipped ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)) | `200 { moved: id[], skipped: id[] }`; one transaction |
-| `POST /applications` | Record an application on a vacancy by id | `201 { application, resolution, vacancyCreated }` |
+| `POST /applications` | Record an application on a vacancy by id | `201` + `Location`, `{ application, resolution, vacancyCreated }` |
 | `GET /applications` | The pipeline: `status`, `state` (`active` \| `timedOut`), `search`, `sameCompanyAs` | items with `appliedAt`, `timedOut`, `comments`, `companyMatchCount` |
 | `GET /applications/:id` | One application | `404` if not in the pipeline |
-| `PATCH /applications/:id/status` | Move to any status, an optional `USER` comment | the application |
-| `PATCH /applications/:id` | Edit salary / CV, append a `USER` comment | the application |
+| `PATCH /applications/:id/status` | Move to any status, an optional comment | the application |
+| `PATCH /applications/:id` | Edit salary / CV, append a comment | the application |
 | `GET /stats` | The dashboard's counts ([ADR-0031](decisions/0031-stats-endpoint.md)) | `{ logged, awaitingAnalysis, awaitingTriage, recommended, notRecommended, applied, declined, unavailable, responded, interview, actionNeeded, pipeline: { byStatus, active, timedOut, total }, recent }` |
 
 **Errors.** A `DomainError` is `{ statusCode, error: "<ErrorName>", message }`, `422`
 unless `STATUS_OF` in `domain-exception.filter.ts` says otherwise:
-`AlreadyAnalysedError` → `409`, `VacancyNotFoundError` → `404`. The common ones:
+`AlreadyAnalysedError` → `409`, `VacancyNotFoundError` → `404`, `RateLimitedError` →
+`429`. The common ones:
 `SameStatusError` (a triage status the vacancy already has), `AnalysedNotNewError`
 (`NEW` on an analysed vacancy), `AlreadyAppliedError` (already in the pipeline). A
 query that finds nothing (`getById`) answers `null` and the controller sends Nest's
@@ -89,7 +93,8 @@ query that finds nothing (`getById`) answers `null` and the controller sends Nes
 ## MCP tools
 
 The tools are registered in `createServer()` ([ADR-0010](decisions/0010-mcp-server-factory.md));
-each feature owns its `*.tools.ts` and `*.schemas.ts`. Inputs are zod schemas; outputs
+each feature owns its `*.tools.ts`, and a `*.schemas.ts` where its inputs are shared
+(intake's sit in its tools file). Inputs are zod schemas; outputs
 are `JSON.stringify(result, null, 2)` in one text block; a `DomainError` is
 `{ isError: true }` with its message. The write tools answer with a short confirmation
 — `success` and the row's `id`, `company`, `title`; intake's `{ new }` — never the

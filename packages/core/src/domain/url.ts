@@ -1,7 +1,7 @@
 /**
  * URL handling for values that arrive from outside — scraped job postings, a
- * pasted link, the MCP tools. Kept in one module because both services write an
- * `applyUrl` and both need the same two rules.
+ * pasted link, the MCP tools. Kept in one module because every service that writes
+ * an `applyUrl` needs the same two rules.
  */
 
 function slug(value: string): string {
@@ -82,8 +82,8 @@ function normalizeIndeed(parsed: URL): void {
  * Neutralize an incoming `applyUrl` and reduce it to its canonical form.
  *
  * Two jobs, both about the same value being the row's identity — it is the
- * `@unique` key that analyze-once rests on (ADR-0005), and it is what the web app
- * writes into an `href`.
+ * per-user unique key (`userId, applyUrl`) that analyze-once rests on (ADR-0005), and
+ * it is what the web app writes into an `href`.
  *
  * **Neutralize.** Only http(s) can be a real listing link, and the rest is not
  * merely wrong — it is dangerous downstream: a `javascript:` URL in an `href`

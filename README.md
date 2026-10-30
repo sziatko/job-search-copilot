@@ -160,11 +160,12 @@ The repo is set up so an AI agent can work on it for weeks without losing the th
 - **Real tests.** Integration tests against a real PostgreSQL, no Prisma mocks; a
   contract test between the web and the API; Playwright over every screen.
 - **No personal data.** Tests, the seed and these screenshots use made-up companies, and
-  a git hook blocks a commit or a push that carries my real data.
+  a hook in my Claude Code setup blocks a commit or a push that carries my real data.
 
 ## Known limits
 
-- **No deploy yet.** It runs on my machine; the [roadmap](#roadmap) covers the rest.
+- **Private.** There is no public instance; a demo is on the
+  [roadmap](#roadmap).
 - **One real user: me.** Several users are supported and tested — a test runs every
   core method as a second user — but nobody else has used it day to day.
 - **Owner scoping lives in the app, not in Postgres.** Every query in `packages/core`
@@ -178,8 +179,6 @@ The repo is set up so an AI agent can work on it for weeks without losing the th
 
 ## Roadmap
 
-- **Deploy** to a small VPS with HTTPS, so claude.ai can reach the MCP server and the
-  n8n intake runs around the clock.
 - **A public demo** on the made-up seed, reset every night.
 - **A real profile page** — the candidate profile and master resumes in the app, then
   tailoring a resume from a vacancy page.

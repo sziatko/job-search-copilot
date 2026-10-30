@@ -62,7 +62,7 @@ function asApplication(row: FakeVacancy) {
   return { ...row, timedOut: isTimedOut(row) };
 }
 
-/** Core's `companyKey` equality (ADR-0032), cut down to case: core's tests own the
+/** Core's `companyGroupKey` equality (ADR-0032), cut down to case: core's tests own the
  * rule, these only need one company to be one company. */
 function sameCompany(a: string, b: string) {
   return a.toLowerCase() === b.toLowerCase();

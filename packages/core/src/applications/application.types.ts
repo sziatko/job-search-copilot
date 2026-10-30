@@ -10,7 +10,8 @@ export interface RecordApplicationByIdInput {
   vacancyId: number;
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
-  /** Added as a USER comment; a blank one adds none. */
+  /** Added as a comment in the caller's source (USER, or AGENT from an API key); a
+   * blank one adds none. */
   comment?: string | null;
   /** Where the application already is. APPLIED is journaled first either way. */
   status?: PipelineStatus;
@@ -28,7 +29,8 @@ export interface RecordApplicationByVacancyInput {
   applyUrl?: string | null;
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
-  /** Added as a USER comment; a blank one adds none. */
+  /** Added as a comment in the caller's source (USER, or AGENT from an API key); a
+   * blank one adds none. */
   comment?: string | null;
   status?: PipelineStatus;
 }
@@ -52,8 +54,8 @@ export interface RecordManyApplicationsResult {
 }
 
 /** ApplicationService.update: the fields the apply modal wrote. Absent = untouched;
- * null or blank = cleared. `comment` is not a field: a non-blank one adds a USER
- * comment, a blank one adds nothing. */
+ * null or blank = cleared. `comment` is not a field: a non-blank one adds a comment
+ * in the caller's source, a blank one adds nothing. */
 export interface UpdateApplicationInput {
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
@@ -63,8 +65,8 @@ export interface UpdateApplicationInput {
 export interface ListApplicationsFilters {
   /** One pipeline status; absent = all of them. */
   status?: PipelineStatus;
-  /** Matches Vacancy.company OR .title, ILIKE '%term%', case-insensitive. For
-   * the /applications page's single free-text search box. */
+  /** Matches Vacancy.company OR .title, ILIKE '%term%', case-insensitive. The
+   * search modal's term. */
   search?: string;
   /** Matches Vacancy.company, ILIKE '%term%', case-insensitive. Independent of
    * `search` — combined with `title` (and `search`, if also given) via AND, not OR. */

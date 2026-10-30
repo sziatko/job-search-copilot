@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
-/** Max items accepted by one *_batch call. */
+/** Max items one save / record / intake batch call accepts; the analysis batches take
+ * core's ANALYSIS_BATCH_MAX. */
 export const BATCH_MAX = 100;
 
-/** Score the analyzer assigns a vacancy, 0-100. Shared by save_* and record_* inputs. */
+/** Score the analyzer assigns a vacancy, 0-100. Shared by save_* and submit_* inputs. */
 export const matchScore = z.number().int().min(0).max(100);
 
 /**

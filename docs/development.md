@@ -15,7 +15,7 @@ cp .env.test.example .env.test  # npm test; it refuses any database but *_test
 cp .env.e2e.example .env.e2e    # npm run test:e2e
 npm install
 npm run generate                # the Prisma client; npm install does not make it
-docker compose up -d            # postgres + api + mcp + web + a core build watcher
+docker compose up -d            # postgres + api + mcp + mcp-http + web + a core build watcher
 
 # First run only: create the schema and the separate test database
 npm run migrate:dev             # dev DB (job_search_copilot)
@@ -45,8 +45,8 @@ the first sign-in ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)).
 | Postgres | `localhost:5432` (`postgres` / `postgres`) |
 
 The `mcp` container idles (`sleep infinity`); a session connects by `docker exec`
-into it and running `npm run dev:mcp`. `mcp-http` serves the same tools over HTTP for
-remote clients: `claude mcp add --transport http jsc http://localhost:3001/mcp`, or the
+into it and running `npm run dev`. `mcp-http` serves the same tools over HTTP for remote
+clients: `claude mcp add --transport http jsc http://localhost:3001/mcp`, or the
 MCP Inspector with transport *Streamable HTTP* and that URL.
 
 **API keys** ([ADR-0039](decisions/0039-api-keys-per-user.md)) — create one on
@@ -57,8 +57,8 @@ config alone does not reach it: that config runs `docker exec`, so its `env` is 
 the host's `docker` process, not inside the container — to keep the key there, add
 `-e JSC_API_KEY` to the `docker exec` arguments, which passes it through. A client
 without OAuth reaches the HTTP MCP with `Authorization: Bearer jsc_…`
-(`mcp-remote --header`). n8n's credential, the same header on the intake and analysis
-routes, holds a key too.
+(`mcp-remote --header`). n8n's credential, the same header on the intake, analysis and
+`/vacancies/unavailable` routes, holds a key too.
 
 After a change to `core` or its schema, or a new dependency, the containers need a
 restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack-docker-compose).
@@ -77,7 +77,7 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 | `npm run screenshots` | retake the README's screenshots (`docs/screenshots/`) on the e2e seed, light and dark |
 | `npm run seed` | reset the e2e database to the made-up seed (refuses any DB not named `*_e2e` / `*_test` / `*_demo`) |
 | `npm run lint` / `npm run lint:fix` / `npm run format` | Biome |
-| `npm run typecheck` | `tsc --noEmit` across every workspace |
+| `npm run typecheck` | builds core first, then `tsc --noEmit` on core's specs, the apps and e2e |
 | `npm run build` | build all workspaces |
 | `npm run generate` | regenerate the Prisma client |
 | `npm run migrate:dev` | create + apply a migration on the dev DB |
@@ -86,7 +86,7 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 | `npm run studio` | Prisma Studio |
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
-Postgres service on every push and PR; on a PR a second job, `e2e`, runs
+Postgres service on a push to `main` and on every PR; on a PR a second job, `e2e`, runs
 `npm run test:e2e` and the visual tests in the Playwright image ([ADR-0037](decisions/0037-e2e-playwright.md)).
 `.github/workflows/images.yml` builds the three production images on a PR; on a push
 to `main` or a `phase-*` branch it also publishes them to GHCR as

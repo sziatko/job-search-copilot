@@ -107,8 +107,7 @@ function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
 /**
  * Writes an analysis onto an unanalysed row, in the caller's transaction — how save()'s
  * created and attached rows and submitAnalysis write one; the analysis is written once
- * (ADR-0033). The one other writer is `record()`'s placeholder: a row it has just created
- * in the same transaction, so there is no concurrent analysis for the lock below to stop.
+ * (ADR-0033).
  *
  * The conditional write comes first (`recommendation IS NULL`, a no-op `updatedAt`): it
  * takes the row lock, so a concurrent analysis of the same row waits for this one and
@@ -207,7 +206,7 @@ export class VacancyService {
    * - a row without an analysis (taken in by intake) → the analysis is attached to it,
    *   and the posting text when the row has none (`attached: true`);
    * - a row with one → returned untouched, the incoming analysis discarded (both false).
-   * The unique constraint on applyUrl is the real guard; the pre-check just avoids a
+   * The unique constraint on (userId, applyUrl) is the real guard; the pre-check just avoids a
    * guaranteed-failing insert on the common path.
    *
    * Either way the analysis goes through writeAnalysis: a new row's journal is NEW, then
