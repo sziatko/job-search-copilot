@@ -146,7 +146,7 @@ write to either database meanwhile.
    `https://jsc.<domain>/api/v1`. The API keys came with the database.
 5. MCP clients move to `https://jsc-mcp.<domain>/mcp`: the claude.ai connector is added
    again (its OAuth client was in the replaced database), and Claude's skills that name
-   a local URL are updated and uploaded again.
+   a local URL are updated and pushed again.
 6. Passkeys are registered again: the restored ones are bound to `localhost`.
 7. The scheduled tasks back on, the local n8n stays off — two would bring every vacancy
    twice. A server snapshot.
