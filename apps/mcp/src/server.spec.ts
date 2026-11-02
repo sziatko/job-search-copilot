@@ -125,11 +125,11 @@ describe('job-search-copilot MCP server', () => {
     ]);
   });
 
-  // The skills in skills/ call these tools by name and are uploaded to claude.ai by
-  // hand, so a rename here leaves them calling a tool that no longer exists — silently.
-  // They live in a separate private repo cloned into skills/ (gitignored): without
-  // that clone (CI, a fresh checkout) there is nothing to check.
-  const skillsDir = path.resolve(import.meta.dirname, '../../../skills');
+  // The owner's skills call these tools by name, so a rename here leaves them calling a
+  // tool that no longer exists — silently. They are a plugin in a separate private repo
+  // cloned into skills/ (gitignored): without that clone (CI, a fresh checkout) there is
+  // nothing to check.
+  const skillsDir = path.resolve(import.meta.dirname, '../../../skills/plugins/job-search/skills');
   it.skipIf(!existsSync(skillsDir))('every JSC tool a skill names is registered', async () => {
     const client = await connectedClient();
     const { tools } = await client.listTools();

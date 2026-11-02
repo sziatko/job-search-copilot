@@ -131,8 +131,8 @@ every client shows.
   `MCP_PUBLIC_URL`'s host, else `403`.
 
 > **What this constrains — breaks if you change it**
-> - A tool's name, input or output → the owner's skills (outside the repo, re-uploaded
->   by hand) and `apps/mcp/src/server.spec.ts`.
+> - A tool's name, input or output → the owner's skills (a plugin in a private repo,
+>   pushed after the server deploys) and `apps/mcp/src/server.spec.ts`.
 > - Anything written to `stdout` by the stdio process → the protocol stream breaks and
 >   the client disconnects.
 > - `MCP_PUBLIC_URL` without the API seeing the same value → every token's `aud` misses,
