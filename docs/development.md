@@ -29,12 +29,20 @@ Signing in needs a Google or LinkedIn OAuth client (redirect URIs in `.env.examp
 and your email in `AUTH_ALLOWED_EMAILS`; a passkey can be added on `/profile` after
 the first sign-in ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)).
 
-**The owner's fresh clone.** Git does not clone these, so after a new `git clone`:
+**The owner's fresh clone.** `git clone --recurse-submodules`: it also brings `.claude/`,
+the Claude Code setup, a private submodule (a plain `git clone` works too, without the
+setup). Then, after a new clone:
 
+- `git -C .claude switch main` — a submodule starts on a detached HEAD, where a commit
+  gets lost;
+- `git config push.recurseSubmodules check` — it stops a push of a pointer to a commit
+  `.claude` has not pushed;
+- `.claude/settings.local.json` with `"syncClaudeAiSkills": false` — the shared
+  `settings.json` does not honour the key, see `.claude/AGENT-SETUP.md`;
 - the skills: `git clone https://github.com/sziatko/job-search-copilot-skills.git skills`
   (private; without it the skill↔MCP sync test in `apps/mcp` skips), then an empty
   `skills/.git/info/publish-guard-off` — that repo holds real data on purpose;
-- `git config user.name` / `user.email` in both repos, if git has no global identity
+- `git config user.name` / `user.email` in each repo, if git has no global identity
   (the GitHub noreply address).
 
 | Service | URL |

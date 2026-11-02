@@ -150,10 +150,9 @@ vite.config.ts.timestamp-*
 *.config.mjs.map
 *.config.d.mts
 
-# The owner's Claude Code setup — local config, and agent rules kept in the private
-# skills repo (skills/claude-code/), linked in from here.
+# The owner's Claude Code setup: a private repo, a submodule. Ignored as well, so
+# Biome skips it; git still tracks the submodule's pointer.
 .claude/
-CLAUDE.md
 
 # Playwright (e2e/): its output, the api built for it, the signed-in cookie.
 test-results/
