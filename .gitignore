@@ -150,10 +150,6 @@ vite.config.ts.timestamp-*
 *.config.mjs.map
 *.config.d.mts
 
-# The owner's Claude Code setup: a private repo, a submodule. Ignored as well, so
-# Biome skips it; git still tracks the submodule's pointer.
-.claude/
-
 # Playwright (e2e/): its output, the api built for it, the signed-in cookie.
 test-results/
 playwright-report/

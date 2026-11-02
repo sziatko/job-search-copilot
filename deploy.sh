@@ -20,7 +20,9 @@ main() {
   local tag=sha-$sha
 
   cd "$(dirname "$0")"
-  git pull --ff-only
+  # The server never initialises the `.claude` submodule. Without the flag, one file in
+  # that folder fails the pull at the next pointer move: "Could not access submodule".
+  git -c fetch.recurseSubmodules=false pull --ff-only
   # Fails here, before anything stops, if CI never published this tag.
   JSC_TAG=$tag docker compose pull
   # Prisma migrations are not transactional: a backup first, every time — the script
