@@ -34,7 +34,9 @@ export function parseTagName(name: string): { name: string; nameKey: string } {
   const tidied = tidy(name);
   if (!tidied) throw new InvalidTagsError('A tag name must not be blank');
   if (tidied.length > MAX_LENGTH.tag) {
-    throw new InvalidTagsError(`A tag name is at most ${MAX_LENGTH.tag} characters: "${tidied}"`);
+    // Cut: this message is logged and answered, and the body limit is 5 MB.
+    const start = tidied.slice(0, MAX_LENGTH.tag);
+    throw new InvalidTagsError(`A tag name is at most ${MAX_LENGTH.tag} characters: "${start}…"`);
   }
   return { name: tidied, nameKey: normalizeTagKey(tidied) };
 }

@@ -25,7 +25,7 @@ Free strings are capped by `MAX_LENGTH` (core), the same caps as MCP's inputs.
 **Auth** ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)). Every route wants a
 session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` and the
 `.well-known` metadata are anonymous.
-The domain routes — `/vacancies`, `/applications`, `/stats` — also take
+The domain routes — `/vacancies`, `/applications`, `/stats`, `/tags` — also take
 `Authorization: Bearer jsc_…`, an API key from `/settings`
 ([ADR-0039](decisions/0039-api-keys-per-user.md)); a comment a key writes is `AGENT`,
 a session's `USER`. A key over its rate limit (1000 requests an hour) is a `429`, here
@@ -43,16 +43,21 @@ matching the filter, not the page size.
 | --- | --- | --- |
 | `GET /health` | DB ping | `200 { status: 'ok', db: 'up' }`, else `503` |
 | `GET /.well-known/oauth-authorization-server/api/auth` | The OAuth server's metadata (RFC 8414), for MCP clients | `200` the metadata |
-| `POST /vacancies` | Save an analysed vacancy | `201` + `Location` when created; `200` when the `applyUrl` exists — the analysis attached if the row had none, else untouched ([ADR-0005](decisions/0005-analyze-once.md)) |
+| `POST /vacancies` | Save an analysed vacancy, optional `tags` (names) | `201` + `Location` when created; `200` when the `applyUrl` exists — the analysis attached if the row had none, else untouched ([ADR-0005](decisions/0005-analyze-once.md)) |
 | `POST /vacancies/intake` | Take postings in, unanalysed (1–100) | `200 { new: string[] }` — the urls created, as sent; one transaction |
-| `POST /vacancies/:id/analysis` | Analyse a vacancy that has none | `200` the vacancy; from `NEW` the status moves by the rule |
+| `POST /vacancies/:id/analysis` | Analyse a vacancy that has none, optional `tags` (names); a bad one rejects the analysis | `200` the vacancy; from `NEW` the status moves by the rule |
 | `POST /vacancies/analysis` | The same for 1–10, one transaction | `200` the vacancies, in input order |
-| `GET /vacancies` | List: filters `recommendation`, `status` (a list), `company`, `search` (company, title, or the id for `123` or `#123`), `sameCompanyAs`, `hasText`; `sort` `newest` \| `recommended` | items without `fullText`, with `companyMatchCount`, `hasAnalysis`, `hasText` |
-| `GET /vacancies/:id` | One vacancy | with `comments`, `estimationComment`, `timeline` |
+| `GET /vacancies` | List: filters `recommendation`, `status` (a list), `company`, `search` (company, title, or the id for `123` or `#123`), `sameCompanyAs`, `hasText`; `sort` `newest` \| `recommended` | items without `fullText`, with `tags`, `companyMatchCount`, `hasAnalysis`, `hasText` |
+| `GET /vacancies/:id` | One vacancy | with `tags`, `comments`, `estimationComment`, `timeline` |
 | `PATCH /vacancies/:id/status` | Move to any status, an optional comment | `200` as `GET /:id` |
 | `POST /vacancies/unavailable` | Closed postings (1–100, `{ id, reason }`): a row still in the queue → `UNAVAILABLE`, `reason` a comment; any other skipped ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)) | `200 { moved: id[], skipped: id[] }`; one transaction |
+| `POST /vacancies/tags` | Add and remove tags by name (1–10, `{ vacancyId, add?, remove? }`): a new name creates the tag, an unknown one in `remove` is ignored ([ADR-0042](decisions/0042-tags-written-by-anyone.md)) | `204`; one transaction |
+| `GET /tags` | The user's tags, by name | `200 { id, name, tone, vacancyCount }[]` |
+| `POST /tags` | Create a tag: `name`, optional `tone` | `201 { id, name, tone }` |
+| `PATCH /tags/:id` | Rename, change the tone | `200 { id, name, tone }` |
+| `DELETE /tags/:id` | Delete, off its vacancies too | `204` |
 | `POST /applications` | Record an application on a vacancy by id | `201` + `Location`, `{ application, resolution, vacancyCreated }` |
-| `GET /applications` | The pipeline: `status`, `state` (`active` \| `timedOut`), `search`, `sameCompanyAs` | items with `appliedAt`, `timedOut`, `comments`, `companyMatchCount` |
+| `GET /applications` | The pipeline: `status`, `state` (`active` \| `timedOut`), `search`, `sameCompanyAs` | items with `appliedAt`, `timedOut`, `tags`, `comments`, `companyMatchCount` |
 | `GET /applications/:id` | One application | `404` if not in the pipeline |
 | `PATCH /applications/:id/status` | Move to any status, an optional comment | the application |
 | `PATCH /applications/:id` | Edit salary / CV / letter, append a comment | the application |
@@ -60,10 +65,12 @@ matching the filter, not the page size.
 
 **Errors.** A `DomainError` is `{ statusCode, error: "<ErrorName>", message }`, `422`
 unless `STATUS_OF` in `domain-exception.filter.ts` says otherwise:
-`AlreadyAnalysedError` → `409`, `VacancyNotFoundError` → `404`, `RateLimitedError` →
-`429`. The common ones:
+`AlreadyAnalysedError` and `TagNameTakenError` → `409`, `VacancyNotFoundError` and
+`TagNotFoundError` → `404`, `RateLimitedError` → `429`. The common ones:
 `SameStatusError` (a triage status the vacancy already has), `AnalysedNotNewError`
-(`NEW` on an analysed vacancy), `AlreadyAppliedError` (already in the pipeline). A
+(`NEW` on an analysed vacancy), `AlreadyAppliedError` (already in the pipeline),
+`InvalidTagsError` (a blank or too long name, a vacancy over its limit of tags; more names
+in one request than that limit is already a `400`). A
 query that finds nothing (`getById`) answers `null` and the controller sends Nest's
 `404`; a command throws `VacancyNotFoundError`
 ([ADR-0009](decisions/0009-domain-errors-and-configure-app.md)).

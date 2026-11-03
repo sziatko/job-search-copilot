@@ -1,5 +1,6 @@
 import { MAX_LENGTH, Recommendation } from '@job-search-copilot/core';
 import { IsEnum, IsInt, IsNotEmpty, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator';
+import { IsTagNames } from '../../tags/dto/tag-vacancies.dto';
 import { HTTP_URL } from './intake-vacancies.dto';
 
 export class SaveVacancyDto {
@@ -34,4 +35,9 @@ export class SaveVacancyDto {
   @IsNotEmpty()
   @MaxLength(MAX_LENGTH.note)
   estimationComment!: string;
+
+  /** Names to put on the vacancy; a bad one rejects the save too. Dropped with the analysis
+   * when the row has one. */
+  @IsTagNames()
+  tags?: string[];
 }

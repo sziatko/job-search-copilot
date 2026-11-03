@@ -16,7 +16,7 @@ Better Auth's `@better-auth/api-key` plugin in `createAuth`: keys owned by a use
 (create, list, revoke). No expiry, no per-key scopes. A rate limit of 1000 requests an
 hour per key, set in `API_KEY_OPTIONS` (`core/src/auth/api-key.ts`); a key over it is a
 `429` on REST and the HTTP MCP. A key is accepted:
-- on the domain REST routes (`/vacancies`, `/applications`, `/stats`), by `ApiKeyGuard`
+- on the domain REST routes (`/vacancies`, `/applications`, `/stats`, `/tags`), by `ApiKeyGuard`
   on each controller's class, as `Authorization: Bearer jsc_…`; a comment a key writes
   is `AGENT`;
 - by the HTTP MCP, as a bearer next to the OAuth JWT (a `jsc_` prefix picks the path);

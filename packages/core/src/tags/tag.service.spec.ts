@@ -120,6 +120,12 @@ describe('TagService', () => {
       await tags.create(userId, { name: 'x'.repeat(MAX_LENGTH.tag) });
       expect(await tags.list(userId)).toHaveLength(1);
     });
+
+    it('does not echo a huge name into the error, which is logged and answered', async () => {
+      const error = await tags.create(userId, { name: 'x'.repeat(100_000) }).catch((e) => e);
+      expect(error).toBeInstanceOf(InvalidTagsError);
+      expect(error.message.length).toBeLessThan(200);
+    });
   });
 
   describe('list', () => {

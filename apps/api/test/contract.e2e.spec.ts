@@ -131,6 +131,22 @@ describe('Web↔API contract (e2e)', () => {
     }
   });
 
+  // Review focus 7: the row is replaced by this answer, so without `tags` it loses its chips.
+  // On the body until the web schema has the field (step 8).
+  it('PATCH /vacancies/:id/status: carries the tags', async () => {
+    await api
+      .post('/api/v1/vacancies/tags')
+      .send({ items: [{ vacancyId: full, add: ['Remote'] }] })
+      .expect(204);
+
+    const res = await api
+      .patch(`/api/v1/vacancies/${full}/status`)
+      .send({ status: 'SAVED_FOR_LATER' })
+      .expect(200);
+
+    expect(res.body.tags).toEqual([{ id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' }]);
+  });
+
   it('the applications endpoints and /stats: their schemas', async () => {
     // An analysed one in APPLIED, an unanalysed one set straight past it (no appliedAt).
     const recorded = await api

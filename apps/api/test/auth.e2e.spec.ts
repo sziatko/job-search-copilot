@@ -60,6 +60,7 @@ describe('Auth (e2e)', () => {
       ['GET /vacancies', async () => ['get', '/api/v1/vacancies']],
       ['GET /applications', async () => ['get', '/api/v1/applications']],
       ['GET /stats', async () => ['get', '/api/v1/stats']],
+      ['GET /tags', async () => ['get', '/api/v1/tags']],
       [
         'POST /vacancies/intake',
         async () => [

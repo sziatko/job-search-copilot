@@ -92,6 +92,40 @@ describe('Isolation between users (e2e)', () => {
     expect(row).toMatchObject({ status: 'NEW', matchScore: null, comments: [] });
   });
 
+  it("404s B on A's tag and vacancy, leaves A's as they were, and shows B none of A's tags", async () => {
+    const { body: vacancy } = await a
+      .post('/api/v1/vacancies')
+      .send({
+        company: 'Acme',
+        title: 'Backend Engineer',
+        applyUrl: 'https://example.com/jobs/2',
+        fullText: 'Full vacancy text.',
+        matchScore: 80,
+        recommendation: 'APPLY',
+        estimationComment: 'Strong match.',
+        tags: ['Remote'],
+      })
+      .expect(201);
+    const { body: before } = await a.get('/api/v1/tags').expect(200);
+    const { vacancyCount, ...tag } = before[0];
+    expect(vacancyCount).toBe(1);
+
+    expect((await b.get('/api/v1/tags').expect(200)).body).toEqual([]);
+    await b.patch(`/api/v1/tags/${tag.id}`).send({ name: 'Mine' }).expect(404);
+    await b.delete(`/api/v1/tags/${tag.id}`).expect(404);
+    // Not a P2003 and a 500, with or without a name to add, and B gets no tag out of it.
+    for (const change of [{ add: ['Remote'] }, { remove: ['Remote'] }]) {
+      await b
+        .post('/api/v1/vacancies/tags')
+        .send({ items: [{ vacancyId: vacancy.id, ...change }] })
+        .expect(404);
+    }
+
+    expect((await b.get('/api/v1/tags').expect(200)).body).toEqual([]);
+    expect((await a.get('/api/v1/tags').expect(200)).body).toEqual(before);
+    expect((await a.get(`/api/v1/vacancies/${vacancy.id}`).expect(200)).body.tags).toEqual([tag]);
+  });
+
   it("lands an intake with B's key in B: new to B though A has the same url, unseen by A", async () => {
     const entries = [{ url: 'https://acme.com/jobs/1', company: 'Acme', title: 'Dev' }];
     await a.post('/api/v1/vacancies/intake').send({ entries }).expect(200);
