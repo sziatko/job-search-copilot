@@ -3,9 +3,8 @@
 - Status: Accepted · Date: 2026-09
 
 ## Context
-The web was built against a mockup ([`docs/design/`](../design/README.md)): an app
-shell (sidebar, topbar, per-route chrome), a dashboard at `/`, and a light / dark
-theme. Several of these are agreements between files that no compiler checks.
+The web has an app shell (sidebar, topbar, per-route chrome), a dashboard at `/`, and a
+light / dark theme. Several of these are agreements between files that no compiler checks.
 
 ## Decision
 1. **The theme** follows the OS until the user picks one. The mechanism is one

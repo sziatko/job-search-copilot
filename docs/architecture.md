@@ -198,8 +198,9 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 1. **`packages/core` is the only database client.** `apps/api` and `apps/mcp`
    reach the DB *only* through `core`'s services. A
    query written in a controller or a tool handler is a bug; Biome's
-   `noRestrictedImports` rejects `@prisma/*` and `pg` imports there. Auth is the one other
-   door: the Better Auth instance `createAuth` builds in `core` on `core`'s client; the
+   `noRestrictedImports` rejects `@prisma/*` and `pg` imports there. The exception is
+   `/health`'s `SELECT 1` (`apps/api/src/health/health.controller.ts`): it reads no
+   user's data. Auth is another door: the Better Auth instance `createAuth` builds in `core` on `core`'s client; the
    apps mount it, never build their own.
    → [ADR-0002](decisions/0002-core-shared-domain-layer.md),
    [ADR-0034](decisions/0034-auth-better-auth-in-core.md)
@@ -277,9 +278,3 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
     one part a tool checks (Biome's `noRestrictedImports`).
     → [Inside `apps/web/src`](#inside-appswebsrc),
     [`components/ui/README.md`](../apps/web/src/components/ui/README.md)
-
-## Stack
-
-Node 24 · PostgreSQL 17 · Prisma 7 · NestJS 12 · React 19 · Vite · Vitest 5 ·
-Biome 2 · `@modelcontextprotocol/sdk` 1 · `@tanstack/react-query` 5 ·
-`@tanstack/react-router` 1 · zod 4.

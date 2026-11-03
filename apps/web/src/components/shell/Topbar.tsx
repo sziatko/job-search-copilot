@@ -24,9 +24,9 @@ function SignOutButton() {
 }
 
 /**
- * `title` is an <h1> rather than the mockup's <div> — same rendering (preflight
- * inherits font-size/weight, and its classes set both), but keeps a real
- * page heading for screen readers and for the router test.
+ * `title` is an <h1> rather than a <div> — same rendering (preflight inherits
+ * font-size/weight, and its classes set both), but keeps a real page heading for
+ * screen readers and for the router test.
  */
 export function Topbar({ title, onOpenMobile }: { title: string; onOpenMobile: () => void }) {
   return (

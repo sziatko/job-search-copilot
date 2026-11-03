@@ -12,7 +12,6 @@ it: [`development.md`](development.md).
 | [`deployment.md`](deployment.md) | The server: its layout, the first start, deploying a version, rolling back. |
 | [`decisions/`](decisions/) | One ADR per decision other code depends on. |
 | [`backlog.md`](backlog.md) | Ideas and fixes not yet planned. |
-| [`design/`](design/) | The HTML mockups the UI started from. Open them in a browser. |
 
 ## Conventions
 

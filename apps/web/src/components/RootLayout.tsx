@@ -53,8 +53,8 @@ export function RootLayout() {
 
   return (
     <div className="flex min-h-screen" data-rail={collapsed || undefined}>
-      {/* A <button> rather than the mockup's <div>: it is a dismiss control, and a
-          click-only div fails the a11y lint. */}
+      {/* A <button> rather than a <div>: it is a dismiss control, and a click-only div
+          fails the a11y lint. */}
       <button
         type="button"
         className={`hidden border-0 p-0 ${mobileOpen ? 'narrow:fixed narrow:inset-0 narrow:z-30 narrow:block narrow:bg-scrim' : ''}`}

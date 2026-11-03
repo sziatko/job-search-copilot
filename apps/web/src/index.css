@@ -19,8 +19,6 @@
    (the end of this file). So no `dark:` variant appears anywhere: `bg-surface`
    resolves through var(--color-surface), and the scheme picks its value. Never a
    raw Tailwind palette name (bg-slate-50) or a raw colour in a component.
-
-   Ported from docs/design/dashboard-reference_2.html.
 --------------------------------------------------------------------------- */
 @theme {
   --font-sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

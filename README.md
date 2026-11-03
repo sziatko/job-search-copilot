@@ -155,8 +155,8 @@ The repo is set up so an AI agent can work on it for weeks without losing the th
   [`docs/architecture.md`](docs/architecture.md#system-invariants), with tests where a
   test can guard one — for example, a test that fails if any vacancy query skips the
   owner filter.
-- **Chained steps.** Several steps can run in a row, each in a fresh subagent, while
-  the main session reviews and commits.
+- **Chained steps.** Several steps can run in a row: a heavy one in a fresh subagent, a
+  light one in the main session, which verifies and commits each.
 - **Real tests.** Integration tests against a real PostgreSQL, no Prisma mocks; a
   contract test between the web and the API; Playwright over every screen.
 - **No personal data.** Tests, the seed and these screenshots use made-up companies, and

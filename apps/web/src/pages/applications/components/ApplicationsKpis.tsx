@@ -14,8 +14,7 @@ import {
 } from '@/lib/applications/types';
 import { STATUS_TAGS } from '@/lib/vacancies/constants';
 
-// Which tiles get a coloured value (mirroring the mockup's tracker tiles), in their
-// status's tone.
+// Which tiles get a coloured value, in their status's tone.
 const TONED: ApplicationStatus[] = ['OFFER', 'INTERVIEW', 'REJECTED'];
 
 // Always show these two; then any other status with a non-zero count, so an
@@ -26,9 +25,9 @@ const ALWAYS: ApplicationStatus[] = ['APPLIED', 'REJECTED'];
  * The summary tiles above the /applications table, each one a quick filter that writes
  * the same URL search param the dropdown does.
  *
- * Total / Active / Timeout are ours — the mockup has only the status counts. The
- * derived pair is what the 30-day timeout rule surfaces, so dropping them would
- * hide the only place a stalled application is visible at a glance.
+ * Total / Active / Timeout sit beside the status counts. The derived pair is what
+ * the 30-day timeout rule surfaces, so dropping them would hide the only place a
+ * stalled application is visible at a glance.
  */
 export function ApplicationsKpis({
   stats,

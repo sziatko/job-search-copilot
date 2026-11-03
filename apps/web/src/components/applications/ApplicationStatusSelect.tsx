@@ -3,8 +3,7 @@ import { APPLICATION_STATUS_LABELS } from '@/lib/applications/constants';
 import { type ApplicationStatus, applicationStatusSchema } from '@/lib/applications/types';
 
 // Schema order, which is pipeline order: Applied → Action needed → Interview →
-// Awaiting → Offer → Rejected. (The mockup lists five of these in a different
-// order and has no Offer at all — pipeline order wins.)
+// Awaiting → Offer → Rejected.
 const OPTIONS: SelectOption<ApplicationStatus>[] = applicationStatusSchema.options.map((value) => ({
   value,
   label: APPLICATION_STATUS_LABELS[value],
