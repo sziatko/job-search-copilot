@@ -29,7 +29,7 @@ function token(audience = mcpUrl) {
 /** The key owners `apiKey` made, deleted in `afterAll`. */
 const owners: string[] = [];
 
-/** What /profile's "Create" does: an API key for a new user, through the API's auth. */
+/** What /settings's "Create" does: an API key for a new user, through the API's auth. */
 async function apiKey(): Promise<string> {
   const prisma = getPrisma();
   const user = await prisma.user.create({

@@ -42,8 +42,8 @@ an API key — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md)
 [ADR-0039](decisions/0039-api-keys-per-user.md)).
 
 `apps/web` sits in an app shell, routed by `@tanstack/react-router`: `/` dashboard,
-`/vacancies`, `/vacancies/$id`, `/applications`, `/inbox`, `/profile`, plus `/login` and
-`/consent` (the OAuth consent page) ([ADR-0024](decisions/0024-web-shell-and-theme.md)).
+`/vacancies`, `/vacancies/$id`, `/applications`, `/inbox`, `/profile`, `/settings`, plus
+`/login` and `/consent` (the OAuth consent page) ([ADR-0024](decisions/0024-web-shell-and-theme.md)).
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 (monorepo), [ADR-0002](decisions/0002-core-shared-domain-layer.md) (core as the
@@ -106,7 +106,7 @@ sibling folder.
 **A file is split by job, not by length**: one that holds several sections, its own
 data writes beside its markup, or a near-copy of a sibling. A page's sections are files
 beside it (`pages/vacancy/Header.tsx`, `Timeline.tsx`, …); its queries and mutations
-are a hook there (`useProfile.ts`). A large file of one uniform kind (`icons.tsx`,
+are a hook there (`useSettings.ts`). A large file of one uniform kind (`icons.tsx`,
 `router.tsx`) stays whole.
 
 **The UI is built from `components/ui`.** Markup starts from a primitive there, and a

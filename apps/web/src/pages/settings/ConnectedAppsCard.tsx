@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/Button';
 import { Card, CardHead, CardTitle } from '@/components/ui/Card';
-import { useConnectedApps } from './useProfile';
+import { useConnectedApps } from './useSettings';
 
 /**
  * The MCP clients the user has allowed on /consent (ADR-0035), each acting as this user.

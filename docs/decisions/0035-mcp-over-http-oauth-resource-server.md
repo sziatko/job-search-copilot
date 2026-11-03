@@ -36,7 +36,7 @@ Stdio stays, as the owner of `JSC_API_KEY`.
 ## Consequences
 - Any MCP client that speaks the spec connects with no JSC-specific setup.
 - A JWT cannot be revoked before it expires: access tokens are short-lived (an hour).
-  /profile's "Connected apps" revokes a grant — the consent and the client's tokens for
+  /settings's "Connected apps" revokes a grant — the consent and the client's tokens for
   that user. The plugin deletes only the consent and its refresh grant never checks
   one, so a `hooks.before` in `create-auth.ts` deletes the tokens.
 - claude.ai calls from Anthropic's servers, so it needs a public HTTPS URL — the

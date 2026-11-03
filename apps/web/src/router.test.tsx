@@ -38,6 +38,7 @@ describe('router', () => {
     expect(screen.getByRole('link', { name: /application tracker/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^dashboard$/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^inbox$/i })).toHaveAttribute('href', '/inbox');
+    expect(screen.getByRole('link', { name: /^settings$/i })).toHaveAttribute('href', '/settings');
   });
 
   it('shows the brand logo in the sidebar', async () => {

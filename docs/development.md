@@ -26,7 +26,7 @@ npm run test:db:migrate         # test DB (job_search_copilot_test)
 `npm test -- --project web` needs no database.
 
 Signing in needs a Google or LinkedIn OAuth client (redirect URIs in `.env.example`)
-and your email in `AUTH_ALLOWED_EMAILS`; a passkey can be added on `/profile` after
+and your email in `AUTH_ALLOWED_EMAILS`; a passkey can be added on `/settings` after
 the first sign-in ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)).
 
 **The owner's fresh clone.** `git clone --recurse-submodules`: it also brings `.claude/`,
@@ -58,7 +58,7 @@ clients: `claude mcp add --transport http jsc http://localhost:3001/mcp`, or the
 MCP Inspector with transport *Streamable HTTP* and that URL.
 
 **API keys** ([ADR-0039](decisions/0039-api-keys-per-user.md)) — create one on
-`/profile`; it is shown once. The stdio MCP acts as the key's owner and refuses to boot
+`/settings`; it is shown once. The stdio MCP acts as the key's owner and refuses to boot
 without a valid one: `JSC_API_KEY=jsc_…` in the repo-root `.env` (mounted into the `mcp`
 container; `apps/mcp/src/env.ts` loads it). The `env` of Claude Desktop's stdio server
 config alone does not reach it: that config runs `docker exec`, so its `env` is set on

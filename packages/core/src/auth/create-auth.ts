@@ -100,7 +100,7 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
       },
     },
     hooks: {
-      // /profile's "Revoke" on a connected app. The plugin deletes only the consent row,
+      // /settings's "Revoke" on a connected app. The plugin deletes only the consent row,
       // and its refresh grant never looks at consents: the app would keep refreshing.
       // Its tokens for this user go first; an issued access token (a JWT) lives to `exp`.
       before: createAuthMiddleware(async (ctx) => {
@@ -153,7 +153,7 @@ export function createAuth(prisma: PrismaClient, config: AuthConfig) {
         resources: [{ identifier: config.mcpUrl, allowedScopes: [...DEFAULT_OAUTH_SCOPES] }],
         clientRegistrationDefaultResources: [config.mcpUrl],
       }),
-      // Per-user keys for n8n and MCP (ADR-0039), managed on the web's /profile.
+      // Per-user keys for n8n and MCP (ADR-0039), managed on the web's /settings.
       // `enableSessionForAPIKeys` stays off: on, a key would open every REST route.
       apiKey(API_KEY_OPTIONS),
     ],

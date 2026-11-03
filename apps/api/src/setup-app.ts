@@ -40,7 +40,7 @@ export function configureApp(app: NestExpressApplication, config: ConfigService<
         new DocumentBuilder()
           .setTitle('Job Search Copilot API')
           .setVersion('1')
-          // An API key (`jsc_…`, from /profile) on the domain routes (ADR-0039).
+          // An API key (`jsc_…`, from /settings) on the domain routes (ADR-0039).
           .addBearerAuth()
           .build(),
       ),

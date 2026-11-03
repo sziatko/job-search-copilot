@@ -26,7 +26,7 @@ Free strings are capped by `MAX_LENGTH` (core), the same caps as MCP's inputs.
 session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` and the
 `.well-known` metadata are anonymous.
 The domain routes — `/vacancies`, `/applications`, `/stats` — also take
-`Authorization: Bearer jsc_…`, an API key from `/profile`
+`Authorization: Bearer jsc_…`, an API key from `/settings`
 ([ADR-0039](decisions/0039-api-keys-per-user.md)); a comment a key writes is `AGENT`,
 a session's `USER`. A key over its rate limit (1000 requests an hour) is a `429`, here
 and on the HTTP MCP. Swagger is outside Nest's router, so the guard does

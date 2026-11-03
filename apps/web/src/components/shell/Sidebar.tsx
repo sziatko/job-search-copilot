@@ -7,6 +7,7 @@ import {
   IconInbox,
   IconPerson,
   IconSend,
+  IconSettings,
   JscLogo,
 } from '@/components/icons';
 
@@ -51,6 +52,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         title: 'Profile & forms',
         icon: IconPerson,
       },
+      { to: '/settings', label: 'Settings', title: 'Settings', icon: IconSettings },
     ],
   },
 ];

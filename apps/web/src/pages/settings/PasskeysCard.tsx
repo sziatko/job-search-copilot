@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/Button';
 import { Card, CardHead, CardTitle } from '@/components/ui/Card';
-import { usePasskeys } from './useProfile';
+import { usePasskeys } from './useSettings';
 
 /**
  * The signed-in user's passkeys. Adding one runs WebAuthn in the browser (the

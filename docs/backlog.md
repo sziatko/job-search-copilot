@@ -16,9 +16,9 @@ data only: the e2e seed, reset nightly by `resetToSeed`.
 
 ### `/profile` page
 
-Only the Passkeys and API keys cards are real; the rest is a `ComingSoon` panel. Needs a
-candidate-profile store, where the master resumes would live ([Tailor a resume from the
-vacancy page](#tailor-a-resume-from-the-vacancy-page)).
+The candidate profile is a `ComingSoon` panel there. It needs a store, where the master
+resumes would live ([Tailor a resume from the vacancy
+page](#tailor-a-resume-from-the-vacancy-page)).
 
 ### Tailor a resume from the vacancy page
 

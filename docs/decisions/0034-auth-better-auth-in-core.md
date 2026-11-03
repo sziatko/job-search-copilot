@@ -15,7 +15,7 @@ Better Auth, configured in `packages/core/src/auth/` (`createAuth(prisma, config
 route by default.
 
 - Sign-in: Google and LinkedIn over OIDC (Authorization Code + PKCE); passkeys added on
-  `/profile`. No password, no email sending.
+  `/settings`. No password, no email sending.
 - A session is a DB row behind an `HttpOnly; SameSite=Lax` cookie (the BFF pattern):
   the browser never holds a token.
 - Sign-up only for `AUTH_ALLOWED_EMAILS`, with the email verified by the provider (a

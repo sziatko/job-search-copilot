@@ -14,7 +14,7 @@ import { API_ORIGIN } from './api';
  * API sends the user to /login or /consent with the request signed into the URL; this
  * plugin posts that query back with every sign-in or consent, so the API can resume it.
  *
- * `apiKeyClient`: /profile's API keys, for n8n and MCP (ADR-0039).
+ * `apiKeyClient`: /settings's API keys, for n8n and MCP (ADR-0039).
  */
 export const authClient = createAuthClient({
   baseURL: API_ORIGIN,

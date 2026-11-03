@@ -12,7 +12,7 @@ const route = getRouteApi('/login');
  * back through the API's callback, which sets the session cookie and then redirects to
  * `callbackURL`. Absolute URLs both: the callback runs on the API's origin, so a bare
  * `/` would land there. A passkey signs in right here (WebAuthn), no redirect.
- * An account is made by a social sign-in only; a passkey is added on /profile after.
+ * An account is made by a social sign-in only; a passkey is added on /settings after.
  */
 export function LoginPage() {
   const { error: callbackError } = route.useSearch();
@@ -67,7 +67,7 @@ export function LoginPage() {
           Sign in with a passkey
         </Button>
       </div>
-      <p>No account yet? Sign in with Google or LinkedIn first, then add a passkey on Profile.</p>
+      <p>No account yet? Sign in with Google or LinkedIn first, then add a passkey on Settings.</p>
     </CenterColumn>
   );
 }

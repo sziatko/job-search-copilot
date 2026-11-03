@@ -9,8 +9,8 @@ and back-button-correct — in the URL, typed and validated.
 ## Decision
 **`@tanstack/react-router`**, code-based routes in `apps/web/src/router.tsx`: `/login`
 and `/consent` outside the sign-in guard; under it (`/_app`) `/`, `/vacancies`,
-`/vacancies/$id`, `/applications`, `/inbox`, `/profile`. A page's search params are
-parsed by its route's `validateSearch` with a zod schema, read with `useSearch({ from })`
+`/vacancies/$id`, `/applications`, `/inbox`, `/profile`, `/settings`. A page's search params
+are parsed by its route's `validateSearch` with a zod schema, read with `useSearch({ from })`
 and written with `useNavigate`. `QueryClientProvider` wraps the `RouterProvider` in
 `main.tsx`.
 

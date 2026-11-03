@@ -10,7 +10,7 @@ async function main() {
   // Identity, not security: whoever runs stdio holds DATABASE_URL (ADR-0039).
   const userId = await verifyApiKey(getPrisma(), env.JSC_API_KEY);
   if (!userId) {
-    throw new Error('JSC_API_KEY is not a valid API key: create one on /profile in the web app');
+    throw new Error('JSC_API_KEY is not a valid API key: create one on /settings in the web app');
   }
   const server = createServer({ userId });
   const transport = new StdioServerTransport();

@@ -14,6 +14,7 @@ test('each sidebar link opens its page', async ({ page }) => {
     ['Application tracker', '/applications', 'Application tracker'],
     ['Inbox', '/inbox', 'Inbox'],
     ['Profile & forms', '/profile', 'Profile & forms'],
+    ['Settings', '/settings', 'Settings'],
     ['Dashboard', '/', 'Dashboard'],
   ]) {
     await nav.getByRole('link', { name: link }).click();
@@ -92,7 +93,7 @@ test.describe('at 390px', () => {
   });
 
   test('every page title fits on one line', async ({ page }) => {
-    for (const path of ['/', '/vacancies', '/applications', '/inbox', '/profile']) {
+    for (const path of ['/', '/vacancies', '/applications', '/inbox', '/profile', '/settings']) {
       await page.goto(path);
       await expect(title(page)).not.toBeEmpty();
       const lines = await title(page).evaluate((el) => {

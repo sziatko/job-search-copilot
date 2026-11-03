@@ -47,6 +47,7 @@ for (const theme of ['light', 'dark'] as const) {
       ['vacancies', '/vacancies'],
       ['applications', '/applications'],
       ['profile', '/profile'],
+      ['settings', '/settings'],
     ]) {
       test(name, async ({ page }) => {
         await open(page, path);

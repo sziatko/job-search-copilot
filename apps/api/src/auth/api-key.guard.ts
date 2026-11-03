@@ -18,7 +18,7 @@ type AuthedRequest = Request & {
 
 /**
  * n8n's and scripts' way in (ADR-0039): a session, else `Authorization: Bearer jsc_…`,
- * a key from /profile. Pair it with `@AllowAnonymous()` — the global AuthGuard runs
+ * a key from /settings. Pair it with `@AllowAnonymous()` — the global AuthGuard runs
  * first and would 401 a key; with it, that guard only looks the session up.
  * Set on each domain controller's class, so a new controller stays closed to keys.
  */
