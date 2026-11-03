@@ -72,8 +72,8 @@ an injection or a bug can delete data, not drop a table. As `postgres`, in `/srv
 
 Then in `/srv/jsc`: `.env.migrate` (`chmod 600`) gets the owner's URL as
 `DATABASE_URL`, `.env`'s `DATABASE_URL` becomes `jsc_app`'s, and `docker compose up -d`.
-After a restore with `--no-acl`, run the `GRANT` and `ALTER DEFAULT PRIVILEGES` lines
-again: they are idempotent, `CREATE ROLE` is not.
+`--no-acl` drops the grants a dump carries, so after a restore with it, run the `GRANT` and
+`ALTER DEFAULT PRIVILEGES` lines again: they are idempotent, `CREATE ROLE` is not.
 
 ## Deploy a version
 

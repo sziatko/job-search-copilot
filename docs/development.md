@@ -39,7 +39,7 @@ setup). Then, after a new clone:
   `.claude` has not pushed;
 - `.claude/settings.local.json` with `"syncClaudeAiSkills": false` — the shared
   `settings.json` does not honour the key, see `.claude/AGENT-SETUP.md`;
-- the skills: `git clone https://github.com/sziatko/job-search-copilot-skills.git skills`
+- the skills: `git clone https://github.com/<owner>/job-search-copilot-skills.git skills`
   (private; without it the skill↔MCP sync test in `apps/mcp` skips), then an empty
   `skills/.git/info/publish-guard-off` — that repo holds real data on purpose;
 - `git config user.name` / `user.email` in each repo, if git has no global identity

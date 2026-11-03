@@ -52,7 +52,7 @@ pipeline.
 | `comments` | `Comment[]` | Every note on the vacancy: [`Comment`](#comment). |
 | `status` | `VacancyStatus` enum, default `NEW` | **The user's call**, a cache of the latest [`StatusChange`](#statuschange). |
 | `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. |
-| `salaryInApplication` | `String?` | Free text ("130 PLN/h"), entered when applying. |
+| `salaryInApplication` | `String?` | Free text ("150 PLN/h"), entered when applying. |
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
 | `statusChanges` | `StatusChange[]` | The journal — see below. |
 
@@ -132,8 +132,8 @@ decision are **different things on different axes**:
   `FILTERED_OUT`, anything else → `NOT_REVIEWED` (`statusAfterAnalysis` in `status.ts`;
   the rule is `core`'s, never an agent's). It only fires from `NEW`, so it never
   clobbers the user's progress ([ADR-0033](decisions/0033-unscored-vacancies-in-one-table.md)).
-  One more machine move, not from `recommendation`: a posting found closed goes from the queue (`NEW`,
-  `NOT_REVIEWED`, `SAVED_FOR_LATER`) to `UNAVAILABLE`, any other row untouched
+  One more machine move, not from `recommendation`: a posting found closed goes from
+  [the queue](#glossary) to `UNAVAILABLE`, any other row untouched
   ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)).
 
 **Status lifecycle** (enforced by the UI, not the DB — the API allows any move,
