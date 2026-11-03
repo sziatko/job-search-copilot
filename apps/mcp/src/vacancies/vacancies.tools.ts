@@ -7,6 +7,7 @@ import {
   RecommendationEnum,
   SaveVacancyItemSchema,
   SubmitAnalysisItemSchema,
+  TAGS_NOTE,
   VacancyStatusEnum,
 } from './vacancies.schemas';
 
@@ -35,8 +36,8 @@ export function registerVacancyTools(
         'analysis, and save_vacancy then attaches the analysis to it. The analysis is ' +
         'written once: an existing applyUrl without one gets this analysis (and the ' +
         'posting text, if it had none); one that has an analysis keeps it, and the ' +
-        `incoming one is discarded. ${ANALYSIS_RULE} Returns { success, vacancy: { id, ` +
-        'company, title } } — `success` is false when the analysis was dropped as a ' +
+        `incoming one is discarded, its tags too. ${ANALYSIS_RULE} Returns { success, ` +
+        'vacancy: { id, company, title } } — `success` is false when the analysis was dropped as a ' +
         'duplicate. Use get_vacancy(id) to read back the full stored record. Saving ' +
         'several vacancies from one analysis run? Use save_vacancies_batch instead.',
       inputSchema: SaveVacancyItemSchema.shape,
@@ -59,8 +60,11 @@ export function registerVacancyTools(
         'without an analysis gets this one; one with an analysis is skipped, not ' +
         'overwritten). Returns one entry per input, same order and same shape as ' +
         'save_vacancy: { success, vacancy: { id, company, title } }. Use this instead of N ' +
-        `separate save_vacancy calls when saving a batch from one analysis run. Max ` +
-        `${BATCH_MAX} per call.`,
+        'separate save_vacancy calls when saving a batch from one analysis run. Not one ' +
+        'transaction: an item rejected for its tags is an error and the batch stops at it. ' +
+        'The items before it stay saved; it and the later ones are not written. Fix it and ' +
+        `send the whole batch again: the saved ones answer success: false. Max ${BATCH_MAX} ` +
+        'per call.',
       inputSchema: { vacancies: z.array(SaveVacancyItemSchema).min(1).max(BATCH_MAX) },
     },
     withDomainErrors(async ({ vacancies: items }) => {
@@ -96,8 +100,9 @@ export function registerVacancyTools(
       title: 'Submit several analyses in one call',
       description:
         'Batch form of submit_analysis, same rule per item, in one transaction: all or ' +
-        'nothing — one item that fails (already analysed, unknown id) writes none of ' +
-        'them; drop it and send the rest again. Returns one entry per input, same order: ' +
+        'nothing — one item that fails (already analysed, unknown id, a bad tag) writes none ' +
+        'of them, their tags included; fix or drop it and send the rest again. Returns one ' +
+        'entry per input, same order: ' +
         `{ success: true, vacancy: { id, company, title } }. Max ${ANALYSIS_BATCH_MAX} per ` +
         'call.',
       inputSchema: {
@@ -116,8 +121,8 @@ export function registerVacancyTools(
       title: 'Get vacancy by id',
       description:
         'Fetch one vacancy including its full text (e.g. for resume tailoring), its ' +
-        'status, every comment — [{ id, createdAt, body, source }], oldest first — and its ' +
-        'status timeline — [{ status, createdAt }], oldest first.',
+        `status, ${TAGS_NOTE}, every comment — [{ id, createdAt, body, source }], oldest ` +
+        'first — and its status timeline — [{ status, createdAt }], oldest first.',
       inputSchema: { id: z.number().int() },
     },
     async ({ id }) => {
@@ -137,8 +142,8 @@ export function registerVacancyTools(
     {
       title: 'Get several vacancies by id',
       description:
-        'Batch form of get_vacancy: each vacancy as get_vacancy returns it, fullText ' +
-        'included, in the order of `ids`. The analysis queue: list_vacancies({ status: ' +
+        'Batch form of get_vacancy: each vacancy as get_vacancy returns it, fullText and ' +
+        'tags included, in the order of `ids`. The analysis queue: list_vacancies({ status: ' +
         "['NEW'], hasText: true }) → get_vacancies_batch → score each → " +
         'submit_analyses_batch. An unknown id is an error naming it. Max ' +
         `${ANALYSIS_BATCH_MAX} per call.`,
@@ -162,9 +167,9 @@ export function registerVacancyTools(
         'triage; then the pipeline: APPLIED … REJECTED); hasText — true: only vacancies ' +
         'with posting text, false: only those without; company, title — ILIKE %term%, ' +
         'case-insensitive; applyUrl — the vacancy with that posting link, raw is fine ' +
-        '(normalized as saved). Each item carries hasAnalysis and hasText; matchScore and ' +
-        'recommendation are null until analysed. Does not include fullText — use ' +
-        `get_vacancy / get_vacancies_batch for that. ${PAGING_NOTE}`,
+        `(normalized as saved). Each item carries hasAnalysis, hasText and ${TAGS_NOTE}; ` +
+        'matchScore and recommendation are null until analysed. Does not include fullText ' +
+        `— use get_vacancy / get_vacancies_batch for that. ${PAGING_NOTE}`,
       inputSchema: {
         recommendation: RecommendationEnum.optional(),
         status: z.array(VacancyStatusEnum).optional(),

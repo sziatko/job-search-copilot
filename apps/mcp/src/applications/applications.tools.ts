@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BATCH_MAX, PAGING_NOTE, pagination } from '../common/schemas';
 import { json, ref, toolError, withDomainErrors } from '../common/tool-result';
-import { VacancyStatusEnum } from '../vacancies/vacancies.schemas';
+import { TAGS_NOTE, VacancyStatusEnum } from '../vacancies/vacancies.schemas';
 import {
   PipelineStatusEnum,
   RecordApplicationItemSchema,
@@ -85,8 +85,9 @@ export function registerApplicationTools(
         'LinkedIn link from an email matches). Each item carries status, ' +
         'statusChangedAt, appliedAt (null if the vacancy skipped APPLIED), salary / CV / ' +
         'cover letter, ' +
-        'company / title / applyUrl / matchScore / recommendation, and `comments` — ' +
-        '[{ id, createdAt, body, source }], oldest first, source ANALYZER | USER | AGENT. ' +
+        `company / title / applyUrl / matchScore / recommendation, ${TAGS_NOTE}, and ` +
+        '`comments` — [{ id, createdAt, body, source }], oldest first, source ANALYZER | ' +
+        'USER | AGENT. ' +
         PAGING_NOTE,
       inputSchema: {
         status: PipelineStatusEnum.optional(),

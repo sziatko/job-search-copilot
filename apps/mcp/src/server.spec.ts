@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
+import {
+  ANALYSIS_BATCH_MAX,
+  getPrisma,
+  MAX_LENGTH,
+  TAGS_PER_VACANCY_MAX,
+  VacancyIntakeService,
+} from '@job-search-copilot/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -57,6 +63,7 @@ describe('job-search-copilot MCP server', () => {
 
   afterEach(async () => {
     await prisma.vacancy.deleteMany({ where: { userId } });
+    await prisma.tag.deleteMany({ where: { userId } });
   });
 
   afterAll(async () => {
@@ -101,9 +108,10 @@ describe('job-search-copilot MCP server', () => {
     const instructions = client.getInstructions() ?? '';
     expect(instructions).toContain('intake_vacancy before analysing');
     expect(instructions).toContain('update_vacancy_status');
+    expect(instructions).toContain('list_tags');
   });
 
-  it('registers exactly the fifteen tools', async () => {
+  it('registers exactly these tools', async () => {
     const client = await connectedClient();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
@@ -113,6 +121,7 @@ describe('job-search-copilot MCP server', () => {
       'intake_vacancies_batch',
       'intake_vacancy',
       'list_applications',
+      'list_tags',
       'list_vacancies',
       'record_application',
       'record_applications_batch',
@@ -120,6 +129,7 @@ describe('job-search-copilot MCP server', () => {
       'save_vacancy',
       'submit_analyses_batch',
       'submit_analysis',
+      'tag_vacancies',
       'update_application',
       'update_vacancy_status',
     ]);
@@ -135,14 +145,14 @@ describe('job-search-copilot MCP server', () => {
     const { tools } = await client.listTools();
     const registered = new Set(tools.map((t) => t.name));
 
-    // A tool is recognised by its noun (`<verb>_vacanc…/application…/analys…`); one
+    // A tool is recognised by its noun (`<verb>_vacanc…/application…/analys…/tag…`); one
     // named after another noun goes unchecked — widen the pattern when one appears.
     const referenced = readdirSync(skillsDir, { withFileTypes: true })
       // A skill is a folder with a SKILL.md — not the clone's own .git.
       .filter((entry) => existsSync(path.join(skillsDir, entry.name, 'SKILL.md')))
       .flatMap((entry) => {
         const text = readFileSync(path.join(skillsDir, entry.name, 'SKILL.md'), 'utf8');
-        return [...text.matchAll(/`([a-z]+_(?:vacanc|application|analys)[a-z_]*)`/g)].map(
+        return [...text.matchAll(/`([a-z]+_(?:vacanc|application|analys|tag)[a-z_]*)`/g)].map(
           (m) => `${entry.name}: ${m[1]}`,
         );
       });
@@ -1028,5 +1038,342 @@ describe('job-search-copilot MCP server', () => {
     } finally {
       await prisma.user.delete({ where: { id: other } });
     }
+  });
+
+  describe('tags', () => {
+    const tagNames = (rows: { name: string }[]) => rows.map((row) => row.name);
+
+    async function call(client: Client, name: string, args: Record<string, unknown>) {
+      return client.callTool({ name, arguments: args });
+    }
+
+    async function saved(client: Client, url: string, tags?: unknown): Promise<number> {
+      const args = { ...validArgs, applyUrl: url, ...(tags !== undefined && { tags }) };
+      const result = await call(client, 'save_vacancy', args);
+      return JSON.parse(textOf(result)).vacancy.id;
+    }
+
+    async function tagsOf(client: Client, id: number): Promise<string[]> {
+      const got = await call(client, 'get_vacancy', { id });
+      return tagNames(JSON.parse(textOf(got)).tags);
+    }
+
+    const tagCount = () => prisma.tag.count({ where: { userId } });
+
+    it('save_vacancy writes tags, answers with its usual ref, and every read carries them', async () => {
+      const client = await connectedClient();
+      const result = await call(client, 'save_vacancy', {
+        ...validArgs,
+        tags: ['Remote', 'Poland'],
+      });
+      const body = JSON.parse(textOf(result));
+      expect(Object.keys(body).sort()).toEqual(['success', 'vacancy']);
+      expect(Object.keys(body.vacancy).sort()).toEqual(['company', 'id', 'title']);
+      const { id } = body.vacancy;
+
+      expect(await tagsOf(client, id)).toEqual(['Poland', 'Remote']);
+      const batch = await call(client, 'get_vacancies_batch', { ids: [id] });
+      expect(tagNames(JSON.parse(textOf(batch))[0].tags)).toEqual(['Poland', 'Remote']);
+      const listed = await call(client, 'list_vacancies', {});
+      expect(tagNames(JSON.parse(textOf(listed)).items[0].tags)).toEqual(['Poland', 'Remote']);
+
+      await call(client, 'record_application', { vacancyId: id });
+      const applications = await call(client, 'list_applications', {});
+      expect(tagNames(JSON.parse(textOf(applications)).items[0].tags)).toEqual([
+        'Poland',
+        'Remote',
+      ]);
+    });
+
+    it('save_vacancy on an analysed row drops the tags with the analysis', async () => {
+      const client = await connectedClient();
+      const id = await saved(client, 'https://example.com/t/resave', ['First']);
+      const again = await call(client, 'save_vacancy', {
+        ...validArgs,
+        applyUrl: 'https://example.com/t/resave',
+        tags: ['Second'],
+      });
+      expect(JSON.parse(textOf(again)).success).toBe(false);
+      expect(await tagsOf(client, id)).toEqual(['First']);
+      expect(await tagCount()).toBe(1);
+    });
+
+    it('save_vacancies_batch writes each item its tags; a rejected item stops there', async () => {
+      const client = await connectedClient();
+      const item = (n: number, tags: string[]) => ({
+        ...validArgs,
+        applyUrl: `https://example.com/t/batch/${n}`,
+        tags,
+      });
+      const result = await call(client, 'save_vacancies_batch', {
+        vacancies: [item(1, ['Remote']), item(2, ['Hybrid'])],
+      });
+      const [one, two] = JSON.parse(textOf(result));
+      expect(await tagsOf(client, one.vacancy.id)).toEqual(['Remote']);
+      expect(await tagsOf(client, two.vacancy.id)).toEqual(['Hybrid']);
+
+      const bad = await call(client, 'save_vacancies_batch', {
+        vacancies: [item(3, ['On-site']), item(4, ['   ']), item(5, ['Remote'])],
+      });
+      expect(bad.isError).toBe(true);
+      expect(textOf(bad)).toContain('blank');
+      const rows = await prisma.vacancy.findMany({ where: { userId }, select: { applyUrl: true } });
+      expect(rows.map((row) => row.applyUrl).sort()).toEqual([
+        'https://example.com/t/batch/1',
+        'https://example.com/t/batch/2',
+        'https://example.com/t/batch/3',
+      ]);
+
+      const retried = await call(client, 'save_vacancies_batch', {
+        vacancies: [item(3, ['On-site']), item(4, ['EU']), item(5, ['Remote'])],
+      });
+      const [three, four, five] = JSON.parse(textOf(retried));
+      expect([three.success, four.success, five.success]).toEqual([false, true, true]);
+      expect(await tagsOf(client, three.vacancy.id)).toEqual(['On-site']);
+      expect(await tagsOf(client, four.vacancy.id)).toEqual(['EU']);
+      expect(await prisma.vacancy.count({ where: { userId } })).toBe(rows.length + 2);
+    });
+
+    it('tag_vacancies ignores a blank name in remove, as any unknown one', async () => {
+      const client = await connectedClient();
+      const id = await queued('https://example.com/t/blank-remove');
+
+      const result = await call(client, 'tag_vacancies', {
+        items: [{ vacancyId: id, add: ['Remote'], remove: ['   '] }],
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(await tagsOf(client, id)).toEqual(['Remote']);
+    });
+
+    it('submit_analysis writes tags; a bad name rejects the analysis too', async () => {
+      const client = await connectedClient();
+      const id = await queued('https://example.com/t/submit');
+      const analysis = { matchScore: 70, recommendation: 'APPLY', estimationComment: 'Fine.' };
+
+      const rejected = await call(client, 'submit_analysis', {
+        id,
+        ...analysis,
+        tags: ['Remote', 'x'.repeat(MAX_LENGTH.tag + 1)],
+      });
+      expect(rejected.isError).toBe(true);
+      expect(textOf(rejected)).toContain(`at most ${MAX_LENGTH.tag}`);
+      const before = JSON.parse(textOf(await call(client, 'get_vacancy', { id })));
+      expect(before).toMatchObject({ status: 'NEW', recommendation: null, tags: [] });
+      expect(await tagCount()).toBe(0);
+
+      const accepted = await call(client, 'submit_analysis', { id, ...analysis, tags: ['Remote'] });
+      expect(Object.keys(JSON.parse(textOf(accepted))).sort()).toEqual(['success', 'vacancy']);
+      expect(await tagsOf(client, id)).toEqual(['Remote']);
+    });
+
+    it('submit_analyses_batch writes tags per item; one failure leaves no tag and no link', async () => {
+      const client = await connectedClient();
+      const one = await queued('https://example.com/t/a');
+      const two = await queued('https://example.com/t/b');
+      const analysed = await saved(client, 'https://example.com/t/c');
+      const analysis = { matchScore: 70, recommendation: 'APPLY', estimationComment: 'Fine.' };
+
+      const failed = await call(client, 'submit_analyses_batch', {
+        analyses: [
+          { id: one, ...analysis, tags: ['Remote'] },
+          { id: analysed, ...analysis, tags: ['Hybrid'] },
+        ],
+      });
+      expect(failed.isError).toBe(true);
+      expect(await tagCount()).toBe(0);
+      expect(await tagsOf(client, one)).toEqual([]);
+
+      await call(client, 'submit_analyses_batch', {
+        analyses: [
+          { id: one, ...analysis, tags: ['Remote'] },
+          { id: two, ...analysis, tags: ['remote', 'Hybrid'] },
+        ],
+      });
+      expect(await tagsOf(client, one)).toEqual(['Remote']);
+      expect(await tagsOf(client, two)).toEqual(['Hybrid', 'Remote']);
+    });
+
+    it('tag_vacancies adds and removes by name, one tag per spelling, and moves no status', async () => {
+      const client = await connectedClient();
+      const id = await saved(client, 'https://example.com/t/tagged', ['Old']);
+      const before = JSON.parse(textOf(await call(client, 'get_vacancy', { id })));
+
+      const result = await call(client, 'tag_vacancies', {
+        items: [{ vacancyId: id, add: [' Remote ', 'remote'], remove: ['OLD', 'Never existed'] }],
+      });
+      expect(JSON.parse(textOf(result))).toEqual({ success: true });
+
+      const after = JSON.parse(textOf(await call(client, 'get_vacancy', { id })));
+      expect(tagNames(after.tags)).toEqual(['Remote']);
+      expect(after.status).toBe(before.status);
+      expect(after.recommendation).toBe(before.recommendation);
+      expect(after.timeline).toEqual(before.timeline);
+    });
+
+    it('list_tags answers each tag with its count, by name, and only this user sees them', async () => {
+      const client = await connectedClient();
+      await saved(client, 'https://example.com/t/list/1', ['Remote', 'Poland']);
+      await saved(client, 'https://example.com/t/list/2', ['Remote']);
+
+      const listed = JSON.parse(textOf(await call(client, 'list_tags', {})));
+      expect(listed).toEqual([
+        { id: expect.any(Number), name: 'Poland', tone: 'NEUTRAL', vacancyCount: 1 },
+        { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL', vacancyCount: 2 },
+      ]);
+
+      const other = randomUUID();
+      await prisma.user.create({
+        data: { id: other, name: 'Other', email: `${other}@example.com` },
+      });
+      try {
+        const stranger = await connectedClient(other);
+        expect(JSON.parse(textOf(await call(stranger, 'list_tags', {})))).toEqual([]);
+      } finally {
+        await prisma.user.delete({ where: { id: other } });
+      }
+    });
+
+    it('tag_vacancies: an unknown, foreign or past-Int4 id reports not found and writes nothing', async () => {
+      const client = await connectedClient();
+      const id = await saved(client, 'https://example.com/t/mine');
+      const other = randomUUID();
+      await prisma.user.create({
+        data: { id: other, name: 'Other', email: `${other}@example.com` },
+      });
+      try {
+        const stranger = await connectedClient(other);
+        const foreign = await call(stranger, 'tag_vacancies', {
+          items: [{ vacancyId: id, add: ['Mine now'] }],
+        });
+        expect(foreign.isError).toBe(true);
+        expect(textOf(foreign)).toContain('not found');
+        expect(await prisma.tag.count({ where: { userId: other } })).toBe(0);
+      } finally {
+        await prisma.user.delete({ where: { id: other } });
+      }
+
+      const huge = 99_999_999_999;
+      const pastInt4 = await call(client, 'tag_vacancies', {
+        items: [
+          { vacancyId: id, add: ['Remote'] },
+          { vacancyId: huge, add: ['Hybrid'] },
+        ],
+      });
+      expect(pastInt4.isError).toBe(true);
+      expect(textOf(pastInt4)).toContain(`Vacancy ${huge} not found`);
+      expect(await tagCount()).toBe(0);
+
+      const pastSafe = await call(client, 'tag_vacancies', {
+        items: [{ vacancyId: Number.MAX_SAFE_INTEGER + 1 }],
+      });
+      expect(pastSafe.isError).toBe(true);
+      expect(textOf(pastSafe)).not.toContain('Internal error');
+    });
+
+    it('tag_vacancies: over the limit counted with the existing tags writes nothing', async () => {
+      const client = await connectedClient();
+      const names = (from: number, count: number) =>
+        Array.from({ length: count }, (_, i) => `Tag ${from + i}`);
+      const id = await saved(client, 'https://example.com/t/limit', names(0, TAGS_PER_VACANCY_MAX));
+
+      const over = await call(client, 'tag_vacancies', {
+        items: [{ vacancyId: id, add: ['One more'] }],
+      });
+      expect(over.isError).toBe(true);
+      expect(textOf(over)).toContain(`more than ${TAGS_PER_VACANCY_MAX}`);
+      expect(await tagCount()).toBe(TAGS_PER_VACANCY_MAX);
+
+      const swap = await call(client, 'tag_vacancies', {
+        items: [{ vacancyId: id, add: ['One more'], remove: ['Tag 0'] }],
+      });
+      expect(swap.isError).toBeFalsy();
+      expect(await tagsOf(client, id)).toContain('One more');
+    });
+
+    // `null` must not reach core, where it would be an internal error, and a list of names is
+    // capped before any query.
+    describe.each([
+      ['null', null],
+      [
+        'a list past the limit',
+        Array.from({ length: TAGS_PER_VACANCY_MAX + 1 }, (_, i) => `T${i}`),
+      ],
+      ['a name that is not a string', [1]],
+    ])('%s for the names is refused, with nothing written', (_label, names) => {
+      const analysis = { matchScore: 70, recommendation: 'APPLY', estimationComment: 'Fine.' };
+
+      it('on the two save tools', async () => {
+        const client = await connectedClient();
+        const args = { ...validArgs, applyUrl: 'https://example.com/t/refused', tags: names };
+        const one = await call(client, 'save_vacancy', args);
+        const many = await call(client, 'save_vacancies_batch', { vacancies: [args] });
+        expect([one.isError, many.isError]).toEqual([true, true]);
+        expect(await prisma.vacancy.count({ where: { userId } })).toBe(0);
+        expect(await tagCount()).toBe(0);
+      });
+
+      it('on the two submit tools', async () => {
+        const client = await connectedClient();
+        const id = await queued('https://example.com/t/refused');
+        const args = { id, ...analysis, tags: names };
+        const one = await call(client, 'submit_analysis', args);
+        const many = await call(client, 'submit_analyses_batch', { analyses: [args] });
+        expect([one.isError, many.isError]).toEqual([true, true]);
+        const got = JSON.parse(textOf(await call(client, 'get_vacancy', { id })));
+        expect(got.recommendation).toBeNull();
+        expect(await tagCount()).toBe(0);
+      });
+
+      it('on tag_vacancies, in `add` and in `remove`', async () => {
+        const client = await connectedClient();
+        const id = await saved(client, 'https://example.com/t/refused');
+        const add = await call(client, 'tag_vacancies', { items: [{ vacancyId: id, add: names }] });
+        const remove = await call(client, 'tag_vacancies', {
+          items: [{ vacancyId: id, remove: names }],
+        });
+        expect([add.isError, remove.isError]).toEqual([true, true]);
+        expect(await tagCount()).toBe(0);
+      });
+    });
+
+    it('tag_vacancies rejects an empty or oversized list of items', async () => {
+      const client = await connectedClient();
+      const empty = await call(client, 'tag_vacancies', { items: [] });
+      expect(empty.isError).toBe(true);
+      const items = Array.from({ length: ANALYSIS_BATCH_MAX + 1 }, (_, i) => ({
+        vacancyId: i + 1,
+      }));
+      const oversized = await call(client, 'tag_vacancies', { items });
+      expect(oversized.isError).toBe(true);
+    });
+
+    it('the descriptions tell the rule: the write tools name list_tags, the reads name tags', async () => {
+      const client = await connectedClient();
+      const { tools } = await client.listTools();
+      const tool = (name: string) => {
+        const found = tools.find((t) => t.name === name);
+        if (!found) throw new Error(`no tool ${name}`);
+        return found;
+      };
+
+      for (const name of [
+        'save_vacancy',
+        'save_vacancies_batch',
+        'submit_analysis',
+        'submit_analyses_batch',
+      ]) {
+        expect(JSON.stringify(tool(name).inputSchema)).toContain('list_tags');
+      }
+      expect(tool('tag_vacancies').description).toContain('list_tags first');
+      for (const name of [
+        'get_vacancy',
+        'get_vacancies_batch',
+        'list_vacancies',
+        'list_applications',
+      ]) {
+        expect(tool(name).description).toContain('tags');
+      }
+    });
   });
 });

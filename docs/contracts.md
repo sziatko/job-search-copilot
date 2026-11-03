@@ -104,15 +104,16 @@ each feature owns its `*.tools.ts`, and a `*.schemas.ts` where its inputs are sh
 (intake's sit in its tools file). Inputs are zod schemas; outputs
 are `JSON.stringify(result, null, 2)` in one text block; a `DomainError` is
 `{ isError: true }` with its message. The write tools answer with a short confirmation
-— `success` and the row's `id`, `company`, `title`; intake's `{ new }` — never the
-text just sent.
+— `success` and the row's `id`, `company`, `title`; intake's `{ new }`; `tag_vacancies`'
+`{ success: true }` — never the text just sent.
 
 | Group | Tools |
 | --- | --- |
-| Save analysed | `save_vacancy`, `save_vacancies_batch` (not transactional) |
+| Save analysed | `save_vacancy`, `save_vacancies_batch` (not transactional), both with optional `tags` (names) |
 | Intake | `intake_vacancy`, `intake_vacancies_batch` (no posting text over MCP) |
-| The analysis queue | `list_vacancies` (`status: ['NEW'], hasText: true`) → `get_vacancies_batch` (1–10) → `submit_analysis` / `submit_analyses_batch` (1–10, one transaction) |
-| Read | `get_vacancy`, `list_vacancies`, `list_applications` (`cursor` paging, as REST) |
+| The analysis queue | `list_vacancies` (`status: ['NEW'], hasText: true`) → `get_vacancies_batch` (1–10) → `submit_analysis` / `submit_analyses_batch` (1–10, one transaction), both with optional `tags` (names); a bad one rejects the analysis |
+| Read | `get_vacancy`, `list_vacancies`, `list_applications` (`cursor` paging, as REST), each row with `tags` |
+| Tags | `list_tags`, `tag_vacancies` (1–10, `{ vacancyId, add?, remove? }`, one transaction). Rename, tone and delete are not in MCP ([ADR-0042](decisions/0042-tags-written-by-anyone.md)) |
 | Applications | `record_application`, `record_applications_batch` (one transaction), `update_application`, `update_vacancy_status`, `add_comment` |
 
 Rules that span tools go to the client as the server's `instructions`

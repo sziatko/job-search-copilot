@@ -122,7 +122,7 @@ describe('MCP over HTTP', () => {
       }),
     );
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(17);
     await client.close();
   });
 
@@ -133,7 +133,7 @@ describe('MCP over HTTP', () => {
         requestInit: { headers: { Authorization: `Bearer ${await apiKey()}` } },
       }),
     );
-    expect((await client.listTools()).tools).toHaveLength(15);
+    expect((await client.listTools()).tools).toHaveLength(17);
     await client.close();
   });
 

@@ -1,4 +1,9 @@
-import { MAX_LENGTH, Recommendation, VacancyStatus } from '@job-search-copilot/core';
+import {
+  MAX_LENGTH,
+  Recommendation,
+  TAGS_PER_VACANCY_MAX,
+  VacancyStatus,
+} from '@job-search-copilot/core';
 import { z } from 'zod';
 import { matchScore } from '../common/schemas';
 
@@ -6,6 +11,19 @@ import { matchScore } from '../common/schemas';
 export const RecommendationEnum = z.enum(Recommendation);
 
 export const VacancyStatusEnum = z.enum(VacancyStatus);
+
+/** Tag names in a write. More than a vacancy can hold is refused here, before any query; a
+ * name's own rules and the limit counted with the vacancy's tags are core's. */
+export const TagNamesSchema = z.array(z.string()).max(TAGS_PER_VACANCY_MAX).optional();
+
+/** What a read tool's description says about the tags it returns. */
+export const TAGS_NOTE = '`tags` — [{ id, name, tone }], by name';
+
+const analysisTags = TagNamesSchema.describe(
+  'Tags for the vacancy, by name: list_tags first, reuse an existing name; a new name creates ' +
+    `a tag. Written with the analysis: a blank name, one over ${MAX_LENGTH.tag} characters or ` +
+    `more than ${TAGS_PER_VACANCY_MAX} tags on the vacancy rejects the analysis too.`,
+);
 
 const estimationComment = z
   .string()
@@ -27,6 +45,7 @@ export const SaveVacancyItemSchema = z.object({
   matchScore,
   recommendation: RecommendationEnum,
   estimationComment,
+  tags: analysisTags,
 });
 
 export const SubmitAnalysisItemSchema = z.object({
@@ -34,4 +53,5 @@ export const SubmitAnalysisItemSchema = z.object({
   matchScore,
   recommendation: RecommendationEnum,
   estimationComment,
+  tags: analysisTags,
 });
