@@ -14,7 +14,7 @@ const MINUTE = 60_000;
 const DISPOSABLE_DB = /_(e2e|test|demo)$/;
 
 /**
- * Makes `userId`'s data the seed (ADR-0037): deletes that user's vacancies, then writes
+ * Makes `userId`'s data the seed (ADR-0037): deletes that user's vacancies and tags, then writes
  * SEED_VACANCIES through the services as that user, so the journal and the comments are
  * the ones the app itself writes. Users, sessions and other users' vacancies are left
  * alone. Then every date is moved back
@@ -35,6 +35,7 @@ export async function resetToSeed(
   }
 
   await db.vacancy.deleteMany();
+  await db.tag.deleteMany();
   const vacancies = new VacancyService(prisma);
   const applications = new ApplicationService(prisma);
   await new VacancyIntakeService(prisma).intakeMany(

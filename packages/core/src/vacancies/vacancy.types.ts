@@ -1,4 +1,5 @@
 import type { CommentSource, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
+import type { TagRef } from '../tags/tag.types';
 
 export interface VacancyComment {
   id: number;
@@ -25,6 +26,9 @@ export interface SubmitAnalysisInput {
   recommendation: string;
   /** Written as the vacancy's `ANALYZER` comment; a blank one writes none. */
   estimationComment: string;
+  /** Names to put on the vacancy, in the analysis's transaction: a bad one rejects the
+   * analysis too (`attachTags`). */
+  tags?: string[];
 }
 
 /** Max analyses per submitAnalyses / get_vacancies_batch call: each posting is read and
@@ -44,15 +48,18 @@ export const MAX_LENGTH = {
   note: 20_000,
   /** a posting's whole text */
   fullText: 200_000,
+  /** a tag's name: a short label in a table row. Enforced by core too (`parseTagName`). */
+  tag: 50,
 } as const;
 
 /** getById / updateStatus: the whole row and every comment, oldest first, plus the
  * analyzer's (the first `ANALYZER` one), or null when there is none; `timeline` is
- * every `StatusChange`, oldest first. */
+ * every `StatusChange`, oldest first; `tags` by name. */
 export type VacancyDetail = Vacancy & {
   comments: VacancyComment[];
   estimationComment: string | null;
   timeline: { status: VacancyStatus; createdAt: Date }[];
+  tags: TagRef[];
 };
 
 export interface SaveManyVacanciesResult {
@@ -69,6 +76,8 @@ export interface SaveVacancyInput {
   recommendation: string;
   /** Written as the vacancy's `ANALYZER` comment; a blank one writes none. */
   estimationComment: string;
+  /** See `SubmitAnalysisInput.tags`. Dropped with the analysis when the row has one. */
+  tags?: string[];
 }
 
 export interface ListVacanciesFilters {
@@ -128,6 +137,8 @@ export type VacancyListItem = {
   estimationComment: string | null;
   status: VacancyStatus;
   statusChangedAt: Date;
+  /** By name. */
+  tags: TagRef[];
   /**
    * How many vacancies are this row's company (an equal `companyGroupKey`, ADR-0032),
    * counting this row itself — the rows `sameCompanyAs` lists. Derived on every list

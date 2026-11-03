@@ -273,13 +273,15 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
     live in a separate private repo cloned into the gitignored `skills/`.
 11. **Every domain query is scoped to its user.** `Vacancy`
     has a `userId`; core's services take it as their first argument and query only
-    through `forUser(db, userId)`, which adds the owner to every `Vacancy`, `Comment`
-    and `StatusChange` query and throws on any other model. The services hold the raw
-    client as `Unscoped` (`$extends` only), so a query on it does not compile — one
-    would read every user's rows. Another user's row answers like a missing one (404,
-    never 403).
+    through `forUser(db, userId)`, which adds the owner to every `Vacancy`, `Comment`,
+    `StatusChange`, `Tag` and `VacancyTag` query and throws on any other model. The
+    services hold the raw client as `Unscoped` (`$extends` only), so a query on it does
+    not compile — one would read every user's rows. Another user's row answers like a
+    missing one (404, never 403). A tag link cannot cross users even past `forUser`: its
+    two foreign keys share one `userId`.
     → [ADR-0038](decisions/0038-multi-user-shared-schema.md),
-    [ADR-0039](decisions/0039-api-keys-per-user.md)
+    [ADR-0039](decisions/0039-api-keys-per-user.md),
+    [ADR-0042](decisions/0042-tags-written-by-anyone.md)
 12. **The web UI is built from `components/ui`; a page never imports another page.** A
     page's markup comes from the primitives there, which own their styles; no new
     component class goes into `index.css`. Nothing fails when a page styles a

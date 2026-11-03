@@ -42,6 +42,7 @@ choice (a status code, an index type) is a section of
 | [0039](0039-api-keys-per-user.md) | API keys per user, for n8n and MCP |
 | [0040](0040-machine-moves-queue-to-unavailable.md) | A machine moves only the queue, to `UNAVAILABLE` |
 | [0041](0041-one-origin-images-from-ghcr.md) | One origin through Caddy, images from GHCR, the migration as a one-shot service |
+| [0042](0042-tags-written-by-anyone.md) | Tags are written by anyone, the analyzer included |
 
 A missing number (0017, 0018, 0021, 0026, 0028, 0036) is a deleted or unused one. A
 replaced ADR is named on its successor's `Replaces:` line, and `git log --all --

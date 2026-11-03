@@ -14,10 +14,13 @@ import { configureApp } from '../src/setup-app';
 /** The users `signIn` and `createApiKey` made in this file, not yet deleted. */
 const users: string[] = [];
 
-/** Deletes the vacancies of the users made here (an `afterEach`); comments and status
- * changes go with them. Other files' rows stay, so files can run at the same time. */
+/** Deletes the vacancies and tags of the users made here (an `afterEach`); comments and
+ * status changes go with them, and a tag's unique name cannot conflict with the next test.
+ * Other files' rows stay, so files can run at the same time. */
 export async function deleteTestVacancies(): Promise<void> {
-  await getPrisma().vacancy.deleteMany({ where: { userId: { in: users } } });
+  const where = { userId: { in: users } };
+  await getPrisma().vacancy.deleteMany({ where });
+  await getPrisma().tag.deleteMany({ where });
 }
 
 /** Deletes the users made here (an `afterAll`); sessions, keys and vacancies go with

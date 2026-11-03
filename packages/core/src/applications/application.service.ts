@@ -1,6 +1,12 @@
-import type { CommentSource, VacancyStatus } from '@prisma/client';
-import { Prisma } from '@prisma/client';
-import { forUser, orNotFound, type Unscoped, type UserDb, type UserTx } from '../db/for-user';
+import type { CommentSource, Prisma, VacancyStatus } from '@prisma/client';
+import {
+  forUser,
+  isPrismaError,
+  orNotFound,
+  type Unscoped,
+  type UserDb,
+  type UserTx,
+} from '../db/for-user';
 import { textFilters } from '../db/like';
 import { cursorArgs, toCursorPage } from '../db/paging';
 import { getPrisma } from '../db/prisma-client';
@@ -22,6 +28,7 @@ import {
   timedOutWhere,
   writeStatus,
 } from '../domain/status';
+import { VACANCY_TAGS, withTags } from '../domain/tags';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from '../domain/url';
 import type {
   ApplicationListItem,
@@ -49,6 +56,7 @@ const APPLICATION_SELECT = {
   matchScore: true,
   recommendation: true,
   comments: ALL_COMMENTS,
+  tags: VACANCY_TAGS,
   // appliedAt: the latest APPLIED row — a vacancy can be applied to, set back, and
   // applied to again.
   statusChanges: {
@@ -69,7 +77,7 @@ const PIPELINE: VacancyStatus[] = [...PIPELINE_STATUSES];
 /** `now` is the timeout clock's; a list passes the one its `where` used. */
 function flatten({ statusChanges, ...row }: ApplicationRow, now = new Date()): ApplicationListItem {
   return {
-    ...row,
+    ...withTags(row),
     timedOut: isTimedOut(row.status, row.statusChangedAt, now),
     appliedAt: statusChanges[0]?.createdAt ?? null,
   };
@@ -382,7 +390,7 @@ async function resolveVacancy(
     return { vacancy: created, resolution: 'created-vacancy', vacancyCreated: true };
   } catch (err) {
     // The url was looked up above, so only a concurrent write gets here.
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    if (isPrismaError(err, 'P2002')) {
       throw new InvalidApplicationInputError(
         `Could not create a vacancy for "${company}" / "${title}": its applyUrl ` +
           `(${applyUrl}) already belongs ` +

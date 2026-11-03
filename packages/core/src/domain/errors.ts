@@ -41,5 +41,14 @@ export class AlreadyAnalysedError extends DomainError {}
 /** No vacancy has this id. */
 export class VacancyNotFoundError extends DomainError {}
 
+/** No tag of this user's has this id. */
+export class TagNotFoundError extends DomainError {}
+
+/** Another tag of this user's already has this name, in any spelling. */
+export class TagNameTakenError extends DomainError {}
+
+/** A tag name blank or over `MAX_LENGTH.tag`, or a vacancy over `TAGS_PER_VACANCY_MAX`. */
+export class InvalidTagsError extends DomainError {}
+
 /** An API key over its rate limit (`API_KEY_OPTIONS`, ADR-0039). */
 export class RateLimitedError extends DomainError {}

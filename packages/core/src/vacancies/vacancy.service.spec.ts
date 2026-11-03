@@ -6,13 +6,17 @@ import {
   AlreadyAnalysedError,
   AnalysedNotNewError,
   InvalidRecommendationError,
+  InvalidTagsError,
   SameStatusError,
   VacancyNotFoundError,
 } from '../domain/errors';
 import { companyGroupKey } from '../domain/identity';
 import { VacancyIntakeService } from '../intake/vacancy-intake.service';
+import { TagService } from '../tags/tag.service';
+import { TAGS_PER_VACANCY_MAX } from '../tags/tag.types';
 import { VacancyService } from './vacancy.service';
 import type { ListVacanciesFilters, SaveVacancyInput, VacancyListItem } from './vacancy.types';
+import { ANALYSIS_BATCH_MAX } from './vacancy.types';
 
 /** Every call acts as this test's user (ADR-0038). */
 let userId: string;
@@ -1050,6 +1054,175 @@ describe('VacancyService', () => {
 
         expect(countsByCompany(items)['A\\B']).toBe(1);
       });
+    });
+  });
+
+  describe('tags', () => {
+    const tagService = new TagService();
+    const tagNames = async () => (await tagService.list(userId)).map((tag) => tag.name);
+    /** The names on a vacancy, as the detail reads them. */
+    const on = async (id: number) =>
+      ((await service.getById(userId, id))?.tags ?? []).map((tag) => tag.name);
+
+    it('save writes them with a new row', async () => {
+      const { vacancy } = await service.save(userId, input({ tags: ['Remote', 'poland'] }));
+      expect(await on(vacancy.id)).toEqual(['poland', 'Remote']);
+    });
+
+    it('save writes them when it attaches an analysis', async () => {
+      const id = await queued(1);
+      await service.save(
+        userId,
+        input({ applyUrl: 'https://example.com/queue/1', tags: ['Remote'] }),
+      );
+      expect(await on(id)).toEqual(['Remote']);
+    });
+
+    it('save on an analysed row drops them, as it drops the analysis', async () => {
+      const { vacancy } = await service.save(userId, input());
+      const again = await service.save(userId, input({ tags: ['Remote'] }));
+
+      expect([again.created, again.attached]).toEqual([false, false]);
+      expect(await on(vacancy.id)).toEqual([]);
+      expect(await tagNames()).toEqual([]);
+    });
+
+    it('submitAnalysis writes them', async () => {
+      const id = await queued(1);
+      await service.submitAnalysis(userId, { id, ...analysis, tags: ['Remote'] });
+      expect(await on(id)).toEqual(['Remote']);
+    });
+
+    it('submitAnalysis on an analysed row writes no tag', async () => {
+      const id = await queued(1);
+      await service.submitAnalysis(userId, { id, ...analysis });
+
+      await expect(
+        service.submitAnalysis(userId, { id, ...analysis, tags: ['Remote'] }),
+      ).rejects.toBeInstanceOf(AlreadyAnalysedError);
+
+      expect(await tagNames()).toEqual([]);
+    });
+
+    it('a bad tag rejects the analysis, and the row stays in the queue', async () => {
+      const id = await queued(1);
+
+      await expect(
+        service.submitAnalysis(userId, { id, ...analysis, tags: ['Remote', '  '] }),
+      ).rejects.toBeInstanceOf(InvalidTagsError);
+
+      expect((await service.getById(userId, id))?.status).toBe('NEW');
+      expect(await tagNames()).toEqual([]);
+    });
+
+    it('a batch with one rejected item writes no tag at all', async () => {
+      const [a, b] = [await queued(1), await queued(2)];
+      await service.submitAnalysis(userId, { id: b, ...analysis });
+
+      await expect(
+        service.submitAnalyses(userId, [
+          { id: a, ...analysis, tags: ['Remote'] },
+          { id: b, ...analysis, tags: ['Poland'] },
+        ]),
+      ).rejects.toBeInstanceOf(AlreadyAnalysedError);
+
+      expect(await on(a)).toEqual([]);
+      expect(await tagNames()).toEqual([]);
+    });
+
+    it('parallel batches whose items add new names in opposite orders all land', async () => {
+      const ids: number[] = [];
+      for (let n = 0; n < 6; n++) ids.push(await queued(n));
+      const zeta = (id: number) => ({ id, ...analysis, tags: ['Zeta'] });
+      const alpha = (id: number) => ({ id, ...analysis, tags: ['Alpha'] });
+
+      await Promise.all([
+        service.submitAnalyses(userId, [zeta(ids[0]), alpha(ids[1])]),
+        service.submitAnalyses(userId, [alpha(ids[2]), zeta(ids[3])]),
+        service.submitAnalyses(userId, [zeta(ids[4]), alpha(ids[5])]),
+      ]);
+
+      expect(await tagNames()).toEqual(['Alpha', 'Zeta']);
+    });
+
+    it('one vacancy analysed at once alone and in a batch: one wins, no deadlock', async () => {
+      for (let n = 0; n < 5; n++) {
+        const id = await queued(n);
+        const tags = [`New ${n}`];
+
+        const results = await Promise.allSettled([
+          service.submitAnalysis(userId, { id, ...analysis, tags }),
+          service.submitAnalyses(userId, [{ id, ...analysis, tags }]),
+        ]);
+
+        const lost = results.flatMap((result) =>
+          result.status === 'rejected' ? [result.reason] : [],
+        );
+        expect(lost).toHaveLength(1);
+        expect(lost[0]).toBeInstanceOf(AlreadyAnalysedError);
+      }
+    });
+
+    it('a bad tag in save leaves no new row, and a queued row in the queue', async () => {
+      await expect(service.save(userId, input({ tags: ['  '] }))).rejects.toBeInstanceOf(
+        InvalidTagsError,
+      );
+      expect((await service.list(userId, { applyUrl: input().applyUrl })).total).toBe(0);
+
+      const id = await queued(1);
+      await expect(
+        service.save(userId, input({ applyUrl: 'https://example.com/queue/1', tags: ['  '] })),
+      ).rejects.toBeInstanceOf(InvalidTagsError);
+      expect(await service.getById(userId, id)).toMatchObject({
+        status: 'NEW',
+        recommendation: null,
+      });
+    });
+
+    it('an analysis over the tag limit is rejected whole', async () => {
+      const id = await queued(1);
+      const tags = Array.from({ length: TAGS_PER_VACANCY_MAX + 1 }, (_, i) => `tag ${i}`);
+
+      await expect(
+        service.submitAnalysis(userId, { id, ...analysis, tags }),
+      ).rejects.toBeInstanceOf(InvalidTagsError);
+
+      expect(await service.getById(userId, id)).toMatchObject({ status: 'NEW', tags: [] });
+      expect(await tagNames()).toEqual([]);
+    });
+
+    it('a full batch at the limit fits the transaction timeout', async () => {
+      const ids: number[] = [];
+      for (let n = 0; n < ANALYSIS_BATCH_MAX; n++) ids.push(await queued(n));
+      const tags = Array.from({ length: TAGS_PER_VACANCY_MAX }, (_, i) => `tag ${i}`);
+
+      await service.submitAnalyses(
+        userId,
+        ids.map((id) => ({ id, ...analysis, tags })),
+      );
+
+      expect(await on(ids[0])).toHaveLength(TAGS_PER_VACANCY_MAX);
+    });
+
+    it('list, getById and a status change carry them by name, with id and tone', async () => {
+      const { vacancy } = await service.save(userId, input({ tags: ['Remote', 'poland'] }));
+      const { id: dream } = await tagService.create(userId, { name: 'Dream', tone: 'GOOD' });
+      await tagService.tagVacancies(userId, [{ vacancyId: vacancy.id, add: ['dream'] }]);
+      const expected = [
+        { id: dream, name: 'Dream', tone: 'GOOD' },
+        { id: expect.any(Number), name: 'poland', tone: 'NEUTRAL' },
+        { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' },
+      ];
+
+      expect((await service.list(userId)).items[0].tags).toEqual(expected);
+      expect((await service.getById(userId, vacancy.id))?.tags).toEqual(expected);
+      expect((await service.updateStatus(userId, vacancy.id, 'DECLINED')).tags).toEqual(expected);
+    });
+
+    it('an untagged vacancy reads as an empty list', async () => {
+      const { vacancy } = await service.save(userId, input());
+      expect((await service.list(userId)).items[0].tags).toEqual([]);
+      expect((await service.getById(userId, vacancy.id))?.tags).toEqual([]);
     });
   });
 

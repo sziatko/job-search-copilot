@@ -1,6 +1,12 @@
-import type { CommentSource, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
-import { Prisma } from '@prisma/client';
-import { forUser, orNotFound, type Unscoped, type UserDb, type UserTx } from '../db/for-user';
+import type { CommentSource, Prisma, Recommendation, Vacancy, VacancyStatus } from '@prisma/client';
+import {
+  forUser,
+  isPrismaError,
+  orNotFound,
+  type Unscoped,
+  type UserDb,
+  type UserTx,
+} from '../db/for-user';
 import { textFilters } from '../db/like';
 import { cursorArgs, toCursorPage } from '../db/paging';
 import { getPrisma } from '../db/prisma-client';
@@ -11,6 +17,7 @@ import { matchKeys } from '../domain/identity';
 import { usablePostingText } from '../domain/posting-text';
 import { parseRecommendation } from '../domain/recommendation';
 import { commentOn, firstStatus, statusAfterAnalysis, writeStatus } from '../domain/status';
+import { attachTags, createTags, lockVacancies, VACANCY_TAGS, withTags } from '../domain/tags';
 import { applyUrlKey, buildSyntheticApplyUrl, normalizeApplyUrl } from '../domain/url';
 import type {
   ListVacanciesFilters,
@@ -47,6 +54,7 @@ const DETAIL_INCLUDE = {
     select: { status: true, createdAt: true },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   },
+  tags: VACANCY_TAGS,
 } satisfies Prisma.VacancyInclude;
 
 /** The row with all its comments, plus the analyzer's (the first `ANALYZER` one)
@@ -56,7 +64,7 @@ function toDetail({
   ...row
 }: Prisma.VacancyGetPayload<{ include: typeof DETAIL_INCLUDE }>): VacancyDetail {
   return {
-    ...row,
+    ...withTags(row),
     estimationComment: row.comments.find((c) => c.source === 'ANALYZER')?.body ?? null,
     timeline: statusChanges,
   };
@@ -85,6 +93,7 @@ const LIST_SELECT = {
   comments: ANALYZER_COMMENT,
   status: true,
   statusChangedAt: true,
+  tags: VACANCY_TAGS,
 } satisfies Prisma.VacancySelect;
 
 interface Analysis {
@@ -94,6 +103,7 @@ interface Analysis {
   /** Filled in when the row has no text yet; never replaces one. Already through
    * `usablePostingText`. */
   fullText?: string | null;
+  tags: string[];
 }
 
 function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
@@ -101,6 +111,7 @@ function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
     matchScore: input.matchScore,
     recommendation: parseRecommendation(input.recommendation),
     estimationComment: input.estimationComment,
+    tags: input.tags ?? [],
   };
 }
 
@@ -113,10 +124,12 @@ function toAnalysis(input: Omit<SubmitAnalysisInput, 'id'>): Analysis {
  * takes the row lock, so a concurrent analysis of the same row waits for this one and
  * then finds it analysed. From NEW the rule's status follows, before the analysis — the
  * DB refuses an analysis on a NEW row and neither CHECK is deferrable. Any other status
- * (a pipeline placeholder) is left as it is.
+ * (a pipeline placeholder) is left as it is. The tags go last: a rejected analysis never
+ * reaches them, and a rejected tag rolls the analysis back.
  */
 async function writeAnalysis(
   db: UserTx,
+  userId: string,
   id: number,
   analysis: Analysis,
   at: Date,
@@ -136,7 +149,7 @@ async function writeAnalysis(
     await writeStatus(db, id, statusAfterAnalysis(analysis.recommendation), at);
   }
   const estimationComment = analysis.estimationComment.trim();
-  return db.vacancy.update({
+  const vacancy = await db.vacancy.update({
     where: { id },
     data: {
       matchScore: analysis.matchScore,
@@ -147,6 +160,8 @@ async function writeAnalysis(
       }),
     },
   });
+  await attachTags(db, userId, id, analysis.tags);
+  return vacancy;
 }
 
 /**
@@ -232,7 +247,9 @@ export class VacancyService {
     const analysis = { ...toAnalysis(input), fullText };
     const at = new Date();
     if (existing) {
-      const vacancy = await db.$transaction((db) => writeAnalysis(db, existing.id, analysis, at));
+      const vacancy = await db.$transaction((db) =>
+        writeAnalysis(db, userId, existing.id, analysis, at),
+      );
       return { created: false, attached: true, vacancy };
     }
     try {
@@ -249,12 +266,12 @@ export class VacancyService {
           },
           select: { id: true },
         });
-        return writeAnalysis(db, id, analysis, at);
+        return writeAnalysis(db, userId, id, analysis, at);
       });
       return { created: true, attached: false, vacancy };
     } catch (err) {
       // Lost a race with a concurrent save of the same applyUrl — the other write won.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      if (isPrismaError(err, 'P2002')) {
         const raced = await db.vacancy.findUnique({ where });
         if (raced) {
           return { created: false, attached: false, vacancy: raced };
@@ -273,7 +290,7 @@ export class VacancyService {
    */
   submitAnalysis(userId: string, { id, ...input }: SubmitAnalysisInput): Promise<Vacancy> {
     return forUser(this.db, userId).$transaction((db) =>
-      writeAnalysis(db, id, toAnalysis(input), new Date()),
+      writeAnalysis(db, userId, id, toAnalysis(input), new Date()),
     );
   }
 
@@ -283,9 +300,19 @@ export class VacancyService {
   submitAnalyses(userId: string, inputs: SubmitAnalysisInput[]): Promise<Vacancy[]> {
     return forUser(this.db, userId).$transaction(async (db) => {
       const at = new Date();
+      await lockVacancies(
+        db,
+        userId,
+        inputs.map((input) => input.id),
+      );
+      await createTags(
+        db,
+        userId,
+        inputs.flatMap((input) => input.tags ?? []),
+      );
       const rows: Vacancy[] = [];
       for (const { id, ...input } of inputs) {
-        rows.push(await writeAnalysis(db, id, toAnalysis(input), at));
+        rows.push(await writeAnalysis(db, userId, id, toAnalysis(input), at));
       }
       return rows;
     });
@@ -360,7 +387,14 @@ export class VacancyService {
     ]);
 
     const { items, nextCursor } = toCursorPage(rows, cursor, limit);
-    return { items: await withDerivedFields(db, items.map(withEstimation)), total, nextCursor };
+    return {
+      items: await withDerivedFields(
+        db,
+        items.map((row) => withTags(withEstimation(row))),
+      ),
+      total,
+      nextCursor,
+    };
   }
 
   /** Moves the vacancy to `status` through writeStatus — a repeated pipeline status is

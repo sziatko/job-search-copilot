@@ -8,6 +8,7 @@ import {
   InvalidApplicationInputError,
   VacancyNotFoundError,
 } from '../domain/errors';
+import { TagService } from '../tags/tag.service';
 import { VacancyService } from '../vacancies/vacancy.service';
 import { ApplicationService } from './application.service';
 
@@ -71,6 +72,24 @@ async function seedVacancy(
 }
 
 describe('ApplicationService', () => {
+  it("list, getById and every write carry the vacancy's tags", async () => {
+    const { application } = await applications.record(userId, { company: 'Acme', title: 'Dev' });
+    const { id } = application;
+    expect(application.tags).toEqual([]);
+    await new TagService().tagVacancies(userId, [{ vacancyId: id, add: ['Remote', 'poland'] }]);
+    const expected = [
+      { id: expect.any(Number), name: 'poland', tone: 'NEUTRAL' },
+      { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' },
+    ];
+
+    expect((await applications.list(userId)).items[0].tags).toEqual(expected);
+    expect((await applications.getById(userId, id))?.tags).toEqual(expected);
+    expect((await applications.update(userId, id, { comment: 'Hi.' })).tags).toEqual(expected);
+    expect(
+      (await applications.updateStatus(userId, id, 'INTERVIEW', undefined, 'USER')).tags,
+    ).toEqual(expected);
+  });
+
   describe('record — by id (web path)', () => {
     it('moves the vacancy to APPLIED and sets salary / CV / comment', async () => {
       const vacancy = await seedVacancy({ status: 'SAVED_FOR_LATER' });

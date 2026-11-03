@@ -4,6 +4,7 @@ import { createUser } from '../../tests/user';
 import { ApplicationService } from '../applications/application.service';
 import { VacancyIntakeService } from '../intake/vacancy-intake.service';
 import { StatsService } from '../stats/stats.service';
+import { TagService } from '../tags/tag.service';
 import { VacancyService } from '../vacancies/vacancy.service';
 import { forUser, type Unscoped } from './for-user';
 import { getPrisma } from './prisma-client';
@@ -83,6 +84,71 @@ describe('forUser', () => {
     expect(await asA.comment.findMany()).toHaveLength(1);
     await asA.statusChange.create({ data: { vacancyId: aRow.id, status: 'DECLINED' } });
     expect(await prisma.statusChange.count({ where: { vacancyId: aRow.id } })).toBe(2);
+  });
+
+  describe('Tag and VacancyTag, by their own userId', () => {
+    let tagId: number;
+    beforeEach(async () => {
+      tagId = (await prisma.tag.create({ data: { userId: a, name: 'Remote', nameKey: 'remote' } }))
+        .id;
+      await prisma.vacancyTag.create({ data: { vacancyId: aRow.id, tagId, userId: a } });
+    });
+
+    it("reads and writes none of another user's", async () => {
+      const asB = forUser(prisma, b);
+      expect(await asB.tag.findMany()).toEqual([]);
+      expect(await asB.vacancyTag.count()).toBe(0);
+      await expect(
+        asB.tag.update({ where: { id: tagId }, data: { name: 'Hacked' } }),
+      ).rejects.toMatchObject(notFound);
+      expect(await asB.tag.deleteMany()).toEqual({ count: 0 });
+      expect(await asB.vacancyTag.deleteMany()).toEqual({ count: 0 });
+
+      const asA = forUser(prisma, a);
+      expect(await asA.tag.findMany()).toMatchObject([{ name: 'Remote' }]);
+      expect(await asA.vacancyTag.count()).toBe(1);
+    });
+
+    it('creates only rows that carry the scoped userId, every row of a createMany', async () => {
+      const asB = forUser(prisma, b);
+      const own = { userId: b, name: 'Own', nameKey: 'own' };
+      const foreign = { userId: a, name: 'Theirs', nameKey: 'theirs' };
+      await expect(asB.tag.create({ data: foreign })).rejects.toThrow(
+        'must carry the scoped userId',
+      );
+      await expect(asB.tag.createMany({ data: [own, foreign] })).rejects.toThrow(
+        'must carry the scoped userId',
+      );
+      await expect(
+        asB.vacancyTag.createMany({ data: [{ vacancyId: aRow.id, tagId, userId: a }] }),
+      ).rejects.toThrow('must carry the scoped userId');
+      expect(await asB.tag.findMany()).toEqual([]);
+
+      expect(await asB.tag.createMany({ data: [own] })).toEqual({ count: 1 });
+    });
+
+    it('never moves an owner, and nests only a create', async () => {
+      const asA = forUser(prisma, a);
+      await expect(asA.tag.update({ where: { id: tagId }, data: { userId: b } })).rejects.toThrow(
+        'cannot change its owner',
+      );
+      await expect(
+        asA.tag.update({ where: { id: tagId }, data: { vacancies: { deleteMany: {} } } }),
+      ).rejects.toThrow('nests only a create (vacancies)');
+    });
+
+    it('throws on an operation it does not scope', async () => {
+      const asA = forUser(prisma, a);
+      await expect(asA.tag.delete({ where: { id: tagId } })).rejects.toThrow(
+        'forUser does not scope Tag.delete',
+      );
+      await expect(
+        asA.vacancyTag.create({ data: { vacancyId: aRow.id, tagId, userId: a } }),
+      ).rejects.toThrow('forUser does not scope VacancyTag.create');
+      await expect(asA.vacancyTag.updateMany({ data: { userId: a } })).rejects.toThrow(
+        'forUser does not scope VacancyTag.updateMany',
+      );
+    });
   });
 
   it('stays on inside an interactive transaction', async () => {
@@ -182,5 +248,7 @@ describe('the raw client reaches a domain model only through forUser (ADR-0038)'
     void new StatsService(prisma)[DB].vacancy;
     // @ts-expect-error — `db` is Unscoped
     void new VacancyIntakeService(prisma)[DB].vacancy;
+    // @ts-expect-error — `db` is Unscoped
+    void new TagService(prisma)[DB].tag;
   });
 });

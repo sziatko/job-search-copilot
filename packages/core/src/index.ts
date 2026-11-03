@@ -1,5 +1,5 @@
 export type { PrismaClient, Vacancy } from '@prisma/client';
-export { CommentSource, Recommendation, VacancyStatus } from '@prisma/client';
+export { CommentSource, Recommendation, TagTone, VacancyStatus } from '@prisma/client';
 export { ApplicationService } from './applications/application.service';
 export type {
   ApplicationListItem,
@@ -29,8 +29,11 @@ export {
   InvalidApplicationInputError,
   InvalidIntakeEntryError,
   InvalidRecommendationError,
+  InvalidTagsError,
   RateLimitedError,
   SameStatusError,
+  TagNameTakenError,
+  TagNotFoundError,
   VacancyNotFoundError,
 } from './domain/errors';
 export { companyGroupKey, normalizeCompanyKey, normalizeTitleKey } from './domain/identity';
@@ -43,6 +46,15 @@ export { SEED_VACANCIES } from './seed/data';
 export { resetToSeed } from './seed/reset-to-seed';
 export type { Stats } from './stats/stats.service';
 export { StatsService } from './stats/stats.service';
+export { TagService } from './tags/tag.service';
+export type {
+  CreateTagInput,
+  TagRef,
+  TagSummary,
+  TagVacanciesItem,
+  UpdateTagInput,
+} from './tags/tag.types';
+export { TAGS_PER_VACANCY_MAX } from './tags/tag.types';
 export { VacancyService } from './vacancies/vacancy.service';
 export type {
   ListVacanciesFilters,

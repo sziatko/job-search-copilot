@@ -1,5 +1,6 @@
 import type { Recommendation, VacancyStatus } from '@prisma/client';
 import type { PipelineStatus } from '../domain/status';
+import type { TagRef } from '../tags/tag.types';
 import type { VacancyComment } from '../vacancies/vacancy.types';
 
 /**
@@ -137,4 +138,6 @@ export interface ApplicationListItem {
   /** Both null when the vacancy has no analysis (a vacancy record_application created). */
   matchScore: number | null;
   recommendation: Recommendation | null;
+  /** By name. */
+  tags: TagRef[];
 }

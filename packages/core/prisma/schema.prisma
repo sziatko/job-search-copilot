@@ -50,7 +50,11 @@ model Vacancy {
   comments      Comment[]
   // Every status the vacancy has been in, with its date.
   statusChanges StatusChange[]
+  // Marks written by the user or a machine (ADR-0042), not a status of any kind.
+  tags          VacancyTag[]
 
+  // The target of VacancyTag's composite foreign key.
+  @@unique([id, userId])
   @@unique([userId, applyUrl])
   @@index([userId, recommendation])
   @@index([userId, status, statusChangedAt])
@@ -85,6 +89,45 @@ model Comment {
   vacancy   Vacancy       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
 
   @@index([vacancyId, createdAt])
+}
+
+// A mark on a vacancy, written by the user and by machines alike (ADR-0042). `nameKey` is
+// `normalizeTagKey` (domain/tags.ts): one tag per spelling, never empty (a hand-written CHECK).
+model Tag {
+  id        Int          @id @default(autoincrement())
+  createdAt DateTime     @default(now())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  nameKey   String
+  tone      TagTone      @default(NEUTRAL)
+  vacancies VacancyTag[]
+
+  @@unique([userId, nameKey])
+  // The target of VacancyTag's composite foreign key.
+  @@unique([id, userId])
+}
+
+// One `userId` shared by both foreign keys: a link between one user's tag and another
+// user's vacancy cannot exist, whatever the code does.
+model VacancyTag {
+  vacancyId Int
+  tagId     Int
+  userId    String
+  createdAt DateTime @default(now())
+  vacancy   Vacancy  @relation(fields: [vacancyId, userId], references: [id, userId], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@id([vacancyId, tagId])
+  @@index([tagId])
+}
+
+enum TagTone {
+  NEUTRAL
+  GOOD
+  WARN
+  BAD
+  ACCENT
 }
 
 enum Recommendation {
@@ -140,6 +183,7 @@ model User {
   oauthconsents      OauthConsent[]
   apikeys            Apikey[]
   vacancies          Vacancy[]
+  tags               Tag[]
 
   @@unique([email])
 }

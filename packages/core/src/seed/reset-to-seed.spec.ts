@@ -35,6 +35,17 @@ async function counts() {
 }
 
 describe('resetToSeed', () => {
+  it("deletes the user's tags and leaves another user's", async () => {
+    const other = await createUser();
+    const tag = { name: 'Remote', nameKey: 'remote' };
+    await prisma.tag.createMany({ data: [userId, other].map((id) => ({ ...tag, userId: id })) });
+
+    await resetToSeed(prisma, userId);
+
+    expect(await prisma.tag.count({ where: { userId } })).toBe(0);
+    expect(await prisma.tag.count({ where: { userId: other } })).toBe(1);
+  }, 120_000);
+
   it("makes the user's data the seed, the same on a second run", async () => {
     await prisma.vacancy.create({
       data: {
