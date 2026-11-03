@@ -243,6 +243,33 @@ export function buildHandlers(rows: FakeVacancy[], tags: TagRef[] = []) {
       }
       return HttpResponse.json(addTag(name, tone), { status: 201 });
     }),
+    http.patch(`${API_URL}/tags/:id`, async ({ params, request }) => {
+      const id = Number(params.id);
+      if (!tagTable.has(id)) {
+        return HttpResponse.json({ message: `Tag ${id} not found` }, { status: 404 });
+      }
+      const { name, tone } = (await request.json()) as { name: string; tone: TagTone };
+      const taken = findTag(name);
+      if (taken && taken.id !== id) {
+        return HttpResponse.json({ message: `Tag "${name}" already exists` }, { status: 409 });
+      }
+      const updated = { id, name: name.trim(), tone };
+      tagTable.set(id, updated);
+      for (const row of rows) {
+        row.tags = row.tags.map((tag) => (tag.id === id ? updated : tag));
+      }
+      return HttpResponse.json(updated);
+    }),
+    http.delete(`${API_URL}/tags/:id`, ({ params }) => {
+      const id = Number(params.id);
+      if (!tagTable.delete(id)) {
+        return HttpResponse.json({ message: `Tag ${id} not found` }, { status: 404 });
+      }
+      for (const row of rows) {
+        row.tags = row.tags.filter((tag) => tag.id !== id);
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
     http.post(`${API_URL}/vacancies/tags`, async ({ request }) => {
       const { items } = (await request.json()) as {
         items: { vacancyId: number; add?: string[]; remove?: string[] }[];

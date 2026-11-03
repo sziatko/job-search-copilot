@@ -22,6 +22,26 @@ export async function createTag(input: { name: string; tone: TagTone }): Promise
   return parseResponse(tagRefSchema, await res.json(), 'Create tag');
 }
 
+/** As `createTag`: a name taken in any spelling is a 409, whose message the dialog shows. */
+export async function updateTag({ id, name, tone }: TagRef): Promise<TagRef> {
+  const res = await apiFetch(`${API_BASE}/tags/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, tone }),
+  });
+  if (!res.ok) {
+    throw await errorMessage(res, `Failed to update the tag: HTTP ${res.status}`);
+  }
+  return parseResponse(tagRefSchema, await res.json(), 'Update tag');
+}
+
+export async function deleteTag(id: number): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/tags/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    throw await errorMessage(res, `Failed to delete the tag: HTTP ${res.status}`);
+  }
+}
+
 /** Puts a tag on a vacancy or takes it off. Over the limit of tags is a 422, whose message
  * the row shows. */
 export async function writeVacancyTags({ id, add, remove }: TagWrite): Promise<void> {

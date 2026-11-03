@@ -149,7 +149,7 @@ describe('Web↔API contract (e2e)', () => {
     ]);
   });
 
-  it('GET and POST /tags: their schemas', async () => {
+  it('GET, POST and PATCH /tags: their schemas', async () => {
     const created = await api
       .post('/api/v1/tags')
       .send({ name: 'On-site', tone: 'WARN' })
@@ -160,6 +160,16 @@ describe('Web↔API contract (e2e)', () => {
     expect(tagListSchema.parse(list.body)).toEqual([
       { id: created.body.id, name: 'On-site', tone: 'WARN', vacancyCount: 0 },
     ]);
+
+    const updated = await api
+      .patch(`/api/v1/tags/${created.body.id}`)
+      .send({ name: 'Onsite', tone: 'BAD' })
+      .expect(200);
+    expect(tagRefSchema.parse(updated.body)).toEqual({
+      id: created.body.id,
+      name: 'Onsite',
+      tone: 'BAD',
+    });
   });
 
   it('the applications endpoints and /stats: their schemas', async () => {

@@ -54,7 +54,8 @@ export const staleAfter = {
   /** An application's edit or a comment touches where the application's fields and
    * comments show. */
   edit: [queryKeys.applications(), queryKeys.vacancy(), queryKeys.applicationCompany()],
-  /** A tag on or off a vacancy touches where its chips show, and the tags' counts. */
+  /** A tag on or off a vacancy, renamed, toned or deleted, touches where its chips show,
+   * and the tags' counts. */
   tagWrite: [
     queryKeys.vacancies(),
     queryKeys.applications(),

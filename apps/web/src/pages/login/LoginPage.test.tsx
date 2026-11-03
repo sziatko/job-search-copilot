@@ -92,6 +92,7 @@ describe('the shell', () => {
           user: { id: 'u1', email: 'jane@example.com', name: 'Jane Doe', emailVerified: true },
         }),
       ),
+      ...buildHandlers([]),
     );
     renderAt('/profile');
 

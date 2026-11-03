@@ -3,19 +3,12 @@ import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { DialogActions, DialogTitle } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Checkbox, Input, Label } from '@/components/ui/Field';
+import { Input, Label } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
-import { type TagRef, type TagTone, tagKey, tagToneSchema } from '@/lib/tags/types';
+import { type TagRef, type TagTone, tagKey } from '@/lib/tags/types';
 import { useCreateTag, useTags } from '@/lib/tags/useTags';
+import { TagToneField } from './TagToneField';
 import { CHIP_TONE } from './VacancyTags';
-
-const TONE_LABEL: Record<TagTone, string> = {
-  NEUTRAL: 'Neutral',
-  GOOD: 'Good',
-  WARN: 'Warning',
-  BAD: 'Bad',
-  ACCENT: 'Accent',
-};
 
 /**
  * Picks a tag for a vacancy, or creates one with a tone. The caller owns the write, a row's
@@ -33,7 +26,6 @@ export function AddTagModal({
 }) {
   const titleId = useId();
   const nameId = useId();
-  const toneName = useId();
   const nameRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
   const [tone, setTone] = useState<TagTone>('NEUTRAL');
@@ -109,23 +101,7 @@ export function AddTagModal({
           </EmptyState>
         )}
 
-        {canCreate && (
-          <fieldset className="mt-4">
-            <legend className="mb-2 text-small font-bold text-ink-soft">Tone</legend>
-            <div className="flex flex-wrap gap-3">
-              {tagToneSchema.options.map((value) => (
-                <Checkbox
-                  key={value}
-                  type="radio"
-                  name={toneName}
-                  label={<Chip tone={CHIP_TONE[value]}>{TONE_LABEL[value]}</Chip>}
-                  checked={tone === value}
-                  onChange={() => setTone(value)}
-                />
-              ))}
-            </div>
-          </fieldset>
-        )}
+        {canCreate && <TagToneField value={tone} onChange={setTone} />}
 
         {create.error && (
           <p role="alert" className="mt-2 text-small text-bad-ink">
