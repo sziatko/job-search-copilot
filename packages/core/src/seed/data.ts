@@ -1,4 +1,4 @@
-import type { Recommendation, VacancyStatus } from '@prisma/client';
+import type { Recommendation, TagTone, VacancyStatus } from '@prisma/client';
 
 /**
  * The seed (ADR-0037): made-up vacancies for the e2e tests and a future public demo.
@@ -16,6 +16,11 @@ export interface SeedMove {
   note?: string;
 }
 
+export interface SeedTag {
+  name: string;
+  tone: TagTone;
+}
+
 export interface SeedVacancy {
   company: string;
   title: string;
@@ -30,6 +35,7 @@ export interface SeedVacancy {
   salary?: string;
   tailored?: boolean;
   coverLetter?: boolean;
+  tags: readonly SeedTag[];
   /** Days between the last status move and the reset; the journal before it is one day
    * per step. Over 30 on an open pipeline row = timed out. */
   daysAgo: number;
@@ -80,6 +86,16 @@ const TITLES = [
 ];
 
 const SOURCES = ['justjoin', 'linkedin', null];
+
+/** Written directly, not through `attachTags`, which gives only `NEUTRAL`: `Chip` reaches
+ * the visual tests in every tone. */
+export const SEED_TAGS: readonly SeedTag[] = [
+  { name: 'Remote', tone: 'GOOD' },
+  { name: 'Contract', tone: 'NEUTRAL' },
+  { name: 'Relocation', tone: 'WARN' },
+  { name: 'Agency', tone: 'BAD' },
+  { name: 'Startup', tone: 'ACCENT' },
+];
 
 function postingText(company: string, title: string): string {
   return (
@@ -250,6 +266,8 @@ export const SEED_VACANCIES: SeedVacancy[] = GROUPS.flatMap(([count, shape]) =>
     fullText: noText ? null : postingText(company, title),
     analysis: null,
     moves: [],
+    // Every third has one, every fifteenth all of them, so the chips wrap.
+    tags: i % 15 === 0 ? SEED_TAGS : i % 3 === 0 ? [SEED_TAGS[(i / 3) % SEED_TAGS.length]] : [],
     ...shape,
   };
 });

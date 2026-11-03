@@ -151,6 +151,21 @@ test('the Edit dialog updates salary, CV and comment', async ({ page, db }) => {
   await expect(row).toContainText(comment);
 });
 
+test('the Edit dialog records a sent cover letter', async ({ page, db }) => {
+  const { id, title, company } = await pickActiveApplied(db);
+  await page.goto('/applications');
+  const row = rowOf(page, id);
+  await expect(row.getByText('— / —')).toBeVisible();
+
+  await row.getByRole('button', { name: `Edit ${title} at ${company}` }).click();
+  const dialog = page.getByRole('dialog', { name: 'Edit application' });
+  await dialog.getByLabel('Sent a cover letter').check();
+  await dialog.getByRole('button', { name: 'OK' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(row.getByText('— / ✓')).toBeVisible();
+});
+
 test("the merged comment's Show more / Show less", async ({ page, db }) => {
   // An interview row: the analysis, the applying note and two rounds — past two lines.
   const { id } = await db.vacancy.findFirstOrThrow({

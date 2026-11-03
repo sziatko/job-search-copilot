@@ -149,6 +149,34 @@ test('the Apply dialog, and the vacancy shows in /applications', async ({ page }
   await expect(rowOf(page, id).getByText('72k EUR / year')).toBeVisible();
 });
 
+test('a tag: created on a row, kept on a reload, reused on another, removed', async ({ page }) => {
+  await page.goto('/vacancies');
+  const { row } = await firstRow(page);
+  const name = 'Waiting for a reply';
+  const dialog = page.getByRole('dialog', { name: 'Add a tag' });
+  const chip = page.getByRole('button', { name: `Remove tag ${name}` });
+
+  await row.getByRole('button', { name: 'Add tag' }).click();
+  await dialog.getByLabel('Tag name').fill(name);
+  await dialog.getByRole('radio', { name: 'Warning' }).check();
+  await dialog.getByRole('button', { name: `Create “${name}”` }).click();
+  await expect(dialog).toBeHidden();
+  await expect(row.getByRole('button', { name: `Remove tag ${name}` })).toBeVisible();
+
+  await page.reload();
+  await expect(chip).toHaveCount(1);
+
+  await rows(page).nth(1).getByRole('button', { name: 'Add tag' }).click();
+  await dialog.getByLabel('Tag name').fill('waiting');
+  await dialog.getByRole('list', { name: 'Matching tags' }).getByRole('button', { name }).click();
+  await expect(chip).toHaveCount(2);
+
+  await chip.first().click();
+  await expect(chip).toHaveCount(1);
+  await page.reload();
+  await expect(chip).toHaveCount(1);
+});
+
 test('Copy puts the vacancy on the clipboard', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/vacancies');

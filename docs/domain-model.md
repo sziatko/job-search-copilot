@@ -24,6 +24,7 @@ Source of truth: [`packages/core/prisma/schema.prisma`](../packages/core/prisma/
 | **placeholder** | A vacancy `record_application` created because no match existed: no posting text, no analysis — [Applications](#applications-the-pipeline-view). |
 | **comment source** | Who wrote a note on a vacancy: `ANALYZER`, `USER` or `AGENT` (an agent acting for the user) — [`Comment`](#comment). |
 | **context** | The statuses one web page lists (`STATUS_CONTEXT`), which `ALL` in its filter means rather than the whole table — [the statuses](#two-independent-axes-recommendation-vs-status). |
+| **tag** | A free mark on a vacancy, a name and a tone, written by the user or a machine, outside both axes — [`Tag`](#tag). |
 | **owner** | The user a vacancy belongs to (`userId`), to whom every query is scoped — [`Vacancy`](#vacancy). |
 
 ## `Vacancy`
@@ -300,6 +301,18 @@ The writers, by source:
   which source it writes.
 
 `hasAnalysis` on a vacancy list item is `recommendation !== null` (ADR-0033).
+
+## `Tag`
+
+A mark a table shows at a glance: the source, the country, the work format, a note to self.
+`Tag` belongs to a user (`name`, `tone` of `NEUTRAL` \| `GOOD` \| `WARN` \| `BAD` \| `ACCENT`,
+a unique `nameKey`); `VacancyTag` links it to a vacancy, a vacancy holding at most
+`TAGS_PER_VACANCY_MAX`. Neither axis: writing a tag moves no `status` and no
+`recommendation`. Anyone acting for the user writes them, the analyzer with its analysis
+included; the server holds no rule about a particular tag. Writes go by name: `" Remote "` and
+`"remote"` are one tag, the first spelling kept, and a new name creates a `NEUTRAL` one. Rename,
+tone and delete are on `/profile` and REST, not in MCP.
+Why: [ADR-0042](decisions/0042-tags-written-by-anyone.md).
 
 ## Intake
 

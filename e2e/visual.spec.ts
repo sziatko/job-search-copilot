@@ -79,6 +79,7 @@ for (const theme of ['light', 'dark'] as const) {
       ['decline', { name: 'Decline' }],
       ['save-for-later', { name: 'Save for later' }],
       ['company-history', { name: /other vacanc(y|ies) at / }],
+      ['add-tag', { name: 'Add tag' }],
     ] as const) {
       test(`${name} dialog`, async ({ page }) => {
         await open(page, '/vacancies');
@@ -87,6 +88,13 @@ for (const theme of ['light', 'dark'] as const) {
         await shot(page, `${name}-dialog`, false);
       });
     }
+
+    test('edit-tag dialog', async ({ page }) => {
+      await open(page, '/profile');
+      await page.getByRole('button', { name: 'Edit tag Remote' }).click();
+      await settle(page);
+      await shot(page, 'edit-tag-dialog', false);
+    });
 
     test('search dialog', async ({ page }) => {
       await open(page, '/vacancies');
