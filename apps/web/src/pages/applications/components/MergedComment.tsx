@@ -1,5 +1,6 @@
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { TONE_TEXT } from '@/components/ui/tone';
+import { AnalysisComment } from '@/components/vacancies/AnalysisComment';
 import type { ApplicationComment, CommentSource } from '@/lib/applications/types';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
@@ -32,7 +33,11 @@ export function MergedComment({ comments }: { comments: ApplicationComment[] }) 
               <time className="font-mono tabular-nums text-ink-faint">
                 {dateFormatter.format(new Date(comment.createdAt))}:{' '}
               </time>
-              {comment.body}
+              {comment.source === 'ANALYZER' ? (
+                <AnalysisComment text={comment.body} />
+              ) : (
+                comment.body
+              )}
             </span>
           </span>
         ))

@@ -29,6 +29,7 @@ import {
   type VacancyAction,
   type VacancyListItem,
 } from '@/lib/vacancies/types';
+import { AnalysisComment } from './AnalysisComment';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { RecommendationTag } from './RecommendationTag';
 import { StatusTag } from './StatusTag';
@@ -143,7 +144,13 @@ export function VacancyTable({
     {
       header: 'Comment',
       cell: (item) =>
-        item.estimationComment ? <ExpandableText>{item.estimationComment}</ExpandableText> : '—',
+        item.estimationComment ? (
+          <ExpandableText>
+            <AnalysisComment text={item.estimationComment} />
+          </ExpandableText>
+        ) : (
+          '—'
+        ),
     },
     { header: 'Status', width: 150, cell: (item) => <StatusTag status={item.status} /> },
     {
