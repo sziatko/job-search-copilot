@@ -46,6 +46,16 @@ describe('MergedComment', () => {
     );
   });
 
+  it('keeps the line breaks inside a comment', () => {
+    render(
+      <MergedComment comments={[comment(1, '2026-09-14T10:00:00Z', 'First\nSecond', 'USER')]} />,
+    );
+
+    const part = screen.getByText(/first/i);
+    expect(part.textContent).toBe('Sep 14: First\nSecond');
+    expect(part.parentElement?.parentElement).toHaveClass('whitespace-pre-line');
+  });
+
   it('renders a lone comment with no separator', () => {
     const { container } = render(
       <MergedComment comments={[comment(1, '2026-09-14T10:00:00Z', 'Only one', 'USER')]} />,
