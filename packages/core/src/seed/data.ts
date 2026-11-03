@@ -29,6 +29,7 @@ export interface SeedVacancy {
   /** What was entered when applying — read only with an APPLIED move. */
   salary?: string;
   tailored?: boolean;
+  coverLetter?: boolean;
   /** Days between the last status move and the reset; the journal before it is one day
    * per step. Over 30 on an open pipeline row = timed out. */
   daysAgo: number;
@@ -105,7 +106,9 @@ const skip = (k: number) => ({
   comment: 'Backend-heavy role (Java), on-site only — outside the profile.',
 });
 
-type Shape = Partial<Pick<SeedVacancy, 'analysis' | 'moves' | 'salary' | 'tailored'>> & {
+type Shape = Partial<
+  Pick<SeedVacancy, 'analysis' | 'moves' | 'salary' | 'tailored' | 'coverLetter'>
+> & {
   daysAgo: number;
   noText?: boolean;
 };
@@ -148,6 +151,7 @@ const GROUPS: [number, (k: number) => Shape][] = [
       moves: applied(k),
       salary: salary(k),
       tailored: k % 2 === 1,
+      coverLetter: k % 4 === 1,
       daysAgo: 1 + 2 * k,
     }),
   ],
@@ -209,6 +213,7 @@ const GROUPS: [number, (k: number) => Shape][] = [
       moves: applied(k, { to: 'INTERVIEW' }, { to: 'OFFER', note: 'An offer arrived by email.' }),
       salary: salary(k),
       tailored: true,
+      coverLetter: true,
       daysAgo: 1 + k,
     }),
   ],

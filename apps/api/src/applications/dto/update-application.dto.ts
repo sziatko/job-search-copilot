@@ -15,6 +15,10 @@ export class UpdateApplicationDto {
   usedTailoredResume?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  sentCoverLetter?: boolean;
+
+  @IsOptional()
   @IsString()
   @MaxLength(MAX_LENGTH.note)
   comment?: string | null;

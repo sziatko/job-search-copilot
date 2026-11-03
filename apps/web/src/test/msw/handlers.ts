@@ -20,7 +20,12 @@ const RECOMMENDATION_RANK = { APPLY: 0, APPLY_WITH_CAVEATS: 1, SKIP: 2, null: 3 
 export type FakeVacancy = VacancyListItem &
   Pick<
     ApplicationListItem,
-    'statusChangedAt' | 'appliedAt' | 'comments' | 'salaryInApplication' | 'usedTailoredResume'
+    | 'statusChangedAt'
+    | 'appliedAt'
+    | 'comments'
+    | 'salaryInApplication'
+    | 'usedTailoredResume'
+    | 'sentCoverLetter'
   > &
   // Only GET /vacancies/:id reads these; `asDetail` fills them when a test does not.
   Partial<Pick<VacancyDetail, 'fullText' | 'timeline'>>;
@@ -42,6 +47,7 @@ export function fakeVacancy(overrides: Partial<FakeVacancy> = {}): FakeVacancy {
     comments: [],
     salaryInApplication: null,
     usedTailoredResume: false,
+    sentCoverLetter: false,
     ...overrides,
   };
 }
@@ -231,6 +237,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
         vacancyId: number;
         salaryInApplication?: string;
         usedTailoredResume?: boolean;
+        sentCoverLetter?: boolean;
         comment?: string;
       };
       const row = find(body.vacancyId);
@@ -246,6 +253,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
       moveTo(row, 'APPLIED');
       row.salaryInApplication = body.salaryInApplication?.trim() || null;
       row.usedTailoredResume = body.usedTailoredResume ?? false;
+      row.sentCoverLetter = body.sentCoverLetter ?? false;
       addComment(row, body.comment);
       return HttpResponse.json({
         application: asApplication(row),
@@ -316,6 +324,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
         value === undefined ? current : value?.trim() || null;
       row.salaryInApplication = text(body.salaryInApplication, row.salaryInApplication);
       row.usedTailoredResume = body.usedTailoredResume ?? row.usedTailoredResume;
+      row.sentCoverLetter = body.sentCoverLetter ?? row.sentCoverLetter;
       addComment(row, body.comment);
       return HttpResponse.json(asApplication(row));
     }),

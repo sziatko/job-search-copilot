@@ -83,7 +83,8 @@ export function registerApplicationTools(
         'one (OR). Each is ILIKE %term%, case-insensitive. `applyUrl` finds the one ' +
         'application with that posting link — raw is fine, it is normalized as saved (a ' +
         'LinkedIn link from an email matches). Each item carries status, ' +
-        'statusChangedAt, appliedAt (null if the vacancy skipped APPLIED), salary / CV, ' +
+        'statusChangedAt, appliedAt (null if the vacancy skipped APPLIED), salary / CV / ' +
+        'cover letter, ' +
         'company / title / applyUrl / matchScore / recommendation, and `comments` — ' +
         '[{ id, createdAt, body, source }], oldest first, source ANALYZER | USER | AGENT. ' +
         PAGING_NOTE,
@@ -163,20 +164,22 @@ export function registerApplicationTools(
       description:
         'Correct the application form data of a vacancy: `salaryInApplication` (what the ' +
         "applicant entered in the form — not the posting's salary; a blank string clears " +
-        'it) and/or `usedTailoredResume`. A field left out is untouched. Moves no status ' +
-        'and adds no comment — use update_vacancy_status or add_comment. `id` is the ' +
+        'it), `usedTailoredResume`, `sentCoverLetter`. A field left out is untouched. Moves ' +
+        'no status and adds no comment — use update_vacancy_status or add_comment. `id` is the ' +
         'vacancy\'s (from list_applications); an unknown id reports "not found". Returns ' +
         '{ success: true, application: { id, company, title } }.',
       inputSchema: {
         id: z.number().int(),
         salaryInApplication: z.string().max(MAX_LENGTH.name).optional(),
         usedTailoredResume: z.boolean().optional(),
+        sentCoverLetter: z.boolean().optional(),
       },
     },
-    withDomainErrors(async ({ id, salaryInApplication, usedTailoredResume }) => {
+    withDomainErrors(async ({ id, salaryInApplication, usedTailoredResume, sentCoverLetter }) => {
       const application = await applications.update(userId, id, {
         salaryInApplication,
         usedTailoredResume,
+        sentCoverLetter,
       });
       return json({ success: true, application: ref(application) });
     }),

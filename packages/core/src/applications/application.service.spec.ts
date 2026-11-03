@@ -79,6 +79,7 @@ describe('ApplicationService', () => {
         vacancyId: vacancy.id,
         salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         comment: '  Adapted CV.  ',
       });
 
@@ -90,6 +91,7 @@ describe('ApplicationService', () => {
         matchScore: 80,
         salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         status: 'APPLIED',
       });
       expect(notes(result.application)).toEqual([ANALYZED, ['USER', 'Adapted CV.']]);
@@ -670,16 +672,21 @@ describe('ApplicationService', () => {
         salaryInApplication: '100 PLN/h',
       });
 
-      const edited = await applications.update(userId, vacancy.id, { usedTailoredResume: true });
+      const edited = await applications.update(userId, vacancy.id, {
+        usedTailoredResume: true,
+        sentCoverLetter: true,
+      });
       expect(edited).toMatchObject({
         salaryInApplication: '100 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         status: 'APPLIED',
       });
       expect(notes(edited)).toEqual([ANALYZED]);
 
       const cleared = await applications.update(userId, vacancy.id, { salaryInApplication: '  ' });
       expect(cleared?.salaryInApplication).toBeNull();
+      expect(cleared?.sentCoverLetter).toBe(true); // left out, so untouched
     });
 
     it('adds a non-blank comment as a USER row, and moves nothing', async () => {

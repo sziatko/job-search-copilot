@@ -51,6 +51,7 @@ const applied = () =>
     fullText: 'We build things.',
     status: 'APPLIED',
     salaryInApplication: '150 PLN/h',
+    sentCoverLetter: true,
     timeline: [
       { status: 'NOT_REVIEWED', createdAt: '2026-09-01T00:00:00.000Z' },
       { status: 'APPLIED', createdAt: '2026-09-03T00:00:00.000Z' },
@@ -93,6 +94,7 @@ describe('VacancyPage', () => {
     const details = await card(/^details$/i);
     // What the user entered when applying, not necessarily the listing's figure.
     expect(details.getByText('150 PLN/h')).toBeInTheDocument();
+    expect(details.getByText('Cover letter sent').nextSibling).toHaveTextContent('Yes');
     expect(details.getByText('example.com')).toBeInTheDocument();
 
     // The company's others, this one left out.

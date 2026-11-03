@@ -116,6 +116,7 @@ describe('SearchModal', () => {
         status: 'INTERVIEW',
         statusChangedAt: new Date(Date.now() - 45 * DAY).toISOString(),
         usedTailoredResume: true,
+        sentCoverLetter: true,
       }),
     ]);
     await screen.findByText('Beta Corp');
@@ -136,11 +137,11 @@ describe('SearchModal', () => {
     expect(
       within(await row('Data Engineer').findByText('⏳')).getByText('45 days since last update'),
     ).toBeInTheDocument();
-    // Date, Vacancy, Score, Status, CV, Actions.
-    const cv = (title: string) =>
+    // Date, Vacancy, Score, Status, CV / CL, Actions.
+    const flags = (title: string) =>
       (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[4];
-    expect(cv('Data Engineer')).toHaveTextContent('✓');
-    expect(cv('Backend Engineer')).toHaveTextContent('—');
+    expect(flags('Data Engineer')).toHaveTextContent('✓ / ✓');
+    expect(flags('Backend Engineer')).toHaveTextContent('— / —');
 
     // The page's table still lists its own NOT_REVIEWED rows, Beta Corp included.
     const page = within(screen.getByRole('region', { name: 'Vacancies' }));

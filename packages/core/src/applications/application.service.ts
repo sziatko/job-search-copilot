@@ -42,6 +42,7 @@ const APPLICATION_SELECT = {
   statusChangedAt: true,
   salaryInApplication: true,
   usedTailoredResume: true,
+  sentCoverLetter: true,
   company: true,
   title: true,
   applyUrl: true,
@@ -232,6 +233,7 @@ export class ApplicationService {
     return updateRow(forUser(this.db, userId), id, {
       salaryInApplication: text(input.salaryInApplication),
       usedTailoredResume: input.usedTailoredResume,
+      sentCoverLetter: input.sentCoverLetter,
       ...commentOn(input.comment, source),
     });
   }
@@ -415,6 +417,7 @@ async function recordWithin(
     data: {
       salaryInApplication: input.salaryInApplication?.trim() || null,
       usedTailoredResume: input.usedTailoredResume ?? false,
+      sentCoverLetter: input.sentCoverLetter ?? false,
       ...commentOn(input.comment, source),
     },
     select: APPLICATION_SELECT,

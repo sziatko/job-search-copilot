@@ -78,6 +78,7 @@ export function useVacancyPage(id: number) {
             vacancyId: id,
             salaryInApplication: details.salary || undefined,
             usedTailoredResume: details.usedTailoredResume,
+            sentCoverLetter: details.sentCoverLetter,
             comment: details.comment || undefined,
           }),
         { onSuccess: () => toast.success('Application submitted!') },

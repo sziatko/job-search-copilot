@@ -98,12 +98,14 @@ export function ApplicationsPage() {
           initial={{
             salary: editing.salaryInApplication ?? '',
             usedTailoredResume: editing.usedTailoredResume,
+            sentCoverLetter: editing.sentCoverLetter,
           }}
           onCancel={() => setEditing(null)}
-          onConfirm={({ salary, usedTailoredResume, comment }) => {
+          onConfirm={({ salary, usedTailoredResume, sentCoverLetter, comment }) => {
             editApplication(editing.id, {
               salaryInApplication: salary,
               usedTailoredResume,
+              sentCoverLetter,
               comment,
             });
             setEditing(null);

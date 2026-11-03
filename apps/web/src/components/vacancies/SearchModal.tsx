@@ -56,7 +56,7 @@ export function SearchModal({
     placeholderData: keepPreviousData,
   });
 
-  // The ⏳ mark and the CV column: both endpoints' `search` matches the same way, so the
+  // The ⏳ mark and the CV / CL column: both endpoints' `search` matches the same way, so the
   // pipeline rows among the results are these applications. Only asked when a pipeline
   // row can be among them.
   // One page of 500: a term matching more applications loses the oldest marks.

@@ -23,13 +23,14 @@ const pipeline = seedCount((v) => (PIPELINE_STATUSES as readonly string[]).inclu
 const timedOut = seedCount(seedTimedOut);
 const active = seedCount((v) => seedOpen(v) && !seedTimedOut(v));
 
-/** An APPLIED row moved in the last 30 days, with no tailored CV — near the top of the
+/** An APPLIED row moved in the last 30 days, no tailored CV or letter — near the top of the
  * list, and only ever APPLIED. */
 const pickActiveApplied = (db: PrismaClient) =>
   db.vacancy.findFirstOrThrow({
     where: {
       status: 'APPLIED',
       usedTailoredResume: false,
+      sentCoverLetter: false,
       statusChangedAt: { gte: new Date(Date.now() - 30 * 86_400_000) },
     },
     orderBy: { id: 'asc' },
@@ -134,7 +135,7 @@ test('the Edit dialog updates salary, CV and comment', async ({ page, db }) => {
   const comment = 'Sent the portfolio link as well.';
   await page.goto('/applications');
   const row = rowOf(page, id);
-  await expect(row.getByText('✓')).toHaveCount(0);
+  await expect(row.getByText('— / —')).toBeVisible();
 
   await row.getByRole('button', { name: `Edit ${title} at ${company}` }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit application' });
@@ -146,7 +147,7 @@ test('the Edit dialog updates salary, CV and comment', async ({ page, db }) => {
   await expect(page.getByText('Application updated')).toBeVisible();
   await expect(dialog).toBeHidden();
   await expect(row.getByText('77k EUR / year')).toBeVisible();
-  await expect(row.getByText('✓')).toBeVisible();
+  await expect(row.getByText('✓ / —')).toBeVisible();
   await expect(row).toContainText(comment);
 });
 

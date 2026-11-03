@@ -83,6 +83,7 @@ export async function resetToSeed(
           vacancyId: ids[i],
           salaryInApplication: v.salary,
           usedTailoredResume: v.tailored,
+          sentCoverLetter: v.coverLetter,
           comment: note,
         });
       } else if ((PIPELINE_STATUSES as readonly VacancyStatus[]).includes(to)) {

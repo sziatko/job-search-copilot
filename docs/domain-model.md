@@ -54,6 +54,7 @@ pipeline.
 | `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. |
 | `salaryInApplication` | `String?` | Free text ("150 PLN/h"), entered when applying. |
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
+| `sentCoverLetter` | `Boolean @default(false)` | Entered when applying. |
 | `statusChanges` | `StatusChange[]` | The journal — see below. |
 
 Indexes: `@@index([userId, recommendation])`, `@@index([userId, status, statusChangedAt])`,
@@ -83,7 +84,7 @@ The statuses — triage (`TRIAGE_STATUSES` in `status.ts`), then the pipeline
 ### Field notes
 
 - **`id`** — server-assigned; the URI for a row.
-- **`updatedAt`** — a status, salary or CV change bumps it; analysis fields are never
+- **`updatedAt`** — a status, salary, CV or letter change bumps it; analysis fields are never
   updated (analyze-once). For a semantic date read `statusChangedAt` or the journal.
 - **`userId`** — every query reaches the row through `forUser` (core), which adds it;
   `Comment` and `StatusChange` are owned through their vacancy. It leads the list indexes.
@@ -256,7 +257,7 @@ zone: its `id` is the vacancy's, and applying moves the vacancy's own `status`.
   `FILTERED_OUT` ones included. A vacancy already in the pipeline →
   `AlreadyAppliedError`; one set back to triage can be applied to again. Then
   `writeStatus(APPLIED)` — and `writeStatus(status)` when the caller records it further
-  along, so the applied date is journaled either way — and salary / CV / comment.
+  along, so the applied date is journaled either way — and salary / CV / letter / comment.
   [ADR-0019](decisions/0019-record-or-create-vacancy.md).
 - **`updateStatus` / `updateStatusByVacancy`** move a vacancy to any status (the MCP
   `update_vacancy_status`). `updateStatus` takes any vacancy by id;
@@ -266,7 +267,7 @@ zone: its `id` is the vacancy's, and applying moves the vacancy's own `status`.
 - **`list` (both services)** also takes `applyUrl`, compared exactly after the
   normalization `save` applies (`applyUrlKey`; an unusable url is compared raw, so a
   `tracker://` key still matches) — how an email's posting link finds its application.
-- **`update`** edits salary / CV and appends a comment in the caller's source.
+- **`update`** edits salary / CV / letter and appends a comment in the caller's source.
 - **`addComment`** appends a dated comment to any vacancy, no status move (the MCP
   `add_comment`).
 

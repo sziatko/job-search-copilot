@@ -55,7 +55,7 @@ matching the filter, not the page size.
 | `GET /applications` | The pipeline: `status`, `state` (`active` \| `timedOut`), `search`, `sameCompanyAs` | items with `appliedAt`, `timedOut`, `comments`, `companyMatchCount` |
 | `GET /applications/:id` | One application | `404` if not in the pipeline |
 | `PATCH /applications/:id/status` | Move to any status, an optional comment | the application |
-| `PATCH /applications/:id` | Edit salary / CV, append a comment | the application |
+| `PATCH /applications/:id` | Edit salary / CV / letter, append a comment | the application |
 | `GET /stats` | The dashboard's counts | the fields: [ADR-0031](decisions/0031-stats-endpoint.md) |
 
 **Errors.** A `DomainError` is `{ statusCode, error: "<ErrorName>", message }`, `422`

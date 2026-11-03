@@ -99,7 +99,7 @@ export function useVacancyRows(
     setPendingSave(null);
   }
 
-  // Applying records the application (the dialog's salary / tailored-resume /
+  // Applying records the application (the dialog's salary / tailored-resume / cover-letter /
   // comment) and moves the vacancy to APPLIED in the same transaction — so this path
   // does not call updateVacancyStatus.
   const applyMutation = useMutation({
@@ -109,6 +109,7 @@ export function useVacancyRows(
           vacancyId: id,
           salaryInApplication: details.salary || undefined,
           usedTailoredResume: details.usedTailoredResume,
+          sentCoverLetter: details.sentCoverLetter,
           comment: details.comment || undefined,
         }),
       patch: (item) => ({ ...item, status: VACANCY_ACTION.APPLIED }),

@@ -10,6 +10,7 @@ export interface RecordApplicationByIdInput {
   vacancyId: number;
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   /** Added as a comment in the caller's source (USER, or AGENT from an API key); a
    * blank one adds none. */
   comment?: string | null;
@@ -29,6 +30,7 @@ export interface RecordApplicationByVacancyInput {
   applyUrl?: string | null;
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   /** Added as a comment in the caller's source (USER, or AGENT from an API key); a
    * blank one adds none. */
   comment?: string | null;
@@ -59,6 +61,7 @@ export interface RecordManyApplicationsResult {
 export interface UpdateApplicationInput {
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   comment?: string | null;
 }
 
@@ -127,6 +130,7 @@ export interface ApplicationListItem {
   comments: VacancyComment[];
   salaryInApplication: string | null;
   usedTailoredResume: boolean;
+  sentCoverLetter: boolean;
   company: string;
   title: string;
   applyUrl: string;

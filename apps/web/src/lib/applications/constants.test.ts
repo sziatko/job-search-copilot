@@ -23,6 +23,7 @@ function application(overrides: Partial<ApplicationListItem> = {}): ApplicationL
     comments: [],
     salaryInApplication: null,
     usedTailoredResume: false,
+    sentCoverLetter: false,
     company: 'Acme',
     title: 'Backend Engineer',
     applyUrl: 'https://acme.com/jobs/1',

@@ -527,15 +527,19 @@ describe('ApplicationsPage / useApplications', () => {
       // Comments are append-only: the field is a new one, never the old one to edit.
       const comment = within(dialog).getByLabelText('Add a comment');
       expect(comment).toHaveValue('');
+      const letter = within(dialog).getByLabelText('Sent a cover letter');
+      expect(letter).not.toBeChecked();
 
       await user.clear(salary);
       await user.type(salary, '120 PLN/h');
+      await user.click(letter);
       await user.type(comment, 'Went well.');
       await user.click(within(dialog).getByRole('button', { name: 'OK' }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       const table = screen.getByRole('table');
       expect(await within(table).findByText('120 PLN/h')).toBeInTheDocument();
+      expect(within(table).getByText('— / ✓')).toBeInTheDocument();
       expect(
         [...table.querySelectorAll('[data-source="USER"]')].map((el) => el.lastChild?.textContent),
       ).toEqual(['First note', 'Went well.']);

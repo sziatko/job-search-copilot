@@ -44,6 +44,7 @@ model Vacancy {
   // What was entered when applying (the apply modal).
   salaryInApplication String?
   usedTailoredResume  Boolean         @default(false)
+  sentCoverLetter     Boolean         @default(false)
 
   // Every note on the vacancy — the analyzer's reasoning, the user's, an agent's.
   comments      Comment[]

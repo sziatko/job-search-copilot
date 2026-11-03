@@ -635,6 +635,7 @@ describe('VacanciesPage / useVacancies', () => {
 
     await user.type(screen.getByLabelText('Salary / rate'), '150 PLN/h');
     await user.click(screen.getByLabelText('Used a tailored resume'));
+    await user.click(screen.getByLabelText('Sent a cover letter'));
     await user.type(screen.getByLabelText('Comment'), 'Adapted CV.');
     await user.click(screen.getByRole('button', { name: 'OK' }));
 
@@ -643,6 +644,7 @@ describe('VacanciesPage / useVacancies', () => {
         vacancyId: 1,
         salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         comment: 'Adapted CV.',
       }),
     );
@@ -1036,8 +1038,8 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.queryByText('80%')).toBeInTheDocument(); // the safe row keeps its pill
       expect(modal.getByText('Imported Role')).toBeInTheDocument();
       expect(modal.queryByRole('link', { name: 'Imported Role' })).not.toBeInTheDocument();
-      // The placeholder row's score cell — not a page-wide count of dashes: the CV
-      // column draws one on both rows, neither of them applied to.
+      // The placeholder row's score cell — not a page-wide count of dashes: the CV / CL
+      // column draws them on both rows, neither of them applied to.
       const imported = modal.getByText('Imported Role').closest('tr') as HTMLTableRowElement;
       expect(imported.cells[2]).toHaveTextContent('—');
     });
@@ -1085,7 +1087,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.getAllByText('Current')).toHaveLength(1);
     });
 
-    it('shows whether a tailored CV went with each application', async () => {
+    it('shows whether a tailored CV and a cover letter went with each application', async () => {
       mswServer.use(
         ...buildHandlers([
           vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
@@ -1096,7 +1098,13 @@ describe('VacanciesPage / useVacancies', () => {
             status: 'APPLIED',
             usedTailoredResume: true,
           }),
-          vacancy({ id: 3, company: 'Acme', title: 'Frontend Lead', status: 'APPLIED' }),
+          vacancy({
+            id: 3,
+            company: 'Acme',
+            title: 'Frontend Lead',
+            status: 'APPLIED',
+            sentCoverLetter: true,
+          }),
         ]),
       );
       renderVacancies();
@@ -1106,13 +1114,13 @@ describe('VacanciesPage / useVacancies', () => {
         .setup()
         .click(screen.getByRole('button', { name: /other vacancies at Acme/i }));
       const modal = within(await screen.findByRole('dialog'));
-      // Date, Vacancy, Score, Status, CV, Actions.
-      const cv = (title: string) =>
+      // Date, Vacancy, Score, Status, CV / CL, Actions.
+      const flags = (title: string) =>
         (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[4];
       // The ✓ waits for the applications query, which lands after the rows.
-      await waitFor(() => expect(cv('Data Engineer')).toHaveTextContent('✓'));
-      expect(cv('Frontend Lead')).toHaveTextContent('—');
-      expect(cv('Backend Engineer')).toHaveTextContent('—'); // never applied to
+      await waitFor(() => expect(flags('Data Engineer')).toHaveTextContent('✓ / —'));
+      expect(flags('Frontend Lead')).toHaveTextContent('— / ✓');
+      expect(flags('Backend Engineer')).toHaveTextContent('— / —'); // never applied to
     });
 
     it('opens Details in a new tab, where the table opens it in place', async () => {

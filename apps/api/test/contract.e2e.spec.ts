@@ -168,9 +168,14 @@ describe('Web↔API contract (e2e)', () => {
     applicationListItemSchema.parse(moved.body);
     const edited = await api
       .patch(`/api/v1/applications/${full}`)
-      .send({ salaryInApplication: null, usedTailoredResume: true, comment: 'Edited.' })
+      .send({
+        salaryInApplication: null,
+        usedTailoredResume: true,
+        sentCoverLetter: true,
+        comment: 'Edited.',
+      })
       .expect(200);
-    applicationListItemSchema.parse(edited.body);
+    expect(applicationListItemSchema.parse(edited.body).sentCoverLetter).toBe(true);
 
     const stats = await api.get('/api/v1/stats').expect(200);
     expect(statsSchema.parse(stats.body).recent.length).toBeGreaterThan(0);

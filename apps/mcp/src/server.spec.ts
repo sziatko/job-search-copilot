@@ -599,13 +599,14 @@ describe('job-search-copilot MCP server', () => {
 
     const recorded = await client.callTool({
       name: 'record_application',
-      arguments: { vacancyId: vacancy.id, salaryInApplication: '150 PLN/h' },
+      arguments: { vacancyId: vacancy.id, salaryInApplication: '100 PLN/h', sentCoverLetter: true },
     });
     expect(JSON.parse(textOf(recorded)).application.id).toBe(vacancy.id);
     const got = await client.callTool({ name: 'get_vacancy', arguments: { id: vacancy.id } });
     expect(JSON.parse(textOf(got))).toMatchObject({
       status: 'APPLIED',
-      salaryInApplication: '150 PLN/h',
+      salaryInApplication: '100 PLN/h',
+      sentCoverLetter: true,
     });
   });
 
@@ -844,7 +845,7 @@ describe('job-search-copilot MCP server', () => {
     });
     expect(result.isError).toBe(true);
   });
-  it('update_application edits salary and CV flag only; isError for an unknown id', async () => {
+  it('update_application edits salary and the CV and letter flags only; isError for an unknown id', async () => {
     const client = await connectedClient();
     const recorded = await client.callTool({
       name: 'record_application',
@@ -854,14 +855,19 @@ describe('job-search-copilot MCP server', () => {
 
     const updated = await client.callTool({
       name: 'update_application',
-      arguments: { id: application.id, usedTailoredResume: true },
+      arguments: { id: application.id, usedTailoredResume: true, sentCoverLetter: true },
     });
     expect(JSON.parse(textOf(updated))).toEqual({
       success: true,
       application: { id: application.id, company: 'Eta Co', title: 'Dev' },
     });
     expect(await prisma.vacancy.findUniqueOrThrow({ where: { id: application.id } })).toMatchObject(
-      { salaryInApplication: '100 PLN/h', usedTailoredResume: true, status: 'APPLIED' },
+      {
+        salaryInApplication: '100 PLN/h',
+        usedTailoredResume: true,
+        sentCoverLetter: true,
+        status: 'APPLIED',
+      },
     );
 
     await client.callTool({

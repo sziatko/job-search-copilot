@@ -145,6 +145,7 @@ export const vacancyDetailSchema = z.object({
   statusChangedAt: z.string(),
   salaryInApplication: z.string().nullable(),
   usedTailoredResume: z.boolean(),
+  sentCoverLetter: z.boolean(),
   comments: z.array(vacancyCommentSchema),
   /** The analyzer's comment; null on a placeholder the analyzer has not scored. */
   estimationComment: z.string().nullable(),

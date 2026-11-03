@@ -153,7 +153,7 @@ apps/mcp  record_application { company, title, ... }
       → already in the pipeline? AlreadyAppliedError
       → writeStatus(APPLIED), then writeStatus(status) if recorded further along
         (each a StatusChange row + the status / statusChangedAt cache)
-      → set salary / tailored-CV flag; add the comment as a USER Comment
+      → set salary / tailored-CV and cover-letter flags; add the comment as a USER Comment
   → returns { application, resolution, vacancyCreated }   (the vacancy, as /applications reads it)
 ```
 

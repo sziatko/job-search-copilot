@@ -65,6 +65,7 @@ export const applicationListItemSchema = z.object({
   comments: z.array(applicationCommentSchema),
   salaryInApplication: z.string().nullable(),
   usedTailoredResume: z.boolean(),
+  sentCoverLetter: z.boolean(),
   company: z.string(),
   title: z.string(),
   applyUrl: z.string(),
@@ -89,6 +90,7 @@ export type RecordApplicationResponse = z.infer<typeof recordApplicationResponse
 export interface UpdateApplicationInput {
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   comment?: string;
 }
 
@@ -96,6 +98,7 @@ export interface RecordApplicationInput {
   vacancyId: number;
   salaryInApplication?: string;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   comment?: string;
 }
 
@@ -103,5 +106,6 @@ export interface RecordApplicationInput {
 export interface ApplyDetails {
   salary: string;
   usedTailoredResume: boolean;
+  sentCoverLetter: boolean;
   comment: string;
 }

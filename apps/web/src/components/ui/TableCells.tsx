@@ -95,6 +95,23 @@ export function CompanyHistoryButton({
   );
 }
 
+/** The `CV / CL` column: whether a tailored resume and a cover letter went with the
+ * application, `✓ / —`. Both unset on a row never applied to. */
+export function ApplyFlagsCell({
+  resume,
+  letter,
+}: {
+  resume: boolean | undefined;
+  letter: boolean | undefined;
+}) {
+  const mark = (on: boolean | undefined) => (on ? '✓' : '—');
+  return (
+    <div className="whitespace-nowrap text-small text-ink-muted">
+      {mark(resume)} / {mark(letter)}
+    </div>
+  );
+}
+
 /** Why a row's last write failed, under its controls; nothing when it did not. */
 export function RowError({ children }: { children: string | undefined }) {
   return children ? <p className="mt-1 text-caption text-bad-ink">{children}</p> : null;

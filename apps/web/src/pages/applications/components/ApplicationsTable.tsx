@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { type Column, Table } from '@/components/ui/Table';
 import {
+  ApplyFlagsCell,
   CompanyHistoryButton,
   DateCell,
   RoleMeta,
@@ -92,10 +93,10 @@ export function ApplicationsTable({
       ),
     },
     {
-      header: 'CV',
+      header: 'CV / CL',
       width: 80,
       cell: (item) => (
-        <div className="text-small text-ink-muted">{item.usedTailoredResume ? '✓' : '—'}</div>
+        <ApplyFlagsCell resume={item.usedTailoredResume} letter={item.sentCoverLetter} />
       ),
     },
     { header: 'Comment', cell: (item) => <MergedComment comments={item.comments} /> },

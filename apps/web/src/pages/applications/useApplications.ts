@@ -102,6 +102,7 @@ export function useApplications() {
           ...item,
           salaryInApplication: text(input.salaryInApplication, item.salaryInApplication),
           usedTailoredResume: input.usedTailoredResume ?? item.usedTailoredResume,
+          sentCoverLetter: input.sentCoverLetter ?? item.sentCoverLetter,
           comments: comment
             ? [
                 ...item.comments,
