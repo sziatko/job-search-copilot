@@ -280,6 +280,12 @@ describe('Applications (e2e)', () => {
       expect(notes(res.body)).toEqual([ANALYZED, ['USER', 'Old'], ['USER', 'New']]);
     });
 
+    it('400s on a flag sent as null: it has no empty value to clear to', async () => {
+      const id = await recordOne();
+      await api.patch(`/api/v1/applications/${id}`).send({ usedTailoredResume: null }).expect(400);
+      await api.patch(`/api/v1/applications/${id}`).send({ sentCoverLetter: null }).expect(400);
+    });
+
     it('clears a field sent as null', async () => {
       const id = await recordOne({ salaryInApplication: '100 PLN/h' });
       const res = await api
