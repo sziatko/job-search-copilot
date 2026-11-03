@@ -16,6 +16,8 @@ import {
 } from '@/lib/applications/types';
 import { queryKeys, staleAfter } from '@/lib/queryKeys';
 import { fetchStats } from '@/lib/stats/api';
+import { writeVacancyTags } from '@/lib/tags/api';
+import { withTagWrite } from '@/lib/tags/types';
 import { useInfiniteList } from '@/lib/useInfiniteList';
 import { useRowMutation } from '@/lib/useRowMutation';
 import { toastMoved } from '@/lib/vacancies/constants';
@@ -122,6 +124,16 @@ export function useApplications() {
     }),
   );
 
+  // A row write too, so it disables the row's controls: two optimistic writes to one row
+  // could undo each other on a rollback.
+  const tagMutation = useMutation(
+    rowMutation({
+      mutationFn: writeVacancyTags,
+      patch: withTagWrite,
+      invalidates: staleAfter.tagWrite,
+    }),
+  );
+
   return {
     loading,
     loadError,
@@ -133,6 +145,7 @@ export function useApplications() {
     rowErrors,
     statusFilter,
     setStatusFilter,
+    writeTags: tagMutation.mutate,
     changeStatus: (id: number, status: ApplicationStatus) =>
       statusMutation.mutate({ id, status }, { onSuccess: (item) => toastMoved(item.status, item) }),
     editApplication: (id: number, input: UpdateApplicationInput) =>

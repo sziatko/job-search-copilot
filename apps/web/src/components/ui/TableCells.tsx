@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { isSafeExternalUrl } from '@/lib/url';
-import { IconHistory } from '../icons';
+import { IconHistory, IconPlus } from '../icons';
 import { Tip } from './Tip';
 
 /** A row's date: the day, with the ⏳ of an application gone quiet and the date of its
@@ -63,9 +63,12 @@ export function RoleMeta({
   );
 }
 
-/** Opens the company's other vacancies; none when the row is its company's only one.
- * Shaped for the meta line's text rather than an icon button's 30px square, which would
- * stretch the row and push the line around as it appears. */
+/** A button on the meta line, shaped for its text rather than an icon button's 30px square,
+ * which would stretch the row and push the line around as it appears. */
+const META_BUTTON =
+  'relative ml-2 inline-flex cursor-pointer items-center gap-1 rounded-sm border border-border-strong px-1 py-px align-middle text-caption font-bold text-ink-muted hover:border-accent-soft-border hover:bg-accent-soft hover:text-accent-ink aria-disabled:opacity-50 [&_svg]:size-3';
+
+/** Opens the company's other vacancies; none when the row is its company's only one. */
 export function CompanyHistoryButton({
   company,
   matchCount,
@@ -79,11 +82,7 @@ export function CompanyHistoryButton({
   const others = (matchCount ?? 0) - 1;
   if (others < 1) return null;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative ml-2 inline-flex cursor-pointer items-center gap-1 rounded-sm border border-border-strong px-1 py-px align-middle text-caption font-bold text-ink-muted hover:border-accent-soft-border hover:bg-accent-soft hover:text-accent-ink [&_svg]:size-3"
-    >
+    <button type="button" onClick={onClick} className={META_BUTTON}>
       <IconHistory />
       {/* The count is decoration and the bubble is the label, so the button does not
           read out "7, 7 other vacancies at contoso". */}
@@ -91,6 +90,22 @@ export function CompanyHistoryButton({
       <Tip>
         {others} other {others === 1 ? 'vacancy' : 'vacancies'} at {company}
       </Tip>
+    </button>
+  );
+}
+
+/** Opens the dialog that adds a tag. `aria-disabled` while the vacancy saves, not `disabled`:
+ * the write starts as the dialog closes, and focus cannot return to a disabled button. */
+export function AddTagButton({ saving, onClick }: { saving: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-disabled={saving}
+      onClick={saving ? undefined : onClick}
+      className={META_BUTTON}
+    >
+      <IconPlus />
+      <Tip>Add tag</Tip>
     </button>
   );
 }

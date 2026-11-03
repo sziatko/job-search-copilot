@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListCount, ListFrame } from '@/components/ui/ListFrame';
 import { View } from '@/components/ui/View';
+import { AddTagModal } from '@/components/vacancies/AddTagModal';
 import { ApplyDialog } from '@/components/vacancies/ApplyDialog';
 import { CompanyHistoryModal } from '@/components/vacancies/CompanyHistoryModal';
 import { SearchModal } from '@/components/vacancies/SearchModal';
@@ -27,8 +28,11 @@ export function ApplicationsPage() {
     setStatusFilter,
     changeStatus,
     editApplication,
+    writeTags,
   } = useApplications();
   const [editing, setEditing] = useState<ApplicationListItem | null>(null);
+  // Page state, not row state: a virtualized row unmounts as it scrolls out of the window.
+  const [addingTag, setAddingTag] = useState<ApplicationListItem | null>(null);
   const [companyHistory, setCompanyHistory] = useState<{
     company: string;
     vacancyId: number;
@@ -68,6 +72,8 @@ export function ApplicationsPage() {
             onStatusChange={changeStatus}
             onEdit={setEditing}
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
+            onAddTag={setAddingTag}
+            onRemoveTag={(id, remove) => writeTags({ id, remove })}
             onEndReached={loadMore}
             filterKey={statusFilter}
             emptyMessage={emptyMessage}
@@ -87,6 +93,14 @@ export function ApplicationsPage() {
         <SearchModal
           context={STATUS_CONTEXT.applications.options}
           onClose={() => setSearching(false)}
+        />
+      )}
+
+      {addingTag && (
+        <AddTagModal
+          assigned={addingTag.tags}
+          onAdd={(add) => writeTags({ id: addingTag.id, add })}
+          onClose={() => setAddingTag(null)}
         />
       )}
 

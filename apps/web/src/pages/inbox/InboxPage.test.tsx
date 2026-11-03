@@ -66,6 +66,30 @@ const inbox = () => [
   fakeVacancy({ id: 5, company: 'Triaged Co', status: 'NOT_REVIEWED' }),
 ];
 
+describe('InboxPage tags', () => {
+  it('adds a tag to a row from its dialog, and removes it by its ×', async () => {
+    const rows = [fakeVacancy({ id: 1, company: 'Acme', status: 'NEW', tags: [] })];
+    renderInbox(rows);
+    const user = userEvent.setup();
+
+    await screen.findByText('Acme');
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Add tag' }));
+    const modal = within(await screen.findByRole('dialog', { name: 'Add a tag' }));
+    await user.type(modal.getByRole('textbox', { name: 'Tag name' }), 'Contract');
+    await user.click(await modal.findByRole('button', { name: 'Create “Contract”' }));
+
+    await rowOf('Acme').findByRole('button', { name: 'Remove tag Contract' });
+    await waitFor(() => expect(rows[0].tags.map((tag) => tag.name)).toEqual(['Contract']));
+    await waitFor(() =>
+      expect(rowOf('Acme').getByRole('button', { name: 'Remove tag Contract' })).toBeEnabled(),
+    );
+
+    await user.click(rowOf('Acme').getByRole('button', { name: 'Remove tag Contract' }));
+
+    await waitFor(() => expect(rows[0].tags).toEqual([]));
+  });
+});
+
 describe('InboxPage', () => {
   afterEach(() => {
     mswServer.events.removeAllListeners();

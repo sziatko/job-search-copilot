@@ -10,6 +10,7 @@ import {
   recordApplicationResponseSchema,
 } from '@/lib/applications/types';
 import { statsSchema } from '@/lib/stats/types';
+import { tagListSchema, tagRefSchema } from '@/lib/tags/types';
 import {
   vacancyDetailSchema,
   vacancyListItemSchema,
@@ -145,6 +146,19 @@ describe('Web↔API contract (e2e)', () => {
 
     expect(vacancyListItemSchema.parse(res.body).tags).toEqual([
       { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' },
+    ]);
+  });
+
+  it('GET and POST /tags: their schemas', async () => {
+    const created = await api
+      .post('/api/v1/tags')
+      .send({ name: 'On-site', tone: 'WARN' })
+      .expect(201);
+    expect(tagRefSchema.parse(created.body).tone).toBe('WARN');
+
+    const list = await api.get('/api/v1/tags').expect(200);
+    expect(tagListSchema.parse(list.body)).toEqual([
+      { id: created.body.id, name: 'On-site', tone: 'WARN', vacancyCount: 0 },
     ]);
   });
 

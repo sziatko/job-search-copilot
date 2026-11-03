@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ListCount, ListFrame } from '@/components/ui/ListFrame';
 import { Tabs } from '@/components/ui/Tabs';
 import { View } from '@/components/ui/View';
+import { AddTagModal } from '@/components/vacancies/AddTagModal';
 import { CompanyHistoryModal } from '@/components/vacancies/CompanyHistoryModal';
 import { SearchModal } from '@/components/vacancies/SearchModal';
 import { VacancyTable } from '@/components/vacancies/VacancyTable';
@@ -58,10 +59,23 @@ export function InboxPage() {
   const tab = search.tab ?? INBOX_TAB.queue;
   const { status, hasText, empty } = TABS[tab];
 
-  const { loading, loadError, total, items, loadMore, savingIds, rowErrors, requestActionChange } =
-    useVacancyRows(['inbox', tab], (cursor) =>
-      listVacanciesPage({ status: [status], hasText, cursor }),
-    );
+  const {
+    loading,
+    loadError,
+    total,
+    items,
+    loadMore,
+    savingIds,
+    rowErrors,
+    pendingTag,
+    requestActionChange,
+    requestAddTag,
+    removeTag,
+    confirmAddTag,
+    cancelAddTag,
+  } = useVacancyRows(['inbox', tab], (cursor) =>
+    listVacanciesPage({ status: [status], hasText, cursor }),
+  );
 
   // Page state, not row state — see VacanciesPage.
   const [companyHistory, setCompanyHistory] = useState<{
@@ -104,6 +118,8 @@ export function InboxPage() {
             rowErrors={rowErrors}
             onActionChange={requestActionChange}
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
+            onAddTag={requestAddTag}
+            onRemoveTag={removeTag}
           />
         )}
       </ListFrame>
@@ -114,6 +130,10 @@ export function InboxPage() {
           currentId={companyHistory.vacancyId}
           onClose={() => setCompanyHistory(null)}
         />
+      )}
+
+      {pendingTag && (
+        <AddTagModal assigned={pendingTag.tags} onAdd={confirmAddTag} onClose={cancelAddTag} />
       )}
 
       {searching && (

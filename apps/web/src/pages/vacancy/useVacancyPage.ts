@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { recordApplication, updateApplicationStatus } from '@/lib/applications/api';
 import type { ApplicationStatus, ApplyDetails } from '@/lib/applications/types';
 import { queryKeys, staleAfter } from '@/lib/queryKeys';
+import { writeVacancyTags } from '@/lib/tags/api';
+import type { TagRef, TagWrite } from '@/lib/tags/types';
 import {
   addComment,
   getVacancy,
@@ -52,6 +54,12 @@ export function useVacancyPage(id: number) {
     onSettled: refetch(staleAfter.edit),
   });
 
+  const tagWrite = useMutation({
+    mutationFn: writeVacancyTags,
+    onSettled: refetch(staleAfter.tagWrite),
+  });
+  const writeTags = (write: Omit<TagWrite, 'id'>) => tagWrite.mutate({ id, ...write });
+
   // The controls are drawn from the loaded vacancy, so its data is there by now.
   const moved = (status: RowAction | ApplicationStatus) => () => {
     if (vacancy.data) toastMoved(status, vacancy.data);
@@ -92,5 +100,9 @@ export function useVacancyPage(id: number) {
       }),
     commentSaving: commentWrite.isPending,
     commentError: commentWrite.error?.message ?? null,
+    addTag: (add: TagRef) => writeTags({ add }),
+    removeTag: (remove: TagRef) => writeTags({ remove }),
+    tagSaving: tagWrite.isPending,
+    tagError: tagWrite.error?.message ?? null,
   };
 }

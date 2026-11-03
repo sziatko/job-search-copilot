@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { IconExternal } from '@/components/icons';
 import { buttonClass } from '@/components/ui/Button';
 import { ScorePill } from '@/components/ui/ScorePill';
+import { AddTagButton } from '@/components/ui/TableCells';
 import { Tag } from '@/components/ui/Tag';
 import { Tip } from '@/components/ui/Tip';
+import { AddTagModal } from '@/components/vacancies/AddTagModal';
 import { CopyVacancyButton } from '@/components/vacancies/CopyVacancyButton';
 import { RecommendationTag } from '@/components/vacancies/RecommendationTag';
 import { VacancyTags } from '@/components/vacancies/VacancyTags';
@@ -27,6 +30,7 @@ export function Header({
   const linkable = isSafeExternalUrl(vacancy.applyUrl);
   // `hasAnalysis`' rule: the analysis is there when `recommendation` is.
   const analysed = vacancy.recommendation !== null;
+  const [addingTag, setAddingTag] = useState(false);
 
   return (
     <div className={HEADER_ROW}>
@@ -53,9 +57,21 @@ export function Header({
             ) : (
               <RecommendationTag recommendation={vacancy.recommendation} />
             ))}
+          <AddTagButton saving={page.tagSaving} onClick={() => setAddingTag(true)} />
         </div>
-        <VacancyTags tags={vacancy.tags} />
+        <VacancyTags
+          tags={vacancy.tags}
+          edit={{ saving: page.tagSaving, onRemove: page.removeTag }}
+        />
         {page.statusError && <p className="mt-2 text-small text-bad-ink">{page.statusError}</p>}
+        {page.tagError && <p className="mt-2 text-small text-bad-ink">{page.tagError}</p>}
+        {addingTag && (
+          <AddTagModal
+            assigned={vacancy.tags}
+            onAdd={page.addTag}
+            onClose={() => setAddingTag(false)}
+          />
+        )}
       </div>
       <div className="flex flex-none items-center gap-2 narrow:w-full">
         <StatusControl vacancy={vacancy} page={page} />

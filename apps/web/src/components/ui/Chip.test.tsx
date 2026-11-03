@@ -18,6 +18,16 @@ describe('Chip', () => {
     expect(screen.getByText('Remote')).toBeInTheDocument();
   });
 
+  it('turns the × off under removeDisabled', () => {
+    render(
+      <Chip tone="good" onRemove={() => {}} removeLabel="Remove tag Remote" removeDisabled>
+        Remote
+      </Chip>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Remove tag Remote' })).toBeDisabled();
+  });
+
   it('has no button without onRemove', () => {
     render(<Chip tone="neutral">Remote</Chip>);
 

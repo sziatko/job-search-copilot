@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { type Column, Table } from '@/components/ui/Table';
 import {
+  AddTagButton,
   ApplyFlagsCell,
   CompanyHistoryButton,
   DateCell,
@@ -18,6 +19,7 @@ import { CopyVacancyButton } from '@/components/vacancies/CopyVacancyButton';
 import { VacancyTags } from '@/components/vacancies/VacancyTags';
 import { daysSinceLastMove } from '@/lib/applications/constants';
 import type { ApplicationListItem, ApplicationStatus } from '@/lib/applications/types';
+import type { TagRef } from '@/lib/tags/types';
 import { MergedComment } from './MergedComment';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -36,6 +38,8 @@ export function ApplicationsTable({
   onStatusChange,
   onEdit,
   onShowCompanyHistory,
+  onAddTag,
+  onRemoveTag,
   onEndReached,
   filterKey,
   emptyMessage,
@@ -47,6 +51,8 @@ export function ApplicationsTable({
   onStatusChange: (id: number, status: ApplicationStatus) => void;
   onEdit: (item: ApplicationListItem) => void;
   onShowCompanyHistory: (company: string, vacancyId: number) => void;
+  onAddTag: (item: ApplicationListItem) => void;
+  onRemoveTag: (id: number, tag: TagRef) => void;
   onEndReached?: () => void;
   /** The page's filter: a change scrolls the box back to the top. */
   filterKey: string;
@@ -81,8 +87,15 @@ export function ApplicationsTable({
               matchCount={item.companyMatchCount}
               onClick={() => onShowCompanyHistory(item.company, item.id)}
             />
+            <AddTagButton saving={savingIds.has(item.id)} onClick={() => onAddTag(item)} />
           </RoleMeta>
-          <VacancyTags tags={item.tags} />
+          <VacancyTags
+            tags={item.tags}
+            edit={{
+              saving: savingIds.has(item.id),
+              onRemove: (tag) => onRemoveTag(item.id, tag),
+            }}
+          />
         </>
       ),
     },

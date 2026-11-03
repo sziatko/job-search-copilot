@@ -12,6 +12,7 @@ import { ExpandableText } from '@/components/ui/ExpandableText';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { type Column, Table } from '@/components/ui/Table';
 import {
+  AddTagButton,
   CompanyHistoryButton,
   DateCell,
   RoleMeta,
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/TableCells';
 import { Tip } from '@/components/ui/Tip';
 import { isPipelineStatus } from '@/lib/applications/types';
+import type { TagRef } from '@/lib/tags/types';
 import {
   ROW_ACTION,
   type RowAction,
@@ -77,6 +79,8 @@ export function VacancyTable({
   rowErrors,
   onActionChange,
   onShowCompanyHistory,
+  onAddTag,
+  onRemoveTag,
   onEndReached,
   filterKey,
 }: {
@@ -88,6 +92,9 @@ export function VacancyTable({
   /** Better than a per-row modal: the rows are virtualized, so anything mounted
    * inside one unmounts as soon as it scrolls out of the window. */
   onShowCompanyHistory: (company: string, vacancyId: number) => void;
+  /** Opens the page's dialog, for the same reason. */
+  onAddTag: (item: VacancyListItem) => void;
+  onRemoveTag: (id: number, tag: TagRef) => void;
   onEndReached: () => void;
   /** The page's filter: a change scrolls the box back to the top. */
   filterKey: string;
@@ -109,8 +116,15 @@ export function VacancyTable({
               matchCount={item.companyMatchCount}
               onClick={() => onShowCompanyHistory(item.company, item.id)}
             />
+            <AddTagButton saving={savingIds.has(item.id)} onClick={() => onAddTag(item)} />
           </RoleMeta>
-          <VacancyTags tags={item.tags} />
+          <VacancyTags
+            tags={item.tags}
+            edit={{
+              saving: savingIds.has(item.id),
+              onRemove: (tag) => onRemoveTag(item.id, tag),
+            }}
+          />
         </>
       ),
     },
