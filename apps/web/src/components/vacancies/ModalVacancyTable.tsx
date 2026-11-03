@@ -66,7 +66,7 @@ export function ModalVacancyTable({
             </Tag>
           )}
           <RoleMeta company={item.company} id={item.id} />
-          <VacancyTags tags={item.tags} />
+          <VacancyTags tags={item.tags} dense />
         </>
       ),
     },

@@ -4,22 +4,25 @@ import { Tag } from './Tag';
 import type { Tone } from './tone';
 
 /** A label the user owns, such as a vacancy's tag: a `Tag` that can wrap a long name and,
- * with `onRemove`, carries a × button named by `removeLabel`, off under `removeDisabled`. */
+ * with `onRemove`, carries a × button named by `removeLabel`, off under `removeDisabled`.
+ * `dense` is its size in a table row. */
 export function Chip({
   tone,
+  dense,
   children,
   onRemove,
   removeLabel,
   removeDisabled,
 }: {
   tone: Tone;
+  dense?: boolean;
   children: ReactNode;
 } & (
   | { onRemove: () => void; removeLabel: string; removeDisabled?: boolean }
   | { onRemove?: undefined; removeLabel?: undefined; removeDisabled?: undefined }
 )) {
   return (
-    <Tag tone={tone} className="inline-flex max-w-full items-center gap-1">
+    <Tag tone={tone} dense={dense} className="inline-flex max-w-full items-center gap-1">
       {/* Unlike a status's word, a name can be wider than its cell. */}
       <span className="min-w-0 whitespace-normal wrap-anywhere">{children}</span>
       {onRemove && (

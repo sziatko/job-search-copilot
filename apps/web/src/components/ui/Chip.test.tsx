@@ -28,6 +28,20 @@ describe('Chip', () => {
     expect(screen.getByRole('button', { name: 'Remove tag Remote' })).toBeDisabled();
   });
 
+  it('is smaller only when dense', () => {
+    render(
+      <>
+        <Chip tone="good">Full</Chip>
+        <Chip tone="good" dense>
+          Dense
+        </Chip>
+      </>,
+    );
+
+    expect(screen.getByText('Full').parentElement).toHaveClass('py-1');
+    expect(screen.getByText('Dense').parentElement).toHaveClass('py-0');
+  });
+
   it('has no button without onRemove', () => {
     render(<Chip tone="neutral">Remote</Chip>);
 

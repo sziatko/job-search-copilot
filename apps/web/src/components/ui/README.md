@@ -47,7 +47,8 @@ comment has the details), and `src/styles.test.ts` fails on anything else:
   (`lib/vacancies/constants.ts`) — one map, so a status looks the same everywhere.
 - **Meta beside the content** (a date, a time ago, a ratio) is a `Meta`.
 - **A label the user owns** (a vacancy's tag, removable with an `onRemove`) is a `Chip`, which
-  composes `Tag`; `Tag` stays a status label.
+  composes `Tag`; `Tag` stays a status label. In a table row, `dense`: rows carry several, and the
+  status beside them keeps its size.
 
 ## Adding one
 

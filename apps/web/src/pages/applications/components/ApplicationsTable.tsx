@@ -91,6 +91,7 @@ export function ApplicationsTable({
           </RoleMeta>
           <VacancyTags
             tags={item.tags}
+            dense
             edit={{
               saving: savingIds.has(item.id),
               onRemove: (tag) => onRemoveTag(item.id, tag),
