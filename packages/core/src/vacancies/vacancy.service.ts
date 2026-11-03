@@ -429,6 +429,12 @@ export class VacancyService {
   ): Promise<{ moved: number[]; skipped: number[] }> {
     return forUser(this.db, userId).$transaction(
       async (db) => {
+        // In id order, as every write of tags takes them, or a batch in another order deadlocks.
+        await lockVacancies(
+          db,
+          userId,
+          items.map((item) => item.id),
+        );
         const moved: number[] = [];
         const skipped: number[] = [];
         for (const { id, reason } of items) {

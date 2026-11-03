@@ -372,6 +372,24 @@ describe('TagService', () => {
       expect(await namesOn(second)).toEqual(['Alpha']);
     });
 
+    it('takes parallel writes alongside markUnavailable, its items in reverse order', async () => {
+      const ids: number[] = [];
+      for (let n = 0; n < 6; n++) ids.push(await vacancy(n));
+      const reversed = [...ids].reverse().map((id) => ({ id, reason: 'Gone' }));
+
+      await Promise.all([
+        vacancies.markUnavailable(userId, reversed),
+        ...Array.from({ length: 6 }, () =>
+          tags.tagVacancies(
+            userId,
+            ids.map((vacancyId) => ({ vacancyId, add: ['Alpha'] })),
+          ),
+        ),
+      ]);
+
+      expect(await namesOn(ids[0])).toEqual(['Alpha']);
+    });
+
     it('takes parallel swaps on one vacancy', async () => {
       const vacancyId = await vacancy(1);
       await tags.tagVacancies(userId, [{ vacancyId, add: ['Alpha', 'Zeta'] }]);

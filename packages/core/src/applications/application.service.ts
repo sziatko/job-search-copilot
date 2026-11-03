@@ -125,6 +125,9 @@ export class ApplicationService {
   /**
    * Record a whole batch atomically — one transaction, all rows or none. A thrown
    * row rolls everything back, so a failed batch leaves nothing and is safe to retry.
+   * Limit: takes its vacancies in request order, not by id as a write of tags does, because a
+   * row found by its url has no id yet. Past that: a deadlock with an overlapping batch of tags
+   * rolls one of them back, and a retry succeeds.
    */
   recordMany(
     userId: string,
