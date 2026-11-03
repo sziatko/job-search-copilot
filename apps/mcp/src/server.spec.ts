@@ -559,7 +559,7 @@ describe('job-search-copilot MCP server', () => {
 
     const recorded = await client.callTool({
       name: 'record_application',
-      arguments: { company: 'acme', title: 'backend engineer', salaryInApplication: '130 PLN/h' },
+      arguments: { company: 'acme', title: 'backend engineer', salaryInApplication: '150 PLN/h' },
     });
     const { success, application } = JSON.parse(textOf(recorded));
     expect(success).toBe(true);
@@ -571,7 +571,7 @@ describe('job-search-copilot MCP server', () => {
     });
     expect(JSON.parse(textOf(got))).toMatchObject({
       status: 'APPLIED',
-      salaryInApplication: '130 PLN/h',
+      salaryInApplication: '150 PLN/h',
     });
 
     const again = await client.callTool({
@@ -599,13 +599,13 @@ describe('job-search-copilot MCP server', () => {
 
     const recorded = await client.callTool({
       name: 'record_application',
-      arguments: { vacancyId: vacancy.id, salaryInApplication: '130 PLN/h' },
+      arguments: { vacancyId: vacancy.id, salaryInApplication: '150 PLN/h' },
     });
     expect(JSON.parse(textOf(recorded)).application.id).toBe(vacancy.id);
     const got = await client.callTool({ name: 'get_vacancy', arguments: { id: vacancy.id } });
     expect(JSON.parse(textOf(got))).toMatchObject({
       status: 'APPLIED',
-      salaryInApplication: '130 PLN/h',
+      salaryInApplication: '150 PLN/h',
     });
   });
 

@@ -62,7 +62,7 @@ describe('Applications (e2e)', () => {
         .post('/api/v1/applications')
         .send({
           vacancyId,
-          salaryInApplication: '130 PLN/h',
+          salaryInApplication: '150 PLN/h',
           usedTailoredResume: true,
           comment: 'Adapted CV.',
         })
@@ -72,7 +72,7 @@ describe('Applications (e2e)', () => {
       expect(res.body.vacancyCreated).toBe(false);
       expect(res.body.application.company).toBe('Acme');
       expect(res.body.application.matchScore).toBe(80);
-      expect(res.body.application.salaryInApplication).toBe('130 PLN/h');
+      expect(res.body.application.salaryInApplication).toBe('150 PLN/h');
       expect(res.body.application.id).toBe(vacancyId);
       expect(res.body.application.appliedAt).toBe(res.body.application.statusChangedAt);
       expect(notes(res.body.application)).toEqual([ANALYZED, ['USER', 'Adapted CV.']]);

@@ -77,7 +77,7 @@ describe('ApplicationService', () => {
 
       const result = await applications.record(userId, {
         vacancyId: vacancy.id,
-        salaryInApplication: '130 PLN/h',
+        salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
         comment: '  Adapted CV.  ',
       });
@@ -88,7 +88,7 @@ describe('ApplicationService', () => {
         id: vacancy.id,
         company: 'Acme',
         matchScore: 80,
-        salaryInApplication: '130 PLN/h',
+        salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
         status: 'APPLIED',
       });
