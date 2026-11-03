@@ -20,7 +20,7 @@ own watchers compile only their own `src/`.
 
 ## Consequences
 - After a `core` edit the apps keep the old modules in memory until restarted:
-  `docker compose restart core api mcp mcp-http`.
+  [`architecture.md` § Dev stack](../architecture.md#dev-stack-docker-compose).
 - CI and the Docker build build `core` first.
 - `npm test` does not typecheck `core` (vitest strips types): `npm run typecheck` does.
 
@@ -30,5 +30,6 @@ own watchers compile only their own `src/`.
   `node dist/main.js` breaks.
 
 ## Related
-The backlog's "`core` dev-loop friction" row, [ADR-0001](0001-monorepo-npm-workspaces.md),
+[`backlog.md` § `core` dev-loop friction](../backlog.md#core-dev-loop-friction),
+[ADR-0001](0001-monorepo-npm-workspaces.md),
 [ADR-0016](0016-docker-dev-stack-and-ci.md).

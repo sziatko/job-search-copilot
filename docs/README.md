@@ -5,13 +5,16 @@ it: [`development.md`](development.md).
 
 | Doc | What's in it |
 | --- | --- |
-| [`architecture.md`](architecture.md) | The system map: the four packages, the request paths, the dev stack, the invariants. Start here. |
+| [`architecture.md`](architecture.md) | The system map, where to start: the four packages, the request paths, the dev stack, the invariants. |
 | [`domain-model.md`](domain-model.md) | The [glossary](domain-model.md#glossary), `Vacancy`, its two independent fields (`recommendation`, `status`), the status journal, the DB rules. |
 | [`contracts.md`](contracts.md) | The surfaces other code depends on: the REST API, the MCP tools, the web↔API schema. |
-| [`development.md`](development.md) | Running it locally: the Docker stack, the databases, the MCP server, API keys, scripts, the tests, [what enforces the standards](development.md#standards), gotchas. |
+| [`development.md`](development.md) | Running it locally: the Docker stack, the databases, the MCP server, API keys, scripts, the tests, [what enforces the standards](development.md#standards), [secrets](development.md#secrets), gotchas. |
 | [`deployment.md`](deployment.md) | The server: its layout, the first start, deploying a version, rolling back. |
 | [`decisions/`](decisions/) | One ADR per decision other code depends on. |
 | [`backlog.md`](backlog.md) | Ideas and fixes not yet planned. |
+| [`packages/core/README.md`](../packages/core/README.md) | The domain layer, and why the apps run its build rather than its source. |
+| [`packages/core/prisma/README.md`](../packages/core/prisma/README.md) | The database and migrations: the commands, the rules for a migration in review. |
+| [`apps/web/src/components/ui/README.md`](../apps/web/src/components/ui/README.md) | The UI library: how to use a primitive, how to add one. |
 
 ## Conventions
 
@@ -48,16 +51,5 @@ Each rule here closes a way they went stale before.
   ceiling is a plain `Limit: … Past that: …` comment, never a `ponytail:` tag — that
   plugin convention does not apply in this repo.
 - **One sentence per table cell.** More is a section of its own.
-- **Code that deletes data checks its target first** (the database name), as
-  `vitest.test-db.ts`, `resetToSeed` and `e2e/db.ts` do; never trust an env fallback.
 - **When code changes, its docs change in the same commit.** Grep the old name across
   `docs/`, comments and tests before calling a rename done.
-
-## Secrets
-
-- **Credentials live in untracked files.** The apps read env vars loaded at boot
-  ([ADR-0007](decisions/0007-env-config-and-loading.md)); the values sit in `.env`,
-  `.env.test` and `.env.e2e`, which `.gitignore` covers. Only their `*.example`
-  templates, with fake values, are tracked.
-- **If a key reaches a commit, rotate it first.** Rewriting history cleans up but does
-  not help: the key has already been through clones, backups and caches.

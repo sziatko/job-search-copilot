@@ -31,8 +31,8 @@ misses spellings where neither contains the other (`Acme Polska` / `Acme Poland`
   spellings, the middle one sees more rows than the outer two.
 - **The first word** — merges `Globex Systems` with `Globex Ventures`, two companies.
 - **A `Company` table, or names normalised on save** — a migration, and it loses what
-  the analyzer wrote (`Fabrikam (partner company)` carries meaning). The backlog's
-  aliases row.
+  the analyzer wrote (`Fabrikam (partner company)` carries meaning).
+  [`backlog.md` § Company aliases](../backlog.md#company-aliases).
 
 ## Consequences
 - **Accepted miss:** a longer name for the same company (`Contoso` / `Contoso

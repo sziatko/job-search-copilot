@@ -36,15 +36,15 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
   token before each run, for the same trust.
 - **Per-key scopes** — one more choice in the UI and in every guard, for two kinds of
   client. Revisit with a third.
-- **No rate limit** — what this ADR first chose: the plugin's default, 10 requests a
-  day, would stop a scoring run of about a hundred MCP calls, and a limit does nothing
-  against a leaked key; revoking does. But a looping agent or n8n flow then writes
-  without end. 1000 an hour is ten scoring runs, far above real use.
+- **No rate limit** — the plugin's default, 10 requests a day, would stop a scoring run
+  of about a hundred MCP calls, and a limit does nothing against a leaked key; revoking
+  does. But a looping agent or n8n flow then writes without end. 1000 an hour is ten
+  scoring runs, far above real use.
 - **The api's own throttle (`@nestjs/throttler`)** — REST only, in memory per process;
   the plugin's limit is in the key's row, so REST and the MCP share one count.
-- **Keys on the three n8n write routes only** — what this ADR first said, as hygiene.
-  A key already reads and writes everything through MCP, so the narrow scope protected
-  nothing, and n8n could not read the queue it was meant to clean up.
+- **Keys on the three n8n write routes only** — hygiene, but a key already reads and
+  writes everything through MCP, so the narrow scope protects nothing, and n8n could not
+  read the queue it is meant to clean up.
 - **The MCP verifies keys by calling the API** — a network hop per request, and a
   second way to reach the DB's data.
 

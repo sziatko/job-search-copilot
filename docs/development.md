@@ -157,6 +157,18 @@ What enforces what; the reasoning stays in the doc each row links.
 | No tool | The [invariants](architecture.md#system-invariants), the [ADRs](decisions/) and the [doc rules](README.md#writing-docs-and-comments) | What the rows above do not cover holds only because an author or a reviewer reads them. |
 | Local | Hooks and review agents, in `.claude/AGENT-SETUP.md` | The owner's Claude Code setup, which a plain clone does not bring, adds a lint on edit and the reviews before a PR. |
 
+**Code that deletes data checks its target first** (the database name), as
+`vitest.test-db.ts`, `resetToSeed` and `e2e/db.ts` do; never trust an env fallback.
+
+## Secrets
+
+- **Credentials live in untracked files.** The apps read env vars loaded at boot
+  ([ADR-0007](decisions/0007-env-config-and-loading.md)); the values sit in `.env`,
+  `.env.test` and `.env.e2e`, which `.gitignore` covers. Only their `*.example`
+  templates, with fake values, are tracked.
+- **If a key reaches a commit, rotate it first.** Rewriting history cleans up but does
+  not help: the key has already been through clones, backups and caches.
+
 ## Gotchas
 
 - **`npm test` can pass while `core` does not build.** Vitest strips types without

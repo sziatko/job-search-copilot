@@ -56,7 +56,7 @@ matching the filter, not the page size.
 | `GET /applications/:id` | One application | `404` if not in the pipeline |
 | `PATCH /applications/:id/status` | Move to any status, an optional comment | the application |
 | `PATCH /applications/:id` | Edit salary / CV, append a comment | the application |
-| `GET /stats` | The dashboard's counts ([ADR-0031](decisions/0031-stats-endpoint.md)) | `{ logged, awaitingAnalysis, awaitingTriage, recommended, notRecommended, applied, declined, unavailable, responded, interview, actionNeeded, pipeline: { byStatus, active, timedOut, total }, recent }` |
+| `GET /stats` | The dashboard's counts | the fields: [ADR-0031](decisions/0031-stats-endpoint.md) |
 
 **Errors.** A `DomainError` is `{ statusCode, error: "<ErrorName>", message }`, `422`
 unless `STATUS_OF` in `domain-exception.filter.ts` says otherwise:

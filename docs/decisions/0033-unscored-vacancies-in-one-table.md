@@ -37,10 +37,8 @@ neither (`Vacancy_analysis_both_or_neither`); an analysed row is never `NEW`
 (`Vacancy_new_is_unanalysed`). `writeStatus` refuses `NEW` on an analysed row first
 (`AnalysedNotNewError`), so a caller never meets the CHECK as a `500`.
 
-**Intake** (`VacancyIntakeService`): url, company and title required. Match by
-`applyUrl`, else by `(companyKey, titleKey)`, the oldest row. A miss creates the vacancy
-in `NEW`, with `source` and `fullText` when given; a hit only gets the text it lacked —
-never a status, a source or an analysis. It answers `{ new }`.
+**Intake** (`VacancyIntakeService`) takes a posting in as `NEW`:
+[`domain-model.md` § Intake](../domain-model.md#intake).
 
 ## Why this and not the alternatives
 - **A separate table for unscored postings** — two dedups that must agree, and a copy
@@ -60,7 +58,8 @@ never a status, a source or an analysis. It answers `{ new }`.
 - `sort=recommended` puts the unanalysed last (`NULLS LAST` on `asc`); the paging cost
   is in [ADR-0030](0030-cursor-paging.md).
 - Filtered-out rows are record-or-link candidates too, so `record_application` by name
-  meets more ambiguous matches (a backlog row).
+  meets more ambiguous matches
+  ([`backlog.md`](../backlog.md#record_application-by-name-meets-old-filtered-out-rows)).
 - A change to the key functions leaves stored keys in the old shape, and needs a
   backfill. `npm run backfill:match-keys -w @job-search-copilot/core` fills only null
   keys (dry run by default, `--commit` to write); rewriting stored ones would extend it.

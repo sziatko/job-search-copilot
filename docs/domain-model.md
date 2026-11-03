@@ -37,21 +37,21 @@ pipeline.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `id` | `Int` autoincrement | Primary key. Server-assigned; the URI for a row. |
+| `id` | `Int` autoincrement | Primary key. |
 | `createdAt` | `DateTime @default(now())` | When first saved. |
-| `updatedAt` | `DateTime @default(now()) @updatedAt` | Bumped on any row update — a status, salary or CV change; analysis fields are never updated (analyze-once). Not a semantic date: read `statusChangedAt` or the journal. |
-| `userId` | `String` → `User` | The owner, `onDelete: Cascade`. Every query reaches the row through `forUser` (core), which adds it; `Comment` and `StatusChange` are owned through their vacancy. Leads the list indexes. → [ADR-0038](decisions/0038-multi-user-shared-schema.md) |
+| `updatedAt` | `DateTime @default(now()) @updatedAt` | Bumped on any row update; not a semantic date. |
+| `userId` | `String` → `User` | The owner, `onDelete: Cascade`. |
 | `company` | `String` | |
 | `title` | `String` | |
-| `applyUrl` | `String`, `@@unique([userId, applyUrl])` | **The natural key, per user** — two users may track one posting. The unique constraint is what enforces analyze-once at the DB level. Stored **canonicalized** — `normalizeApplyUrl()` drops the query string, the fragment and a trailing slash, so the spellings one posting arrives in share one row. Exception: a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept. → [ADR-0023](decisions/0023-canonical-applyurl.md) |
-| `companyKey` / `titleKey` | `String?` | The posting's match by name — intake's second match, and `record()` / `updateStatusByVacancy`'s lookup: `normalizeCompanyKey` / `normalizeTitleKey` (`identity.ts` — lowercase, punctuation collapsed, company legal suffixes stripped). `@@index([userId, companyKey, titleKey])`. Written on every create (intake, `save()`, `record()` — `matchKeys`); `null` only when the name normalizes to nothing (`—`), and such a row is matched by url only. Not `companyGroupKey()` — ADR-0032's company identity, which also drops places and notes, and is not stored (`identity.ts` says why the two differ). |
-| `source` | `String?` | Where intake found it (`justjoin`, `linkedin`, …). Free text, so a new source needs no migration; `null` on rows from `save()` and `record()`. |
-| `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet (intake without text, a placeholder). Text too short to be a posting is stored as `null` on every path (`posting-text.ts`). A list item carries `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. Can be large. Kept on the row, not a side table — see "fullText stays on the row" below. |
-| `matchScore` | `Int?` | 0–100. App-validated *and* DB-constrained — see "matchScore CHECK" below. `null` = not analysed yet. |
-| `recommendation` | `Recommendation?` enum | **The analyzer's call.** `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`; `null` = not analysed yet — with `matchScore`, both or neither (a CHECK). |
-| `comments` | `Comment[]` | Every note on the vacancy — see [`Comment`](#comment) below. The analyzer's reasoning is its `ANALYZER` row: reads still return it as `estimationComment` (`string \| null`), derived from the first one. |
-| `status` | `VacancyStatus` enum, default `NEW` | **The user's call** (two machine moves from the queue: the analysis's out of `NEW`, a closed posting's to `UNAVAILABLE` — below). A cache of the latest [`StatusChange`](#statuschange). The values are in the table below. |
-| `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. Timeout and the `/applications` sort read it. |
+| `applyUrl` | `String`, `@@unique([userId, applyUrl])` | **The natural key, per user**, stored **canonicalized**. |
+| `companyKey` / `titleKey` | `String?` | The posting's match by name. |
+| `source` | `String?` | Where intake found it (`justjoin`, `linkedin`, …). |
+| `fullText` | `String? @db.Text` | The whole vacancy text; `null` = none yet. |
+| `matchScore` | `Int?` | 0–100; `null` = not analysed yet. |
+| `recommendation` | `Recommendation?` enum | **The analyzer's call**, `APPLY` \| `APPLY_WITH_CAVEATS` \| `SKIP`; `null` = not analysed yet. |
+| `comments` | `Comment[]` | Every note on the vacancy: [`Comment`](#comment). |
+| `status` | `VacancyStatus` enum, default `NEW` | **The user's call**, a cache of the latest [`StatusChange`](#statuschange). |
+| `statusChangedAt` | `DateTime @default(now())` | The latest `StatusChange`'s date: the last move. |
 | `salaryInApplication` | `String?` | Free text ("130 PLN/h"), entered when applying. |
 | `usedTailoredResume` | `Boolean @default(false)` | Entered when applying. |
 | `statusChanges` | `StatusChange[]` | The journal — see below. |
@@ -65,20 +65,59 @@ The statuses — triage (`TRIAGE_STATUSES` in `status.ts`), then the pipeline
 
 | Status | Means |
 | --- | --- |
-| `NEW` | Waiting for an analysis. Never on an analysed row (a CHECK). |
+| `NEW` | Waiting for an analysis, never on an analysed row (a CHECK). |
 | `FILTERED_OUT` | Screened out before triage: the analyzer's `SKIP`, or the user. |
 | `NOT_REVIEWED` | Analysed, waiting for the user's triage. |
 | `SAVED_FOR_LATER` | A bookmark: maybe later. |
 | `DECLINED` | The user read the analysis and chose not to apply. |
-| `UNAVAILABLE` | The posting no longer takes applications. Triage only. |
+| `UNAVAILABLE` | The posting no longer takes applications (triage only). |
 | `APPLIED` | Applied, waiting for a first answer. |
 | `ACTION_NEEDED` | The company wrote; the user must act (a question, a call to book, a test task). |
 | `INTERVIEW` | An interview is set or done. |
 | `AWAITING` | The user answered or did what was asked; waiting on the company. |
-| `OFFER` | An offer. Closed. |
-| `REJECTED` | The company said no. Closed. |
+| `OFFER` | An offer (closed). |
+| `REJECTED` | The company said no (closed). |
 
 `GET /stats` counts `ACTION_NEEDED` and `AWAITING` as *responded*, not *interview*.
+
+### Field notes
+
+- **`id`** — server-assigned; the URI for a row.
+- **`updatedAt`** — a status, salary or CV change bumps it; analysis fields are never
+  updated (analyze-once). For a semantic date read `statusChangedAt` or the journal.
+- **`userId`** — every query reaches the row through `forUser` (core), which adds it;
+  `Comment` and `StatusChange` are owned through their vacancy. It leads the list indexes.
+  → [ADR-0038](decisions/0038-multi-user-shared-schema.md)
+- **`applyUrl`** — two users may track one posting. The unique constraint is what enforces
+  analyze-once at the DB level. `normalizeApplyUrl()` drops the query string, the fragment
+  and a trailing slash, so the spellings one posting arrives in share one row. Exception:
+  a domain with a site rule keeps the param that *is* the vacancy id — Indeed is stored as
+  `<locale>.indeed.com/viewjob?jk=…`, locale and all. The raw listing URL is not kept.
+  → [ADR-0023](decisions/0023-canonical-applyurl.md)
+- **`companyKey` / `titleKey`** — intake's second match, and `record()` /
+  `updateStatusByVacancy`'s lookup: `normalizeCompanyKey` / `normalizeTitleKey`
+  (`identity.ts` — lowercase, punctuation collapsed, company legal suffixes stripped).
+  Written on every create (intake, `save()`, `record()` — `matchKeys`); `null` only when
+  the name normalizes to nothing (`—`), and such a row is matched by url only. Not
+  `companyGroupKey()` — ADR-0032's company identity, which also drops places and notes, and
+  is not stored (`identity.ts` says why the two differ).
+- **`source`** — free text, so a new source needs no migration; `null` on rows from
+  `save()` and `record()`.
+- **`fullText`** — `null` on intake without text and on a placeholder. Text too short to be
+  a posting is stored as `null` on every path (`posting-text.ts`). A list item carries
+  `hasText` (`fullText !== null`, derived) and `list({ hasText })` filters on it. It can be
+  large, and is kept on the row, not a side table:
+  [DB-level rules](#db-level-rules-not-expressible-in-the-prisma-schema-dsl).
+- **`matchScore`** — app-validated *and* DB-constrained:
+  [DB-level rules](#db-level-rules-not-expressible-in-the-prisma-schema-dsl).
+- **`recommendation`** — with `matchScore`, both or neither (a CHECK).
+- **`comments`** — the analyzer's reasoning is its `ANALYZER` row: reads still return it as
+  `estimationComment` (`string | null`), derived from the first one.
+- **`status`** — two machine moves from the queue: the analysis's out of `NEW`, a closed
+  posting's to `UNAVAILABLE`
+  ([Two independent axes](#two-independent-axes-recommendation-vs-status)). The values are
+  in the table above.
+- **`statusChangedAt`** — timeout and the `/applications` sort read it.
 
 ## Two independent axes: `recommendation` vs `status`
 
@@ -162,7 +201,7 @@ The status journal: one row per change of status. Append-only.
 | `id` | `Int` autoincrement | The tie-break for rows that share a `createdAt`. |
 | `createdAt` | `DateTime` | The date of that change — the only one. |
 | `status` | `VacancyStatus` | The status moved to. |
-| `vacancyId` | `Int` | FK to `Vacancy`, `onDelete: Cascade`. `@@index([vacancyId, createdAt])`. |
+| `vacancyId` | `Int` | FK to `Vacancy`, `onDelete: Cascade`, `@@index([vacancyId, createdAt])`. |
 
 **`writeStatus(tx, vacancyId, status, at = now, from?)` is the only writer of status.** In
 the caller's transaction it moves `status` + `statusChangedAt` and inserts the row, both
@@ -198,11 +237,8 @@ filter carries three values that are **not** stored statuses — `ALL`, `ACTIVE`
 as the separate `state=active|timedOut` param, `ALL` as neither (the endpoint's own
 scope, the pipeline, is the page's context).
 
-> **What this constrains — breaks if you change it**
-> - Writing `status` anywhere but `writeStatus` → the cache and the journal disagree,
->   and timeout, the sort and `appliedAt` read the wrong date.
-> - Turning a same-status write back into a no-op → a second interview round leaves
->   no trace, and the timeout clock keeps counting from the first one.
+> **What this constrains — breaks if you change it:**
+> [ADR-0029](decisions/0029-one-vacancy-table.md#what-this-constrains--breaks-if-you-change-it).
 
 ## Applications: the pipeline view
 
@@ -250,7 +286,7 @@ One note on a `Vacancy`, whoever wrote it — [ADR-0029](decisions/0029-one-vaca
 | `createdAt` | `DateTime @default(now())` | When the note was written. |
 | `body` | `String @db.Text` | Trimmed; a blank note is never stored. |
 | `source` | `CommentSource` enum | Who wrote it: `ANALYZER` \| `USER` \| `AGENT`. |
-| `vacancyId` | `Int` | FK to `Vacancy`, `onDelete: Cascade`. `@@index([vacancyId, createdAt])`. |
+| `vacancyId` | `Int` | FK to `Vacancy`, `onDelete: Cascade`, `@@index([vacancyId, createdAt])`. |
 
 The writers, by source:
 
@@ -302,10 +338,8 @@ unanalysed.
 Rationale and the HTTP consequences (POST → `201 + Location` / `200`):
 [ADR-0005](decisions/0005-analyze-once.md).
 
-> **Breaks if you change it:** switching `save()` back to an upsert →
-> re-submitting a vacancy would overwrite the stored analysis; the API's
-> `200`-on-existing branch and the MCP `created` flag become meaningless; the
-> "second save leaves it untouched" tests fail.
+> **Breaks if you change it:**
+> [ADR-0005](decisions/0005-analyze-once.md#what-this-constrains--breaks-if-you-change-it).
 
 ## `recommendation` input
 
@@ -339,7 +373,8 @@ Added by hand in `--create-only` migrations — see
   `list({ company })` filters with `contains` + `mode: 'insensitive'`, i.e.
   `ILIKE '%term%'`, which a b-tree can't serve. The extension is declared in
   `datasource.extensions = [pg_trgm]` (needs `previewFeatures =
-  ["postgresqlExtensions"]`). `title` has the same index.
+  ["postgresqlExtensions"]`). `title` has the same index
+  (`20260910205538_add_application_model`).
   > Breaks if you change it: removing `previewFeatures`/`extensions` from the
   > schema → `prisma migrate` wants to drop the extension and the GIN index;
   > company search falls back to a full scan.
