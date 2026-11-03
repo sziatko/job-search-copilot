@@ -43,9 +43,7 @@ export const STATUS_TAGS = {
   REJECTED: { text: STATUS_LABELS.REJECTED, tone: 'bad' },
 } satisfies Record<VacancyStatus, { text: string; tone: Tone }>;
 
-/** Analyser verdict, as the short tags the table's "Rec." column shows. The
- * mockup calls APPLY_WITH_CAVEATS "Consider" and SKIP "Pass" — those are the
- * labels it renders. */
+/** Analyser verdict, as the short tags the table's "Rec." column shows. */
 export const RECOMMENDATION_TAGS = {
   APPLY: { text: 'Apply', tone: 'good' },
   APPLY_WITH_CAVEATS: { text: 'Consider', tone: 'warn' },

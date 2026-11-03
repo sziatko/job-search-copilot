@@ -11,8 +11,8 @@ interface CopyVacancyButtonProps {
   disabled?: boolean;
 }
 
-/** The mockup's icon button with a "Copied" bubble. The payload is ours — the
- * mockup's is a shorter one-liner that drops the id and URL. */
+/** An icon button with a "Copied" bubble. The payload is several lines, so it keeps the
+ * id and URL. */
 export function CopyVacancyButton({
   id,
   company,

@@ -633,7 +633,7 @@ describe('VacanciesPage / useVacancies', () => {
     await user.click(rowOf('Acme').getByRole('button', { name: 'Apply' }));
     expect(screen.getByText('Mark as applied')).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText('Salary / rate'), '130 PLN/h');
+    await user.type(screen.getByLabelText('Salary / rate'), '150 PLN/h');
     await user.click(screen.getByLabelText('Used a tailored resume'));
     await user.type(screen.getByLabelText('Comment'), 'Adapted CV.');
     await user.click(screen.getByRole('button', { name: 'OK' }));
@@ -641,7 +641,7 @@ describe('VacanciesPage / useVacancies', () => {
     await waitFor(() =>
       expect(recorded).toMatchObject({
         vacancyId: 1,
-        salaryInApplication: '130 PLN/h',
+        salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
         comment: 'Adapted CV.',
       }),

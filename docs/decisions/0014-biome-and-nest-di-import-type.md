@@ -13,7 +13,7 @@ a type-only import erases.
 - `javascript.parser.unsafeParameterDecoratorsEnabled: true`, so it parses NestJS's
   parameter decorators (`@Body()`, `@Param()`);
 - `files.includes` leaves out `dist`, `node_modules`, `*.d.ts`, the Prisma migrations,
-  `docs/design`.
+  `.claude`.
 
 **The override** — in `apps/api` only, `style.useImportType` is `off`:
 

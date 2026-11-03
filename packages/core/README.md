@@ -11,5 +11,5 @@ The database and migrations: [`prisma/README.md`](./prisma/README.md).
 `main` / `types` point at `dist/`: the apps run the compiled output. `npm run build`
 emits it; in Docker the `core` service runs `npm run watch`. The apps' own watchers do
 not see `dist/` change, so after a `core` edit restart them:
-`docker compose restart core api mcp mcp-http`.
+[`architecture.md` § Dev stack](../../docs/architecture.md#dev-stack-docker-compose).
 Why, and the alternatives: [ADR-0003](../../docs/decisions/0003-core-consumed-as-dist.md).

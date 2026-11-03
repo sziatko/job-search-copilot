@@ -31,10 +31,19 @@ apps/web (React SPA)        Claude (the owner's skills)
 
 | Package | Responsibility | Depends on |
 | --- | --- | --- |
-| [`packages/core`](../packages/core/README.md) | The only database client. The schema and migrations; `VacancyService`, `ApplicationService`, `VacancyIntakeService`, `StatsService`; `writeStatus`, the only writer of status; the timeout rule; the `DomainError`s; Better Auth and API keys. | `@prisma/client`, `pg`, `better-auth` |
+| [`packages/core`](../packages/core/README.md) | The only database client: the schema and migrations; `VacancyService`, `ApplicationService`, `VacancyIntakeService`, `StatsService`; `writeStatus`, the only writer of status; the timeout rule; the `DomainError`s; Better Auth and API keys. | `@prisma/client`, `pg`, `better-auth` |
 | `apps/api` | Thin NestJS transport over the core services, for the web app and n8n: DTO validation, versioned routes, a health check. | `core`, `@nestjs/*`, `class-validator` |
-| `apps/mcp` | Thin transport over the *same* services, as tools for Claude ([ADR-0010](decisions/0010-mcp-server-factory.md)). One `createServer()`, two entrypoints: `src/index.ts` (stdio, as the owner of `JSC_API_KEY`) and `src/http.ts` (Streamable HTTP, an OAuth 2.1 resource server or an API key — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md), [ADR-0039](decisions/0039-api-keys-per-user.md)). | `core`, `@modelcontextprotocol/sdk`, `express`, `jose`, `zod` |
-| `apps/web` | React SPA in an app shell, routed by `@tanstack/react-router`: `/` dashboard, `/vacancies`, `/vacancies/$id`, `/applications`, `/inbox`, `/profile`, plus `/login` and `/consent` (the OAuth consent page) ([ADR-0024](decisions/0024-web-shell-and-theme.md)). Talks to `apps/api` only, through its **own** hand-written schema of the API — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
+| `apps/mcp` | Thin transport over the *same* services, as tools for Claude ([ADR-0010](decisions/0010-mcp-server-factory.md)). | `core`, `@modelcontextprotocol/sdk`, `express`, `jose`, `zod` |
+| `apps/web` | React SPA that talks to `apps/api` only, through its **own** hand-written schema of the API — it never imports `core`. | `react`, `@tanstack/react-query`, `@tanstack/react-router`, `zod` |
+
+`apps/mcp` has one `createServer()` and two entrypoints: `src/index.ts` (stdio, as the
+owner of `JSC_API_KEY`) and `src/http.ts` (Streamable HTTP, an OAuth 2.1 resource server or
+an API key — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md),
+[ADR-0039](decisions/0039-api-keys-per-user.md)).
+
+`apps/web` sits in an app shell, routed by `@tanstack/react-router`: `/` dashboard,
+`/vacancies`, `/vacancies/$id`, `/applications`, `/inbox`, `/profile`, plus `/login` and
+`/consent` (the OAuth consent page) ([ADR-0024](decisions/0024-web-shell-and-theme.md)).
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 (monorepo), [ADR-0002](decisions/0002-core-shared-domain-layer.md) (core as the
@@ -198,8 +207,9 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
 1. **`packages/core` is the only database client.** `apps/api` and `apps/mcp`
    reach the DB *only* through `core`'s services. A
    query written in a controller or a tool handler is a bug; Biome's
-   `noRestrictedImports` rejects `@prisma/*` and `pg` imports there. Auth is the one other
-   door: the Better Auth instance `createAuth` builds in `core` on `core`'s client; the
+   `noRestrictedImports` rejects `@prisma/*` and `pg` imports there. The exception is
+   `/health`'s `SELECT 1` (`apps/api/src/health/health.controller.ts`): it reads no
+   user's data. Auth is another door: the Better Auth instance `createAuth` builds in `core` on `core`'s client; the
    apps mount it, never build their own.
    → [ADR-0002](decisions/0002-core-shared-domain-layer.md),
    [ADR-0034](decisions/0034-auth-better-auth-in-core.md)
@@ -225,8 +235,8 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
    the user's progress: the analysis moves a vacancy out of `NEW`, through
    `writeStatus()` in the transaction that writes it — `SKIP` → `FILTERED_OUT`, else
    `NOT_REVIEWED` (`statusAfterAnalysis`, in `core`, never in an agent); and
-   `markUnavailable` moves a closed posting from the queue (`NEW`, `NOT_REVIEWED`,
-   `SAVED_FOR_LATER`) to `UNAVAILABLE`, any other row skipped
+   `markUnavailable` moves a closed posting from
+   [the queue](domain-model.md#glossary) to `UNAVAILABLE`, any other row skipped
    ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)).
    → [`domain-model.md`](domain-model.md),
    [ADR-0029](decisions/0029-one-vacancy-table.md),
@@ -277,9 +287,3 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
     one part a tool checks (Biome's `noRestrictedImports`).
     → [Inside `apps/web/src`](#inside-appswebsrc),
     [`components/ui/README.md`](../apps/web/src/components/ui/README.md)
-
-## Stack
-
-Node 24 · PostgreSQL 17 · Prisma 7 · NestJS 12 · React 19 · Vite · Vitest 5 ·
-Biome 2 · `@modelcontextprotocol/sdk` 1 · `@tanstack/react-query` 5 ·
-`@tanstack/react-router` 1 · zod 4.

@@ -35,9 +35,8 @@ be applied to again.
 - **Require an analysis first** — contradicts the "I applied to X in a chat" flow this
   exists for.
 - **A fuzzy match** — links an application to the wrong posting, silently.
-- **Take a score from the caller** (as this did until 2026-10) — a verdict derived from
-  the score by thresholds of its own, which the web's colours did not share: a second
-  analyzer, worse than none.
+- **Take a score from the caller** — a verdict derived from the score by thresholds of
+  its own, which the web's colours do not share: a second analyzer, worse than none.
 
 ## Consequences
 - `record()` creates vacancies too, but writes no analysis and writes status only

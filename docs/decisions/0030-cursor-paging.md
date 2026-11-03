@@ -1,6 +1,6 @@
 # 0030 — Every list pages by a Prisma cursor
 
-- Status: Accepted · Date: 2026-09 · Revised 2026-10: MCP's `offset` went too
+- Status: Accepted · Date: 2026-09
 
 ## Context
 Every web table fetches its next page as it scrolls, with the server filtering,
@@ -31,9 +31,9 @@ the last loaded row, the table calls `loadMore`.
 ## Why this and not the alternatives
 - **Offset** — skips or repeats rows whenever a status is written mid-scroll, or an
   agent's own writes move rows out of its filter.
-- **Offset beside the cursor for MCP** (as until 2026-10) — two schemes on one list, a
-  `400` for asking both, and a skill told to read the whole list before writing so its
-  own writes would not shift the offset.
+- **Offset beside the cursor for MCP** — two schemes on one list, a `400` for asking
+  both, and a skill told to read the whole list before writing so its own writes would
+  not shift the offset.
 - **Hand-written keyset SQL** (`WHERE (a, b, id) < (…)`) — exact, but one predicate
   per sort, and an enum-aware comparison for `recommended`. Prisma's cursor does any
   `orderBy` at this size.

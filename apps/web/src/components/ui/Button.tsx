@@ -5,11 +5,10 @@ const ICON =
   'relative inline-flex size-7.5 items-center justify-center rounded-md border border-border-strong bg-surface text-ink-muted disabled:opacity-50 [&_svg]:size-3.5';
 
 /**
- * The looks a button comes in. `text-bg` on a filled one is the inversion the mockup's
- * copied flag already uses: --color-accent is dark in the light theme and light in the
- * dark one, so a fixed white or black label would fail contrast in one of them. An
- * icon button is labelled by its `Tip` (and `aria-label` where the bubble is
- * not the name), which it is the positioning box for.
+ * The looks a button comes in. `text-bg` on a filled one is an inversion: --color-accent
+ * is dark in the light theme and light in the dark one, so a fixed white or black label
+ * would fail contrast in one of them. An icon button is labelled by its `Tip` (and
+ * `aria-label` where the bubble is not the name), which it is the positioning box for.
  */
 const VARIANTS = {
   secondary: `${TEXT} border-border-strong bg-surface text-ink hover:bg-surface-alt`,

@@ -23,6 +23,8 @@ Postgres ← database `jsc`: owner `jsc` (migrations), runtime role `jsc_app`
 - **The subdomains carry the project prefix** (`jsc.`, `jsc-mcp.`), so another
   project's MCP server can sit beside this one. A hyphen, not `mcp.jsc.`: a `*.<domain>`
   certificate or DNS record covers one level.
+- **Only the server's n8n runs.** A local one with the same workflows brings every
+  vacancy twice.
 
 ## First start
 
@@ -70,7 +72,7 @@ an injection or a bug can delete data, not drop a table. As `postgres`, in `/srv
 
 Then in `/srv/jsc`: `.env.migrate` (`chmod 600`) gets the owner's URL as
 `DATABASE_URL`, `.env`'s `DATABASE_URL` becomes `jsc_app`'s, and `docker compose up -d`.
-After a restore (`--no-acl` drops the grants a dump carries), run the `GRANT` and
+`--no-acl` drops the grants a dump carries, so after a restore with it, run the `GRANT` and
 `ALTER DEFAULT PRIVILEGES` lines again: they are idempotent, `CREATE ROLE` is not.
 
 ## Deploy a version
@@ -119,40 +121,6 @@ every signed-in `get-session` into a 500. Better Auth makes a new one on demand.
 The local data is a copy: the server is the one that counts. Never point local code at
 the production database (an SSH tunnel, a copied `DATABASE_URL`): `migrate:dev` would
 run on it. A new migration runs first on a fresh pull, then deploys.
-
-## Cut-over: the local stack's data moves to the server
-
-Once, when the server takes over from the local stack as the live one. Nothing may
-write to either database meanwhile.
-
-1. Stop every local writer: the local n8n, Claude Desktop's scheduled tasks.
-2. The last local dump, onto the server:
-
-       docker compose exec -T postgres pg_dump -U postgres -Fc job_search_copilot > jsc.dump
-       scp jsc.dump <ssh-host>:~
-
-3. On the server, the dump replaces the database, then the stack starts again —
-   `jsc-migrate` brings the schema up, the api seeds `MCP_PUBLIC_URL`'s resource:
-
-       cd /srv/jsc && docker compose stop jsc-api jsc-mcp-http
-       cd /srv/infra && docker compose exec -T postgres pg_restore -U postgres -d jsc \
-         --clean --if-exists --no-owner --no-acl --role jsc --single-transaction < ~/jsc.dump
-       docker compose exec -T postgres psql -U postgres -d jsc -c 'DELETE FROM "Jwks"'
-       cd /srv/jsc && docker compose up -d && rm ~/jsc.dump
-
-   The `DELETE`: the local signing key is encrypted with the local secret (§ Pull).
-
-4. n8n moves with its volume (the shared layer's README); its workflows' API URL becomes
-   `https://jsc.<domain>/api/v1`. The API keys came with the database.
-5. MCP clients move to `https://jsc-mcp.<domain>/mcp`: the claude.ai connector is added
-   again (its OAuth client was in the replaced database), and Claude's skills that name
-   a local URL are updated and pushed again.
-6. Passkeys are registered again: the restored ones are bound to `localhost`.
-7. The scheduled tasks back on, the local n8n stays off — two would bring every vacancy
-   twice. A server snapshot.
-
-Check: a new vacancy goes n8n → the server, its analysis lands through MCP, the web
-shows it; the next night's backup reports in.
 
 ## Logs and state
 

@@ -39,7 +39,7 @@ setup). Then, after a new clone:
   `.claude` has not pushed;
 - `.claude/settings.local.json` with `"syncClaudeAiSkills": false` — the shared
   `settings.json` does not honour the key, see `.claude/AGENT-SETUP.md`;
-- the skills: `git clone https://github.com/sziatko/job-search-copilot-skills.git skills`
+- the skills: `git clone https://github.com/<owner>/job-search-copilot-skills.git skills`
   (private; without it the skill↔MCP sync test in `apps/mcp` skips), then an empty
   `skills/.git/info/publish-guard-off` — that repo holds real data on purpose;
 - `git config user.name` / `user.email` in each repo, if git has no global identity
@@ -138,6 +138,36 @@ When a change is meant to look different: `npm run test:visual:update`, open the
 changed PNGs in the diff, and commit them with the change. `npm run test:visual --
 -g dashboard` narrows a run. A failed run's diffs are in `playwright-report/`
 (`npx playwright show-report`). A new page, dialog or empty state gets a test there.
+
+## Standards
+
+What enforces what; the reasoning stays in the doc each row links.
+
+| Layer | Enforced by | What it holds |
+| --- | --- | --- |
+| Merge gate | The `verify` and `e2e` jobs of `.github/workflows/ci.yml`, required by the GitHub ruleset on `main` | A pull request merges only with both green ([what they run](#scripts-repo-root)), unless an admin bypasses the ruleset. |
+| Guard test | `packages/core/src/isolation.spec.ts` | User B, handed user A's ids and data, finds and changes nothing of A's ([invariant 11](architecture.md#system-invariants)). |
+| Guard test | `packages/core/src/db/for-user.spec.ts` | `forUser` scopes or refuses every operation, and `npm run typecheck` holds each service to the raw client as `Unscoped`. |
+| Guard test | `apps/api/test/contract.e2e.spec.ts` | Every response the web parses passes the web's own zod schema against the real API ([invariant 5](architecture.md#system-invariants)). |
+| Guard test | `apps/web/src/styles.test.ts` | The web's [styling rules](#testing) hold over every source file. |
+| Guard test | `vitest.test-db.ts` | The core, api and mcp tests refuse to start unless `DATABASE_URL` names a `*_test` database. |
+| Database | `CHECK` constraints | `matchScore`'s range and the shape of an analysis hold whatever the code does ([DB-level rules](domain-model.md#db-level-rules-not-expressible-in-the-prisma-schema-dsl)). |
+| Database | `UNIQUE` constraints | `(userId, applyUrl)` keeps one row per posting per user, so a lost race cannot analyse a vacancy twice ([Analyze-once](domain-model.md#analyze-once)). |
+| Database | The `jsc_app` role | On the server the api and the MCP server change rows only, no DDL ([the database roles](deployment.md#the-database-roles)). |
+| No tool | The [invariants](architecture.md#system-invariants), the [ADRs](decisions/) and the [doc rules](README.md#writing-docs-and-comments) | What the rows above do not cover holds only because an author or a reviewer reads them. |
+| Local | Hooks and review agents, in `.claude/AGENT-SETUP.md` | The owner's Claude Code setup, which a plain clone does not bring, adds a lint on edit and the reviews before a PR. |
+
+**Code that deletes data checks its target first** (the database name), as
+`vitest.test-db.ts`, `resetToSeed` and `e2e/db.ts` do; never trust an env fallback.
+
+## Secrets
+
+- **Credentials live in untracked files.** The apps read env vars loaded at boot
+  ([ADR-0007](decisions/0007-env-config-and-loading.md)); the values sit in `.env`,
+  `.env.test` and `.env.e2e`, which `.gitignore` covers. Only their `*.example`
+  templates, with fake values, are tracked.
+- **If a key reaches a commit, rotate it first.** Rewriting history cleans up but does
+  not help: the key has already been through clones, backups and caches.
 
 ## Gotchas
 

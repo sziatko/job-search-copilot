@@ -60,9 +60,9 @@ const consentRoute = createRoute({
  * Chrome metadata, read by RootLayout through `useMatches()`. Typed as
  * RouteMeta rather than inlined so a route can't ship without a title.
  *
- * `rail` is the mockup's RAIL_BY_DEFAULT: table-heavy views start with the
- * sidebar collapsed to an icon rail so the tables get the width; the dashboard
- * keeps it open. A manual toggle overrides it until the next navigation.
+ * `rail`: table-heavy views start with the sidebar collapsed to an icon rail so the
+ * tables get the width; the dashboard keeps it open. A manual toggle overrides it
+ * until the next navigation.
  */
 const DASHBOARD_META: RouteMeta = {
   title: 'Dashboard',

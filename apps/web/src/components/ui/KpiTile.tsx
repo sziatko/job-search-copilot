@@ -17,9 +17,8 @@ const BOX =
   'rounded-lg border px-4 py-4 text-left shadow-card strip:flex strip:flex-none strip:items-baseline strip:gap-2 strip:rounded-full strip:px-3 strip:py-1';
 
 /**
- * A summary tile. The mockup draws these as inert <div>s; ours double as quick
- * filters, so they render as buttons when given an onClick and get a `selected`
- * state the mockup has no equivalent for.
+ * A summary tile. It doubles as a quick filter, so it renders as a button when given
+ * an onClick and has a `selected` state.
  */
 export function KpiTile({
   label,
@@ -32,8 +31,8 @@ export function KpiTile({
   label: string;
   value: number | string;
   note?: string;
-  /** The value's colour, by what the number means — `warn` (not in the mockup) is the
-   * Timeout tile's, between good and bad. */
+  /** The value's colour, by what the number means — `warn` is the Timeout tile's,
+   * between good and bad. */
   tone?: Tone;
   selected?: boolean;
   onClick?: () => void;

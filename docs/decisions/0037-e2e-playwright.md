@@ -40,8 +40,8 @@ set before a push or a PR; a CI job on pull requests.
   differently; baselines from one fail on the others. One image renders them all.
 - **The visual tests inside `npm run test:e2e`** — on the host they would compare
   against Linux baselines, and their pinned clock would move every other spec's dates.
-- **The dev stack and the dev DB** — the dev DB holds real data the analyzer writes
-  live; a reset would wipe it. Separate ports let both stacks run at once.
+- **The dev stack and the dev DB** — the dev DB holds a copy of the real data; a reset
+  would wipe it. Separate ports let both stacks run at once.
 - **Signing in through the social providers** — captchas, 2FA, someone else's site.
 
 ## Consequences

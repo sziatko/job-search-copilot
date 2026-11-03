@@ -8,10 +8,10 @@ Run from the repo root (they proxy into `@job-search-copilot/core`):
 
 | Command | What it does |
 | --- | --- |
-| `npm run migrate:dev -w @job-search-copilot/core -- --name <name>` | Diff the schema, create a migration under `migrations/`, apply it to the **dev** DB, regenerate the client. Use this `-w` form: the root `npm run migrate:dev` drops `--name`, and Prisma then hangs on its prompt holding the advisory lock. |
-| `npm run migrate:dev -w @job-search-copilot/core -- --name <name> --create-only` | Same, but don't apply — for hand-written SQL (CHECK constraints, extensions, data backfills). Edit the file, then run `migrate:dev` again to apply. |
+| `npm run migrate:dev -w @job-search-copilot/core -- --name <name>` | Diff the schema, create a migration under `migrations/`, apply it to the **dev** DB, regenerate the client; use this `-w` form ([why](../../../docs/development.md#gotchas)). |
+| `npm run migrate:dev -w @job-search-copilot/core -- --name <name> --create-only` | Same, but don't apply — for hand-written SQL (CHECK constraints, extensions, data backfills): edit the file, then run `migrate:dev` again to apply. |
 | `npm run generate -w @job-search-copilot/core` | Regenerate Prisma Client only. |
-| `npm run test:db:migrate` | Apply committed migrations to the **test** DB (`job_search_copilot_test`, see `.env.test`). Run after every new migration or the test suite breaks. |
+| `npm run test:db:migrate` | Apply committed migrations to the **test** DB (`job_search_copilot_test`, see `.env.test`), after every new migration or the test suite breaks. |
 | `npm run studio -w @job-search-copilot/core` | Open Prisma Studio against the dev DB. |
 
 ## Rules for a migration in review
@@ -31,8 +31,6 @@ Run from the repo root (they proxy into `@job-search-copilot/core`):
 
 ## Things the schema DSL can't express (added by hand in `--create-only` migrations)
 
-- `CHECK ("matchScore" >= 0 AND "matchScore" <= 100)` — `20260909224918_add_match_score_check`.
-- `CHECK (("matchScore" IS NULL) = ("recommendation" IS NULL))` and `CHECK ("status" <> 'NEW' OR "recommendation" IS NULL)` — `20261003130100_vacancy_log_into_vacancy` (ADR-0033).
-- `pg_trgm` extension + GIN indexes for `company` / `title` ILIKE search — `20260909225003_company_trigram_index`, `20260910205538_add_application_model` (the extension itself is declared in `datasource.extensions`).
+The CHECKs and the `pg_trgm` indexes, with their migrations: [`domain-model.md` § DB-level rules](../../../docs/domain-model.md#db-level-rules-not-expressible-in-the-prisma-schema-dsl).
 
 Postgres cannot use a new enum value in the transaction that added it: add the value in a migration of its own, before the one that uses it.
