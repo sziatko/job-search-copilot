@@ -943,6 +943,51 @@ describe('VacancyService', () => {
       });
     });
 
+    describe('search by id', () => {
+      const INT4_MAX = 2147483647;
+      const acmeId = async () => (await service.list(userId, { search: 'acme' })).items[0].id;
+      const companies = async (search: string) =>
+        (await service.list(userId, { search })).items.map((item) => item.company);
+
+      it('finds a vacancy by its id, with or without the #', async () => {
+        const id = await acmeId();
+        expect(await companies(String(id))).toEqual(['Acme']);
+        expect(await companies(`#${id}`)).toEqual(['Acme']);
+      });
+
+      it('finds the largest id Int4 holds', async () => {
+        await getPrisma().vacancy.update({
+          where: { id: await acmeId() },
+          data: { id: INT4_MAX },
+        });
+        expect(await companies(String(INT4_MAX))).toEqual(['Acme']);
+      });
+
+      it('a number past Int4 finds nothing, it is not a 500', async () => {
+        expect(await companies(String(INT4_MAX + 1))).toEqual([]);
+        expect(await companies('99999999999')).toEqual([]);
+      });
+
+      it("finds nothing by another user's id", async () => {
+        const id = await acmeId();
+        const other = await createUser();
+        expect((await service.list(other, { search: String(id) })).total).toBe(0);
+      });
+
+      it('a number still matches company and title as text', async () => {
+        await service.save(
+          userId,
+          input({
+            applyUrl: 'https://example.com/jobs/c',
+            company: '2147483000 Labs',
+            title: 'Dev',
+          }),
+        );
+        expect(await companies('2147483000')).toEqual(['2147483000 Labs']);
+        expect(await companies('#2147483000')).toEqual([]);
+      });
+    });
+
     // Every term here reaches the pattern Prisma builds from `contains`, where
     // `%`, `_` and `\` each mean something. A user's typing means none of them.
     describe('LIKE metacharacters in a term are literal', () => {

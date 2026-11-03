@@ -33,10 +33,21 @@ export function escapeLikePattern(value: string): string {
 const contains = (term: string) =>
   ({ contains: escapeLikePattern(term), mode: 'insensitive' }) as const;
 
+const INT4_MAX = 2_147_483_647;
+
+/** The vacancy id a search term names, `123` or `#123`. A number past Int4 names none:
+ * Postgres would refuse it as an id, a 500 for what is only a search that finds nothing. */
+function idInTerm(term: string): number | undefined {
+  if (!/^#?\d+$/.test(term)) return undefined;
+  const id = Number(term.replace('#', ''));
+  return id <= INT4_MAX ? id : undefined;
+}
+
 /**
  * The free-text clauses both lists share, to AND together: `search` (a page's search
- * box) widens to company OR title, `company` / `title` (the MCP tools) each narrow.
- * Each term is escaped here, so a caller passes what the user typed.
+ * box) widens to company OR title OR, when the term is a number, id; `company` / `title`
+ * (the MCP tools) each narrow. Each term is escaped here, so a caller passes what the
+ * user typed.
  */
 export function textFilters(filters: {
   search?: string;
@@ -45,8 +56,13 @@ export function textFilters(filters: {
 }): Prisma.VacancyWhereInput[] {
   const clauses: Prisma.VacancyWhereInput[] = [];
   if (filters.search) {
+    const id = idInTerm(filters.search);
     clauses.push({
-      OR: [{ company: contains(filters.search) }, { title: contains(filters.search) }],
+      OR: [
+        { company: contains(filters.search) },
+        { title: contains(filters.search) },
+        ...(id === undefined ? [] : [{ id }]),
+      ],
     });
   }
   if (filters.company) clauses.push({ company: contains(filters.company) });

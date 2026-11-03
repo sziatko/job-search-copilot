@@ -64,7 +64,7 @@ describe('SearchModal', () => {
     renderAt(path, [fakeVacancy()]);
     const { user, modal } = await openSearch();
 
-    await user.type(modal.getByRole('searchbox', { name: /search company or role/i }), 'acme');
+    await user.type(modal.getByRole('searchbox', { name: /search company, role or #id/i }), 'acme');
     await waitFor(() =>
       expect(searches(requests).at(-1)?.searchParams.get('status')).toBe(ALL_BUT_FILTERED_OUT),
     );
@@ -156,7 +156,7 @@ describe('SearchModal', () => {
     const before = requests.length;
 
     const { user, modal } = await openSearch();
-    expect(modal.getByText('Type a company or role.')).toBeInTheDocument();
+    expect(modal.getByText('Type a company, role or #id.')).toBeInTheDocument();
     await user.type(modal.getByRole('searchbox'), '   ');
     await user.click(modal.getByRole('radio', { name: 'Context' }));
     await user.click(modal.getByRole('radio', { name: 'All' }));
@@ -166,7 +166,7 @@ describe('SearchModal', () => {
     expect(requests.slice(before)).toEqual([]);
     expect(modal.queryByRole('table')).not.toBeInTheDocument();
     // The table's place holds an empty state, not nothing.
-    expect(modal.getByText('Type a company or role.')).toBeInTheDocument();
+    expect(modal.getByText('Type a company, role or #id.')).toBeInTheDocument();
   });
 
   it('shows an empty state for no match, and the table once rows come back', async () => {

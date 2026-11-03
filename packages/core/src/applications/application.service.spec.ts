@@ -334,6 +334,29 @@ describe('ApplicationService', () => {
       expect((await applications.list(userId, { search: 'engineer' })).total).toBe(1);
     });
 
+    it('search finds an application by its id, with or without the #', async () => {
+      const companies = async (search: string) =>
+        (await applications.list(userId, { search })).items.map((item) => item.company);
+      expect(await companies(String(acmeId))).toEqual(['Acme']);
+      expect(await companies(`#${acmeId}`)).toEqual(['Acme']);
+    });
+
+    it('search by a number at or past the top of Int4 is not a 500', async () => {
+      expect((await applications.list(userId, { search: '2147483647' })).total).toBe(0);
+      expect((await applications.list(userId, { search: '2147483648' })).total).toBe(0);
+      expect((await applications.list(userId, { search: '99999999999' })).total).toBe(0);
+    });
+
+    it("search finds nothing by another user's id", async () => {
+      const other = await createUser();
+      expect((await applications.list(other, { search: String(acmeId) })).total).toBe(0);
+    });
+
+    it('search by a triage vacancy id finds no application', async () => {
+      const triage = await seedVacancy({ company: 'Triage Two', status: 'SAVED_FOR_LATER' });
+      expect((await applications.list(userId, { search: String(triage.id) })).total).toBe(0);
+    });
+
     it('filters by company alone, case-insensitively', async () => {
       const { items, total } = await applications.list(userId, { company: 'acme' });
       expect(total).toBe(1);

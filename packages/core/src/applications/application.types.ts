@@ -65,8 +65,8 @@ export interface UpdateApplicationInput {
 export interface ListApplicationsFilters {
   /** One pipeline status; absent = all of them. */
   status?: PipelineStatus;
-  /** Matches Vacancy.company OR .title, ILIKE '%term%', case-insensitive. The
-   * search modal's term. */
+  /** Matches Vacancy.company OR .title, ILIKE '%term%', case-insensitive, OR the id
+   * when the term is `123` or `#123`. The search modal's term. */
   search?: string;
   /** Matches Vacancy.company, ILIKE '%term%', case-insensitive. Independent of
    * `search` — combined with `title` (and `search`, if also given) via AND, not OR. */

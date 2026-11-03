@@ -92,7 +92,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'Search', exact: true }).click();
       await page
         .getByRole('dialog')
-        .getByRole('searchbox', { name: 'Search company or role' })
+        .getByRole('searchbox', { name: 'Search company, role or #id' })
         .fill(SEED_VACANCIES[0].company);
       await settle(page);
       await shot(page, 'search-dialog', false);

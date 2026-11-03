@@ -47,7 +47,7 @@ matching the filter, not the page size.
 | `POST /vacancies/intake` | Take postings in, unanalysed (1–100) | `200 { new: string[] }` — the urls created, as sent; one transaction |
 | `POST /vacancies/:id/analysis` | Analyse a vacancy that has none | `200` the vacancy; from `NEW` the status moves by the rule |
 | `POST /vacancies/analysis` | The same for 1–10, one transaction | `200` the vacancies, in input order |
-| `GET /vacancies` | List: filters `recommendation`, `status` (a list), `company`, `search` (company or title), `sameCompanyAs`, `hasText`; `sort` `newest` \| `recommended` | items without `fullText`, with `companyMatchCount`, `hasAnalysis`, `hasText` |
+| `GET /vacancies` | List: filters `recommendation`, `status` (a list), `company`, `search` (company, title, or the id for `123` or `#123`), `sameCompanyAs`, `hasText`; `sort` `newest` \| `recommended` | items without `fullText`, with `companyMatchCount`, `hasAnalysis`, `hasText` |
 | `GET /vacancies/:id` | One vacancy | with `comments`, `estimationComment`, `timeline` |
 | `PATCH /vacancies/:id/status` | Move to any status, an optional comment | `200` as `GET /:id` |
 | `POST /vacancies/unavailable` | Closed postings (1–100, `{ id, reason }`): a row still in the queue → `UNAVAILABLE`, `reason` a comment; any other skipped ([ADR-0040](decisions/0040-machine-moves-queue-to-unavailable.md)) | `200 { moved: id[], skipped: id[] }`; one transaction |

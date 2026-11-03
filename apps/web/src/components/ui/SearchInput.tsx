@@ -1,6 +1,6 @@
 import { type Ref, useEffect, useRef, useState } from 'react';
 
-/** Debounced text search over company / role — the search modal's box. Local state
+/** Debounced text search over company, role or id — the search modal's box. Local state
  * keeps typing snappy; `onChange` gets the text once typing pauses. The server matches
  * it (ADR-0025), so the caller trims it and the box keeps what was typed. */
 export function SearchInput({
@@ -29,10 +29,10 @@ export function SearchInput({
     <input
       ref={inputRef}
       type="search"
-      aria-label="Search company or role"
+      aria-label="Search company, role or #id"
       value={text}
       onChange={(e) => setText(e.target.value)}
-      placeholder="Search company or role…"
+      placeholder="Search company, role or #id…"
       className="min-w-40 flex-1 basis-55 rounded-md border border-border-strong bg-surface-sunken px-3 py-2 text-body text-ink placeholder:text-ink-faint focus:bg-surface focus:outline-2 focus:outline-offset-0 focus:outline-accent-soft-border"
     />
   );

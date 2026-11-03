@@ -153,7 +153,8 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
       // without this the modal's tests would pass while doing nothing.
       (!search ||
         row.company.toLowerCase().includes(search.toLowerCase()) ||
-        row.title.toLowerCase().includes(search.toLowerCase()));
+        row.title.toLowerCase().includes(search.toLowerCase()) ||
+        row.id === Number(search.replace(/^#/, '')));
     // The cursor is a place in the whole order, not in the filtered rows: a cursor row
     // that has since left the filter still marks where the next page starts, as it
     // does on the server.
@@ -273,7 +274,8 @@ export function buildHandlers(rows: FakeVacancy[]) {
             : row.status !== 'REJECTED' && row.status !== 'OFFER' && !isTimedOut(row))) &&
         (!search ||
           row.company.toLowerCase().includes(search) ||
-          row.title.toLowerCase().includes(search));
+          row.title.toLowerCase().includes(search) ||
+          row.id === Number(search.replace(/^#/, '')));
       const sorted = [...rows].sort(
         (a, b) =>
           new Date(b.statusChangedAt).getTime() - new Date(a.statusChangedAt).getTime() ||

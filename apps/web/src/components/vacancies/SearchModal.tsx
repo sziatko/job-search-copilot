@@ -56,7 +56,7 @@ export function SearchModal({
     placeholderData: keepPreviousData,
   });
 
-  // The ⏳ mark and the CV column: both endpoints' `search` is company OR title, so the
+  // The ⏳ mark and the CV column: both endpoints' `search` matches the same way, so the
   // pipeline rows among the results are these applications. Only asked when a pipeline
   // row can be among them.
   // One page of 500: a term matching more applications loses the oldest marks.
@@ -111,7 +111,7 @@ export function SearchModal({
           ? 'Loading…'
           : term !== '' && items.length > 0
             ? countLine(items.length, data?.total ?? 0)
-            : 'Matches company or role.'}
+            : 'Matches company, role or #id.'}
       </DialogSub>
 
       {/* The table's place always holds something — an empty state until there are
@@ -128,7 +128,9 @@ export function SearchModal({
           loading={isPending}
         />
       ) : (
-        <EmptyState>{term === '' ? 'Type a company or role.' : 'No vacancies match.'}</EmptyState>
+        <EmptyState>
+          {term === '' ? 'Type a company, role or #id.' : 'No vacancies match.'}
+        </EmptyState>
       )}
 
       <DialogActions>

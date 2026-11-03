@@ -76,7 +76,8 @@ export function registerApplicationTools(
       description:
         'List the vacancies in the pipeline (APPLIED … REJECTED), the last status move ' +
         "first. `id` is the vacancy's id. Optional filters: `status`, one pipeline " +
-        'status; `search`, a single free-text term matched against company OR title; ' +
+        'status; `search`, a single free-text term matched against company OR title, or the ' +
+        'id when it is a number (`123`, `#123`); ' +
         'and/or `company` / `title`, matched independently — giving more than one of ' +
         '`search`/`company`/`title` narrows to rows matching all of them (AND), not any ' +
         'one (OR). Each is ILIKE %term%, case-insensitive. `applyUrl` finds the one ' +
