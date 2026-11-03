@@ -117,6 +117,7 @@ describe('SearchModal', () => {
         statusChangedAt: new Date(Date.now() - 45 * DAY).toISOString(),
         usedTailoredResume: true,
         sentCoverLetter: true,
+        tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }],
       }),
     ]);
     await screen.findByText('Beta Corp');
@@ -128,6 +129,10 @@ describe('SearchModal', () => {
     expect(modal.queryByText('Frontend Lead')).not.toBeInTheDocument();
     const row = (title: string) => within(modal.getByText(title).closest('tr') as HTMLElement);
     expect(row('Data Engineer').getByText('Interview')).toBeInTheDocument();
+    expect(
+      within(row('Data Engineer').getByRole('list', { name: 'Tags' })).getByText('Remote'),
+    ).toBeInTheDocument();
+    expect(row('Backend Engineer').queryByRole('list', { name: 'Tags' })).not.toBeInTheDocument();
     expect(
       row('Backend Engineer').getByRole('button', { name: /copy backend engineer/i }),
     ).toBeInTheDocument();

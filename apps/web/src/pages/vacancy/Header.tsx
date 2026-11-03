@@ -5,6 +5,7 @@ import { Tag } from '@/components/ui/Tag';
 import { Tip } from '@/components/ui/Tip';
 import { CopyVacancyButton } from '@/components/vacancies/CopyVacancyButton';
 import { RecommendationTag } from '@/components/vacancies/RecommendationTag';
+import { VacancyTags } from '@/components/vacancies/VacancyTags';
 import { isSafeExternalUrl } from '@/lib/url';
 import type { VacancyDetail } from '@/lib/vacancies/types';
 import { StatusControl } from './StatusControl';
@@ -14,7 +15,7 @@ import type { useVacancyPage } from './useVacancyPage';
  * on the right — under it, full width, on a phone. */
 export const HEADER_ROW = 'mb-5 flex flex-wrap items-start justify-between gap-4';
 
-/** The company, the title, the id, score and verdict; the status control and the
+/** The company, the title, the id, score, verdict and tags; the status control and the
  * posting's links. */
 export function Header({
   vacancy,
@@ -53,6 +54,7 @@ export function Header({
               <RecommendationTag recommendation={vacancy.recommendation} />
             ))}
         </div>
+        <VacancyTags tags={vacancy.tags} />
         {page.statusError && <p className="mt-2 text-small text-bad-ink">{page.statusError}</p>}
       </div>
       <div className="flex flex-none items-center gap-2 narrow:w-full">

@@ -108,6 +108,14 @@ describe('VacancyPage', () => {
     );
   });
 
+  it('shows the tags in the header', async () => {
+    renderAt('/vacancies/1', [fakeVacancy({ tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] })]);
+
+    expect(
+      within(await screen.findByRole('list', { name: 'Tags' })).getByText('Remote'),
+    ).toBeInTheDocument();
+  });
+
   it('asks for the other vacancies by company, whatever its spelling (ADR-0032)', async () => {
     const asked: (string | null)[] = [];
     mswServer.events.on('request:start', ({ request }) => {

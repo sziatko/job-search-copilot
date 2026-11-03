@@ -42,6 +42,7 @@ export function fakeVacancy(overrides: Partial<FakeVacancy> = {}): FakeVacancy {
     recommendation: 'APPLY',
     estimationComment: 'Strong match.',
     status: 'NOT_REVIEWED',
+    tags: [],
     statusChangedAt: '2026-09-01T00:00:00.000Z',
     appliedAt: null,
     comments: [],

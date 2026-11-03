@@ -28,6 +28,7 @@ function application(overrides: Partial<ApplicationListItem> = {}): ApplicationL
     title: 'Backend Engineer',
     applyUrl: 'https://acme.com/jobs/1',
     matchScore: 80,
+    tags: [],
     ...overrides,
   };
 }

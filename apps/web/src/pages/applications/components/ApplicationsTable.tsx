@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/TableCells';
 import { Tip } from '@/components/ui/Tip';
 import { CopyVacancyButton } from '@/components/vacancies/CopyVacancyButton';
+import { VacancyTags } from '@/components/vacancies/VacancyTags';
 import { daysSinceLastMove } from '@/lib/applications/constants';
 import type { ApplicationListItem, ApplicationStatus } from '@/lib/applications/types';
 import { MergedComment } from './MergedComment';
@@ -81,6 +82,7 @@ export function ApplicationsTable({
               onClick={() => onShowCompanyHistory(item.company, item.id)}
             />
           </RoleMeta>
+          <VacancyTags tags={item.tags} />
         </>
       ),
     },

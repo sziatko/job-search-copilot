@@ -114,6 +114,31 @@ afterEach(() => {
 });
 
 describe('VacanciesPage / useVacancies', () => {
+  it("shows a row's tags, and no list on a row without any", async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({
+          id: 1,
+          company: 'Acme',
+          tags: [
+            { id: 1, name: 'LinkedIn', tone: 'NEUTRAL' },
+            { id: 2, name: 'Remote', tone: 'GOOD' },
+          ],
+        }),
+        vacancy({ id: 2, company: 'Beta Corp' }),
+      ]),
+    );
+    renderVacancies();
+    await screen.findByText('Acme');
+
+    const tags = within(rowOf('Acme').getByRole('list', { name: 'Tags' }));
+    expect(tags.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'LinkedIn',
+      'Remote',
+    ]);
+    expect(rowOf('Beta Corp').queryByRole('list', { name: 'Tags' })).not.toBeInTheDocument();
+  });
+
   it('defaults to the NOT_REVIEWED filter and hides everything else', async () => {
     mswServer.use(
       ...buildHandlers([

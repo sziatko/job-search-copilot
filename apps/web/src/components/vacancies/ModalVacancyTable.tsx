@@ -8,6 +8,7 @@ import type { ApplicationListItem } from '@/lib/applications/types';
 import type { VacancyListItem } from '@/lib/vacancies/types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { StatusTag } from './StatusTag';
+import { VacancyTags } from './VacancyTags';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
@@ -65,6 +66,7 @@ export function ModalVacancyTable({
             </Tag>
           )}
           <RoleMeta company={item.company} id={item.id} />
+          <VacancyTags tags={item.tags} />
         </>
       ),
     },

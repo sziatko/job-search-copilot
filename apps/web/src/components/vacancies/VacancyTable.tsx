@@ -30,6 +30,7 @@ import {
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { RecommendationTag } from './RecommendationTag';
 import { StatusTag } from './StatusTag';
+import { VacancyTags } from './VacancyTags';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
@@ -109,6 +110,7 @@ export function VacancyTable({
               onClick={() => onShowCompanyHistory(item.company, item.id)}
             />
           </RoleMeta>
+          <VacancyTags tags={item.tags} />
         </>
       ),
     },

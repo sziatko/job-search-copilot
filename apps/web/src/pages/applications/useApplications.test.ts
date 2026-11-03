@@ -89,6 +89,21 @@ const rowSelect = () =>
 afterEach(() => vi.restoreAllMocks());
 
 describe('ApplicationsPage / useApplications', () => {
+  it("shows a row's tags, and no list on a row without any", async () => {
+    serve([
+      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] }),
+      application({ id: 2, company: 'Beta Corp' }),
+    ]);
+    renderApplications();
+    await screen.findByText('Acme');
+
+    const row = (company: string) => within(screen.getByText(company).closest('tr') as HTMLElement);
+    expect(
+      within(row('Acme').getByRole('list', { name: 'Tags' })).getByText('Remote'),
+    ).toBeInTheDocument();
+    expect(row('Beta Corp').queryByRole('list', { name: 'Tags' })).not.toBeInTheDocument();
+  });
+
   it('lists applications', async () => {
     serve([
       application({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
