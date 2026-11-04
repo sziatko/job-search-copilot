@@ -53,7 +53,7 @@ beforeEach(async () => {
     await vacancies.save(a, posting('https://example.com/a/applied', 'QA Lead'))
   ).vacancy.id;
   await applications.record(a, { vacancyId: ids.applied, comment: 'Applied.' });
-  aTag = (await tags.create(a, { name: 'Remote', tone: 'GOOD' })).id;
+  aTag = (await tags.create(a, { name: 'Remote', tone: 'GREEN' })).id;
   await tags.tagVacancies(a, [{ vacancyId: ids.analysed, add: ['Remote'] }]);
   before = await snapshotOfA();
 });
@@ -209,12 +209,12 @@ const cases: [string, () => Promise<unknown>][] = [
   ['TagService.list', async () => expect(await tags.list(b)).toEqual([])],
   [
     "TagService.create — A's name is free for B",
-    async () => expect(await tags.create(b, { name: 'Remote' })).toMatchObject({ tone: 'NEUTRAL' }),
+    async () => expect(await tags.create(b, { name: 'Remote' })).toMatchObject({ tone: 'GREY' }),
   ],
   [
     'TagService.update',
     () =>
-      expect(tags.update(b, aTag, { name: 'Hacked', tone: 'BAD' })).rejects.toBeInstanceOf(
+      expect(tags.update(b, aTag, { name: 'Hacked', tone: 'RED' })).rejects.toBeInstanceOf(
         TagNotFoundError,
       ),
   ],

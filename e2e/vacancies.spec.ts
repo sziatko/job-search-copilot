@@ -158,7 +158,7 @@ test('a tag: created on a row, kept on a reload, reused on another, removed', as
 
   await row.getByRole('button', { name: 'Add tag' }).click();
   await dialog.getByLabel('Tag name').fill(name);
-  await dialog.getByRole('radio', { name: 'Warning' }).check();
+  await dialog.getByRole('radio', { name: 'Amber' }).check();
   await dialog.getByRole('button', { name: `Create “${name}”` }).click();
   await expect(dialog).toBeHidden();
   await expect(row.getByRole('button', { name: `Remove tag ${name}` })).toBeVisible();

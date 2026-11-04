@@ -28,7 +28,7 @@ export function AddTagModal({
   const nameId = useId();
   const nameRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
-  const [tone, setTone] = useState<TagTone>('NEUTRAL');
+  const [tone, setTone] = useState<TagTone>('GREY');
   const tags = useTags();
   const create = useCreateTag();
 
@@ -86,7 +86,7 @@ export function AddTagModal({
             {matches.map((tag) => (
               <li key={tag.id} className="max-w-full">
                 <Button variant="ghost" disabled={create.isPending} onClick={() => pick(tag)}>
-                  <Chip tone={CHIP_TONE[tag.tone]}>{tag.name}</Chip>
+                  <Chip color={CHIP_TONE[tag.tone]}>{tag.name}</Chip>
                 </Button>
               </li>
             ))}

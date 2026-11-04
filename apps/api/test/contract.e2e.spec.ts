@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { getPrisma, VacancyIntakeService } from '@job-search-copilot/core';
+import { getPrisma, TagTone, VacancyIntakeService } from '@job-search-copilot/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 // The web's own schemas, imported as they are (the `@` alias in vitest.config.mts) —
@@ -10,7 +10,7 @@ import {
   recordApplicationResponseSchema,
 } from '@/lib/applications/types';
 import { statsSchema } from '@/lib/stats/types';
-import { tagListSchema, tagRefSchema } from '@/lib/tags/types';
+import { tagListSchema, tagRefSchema, tagToneSchema } from '@/lib/tags/types';
 import {
   vacancyDetailSchema,
   vacancyListItemSchema,
@@ -145,30 +145,34 @@ describe('Web↔API contract (e2e)', () => {
       .expect(200);
 
     expect(vacancyListItemSchema.parse(res.body).tags).toEqual([
-      { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' },
+      { id: expect.any(Number), name: 'Remote', tone: 'GREY' },
     ]);
+  });
+
+  it('the web knows every tag colour the database has', () => {
+    expect([...tagToneSchema.options].sort()).toEqual(Object.values(TagTone).sort());
   });
 
   it('GET, POST and PATCH /tags: their schemas', async () => {
     const created = await api
       .post('/api/v1/tags')
-      .send({ name: 'On-site', tone: 'WARN' })
+      .send({ name: 'On-site', tone: 'AMBER' })
       .expect(201);
-    expect(tagRefSchema.parse(created.body).tone).toBe('WARN');
+    expect(tagRefSchema.parse(created.body).tone).toBe('AMBER');
 
     const list = await api.get('/api/v1/tags').expect(200);
     expect(tagListSchema.parse(list.body)).toEqual([
-      { id: created.body.id, name: 'On-site', tone: 'WARN', vacancyCount: 0 },
+      { id: created.body.id, name: 'On-site', tone: 'AMBER', vacancyCount: 0 },
     ]);
 
     const updated = await api
       .patch(`/api/v1/tags/${created.body.id}`)
-      .send({ name: 'Onsite', tone: 'BAD' })
+      .send({ name: 'Onsite', tone: 'RED' })
       .expect(200);
     expect(tagRefSchema.parse(updated.body)).toEqual({
       id: created.body.id,
       name: 'Onsite',
-      tone: 'BAD',
+      tone: 'RED',
     });
   });
 

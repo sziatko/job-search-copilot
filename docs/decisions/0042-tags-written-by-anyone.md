@@ -10,7 +10,7 @@ analyzer's (invariant 3), so neither can carry this, and a column per mark would
 migration for every new one.
 
 ## Decision
-A `Tag` belongs to a user (`name`, a `tone` of five, a unique `nameKey`). `VacancyTag` links
+A `Tag` belongs to a user (`name`, a `tone` of ten colours, a unique `nameKey`). `VacancyTag` links
 it to a vacancy. Anyone acting for the user writes both: the web UI, an MCP client, REST with
 an API key, and the analyzer, which sends `tags` with its analysis in the analysis's
 transaction.
@@ -40,7 +40,7 @@ tag and another user's vacancy cannot exist at the database level.
 - Invariant 3 is not touched: a tag is neither `status` nor `recommendation`, and writing one
   moves neither, nor the status log.
 - Existing vacancies are not tagged by anything; `Vacancy.source` and intake do not change.
-- A new machine name is `NEUTRAL`, and a tag the user renamed comes back under its old name
+- A new machine name is `GREY`, and a tag the user renamed comes back under its old name
   if a machine repeats it. The way round is the skill's rule: take names from `list_tags`.
 - Rename, tone and delete are not in MCP: an LLM does not rebuild the user's tags.
 

@@ -115,7 +115,7 @@ describe('VacancyPage', () => {
   });
 
   it('shows the tags in the header', async () => {
-    renderAt('/vacancies/1', [fakeVacancy({ tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] })]);
+    renderAt('/vacancies/1', [fakeVacancy({ tags: [{ id: 1, name: 'Remote', tone: 'GREEN' }] })]);
 
     expect(
       within(await screen.findByRole('list', { name: 'Tags' })).getByText('Remote'),
@@ -128,7 +128,7 @@ describe('VacancyPage', () => {
     renderAt(
       '/vacancies/1',
       rows,
-      ...buildHandlers(rows, [{ id: 1, name: 'Remote', tone: 'GOOD' }]),
+      ...buildHandlers(rows, [{ id: 1, name: 'Remote', tone: 'GREEN' }]),
     );
     const user = userEvent.setup();
 
@@ -150,7 +150,7 @@ describe('VacancyPage', () => {
   });
 
   it("quotes the server when it refuses a tag, and the header's tags stay", async () => {
-    const remote = { id: 1, name: 'Remote', tone: 'GOOD' } as const;
+    const remote = { id: 1, name: 'Remote', tone: 'GREEN' } as const;
     renderAt(
       '/vacancies/1',
       [fakeVacancy({ id: 1, tags: [remote] })],

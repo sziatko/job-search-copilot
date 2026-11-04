@@ -1,14 +1,19 @@
 import { Chip } from '@/components/ui/Chip';
-import type { Tone } from '@/components/ui/tone';
+import type { ChipColor } from '@/components/ui/tone';
 import type { TagRef, TagTone } from '@/lib/tags/types';
 
-export const CHIP_TONE = {
-  NEUTRAL: 'neutral',
-  GOOD: 'good',
-  WARN: 'warn',
-  BAD: 'bad',
-  ACCENT: 'accent',
-} as const satisfies Record<TagTone, Tone>;
+export const CHIP_TONE: Record<TagTone, ChipColor> = {
+  GREY: 'grey',
+  GREEN: 'green',
+  AMBER: 'amber',
+  RED: 'red',
+  BLUE: 'blue',
+  TEAL: 'teal',
+  VIOLET: 'violet',
+  PINK: 'pink',
+  ORANGE: 'orange',
+  LIME: 'lime',
+};
 
 /** A vacancy's tags, wrapping under its title; nothing, not an empty line, without any.
  * With `edit`, each chip has its × (off during `saving`, the vacancy's write in flight).
@@ -29,7 +34,7 @@ export function VacancyTags({
         <li key={tag.id} className="max-w-full">
           {edit ? (
             <Chip
-              tone={CHIP_TONE[tag.tone]}
+              color={CHIP_TONE[tag.tone]}
               dense={dense}
               onRemove={() => edit.onRemove(tag)}
               removeLabel={`Remove tag ${tag.name}`}
@@ -38,7 +43,7 @@ export function VacancyTags({
               {tag.name}
             </Chip>
           ) : (
-            <Chip tone={CHIP_TONE[tag.tone]} dense={dense}>
+            <Chip color={CHIP_TONE[tag.tone]} dense={dense}>
               {tag.name}
             </Chip>
           )}

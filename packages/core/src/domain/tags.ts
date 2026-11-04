@@ -85,7 +85,7 @@ export async function createTags(db: UserTx, userId: string, names: string[]): P
  * not taken yet. Over TAGS_PER_VACANCY_MAX in total it throws, so the transaction writes
  * nothing. Four queries, whatever the number of names.
  *
- * Limit: a new name is `NEUTRAL`, and a tag renamed by the user comes back under its old
+ * Limit: a new name is `GREY`, and a tag renamed by the user comes back under its old
  * name if a machine repeats that name. Past that: nothing in the server; the skill's rule
  * is to take the names from `list_tags` (ADR-0042).
  *

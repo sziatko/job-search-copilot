@@ -4,6 +4,7 @@ import {
   getPrisma,
   MAX_LENGTH,
   TAGS_PER_VACANCY_MAX,
+  TagTone,
   VacancyIntakeService,
 } from '@job-search-copilot/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -57,12 +58,17 @@ describe('Tags (e2e)', () => {
   });
 
   describe('POST /tags', () => {
-    it('201s the tag, NEUTRAL unless a tone is sent', async () => {
+    it('201s the tag, GREY unless a tone is sent', async () => {
       const plain = await api.post('/api/v1/tags').send({ name: ' Remote ' }).expect(201);
-      expect(plain.body).toEqual({ id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' });
+      expect(plain.body).toEqual({ id: expect.any(Number), name: 'Remote', tone: 'GREY' });
 
-      const toned = await api.post('/api/v1/tags').send({ name: 'EU', tone: 'GOOD' }).expect(201);
-      expect(toned.body.tone).toBe('GOOD');
+      const toned = await api.post('/api/v1/tags').send({ name: 'EU', tone: 'GREEN' }).expect(201);
+      expect(toned.body.tone).toBe('GREEN');
+    });
+
+    it.each(Object.values(TagTone))('takes and returns the colour %s', async (tone) => {
+      const created = await api.post('/api/v1/tags').send({ name: tone, tone }).expect(201);
+      expect(created.body.tone).toBe(tone);
     });
 
     it('409s a name taken in another spelling', async () => {
@@ -87,9 +93,10 @@ describe('Tags (e2e)', () => {
     });
 
     it.each([
-      ['no name', { tone: 'GOOD' }],
+      ['no name', { tone: 'GREEN' }],
       ['a name not a string', { name: 7 }],
-      ['an unknown tone', { name: 'Remote', tone: 'PINK' }],
+      ['an unknown tone', { name: 'Remote', tone: 'MAUVE' }],
+      ['a tone by its old name', { name: 'Remote', tone: 'NEUTRAL' }],
       ['a null tone, not a 500', { name: 'Remote', tone: null }],
     ])('400s %s', async (_, body) => {
       await api.post('/api/v1/tags').send(body).expect(400);
@@ -100,14 +107,14 @@ describe('Tags (e2e)', () => {
     it('lists by name whatever its case, with how many vacancies carry each', async () => {
       const id = await queued('https://example.com/jobs/1');
       await tagVacancies([{ vacancyId: id, add: ['remote', 'EU'] }]).expect(204);
-      await api.post('/api/v1/tags').send({ name: 'Unused', tone: 'WARN' }).expect(201);
+      await api.post('/api/v1/tags').send({ name: 'Unused', tone: 'AMBER' }).expect(201);
 
       const { body } = await api.get('/api/v1/tags').expect(200);
 
       expect(body).toEqual([
-        { id: expect.any(Number), name: 'EU', tone: 'NEUTRAL', vacancyCount: 1 },
-        { id: expect.any(Number), name: 'remote', tone: 'NEUTRAL', vacancyCount: 1 },
-        { id: expect.any(Number), name: 'Unused', tone: 'WARN', vacancyCount: 0 },
+        { id: expect.any(Number), name: 'EU', tone: 'GREY', vacancyCount: 1 },
+        { id: expect.any(Number), name: 'remote', tone: 'GREY', vacancyCount: 1 },
+        { id: expect.any(Number), name: 'Unused', tone: 'AMBER', vacancyCount: 0 },
       ]);
     });
   });
@@ -116,17 +123,17 @@ describe('Tags (e2e)', () => {
     it('200s the tag; a field left out is untouched', async () => {
       const { body: tag } = await api
         .post('/api/v1/tags')
-        .send({ name: 'Remote', tone: 'GOOD' })
+        .send({ name: 'Remote', tone: 'GREEN' })
         .expect(201);
 
       const renamed = await api
         .patch(`/api/v1/tags/${tag.id}`)
         .send({ name: 'Fully remote' })
         .expect(200);
-      expect(renamed.body).toEqual({ id: tag.id, name: 'Fully remote', tone: 'GOOD' });
+      expect(renamed.body).toEqual({ id: tag.id, name: 'Fully remote', tone: 'GREEN' });
 
-      const toned = await api.patch(`/api/v1/tags/${tag.id}`).send({ tone: 'BAD' }).expect(200);
-      expect(toned.body).toEqual({ id: tag.id, name: 'Fully remote', tone: 'BAD' });
+      const toned = await api.patch(`/api/v1/tags/${tag.id}`).send({ tone: 'RED' }).expect(200);
+      expect(toned.body).toEqual({ id: tag.id, name: 'Fully remote', tone: 'RED' });
     });
 
     it('409s a taken name, 422s a blank one', async () => {
@@ -140,7 +147,8 @@ describe('Tags (e2e)', () => {
     it.each([
       ['a null name', { name: null }],
       ['a null tone', { tone: null }],
-      ['an unknown tone', { tone: 'PINK' }],
+      ['an unknown tone', { tone: 'MAUVE' }],
+      ['a tone by its old name', { tone: 'GOOD' }],
     ])('400s %s, not a 500', async (_, body) => {
       const { body: tag } = await api.post('/api/v1/tags').send({ name: 'Remote' }).expect(201);
       await api.patch(`/api/v1/tags/${tag.id}`).send(body).expect(400);
@@ -337,7 +345,7 @@ describe('Tags (e2e)', () => {
         request(app.getHttpServer())[method](path).set('Authorization', `Bearer ${key}`);
 
       const { body: tag } = await call('post', '/api/v1/tags').send({ name: 'EU' }).expect(201);
-      await call('patch', `/api/v1/tags/${tag.id}`).send({ tone: 'GOOD' }).expect(200);
+      await call('patch', `/api/v1/tags/${tag.id}`).send({ tone: 'GREEN' }).expect(200);
       await call('post', '/api/v1/vacancies/tags')
         .send({ items: [{ vacancyId, add: ['Remote'] }] })
         .expect(204);

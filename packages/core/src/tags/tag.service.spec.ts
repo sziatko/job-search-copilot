@@ -94,13 +94,13 @@ describe('TagService', () => {
       expect(await tags.create(userId, { name: '  Fully   Remote ' })).toEqual({
         id: expect.any(Number),
         name: 'Fully Remote',
-        tone: 'NEUTRAL',
+        tone: 'GREY',
       });
     });
 
     it('takes a tone', async () => {
-      expect(await tags.create(userId, { name: 'Dream', tone: 'GOOD' })).toMatchObject({
-        tone: 'GOOD',
+      expect(await tags.create(userId, { name: 'Dream', tone: 'GREEN' })).toMatchObject({
+        tone: 'GREEN',
       });
     });
 
@@ -135,29 +135,29 @@ describe('TagService', () => {
         { vacancyId: first, add: ['remote', 'Poland'] },
         { vacancyId: second, add: ['remote'] },
       ]);
-      await tags.create(userId, { name: 'Unused', tone: 'WARN' });
+      await tags.create(userId, { name: 'Unused', tone: 'AMBER' });
 
       expect(await tags.list(userId)).toEqual([
-        { id: expect.any(Number), name: 'Poland', tone: 'NEUTRAL', vacancyCount: 1 },
-        { id: expect.any(Number), name: 'remote', tone: 'NEUTRAL', vacancyCount: 2 },
-        { id: expect.any(Number), name: 'Unused', tone: 'WARN', vacancyCount: 0 },
+        { id: expect.any(Number), name: 'Poland', tone: 'GREY', vacancyCount: 1 },
+        { id: expect.any(Number), name: 'remote', tone: 'GREY', vacancyCount: 2 },
+        { id: expect.any(Number), name: 'Unused', tone: 'AMBER', vacancyCount: 0 },
       ]);
     });
   });
 
   describe('update', () => {
     it('renames and changes the tone, each without the other', async () => {
-      const { id } = await tags.create(userId, { name: 'Remote', tone: 'GOOD' });
+      const { id } = await tags.create(userId, { name: 'Remote', tone: 'GREEN' });
 
       expect(await tags.update(userId, id, { name: ' Anywhere ' })).toEqual({
         id,
         name: 'Anywhere',
-        tone: 'GOOD',
+        tone: 'GREEN',
       });
-      expect(await tags.update(userId, id, { tone: 'BAD' })).toEqual({
+      expect(await tags.update(userId, id, { tone: 'RED' })).toEqual({
         id,
         name: 'Anywhere',
-        tone: 'BAD',
+        tone: 'RED',
       });
     });
 
@@ -185,7 +185,7 @@ describe('TagService', () => {
     });
 
     it('refuses an unknown id and a blank name', async () => {
-      await expect(tags.update(userId, 2147483647, { tone: 'BAD' })).rejects.toBeInstanceOf(
+      await expect(tags.update(userId, 2147483647, { tone: 'RED' })).rejects.toBeInstanceOf(
         TagNotFoundError,
       );
       const { id } = await tags.create(userId, { name: 'Remote' });
@@ -222,14 +222,14 @@ describe('TagService', () => {
       expect(await allNames()).toEqual(['Remote']);
     });
 
-    it('gives a new name the neutral tone and leaves an existing tone alone', async () => {
+    it('gives a new name GREY and leaves an existing tone alone', async () => {
       const vacancyId = await vacancy(1);
-      await tags.create(userId, { name: 'Dream', tone: 'GOOD' });
+      await tags.create(userId, { name: 'Dream', tone: 'GREEN' });
       await tags.tagVacancies(userId, [{ vacancyId, add: ['dream', 'Remote'] }]);
 
       expect((await tags.list(userId)).map((tag) => [tag.name, tag.tone])).toEqual([
-        ['Dream', 'GOOD'],
-        ['Remote', 'NEUTRAL'],
+        ['Dream', 'GREEN'],
+        ['Remote', 'GREY'],
       ]);
     });
 

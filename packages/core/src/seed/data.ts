@@ -87,14 +87,19 @@ const TITLES = [
 
 const SOURCES = ['justjoin', 'linkedin', null];
 
-/** Written directly, not through `attachTags`, which gives only `NEUTRAL`: `Chip` reaches
- * the visual tests in every tone. */
+/** Written directly, not through `attachTags`, which gives only `GREY`: `Chip` reaches
+ * the visual tests in every colour. */
 export const SEED_TAGS: readonly SeedTag[] = [
-  { name: 'Remote', tone: 'GOOD' },
-  { name: 'Contract', tone: 'NEUTRAL' },
-  { name: 'Relocation', tone: 'WARN' },
-  { name: 'Agency', tone: 'BAD' },
-  { name: 'Startup', tone: 'ACCENT' },
+  { name: 'Remote', tone: 'GREEN' },
+  { name: 'Contract', tone: 'GREY' },
+  { name: 'Relocation', tone: 'AMBER' },
+  { name: 'Agency', tone: 'RED' },
+  { name: 'Startup', tone: 'BLUE' },
+  { name: 'Visa', tone: 'TEAL' },
+  { name: 'Referral', tone: 'VIOLET' },
+  { name: 'Dream', tone: 'PINK' },
+  { name: 'Part-time', tone: 'ORANGE' },
+  { name: 'Equity', tone: 'LIME' },
 ];
 
 function postingText(company: string, title: string): string {

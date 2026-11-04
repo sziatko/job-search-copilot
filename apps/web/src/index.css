@@ -82,25 +82,61 @@
   --color-ink-soft: light-dark(#3a4252, #c2c9d6);
   --color-ink-muted: light-dark(#69738a, #8b93a3);
   --color-ink-faint: light-dark(#99a2b4, #5e6577);
-  /* Four hues, four steps each: `{hue}` for a dot, a bar, an icon, a big number;
-     `{hue}-ink` for small text (4.5:1 on its soft fill, both themes); `{hue}-soft`
-     and `{hue}-soft-border` for a tinted box. `components/ui/tone.ts` combines them. */
-  --color-accent: light-dark(#2e5cd6, #6e9ee8);
-  --color-accent-ink: light-dark(#1f45b0, #9bbef2);
-  --color-accent-soft: light-dark(#e6edfc, #22304a);
-  --color-accent-soft-border: light-dark(#c2d3f5, #35456a);
-  --color-good: light-dark(#17a874, #4cbb87);
-  --color-good-ink: light-dark(#0b7a52, #4cbb87);
-  --color-good-soft: light-dark(#e2f6ec, #17301f);
-  --color-good-soft-border: light-dark(#bae9d1, #275639);
-  --color-warn: light-dark(#b4780a, #dcab3f);
-  --color-warn-ink: light-dark(#946200, #dcab3f);
-  --color-warn-soft: light-dark(#fbf0da, #362a0e);
-  --color-warn-soft-border: light-dark(#efd79c, #5c481b);
-  --color-bad: light-dark(#dc3d3d, #e17575);
-  --color-bad-ink: light-dark(#b32b2b, #eb9a9a);
-  --color-bad-soft: light-dark(#fbeaea, #3a1d1d);
-  --color-bad-soft-border: light-dark(#f2c3c3, #5e2e2e);
+  /* The palette, by colour: `{colour}-ink` for small text (4.5:1 on its soft fill, both
+     themes); `{colour}-soft` and `{colour}-soft-border` for a tinted box. Green, amber, red
+     and blue carry a tone below, so they also have `{colour}` for a dot, a bar, an icon, a
+     big number. A tag takes any of the ten: `CHIP_COLOR` in `components/ui/tone.ts`. */
+  --color-grey-ink: light-dark(#5b6472, #aab2bf);
+  --color-grey-soft: light-dark(#f1f3f6, #272b33);
+  --color-grey-soft-border: light-dark(#dfe3ea, #3c424d);
+  --color-green: light-dark(#17a874, #4cbb87);
+  --color-green-ink: light-dark(#0b7a52, #4cbb87);
+  --color-green-soft: light-dark(#e2f6ec, #17301f);
+  --color-green-soft-border: light-dark(#bae9d1, #275639);
+  --color-amber: light-dark(#b4780a, #dcab3f);
+  --color-amber-ink: light-dark(#946200, #dcab3f);
+  --color-amber-soft: light-dark(#fbf0da, #362a0e);
+  --color-amber-soft-border: light-dark(#efd79c, #5c481b);
+  --color-red: light-dark(#dc3d3d, #e17575);
+  --color-red-ink: light-dark(#b32b2b, #eb9a9a);
+  --color-red-soft: light-dark(#fbeaea, #3a1d1d);
+  --color-red-soft-border: light-dark(#f2c3c3, #5e2e2e);
+  --color-blue: light-dark(#2e5cd6, #6e9ee8);
+  --color-blue-ink: light-dark(#1f45b0, #9bbef2);
+  --color-blue-soft: light-dark(#e6edfc, #22304a);
+  --color-blue-soft-border: light-dark(#c2d3f5, #35456a);
+  --color-teal-ink: light-dark(#0b6e7a, #58c6d2);
+  --color-teal-soft: light-dark(#dff4f6, #12303a);
+  --color-teal-soft-border: light-dark(#b3e3e9, #24545b);
+  --color-violet-ink: light-dark(#6b3fc4, #bda4f2);
+  --color-violet-soft: light-dark(#f0eafc, #2c2145);
+  --color-violet-soft-border: light-dark(#d8c9f5, #483a6e);
+  --color-pink-ink: light-dark(#b02a78, #f09cc9);
+  --color-pink-soft: light-dark(#fbe9f3, #3a1c2e);
+  --color-pink-soft-border: light-dark(#f3c4de, #5e2f4a);
+  --color-orange-ink: light-dark(#b4500a, #f0a066);
+  --color-orange-soft: light-dark(#fdeee0, #3a2312);
+  --color-orange-soft-border: light-dark(#f7d0ad, #5e3a1e);
+  --color-lime-ink: light-dark(#56720a, #b4d455);
+  --color-lime-soft: light-dark(#f0f6d8, #29310f);
+  --color-lime-soft-border: light-dark(#dbe8a6, #454f1b);
+  /* The tones, a colour with a meaning: `components/ui/tone.ts` combines them. */
+  --color-accent: var(--color-blue);
+  --color-accent-ink: var(--color-blue-ink);
+  --color-accent-soft: var(--color-blue-soft);
+  --color-accent-soft-border: var(--color-blue-soft-border);
+  --color-good: var(--color-green);
+  --color-good-ink: var(--color-green-ink);
+  --color-good-soft: var(--color-green-soft);
+  --color-good-soft-border: var(--color-green-soft-border);
+  --color-warn: var(--color-amber);
+  --color-warn-ink: var(--color-amber-ink);
+  --color-warn-soft: var(--color-amber-soft);
+  --color-warn-soft-border: var(--color-amber-soft-border);
+  --color-bad: var(--color-red);
+  --color-bad-ink: var(--color-red-ink);
+  --color-bad-soft: var(--color-red-soft);
+  --color-bad-soft-border: var(--color-red-soft-border);
   /* Behind a dialog, and behind the phone's open sidebar. */
   --color-scrim: rgba(10, 12, 16, 0.4);
   --color-scroll-thumb: light-dark(#c3cddc, #3f4757);

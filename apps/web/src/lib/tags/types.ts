@@ -2,7 +2,18 @@
 // single source of truth, and @job-search-copilot/core is NOT imported (invariant 5).
 import { z } from 'zod';
 
-export const tagToneSchema = z.enum(['NEUTRAL', 'GOOD', 'WARN', 'BAD', 'ACCENT']);
+export const tagToneSchema = z.enum([
+  'GREY',
+  'GREEN',
+  'AMBER',
+  'RED',
+  'BLUE',
+  'TEAL',
+  'VIOLET',
+  'PINK',
+  'ORANGE',
+  'LIME',
+]);
 export type TagTone = z.infer<typeof tagToneSchema>;
 
 /** A tag as a vacancy carries it, and as `POST /tags` answers. */

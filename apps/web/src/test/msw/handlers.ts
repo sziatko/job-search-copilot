@@ -280,7 +280,7 @@ export function buildHandlers(rows: FakeVacancy[], tags: TagRef[] = []) {
         const gone = remove.map(tagKey);
         const kept = row.tags.filter((tag) => !gone.includes(tagKey(tag.name)));
         const added = add
-          .map((name) => findTag(name) ?? addTag(name, 'NEUTRAL'))
+          .map((name) => findTag(name) ?? addTag(name, 'GREY'))
           .filter((tag) => !kept.some(({ id }) => id === tag.id));
         row.tags = [...kept, ...added].sort((a, b) => tagKey(a.name).localeCompare(tagKey(b.name)));
       }

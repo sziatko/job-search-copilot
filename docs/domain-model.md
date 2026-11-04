@@ -305,12 +305,12 @@ The writers, by source:
 ## `Tag`
 
 A mark a table shows at a glance: the source, the country, the work format, a note to self.
-`Tag` belongs to a user (`name`, `tone` of `NEUTRAL` \| `GOOD` \| `WARN` \| `BAD` \| `ACCENT`,
-a unique `nameKey`); `VacancyTag` links it to a vacancy, a vacancy holding at most
+`Tag` belongs to a user (`name`, `tone`, a colour: `GREY` \| `GREEN` \| `AMBER` \| `RED` \| `BLUE` \| `TEAL` \| `VIOLET` \|
+`PINK` \| `ORANGE` \| `LIME`, a unique `nameKey`); `VacancyTag` links it to a vacancy, a vacancy holding at most
 `TAGS_PER_VACANCY_MAX`. Neither axis: writing a tag moves no `status` and no
 `recommendation`. Anyone acting for the user writes them, the analyzer with its analysis
 included; the server holds no rule about a particular tag. Writes go by name: `" Remote "` and
-`"remote"` are one tag, the first spelling kept, and a new name creates a `NEUTRAL` one. Rename,
+`"remote"` are one tag, the first spelling kept, and a new name creates a `GREY` one. Rename,
 tone and delete are on `/profile` and REST, not in MCP.
 Why: [ADR-0042](decisions/0042-tags-written-by-anyone.md).
 

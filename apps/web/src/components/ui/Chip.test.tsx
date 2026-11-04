@@ -7,7 +7,7 @@ describe('Chip', () => {
   it('calls onRemove from the × button its label names', async () => {
     const onRemove = vi.fn();
     render(
-      <Chip tone="good" onRemove={onRemove} removeLabel="Remove tag Remote">
+      <Chip color="green" onRemove={onRemove} removeLabel="Remove tag Remote">
         Remote
       </Chip>,
     );
@@ -20,7 +20,7 @@ describe('Chip', () => {
 
   it('turns the × off under removeDisabled', () => {
     render(
-      <Chip tone="good" onRemove={() => {}} removeLabel="Remove tag Remote" removeDisabled>
+      <Chip color="green" onRemove={() => {}} removeLabel="Remove tag Remote" removeDisabled>
         Remote
       </Chip>,
     );
@@ -31,8 +31,8 @@ describe('Chip', () => {
   it('is smaller only when dense', () => {
     render(
       <>
-        <Chip tone="good">Full</Chip>
-        <Chip tone="good" dense>
+        <Chip color="green">Full</Chip>
+        <Chip color="green" dense>
           Dense
         </Chip>
       </>,
@@ -42,8 +42,14 @@ describe('Chip', () => {
     expect(screen.getByText('Dense').parentElement).toHaveClass('py-0');
   });
 
+  it('takes a colour no tone has', () => {
+    render(<Chip color="violet">Dream</Chip>);
+
+    expect(screen.getByText('Dream').parentElement).toHaveClass('text-violet-ink');
+  });
+
   it('has no button without onRemove', () => {
-    render(<Chip tone="neutral">Remote</Chip>);
+    render(<Chip color="grey">Remote</Chip>);
 
     expect(screen.getByText('Remote')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();

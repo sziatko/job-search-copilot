@@ -91,7 +91,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('ApplicationsPage / useApplications', () => {
   it("shows a row's tags, and no list on a row without any", async () => {
     serve([
-      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] }),
+      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GREEN' }] }),
       application({ id: 2, company: 'Beta Corp' }),
     ]);
     renderApplications();
@@ -106,7 +106,7 @@ describe('ApplicationsPage / useApplications', () => {
 
   it('holds the status select and Edit during a tag write', async () => {
     serve([
-      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] }),
+      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GREEN' }] }),
     ]);
     mswServer.use(
       http.post('http://localhost:3000/api/v1/vacancies/tags', async () => {
@@ -128,10 +128,10 @@ describe('ApplicationsPage / useApplications', () => {
 
   it('adds a tag to a row and removes one', async () => {
     const rows = [
-      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] }),
+      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GREEN' }] }),
     ];
     mswServer.use(
-      ...buildHandlers(rows, [{ id: 2, name: 'Contract', tone: 'WARN' }]),
+      ...buildHandlers(rows, [{ id: 2, name: 'Contract', tone: 'AMBER' }]),
       statsHandler(),
     );
     renderApplications();

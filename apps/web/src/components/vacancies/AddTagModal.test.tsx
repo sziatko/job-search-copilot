@@ -8,9 +8,9 @@ import { API_URL, buildHandlers, holdGet } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { AddTagModal } from './AddTagModal';
 
-const REMOTE: TagRef = { id: 1, name: 'Remote', tone: 'GOOD' };
-const RELOCATION: TagRef = { id: 2, name: 'Relocation', tone: 'WARN' };
-const LINKEDIN: TagRef = { id: 3, name: 'LinkedIn', tone: 'NEUTRAL' };
+const REMOTE: TagRef = { id: 1, name: 'Remote', tone: 'GREEN' };
+const RELOCATION: TagRef = { id: 2, name: 'Relocation', tone: 'AMBER' };
+const LINKEDIN: TagRef = { id: 3, name: 'LinkedIn', tone: 'GREY' };
 
 /** `first` go in front of the fake's own handlers — a `holdGet` must. */
 function renderModal(tags: TagRef[], assigned: TagRef[] = [], ...first: RequestHandler[]) {
@@ -96,19 +96,19 @@ describe('AddTagModal', () => {
     await screen.findByRole('list', { name: 'Matching tags' });
 
     await user.type(nameField(), 'Contract');
-    await user.click(screen.getByRole('radio', { name: 'Bad' }));
+    await user.click(screen.getByRole('radio', { name: 'Red' }));
     await user.click(screen.getByRole('button', { name: 'Create “Contract”' }));
 
     await waitFor(() =>
       expect(onAdd).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Contract', tone: 'BAD' }),
+        expect.objectContaining({ name: 'Contract', tone: 'RED' }),
       ),
     );
-    expect(creates).toEqual([{ name: 'Contract', tone: 'BAD' }]);
+    expect(creates).toEqual([{ name: 'Contract', tone: 'RED' }]);
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('a new tag is Neutral unless told otherwise', async () => {
+  it('a new tag is Grey unless told otherwise', async () => {
     const creates = recordCreates();
     const { user, onAdd } = renderModal([]);
     await screen.findByText(/no tags to add yet/i);
@@ -116,7 +116,7 @@ describe('AddTagModal', () => {
     await user.type(nameField(), 'Contract{Enter}');
 
     await waitFor(() => expect(onAdd).toHaveBeenCalled());
-    expect(creates).toEqual([{ name: 'Contract', tone: 'NEUTRAL' }]);
+    expect(creates).toEqual([{ name: 'Contract', tone: 'GREY' }]);
   });
 
   it('holds the buttons while the new tag is created', async () => {
@@ -125,7 +125,7 @@ describe('AddTagModal', () => {
     mswServer.use(
       http.post(`${API_URL}/tags`, async () => {
         await delay(300);
-        return HttpResponse.json({ id: 9, name: 'Re', tone: 'NEUTRAL' }, { status: 201 });
+        return HttpResponse.json({ id: 9, name: 'Re', tone: 'GREY' }, { status: 201 });
       }),
     );
 

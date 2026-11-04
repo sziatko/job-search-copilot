@@ -121,8 +121,8 @@ describe('VacanciesPage / useVacancies', () => {
           id: 1,
           company: 'Acme',
           tags: [
-            { id: 1, name: 'LinkedIn', tone: 'NEUTRAL' },
-            { id: 2, name: 'Remote', tone: 'GOOD' },
+            { id: 1, name: 'LinkedIn', tone: 'GREY' },
+            { id: 2, name: 'Remote', tone: 'GREEN' },
           ],
         }),
         vacancy({ id: 2, company: 'Beta Corp' }),
@@ -140,8 +140,8 @@ describe('VacanciesPage / useVacancies', () => {
   });
 
   describe('adding and removing a tag', () => {
-    const REMOTE = { id: 1, name: 'Remote', tone: 'GOOD' } as const;
-    const LINKEDIN = { id: 2, name: 'LinkedIn', tone: 'NEUTRAL' } as const;
+    const REMOTE = { id: 1, name: 'Remote', tone: 'GREEN' } as const;
+    const LINKEDIN = { id: 2, name: 'LinkedIn', tone: 'GREY' } as const;
     const TAGS_URL = 'http://localhost:3000/api/v1/vacancies/tags';
 
     /** The bodies of the POST /vacancies/tags requests sent, in order. */
@@ -236,7 +236,7 @@ describe('VacanciesPage / useVacancies', () => {
       const modal = await openAddTag(user, 'Acme');
       await modal.findByText(/no tags to add yet/i);
       await user.type(modal.getByRole('textbox', { name: 'Tag name' }), 'Contract');
-      await user.click(modal.getByRole('radio', { name: 'Accent' }));
+      await user.click(modal.getByRole('radio', { name: 'Blue' }));
       await user.click(modal.getByRole('button', { name: 'Create “Contract”' }));
 
       await waitFor(() => expect(chips('Acme')).toEqual(['Contract']));
