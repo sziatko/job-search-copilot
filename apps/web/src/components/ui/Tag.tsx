@@ -16,7 +16,7 @@ export function Tag({
 }) {
   return (
     <span
-      className={`whitespace-nowrap rounded-full border px-2 ${dense ? 'py-0' : 'py-1'} font-sans text-caption font-bold ${TONE[tone]} ${className}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 ${dense ? 'py-0' : 'py-1'} font-sans text-caption font-bold ${TONE[tone]} ${className}`}
     >
       {children}
     </span>

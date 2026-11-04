@@ -22,7 +22,7 @@ export function Chip({
   | { onRemove?: undefined; removeLabel?: undefined; removeDisabled?: undefined }
 )) {
   return (
-    <Tag tone={tone} dense={dense} className="inline-flex max-w-full items-center gap-1">
+    <Tag tone={tone} dense={dense} className="max-w-full gap-1">
       {/* Unlike a status's word, a name can be wider than its cell. */}
       <span className="min-w-0 whitespace-normal wrap-anywhere">{children}</span>
       {onRemove && (

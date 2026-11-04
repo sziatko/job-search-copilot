@@ -61,7 +61,7 @@ export function ModalVacancyTable({
           {/* Which of these rows is the one you clicked — a sibling can carry another
               spelling of the company. */}
           {item.id === currentId && (
-            <Tag tone="accent" className="ml-2 align-middle">
+            <Tag tone="accent" dense className="ml-2 align-middle">
               Current
             </Tag>
           )}
