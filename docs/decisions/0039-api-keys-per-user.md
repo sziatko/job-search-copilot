@@ -12,11 +12,11 @@ OAuth — Claude Desktop through `mcp-remote`, a script — needs a credential t
 
 ## Decision
 Better Auth's `@better-auth/api-key` plugin in `createAuth`: keys owned by a user
-(`referenceId`), stored hashed, prefix `jsc_`, shown once, managed on `/profile`
+(`referenceId`), stored hashed, prefix `jsc_`, shown once, managed on `/settings`
 (create, list, revoke). No expiry, no per-key scopes. A rate limit of 1000 requests an
 hour per key, set in `API_KEY_OPTIONS` (`core/src/auth/api-key.ts`); a key over it is a
 `429` on REST and the HTTP MCP. A key is accepted:
-- on the domain REST routes (`/vacancies`, `/applications`, `/stats`), by `ApiKeyGuard`
+- on the domain REST routes (`/vacancies`, `/applications`, `/stats`, `/tags`), by `ApiKeyGuard`
   on each controller's class, as `Authorization: Bearer jsc_…`; a comment a key writes
   is `AGENT`;
 - by the HTTP MCP, as a bearer next to the OAuth JWT (a `jsc_` prefix picks the path);
@@ -56,7 +56,7 @@ Core exports `verifyApiKey(prisma, key) → userId | null`, so both apps verify 
   `lastRequest` — so the limit is 1000 calls per busy stretch, not per clock hour.
 - A key checked at boot stays valid in a running stdio process until it restarts.
 - The limit is a key's: an OAuth client on the HTTP MCP (claude.ai) has none. A looping
-  agent there is stopped by revoking it on `/profile` (Connected apps), not by a 429.
+  agent there is stopped by revoking it on `/settings` (Connected apps), not by a 429.
 
 ## What this constrains — breaks if you change it
 - **A key is full access to its owner's data**, through MCP and REST alike. The

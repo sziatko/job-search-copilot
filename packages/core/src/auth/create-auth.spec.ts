@@ -122,7 +122,7 @@ describe('requireUserVerified', () => {
 });
 
 describe('API keys', () => {
-  // What /profile's "Create" does, as the signed-in user; the key comes back once.
+  // What /settings's "Create" does, as the signed-in user; the key comes back once.
   async function createKey() {
     const { user } = await signUpWithGoogle('me@example.com');
     const created = await auth.api.createApiKey({ body: { name: 'n8n', userId: user.id } });

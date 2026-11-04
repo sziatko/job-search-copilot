@@ -24,8 +24,8 @@ light / dark theme. Several of these are agreements between files that no compil
    (`title`, `rail`). `rail` starts the table-heavy pages with the sidebar collapsed
    to an icon rail.
 4. **`/` is the dashboard**, counted by `GET /stats` ([ADR-0031](0031-stats-endpoint.md)).
-5. **A feature not built yet** shows a `ComingSoon` panel where it will be (the rest of
-   `/profile` today).
+5. **A feature not built yet** shows a `ComingSoon` panel where it will be (`/profile`
+   today).
 
 ## Why this and not the alternatives
 - **The theme applied in React on mount** — the first paint happens before hydration,

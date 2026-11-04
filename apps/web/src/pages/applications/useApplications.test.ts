@@ -89,6 +89,76 @@ const rowSelect = () =>
 afterEach(() => vi.restoreAllMocks());
 
 describe('ApplicationsPage / useApplications', () => {
+  it("shows a row's tags, and no list on a row without any", async () => {
+    serve([
+      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] }),
+      application({ id: 2, company: 'Beta Corp' }),
+    ]);
+    renderApplications();
+    await screen.findByText('Acme');
+
+    const row = (company: string) => within(screen.getByText(company).closest('tr') as HTMLElement);
+    expect(
+      within(row('Acme').getByRole('list', { name: 'Tags' })).getByText('Remote'),
+    ).toBeInTheDocument();
+    expect(row('Beta Corp').queryByRole('list', { name: 'Tags' })).not.toBeInTheDocument();
+  });
+
+  it('holds the status select and Edit during a tag write', async () => {
+    serve([
+      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] }),
+    ]);
+    mswServer.use(
+      http.post('http://localhost:3000/api/v1/vacancies/tags', async () => {
+        await delay(300);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderApplications();
+    await screen.findByText('Acme');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove tag Remote' }));
+
+    await waitFor(() => {
+      expect(rowSelect()).toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Edit / })).toBeDisabled();
+    });
+    await waitFor(() => expect(rowSelect()).toBeEnabled());
+  });
+
+  it('adds a tag to a row and removes one', async () => {
+    const rows = [
+      application({ id: 1, company: 'Acme', tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] }),
+    ];
+    mswServer.use(
+      ...buildHandlers(rows, [{ id: 2, name: 'Contract', tone: 'WARN' }]),
+      statsHandler(),
+    );
+    renderApplications();
+    await screen.findByText('Acme');
+    const user = userEvent.setup();
+    const row = () => within(screen.getByText('Acme').closest('tr') as HTMLElement);
+    const chips = () =>
+      within(row().getByRole('list', { name: 'Tags' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent);
+
+    await user.click(row().getByRole('button', { name: 'Add tag' }));
+    const modal = within(await screen.findByRole('dialog', { name: 'Add a tag' }));
+    await user.click(await modal.findByRole('button', { name: 'Contract' }));
+
+    await waitFor(() => expect(chips()).toEqual(['Contract', 'Remote']));
+    await waitFor(() =>
+      expect(rows[0].tags.map((tag) => tag.name)).toEqual(['Contract', 'Remote']),
+    );
+    await waitFor(() => expect(rowSelect()).toBeEnabled());
+
+    await user.click(row().getByRole('button', { name: 'Remove tag Remote' }));
+
+    await waitFor(() => expect(chips()).toEqual(['Contract']));
+    await waitFor(() => expect(rows[0].tags.map((tag) => tag.name)).toEqual(['Contract']));
+  });
+
   it('lists applications', async () => {
     serve([
       application({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
@@ -498,8 +568,9 @@ describe('ApplicationsPage / useApplications', () => {
       await screen.findByText('Acme');
 
       const row = within(screen.getByRole('table')).getAllByRole('row')[1];
+      const action = within(row).getAllByRole('cell')[6];
       expect(
-        within(row)
+        within(action)
           .getAllByRole('button')
           .map((b) => b.textContent),
       ).toEqual(['Copy', 'Edit']);
@@ -527,15 +598,19 @@ describe('ApplicationsPage / useApplications', () => {
       // Comments are append-only: the field is a new one, never the old one to edit.
       const comment = within(dialog).getByLabelText('Add a comment');
       expect(comment).toHaveValue('');
+      const letter = within(dialog).getByLabelText('Sent a cover letter');
+      expect(letter).not.toBeChecked();
 
       await user.clear(salary);
       await user.type(salary, '120 PLN/h');
+      await user.click(letter);
       await user.type(comment, 'Went well.');
       await user.click(within(dialog).getByRole('button', { name: 'OK' }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       const table = screen.getByRole('table');
       expect(await within(table).findByText('120 PLN/h')).toBeInTheDocument();
+      expect(within(table).getByText('— / ✓')).toBeInTheDocument();
       expect(
         [...table.querySelectorAll('[data-source="USER"]')].map((el) => el.lastChild?.textContent),
       ).toEqual(['First note', 'Went well.']);

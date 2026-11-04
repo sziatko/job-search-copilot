@@ -11,6 +11,7 @@
 // ./constants.
 import { z } from 'zod';
 import { cursorPageSchema } from '@/lib/api';
+import { tagRefSchema } from '@/lib/tags/types';
 
 export const recommendationSchema = z.enum(['APPLY', 'APPLY_WITH_CAVEATS', 'SKIP']);
 export type Recommendation = z.infer<typeof recommendationSchema>;
@@ -99,6 +100,7 @@ export const vacancyListItemSchema = z.object({
   /** The analyzer's comment; null when it wrote none (a placeholder row). */
   estimationComment: z.string().nullable(),
   status: vacancyStatusSchema,
+  tags: z.array(tagRefSchema),
   /** How many vacancies share this row's company. Derived by the list endpoint
    * (ADR-0025), so it is **optional**: this schema also parses the PATCH
    * .../status response, which returns a plain record with no derived field —
@@ -143,8 +145,10 @@ export const vacancyDetailSchema = z.object({
   recommendation: recommendationSchema.nullable(),
   status: vacancyStatusSchema,
   statusChangedAt: z.string(),
+  tags: z.array(tagRefSchema),
   salaryInApplication: z.string().nullable(),
   usedTailoredResume: z.boolean(),
+  sentCoverLetter: z.boolean(),
   comments: z.array(vacancyCommentSchema),
   /** The analyzer's comment; null on a placeholder the analyzer has not scored. */
   estimationComment: z.string().nullable(),

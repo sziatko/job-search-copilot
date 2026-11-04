@@ -14,6 +14,7 @@ test('each sidebar link opens its page', async ({ page }) => {
     ['Application tracker', '/applications', 'Application tracker'],
     ['Inbox', '/inbox', 'Inbox'],
     ['Profile & forms', '/profile', 'Profile & forms'],
+    ['Settings', '/settings', 'Settings'],
     ['Dashboard', '/', 'Dashboard'],
   ]) {
     await nav.getByRole('link', { name: link }).click();
@@ -92,7 +93,7 @@ test.describe('at 390px', () => {
   });
 
   test('every page title fits on one line', async ({ page }) => {
-    for (const path of ['/', '/vacancies', '/applications', '/inbox', '/profile']) {
+    for (const path of ['/', '/vacancies', '/applications', '/inbox', '/profile', '/settings']) {
       await page.goto(path);
       await expect(title(page)).not.toBeEmpty();
       const lines = await title(page).evaluate((el) => {
@@ -118,9 +119,9 @@ test('the search modal: a term, All / Context, Hide Filtered out, open details',
   await page.goto('/vacancies');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText('Type a company or role.')).toBeVisible();
+  await expect(dialog.getByText('Type a company, role or #id.')).toBeVisible();
 
-  await dialog.getByRole('searchbox', { name: 'Search company or role' }).fill(company);
+  await dialog.getByRole('searchbox', { name: 'Search company, role or #id' }).fill(company);
   await expect(
     dialog.getByText(counted(ofCompany.filter((s) => s !== 'FILTERED_OUT').length)),
   ).toBeVisible();
@@ -168,6 +169,6 @@ test('a 401 mid-session lands on /login', async ({ page, db }) => {
 
   await db.session.deleteMany(); // the session ends under the open page
   // A request, not a navigation: the router guard checks only on navigation.
-  await page.getByRole('searchbox', { name: 'Search company or role' }).fill('Engineer');
+  await page.getByRole('searchbox', { name: 'Search company, role or #id' }).fill('Engineer');
   await expect(page).toHaveURL(/\/login$/);
 });

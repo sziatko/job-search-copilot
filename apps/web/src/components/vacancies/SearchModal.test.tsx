@@ -64,7 +64,7 @@ describe('SearchModal', () => {
     renderAt(path, [fakeVacancy()]);
     const { user, modal } = await openSearch();
 
-    await user.type(modal.getByRole('searchbox', { name: /search company or role/i }), 'acme');
+    await user.type(modal.getByRole('searchbox', { name: /search company, role or #id/i }), 'acme');
     await waitFor(() =>
       expect(searches(requests).at(-1)?.searchParams.get('status')).toBe(ALL_BUT_FILTERED_OUT),
     );
@@ -116,6 +116,8 @@ describe('SearchModal', () => {
         status: 'INTERVIEW',
         statusChangedAt: new Date(Date.now() - 45 * DAY).toISOString(),
         usedTailoredResume: true,
+        sentCoverLetter: true,
+        tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }],
       }),
     ]);
     await screen.findByText('Beta Corp');
@@ -128,6 +130,10 @@ describe('SearchModal', () => {
     const row = (title: string) => within(modal.getByText(title).closest('tr') as HTMLElement);
     expect(row('Data Engineer').getByText('Interview')).toBeInTheDocument();
     expect(
+      within(row('Data Engineer').getByRole('list', { name: 'Tags' })).getByText('Remote'),
+    ).toBeInTheDocument();
+    expect(row('Backend Engineer').queryByRole('list', { name: 'Tags' })).not.toBeInTheDocument();
+    expect(
       row('Backend Engineer').getByRole('button', { name: /copy backend engineer/i }),
     ).toBeInTheDocument();
     expect(
@@ -136,11 +142,11 @@ describe('SearchModal', () => {
     expect(
       within(await row('Data Engineer').findByText('⏳')).getByText('45 days since last update'),
     ).toBeInTheDocument();
-    // Date, Vacancy, Score, Status, CV, Actions.
-    const cv = (title: string) =>
+    // Date, Vacancy, Score, Status, CV / CL, Actions.
+    const flags = (title: string) =>
       (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[4];
-    expect(cv('Data Engineer')).toHaveTextContent('✓');
-    expect(cv('Backend Engineer')).toHaveTextContent('—');
+    expect(flags('Data Engineer')).toHaveTextContent('✓ / ✓');
+    expect(flags('Backend Engineer')).toHaveTextContent('— / —');
 
     // The page's table still lists its own NOT_REVIEWED rows, Beta Corp included.
     const page = within(screen.getByRole('region', { name: 'Vacancies' }));
@@ -156,7 +162,7 @@ describe('SearchModal', () => {
     const before = requests.length;
 
     const { user, modal } = await openSearch();
-    expect(modal.getByText('Type a company or role.')).toBeInTheDocument();
+    expect(modal.getByText('Type a company, role or #id.')).toBeInTheDocument();
     await user.type(modal.getByRole('searchbox'), '   ');
     await user.click(modal.getByRole('radio', { name: 'Context' }));
     await user.click(modal.getByRole('radio', { name: 'All' }));
@@ -166,7 +172,7 @@ describe('SearchModal', () => {
     expect(requests.slice(before)).toEqual([]);
     expect(modal.queryByRole('table')).not.toBeInTheDocument();
     // The table's place holds an empty state, not nothing.
-    expect(modal.getByText('Type a company or role.')).toBeInTheDocument();
+    expect(modal.getByText('Type a company, role or #id.')).toBeInTheDocument();
   });
 
   it('shows an empty state for no match, and the table once rows come back', async () => {

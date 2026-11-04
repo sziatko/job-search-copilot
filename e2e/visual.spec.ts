@@ -47,6 +47,7 @@ for (const theme of ['light', 'dark'] as const) {
       ['vacancies', '/vacancies'],
       ['applications', '/applications'],
       ['profile', '/profile'],
+      ['settings', '/settings'],
     ]) {
       test(name, async ({ page }) => {
         await open(page, path);
@@ -78,6 +79,7 @@ for (const theme of ['light', 'dark'] as const) {
       ['decline', { name: 'Decline' }],
       ['save-for-later', { name: 'Save for later' }],
       ['company-history', { name: /other vacanc(y|ies) at / }],
+      ['add-tag', { name: 'Add tag' }],
     ] as const) {
       test(`${name} dialog`, async ({ page }) => {
         await open(page, '/vacancies');
@@ -87,12 +89,19 @@ for (const theme of ['light', 'dark'] as const) {
       });
     }
 
+    test('edit-tag dialog', async ({ page }) => {
+      await open(page, '/profile');
+      await page.getByRole('button', { name: 'Edit tag Remote' }).click();
+      await settle(page);
+      await shot(page, 'edit-tag-dialog', false);
+    });
+
     test('search dialog', async ({ page }) => {
       await open(page, '/vacancies');
       await page.getByRole('button', { name: 'Search', exact: true }).click();
       await page
         .getByRole('dialog')
-        .getByRole('searchbox', { name: 'Search company or role' })
+        .getByRole('searchbox', { name: 'Search company, role or #id' })
         .fill(SEED_VACANCIES[0].company);
       await settle(page);
       await shot(page, 'search-dialog', false);

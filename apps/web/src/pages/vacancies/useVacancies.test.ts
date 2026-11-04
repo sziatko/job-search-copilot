@@ -114,6 +114,205 @@ afterEach(() => {
 });
 
 describe('VacanciesPage / useVacancies', () => {
+  it("shows a row's tags, and no list on a row without any", async () => {
+    mswServer.use(
+      ...buildHandlers([
+        vacancy({
+          id: 1,
+          company: 'Acme',
+          tags: [
+            { id: 1, name: 'LinkedIn', tone: 'NEUTRAL' },
+            { id: 2, name: 'Remote', tone: 'GOOD' },
+          ],
+        }),
+        vacancy({ id: 2, company: 'Beta Corp' }),
+      ]),
+    );
+    renderVacancies();
+    await screen.findByText('Acme');
+
+    const tags = within(rowOf('Acme').getByRole('list', { name: 'Tags' }));
+    expect(tags.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'LinkedIn',
+      'Remote',
+    ]);
+    expect(rowOf('Beta Corp').queryByRole('list', { name: 'Tags' })).not.toBeInTheDocument();
+  });
+
+  describe('adding and removing a tag', () => {
+    const REMOTE = { id: 1, name: 'Remote', tone: 'GOOD' } as const;
+    const LINKEDIN = { id: 2, name: 'LinkedIn', tone: 'NEUTRAL' } as const;
+    const TAGS_URL = 'http://localhost:3000/api/v1/vacancies/tags';
+
+    /** The bodies of the POST /vacancies/tags requests sent, in order. */
+    function recordTagWrites() {
+      const bodies: unknown[] = [];
+      mswServer.events.on('request:start', async ({ request }) => {
+        if (request.method === 'POST' && request.url === TAGS_URL) {
+          bodies.push(await request.clone().json());
+        }
+      });
+      return bodies;
+    }
+
+    const chips = (company: string) =>
+      within(rowOf(company).getByRole('list', { name: 'Tags' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent);
+
+    async function openAddTag(user: ReturnType<typeof userEvent.setup>, company: string) {
+      await user.click(rowOf(company).getByRole('button', { name: 'Add tag' }));
+      return within(await screen.findByRole('dialog', { name: 'Add a tag' }));
+    }
+
+    it('adds a picked tag to its row at once, and returns focus to the button', async () => {
+      const writes = recordTagWrites();
+      mswServer.use(...buildHandlers([vacancy({ id: 7, company: 'Acme' })], [REMOTE]));
+      // This answer writes nothing to the fake, so a chip on screen can only be the optimistic one.
+      mswServer.use(
+        http.post(TAGS_URL, async () => {
+          await delay(300);
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      renderVacancies();
+      await screen.findByText('Acme');
+      const user = userEvent.setup();
+
+      const modal = await openAddTag(user, 'Acme');
+      await user.click(await modal.findByRole('button', { name: 'Remote' }));
+
+      await waitFor(() => expect(chips('Acme')).toEqual(['Remote']));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      await waitFor(() => expect(writes).toEqual([{ items: [{ vacancyId: 7, add: ['Remote'] }] }]));
+      expect(rowOf('Acme').getByRole('button', { name: 'Add tag' })).toHaveFocus();
+    });
+
+    it("holds the row's controls during the write, Add tag included", async () => {
+      mswServer.use(
+        ...buildHandlers([vacancy({ id: 1, company: 'Acme', tags: [LINKEDIN] })], [REMOTE]),
+      );
+      let release = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      mswServer.use(
+        http.post(TAGS_URL, async () => {
+          await held;
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      renderVacancies();
+      await screen.findByText('Acme');
+      const user = userEvent.setup();
+
+      const modal = await openAddTag(user, 'Acme');
+      await user.click(await modal.findByRole('button', { name: 'Remote' }));
+
+      await waitFor(() => {
+        expect(rowOf('Acme').getByRole('button', { name: 'Apply' })).toBeDisabled();
+        expect(rowOf('Acme').getByRole('button', { name: 'Remove tag Remote' })).toBeDisabled();
+        expect(rowOf('Acme').getByRole('button', { name: 'Add tag' })).toHaveAttribute(
+          'aria-disabled',
+          'true',
+        );
+      });
+      await user.click(rowOf('Acme').getByRole('button', { name: 'Add tag' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+      release();
+      await waitFor(() =>
+        expect(rowOf('Acme').getByRole('button', { name: 'Apply' })).toBeEnabled(),
+      );
+    });
+
+    it('creates a new toned tag, then links it, and the row shows it', async () => {
+      const writes = recordTagWrites();
+      mswServer.use(...buildHandlers([vacancy({ id: 7, company: 'Acme' })]));
+      renderVacancies();
+      await screen.findByText('Acme');
+      const user = userEvent.setup();
+
+      const modal = await openAddTag(user, 'Acme');
+      await modal.findByText(/no tags to add yet/i);
+      await user.type(modal.getByRole('textbox', { name: 'Tag name' }), 'Contract');
+      await user.click(modal.getByRole('radio', { name: 'Accent' }));
+      await user.click(modal.getByRole('button', { name: 'Create “Contract”' }));
+
+      await waitFor(() => expect(chips('Acme')).toEqual(['Contract']));
+      expect(writes).toEqual([{ items: [{ vacancyId: 7, add: ['Contract'] }] }]);
+    });
+
+    it('removes a tag through its ×', async () => {
+      const writes = recordTagWrites();
+      mswServer.use(
+        ...buildHandlers([vacancy({ id: 7, company: 'Acme', tags: [LINKEDIN, REMOTE] })]),
+      );
+      renderVacancies();
+      await screen.findByText('Acme');
+
+      await userEvent.click(rowOf('Acme').getByRole('button', { name: 'Remove tag LinkedIn' }));
+
+      await waitFor(() => expect(chips('Acme')).toEqual(['Remote']));
+      expect(writes).toEqual([{ items: [{ vacancyId: 7, remove: ['LinkedIn'] }] }]);
+    });
+
+    it("rolls the row back and quotes the server when it refuses, and offers only what's free", async () => {
+      mswServer.use(
+        ...buildHandlers([vacancy({ id: 1, company: 'Acme', tags: [LINKEDIN] })], [REMOTE]),
+      );
+      mswServer.use(
+        http.post(TAGS_URL, () =>
+          HttpResponse.json({ message: 'A vacancy holds at most 20 tags' }, { status: 422 }),
+        ),
+      );
+      renderVacancies();
+      await screen.findByText('Acme');
+      const user = userEvent.setup();
+
+      const modal = await openAddTag(user, 'Acme');
+      expect(modal.queryByRole('button', { name: 'LinkedIn' })).not.toBeInTheDocument();
+      await user.click(await modal.findByRole('button', { name: 'Remote' }));
+
+      expect(await rowOf('Acme').findByText('A vacancy holds at most 20 tags')).toBeInTheDocument();
+      expect(chips('Acme')).toEqual(['LinkedIn']);
+    });
+
+    it('Cancel writes nothing and returns focus to the button', async () => {
+      const writes = recordTagWrites();
+      mswServer.use(...buildHandlers([vacancy({ id: 1, company: 'Acme' })], [REMOTE]));
+      renderVacancies();
+      await screen.findByText('Acme');
+      const user = userEvent.setup();
+
+      const modal = await openAddTag(user, 'Acme');
+      await user.click(modal.getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(rowOf('Acme').getByRole('button', { name: 'Add tag' })).toHaveFocus();
+      expect(writes).toEqual([]);
+    });
+
+    it('the search modal shows chips with no ×', async () => {
+      mswServer.use(
+        ...buildHandlers([
+          vacancy({ id: 1, company: 'Acme', tags: [REMOTE] }),
+          vacancy({ id: 2, company: 'acme', title: 'Other', tags: [LINKEDIN] }),
+        ]),
+      );
+      renderVacancies();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Search' }));
+      const dialog = within(await screen.findByRole('dialog', { name: 'Search vacancies' }));
+
+      await user.type(dialog.getByRole('searchbox'), 'acme');
+
+      await dialog.findAllByRole('list', { name: 'Tags' });
+      expect(dialog.queryByRole('button', { name: /^Remove tag/ })).not.toBeInTheDocument();
+      expect(dialog.queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
+    });
+  });
+
   it('defaults to the NOT_REVIEWED filter and hides everything else', async () => {
     mswServer.use(
       ...buildHandlers([
@@ -635,6 +834,7 @@ describe('VacanciesPage / useVacancies', () => {
 
     await user.type(screen.getByLabelText('Salary / rate'), '150 PLN/h');
     await user.click(screen.getByLabelText('Used a tailored resume'));
+    await user.click(screen.getByLabelText('Sent a cover letter'));
     await user.type(screen.getByLabelText('Comment'), 'Adapted CV.');
     await user.click(screen.getByRole('button', { name: 'OK' }));
 
@@ -643,6 +843,7 @@ describe('VacanciesPage / useVacancies', () => {
         vacancyId: 1,
         salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         comment: 'Adapted CV.',
       }),
     );
@@ -1036,8 +1237,8 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.queryByText('80%')).toBeInTheDocument(); // the safe row keeps its pill
       expect(modal.getByText('Imported Role')).toBeInTheDocument();
       expect(modal.queryByRole('link', { name: 'Imported Role' })).not.toBeInTheDocument();
-      // The placeholder row's score cell — not a page-wide count of dashes: the CV
-      // column draws one on both rows, neither of them applied to.
+      // The placeholder row's score cell — not a page-wide count of dashes: the CV / CL
+      // column draws them on both rows, neither of them applied to.
       const imported = modal.getByText('Imported Role').closest('tr') as HTMLTableRowElement;
       expect(imported.cells[2]).toHaveTextContent('—');
     });
@@ -1085,7 +1286,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.getAllByText('Current')).toHaveLength(1);
     });
 
-    it('shows whether a tailored CV went with each application', async () => {
+    it('shows whether a tailored CV and a cover letter went with each application', async () => {
       mswServer.use(
         ...buildHandlers([
           vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
@@ -1096,7 +1297,13 @@ describe('VacanciesPage / useVacancies', () => {
             status: 'APPLIED',
             usedTailoredResume: true,
           }),
-          vacancy({ id: 3, company: 'Acme', title: 'Frontend Lead', status: 'APPLIED' }),
+          vacancy({
+            id: 3,
+            company: 'Acme',
+            title: 'Frontend Lead',
+            status: 'APPLIED',
+            sentCoverLetter: true,
+          }),
         ]),
       );
       renderVacancies();
@@ -1106,13 +1313,13 @@ describe('VacanciesPage / useVacancies', () => {
         .setup()
         .click(screen.getByRole('button', { name: /other vacancies at Acme/i }));
       const modal = within(await screen.findByRole('dialog'));
-      // Date, Vacancy, Score, Status, CV, Actions.
-      const cv = (title: string) =>
+      // Date, Vacancy, Score, Status, CV / CL, Actions.
+      const flags = (title: string) =>
         (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[4];
       // The ✓ waits for the applications query, which lands after the rows.
-      await waitFor(() => expect(cv('Data Engineer')).toHaveTextContent('✓'));
-      expect(cv('Frontend Lead')).toHaveTextContent('—');
-      expect(cv('Backend Engineer')).toHaveTextContent('—'); // never applied to
+      await waitFor(() => expect(flags('Data Engineer')).toHaveTextContent('✓ / —'));
+      expect(flags('Frontend Lead')).toHaveTextContent('— / ✓');
+      expect(flags('Backend Engineer')).toHaveTextContent('— / —'); // never applied to
     });
 
     it('opens Details in a new tab, where the table opens it in place', async () => {

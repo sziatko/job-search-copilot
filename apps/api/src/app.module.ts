@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { StatsModule } from './stats/stats.module';
+import { TagsModule } from './tags/tags.module';
 import { VacanciesModule } from './vacancies/vacancies.module';
 
 @Module({
@@ -55,6 +56,7 @@ import { VacanciesModule } from './vacancies/vacancies.module';
     VacanciesModule,
     ApplicationsModule,
     StatsModule,
+    TagsModule,
   ],
   controllers: [WellKnownController],
 })

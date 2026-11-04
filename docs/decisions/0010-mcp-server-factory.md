@@ -9,10 +9,11 @@ the same tools.
 
 ## Decision
 - `apps/mcp/src/server.ts` — `createServer({ userId, vacancies?, applications?,
-  intake? })` builds an `McpServer` for one user and returns it **without** a
+  intake?, tags? })` builds an `McpServer` for one user and returns it **without** a
   transport. The services default to ones on the shared lazy client; a test injects
   its own. The file only composes: each feature registers its tools —
-  `registerVacancyTools`, `registerApplicationTools`, `registerIntakeTools`, in
+  `registerVacancyTools`, `registerApplicationTools`, `registerIntakeTools`,
+  `registerTagTools`, in
   `<feature>/<feature>.tools.ts`, with a sibling `*.schemas.ts` for zod inputs worth
   sharing (intake's sit in its tools file).
 - `apps/mcp/src/index.ts` (stdio) — loads env, resolves the owner of `JSC_API_KEY`,

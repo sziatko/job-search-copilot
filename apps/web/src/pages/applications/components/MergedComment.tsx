@@ -1,5 +1,6 @@
 import { ExpandableText } from '@/components/ui/ExpandableText';
 import { TONE_TEXT } from '@/components/ui/tone';
+import { AnalysisComment } from '@/components/vacancies/AnalysisComment';
 import type { ApplicationComment, CommentSource } from '@/lib/applications/types';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
@@ -13,8 +14,9 @@ const SOURCE_CLASS: Record<CommentSource, string> = {
 
 /**
  * Every comment on the vacancy in one cell, in the order the API sends them (oldest
- * first), each with its date and styled by its source: on one line, joined by dashes,
- * while clamped; one under another, ruled, once expanded.
+ * first), each with its date and styled by its source: run together, joined by dashes,
+ * while clamped; one under another, ruled, once expanded. A comment's own line breaks
+ * show in both.
  */
 export function MergedComment({ comments }: { comments: ApplicationComment[] }) {
   if (comments.length === 0) {
@@ -31,7 +33,11 @@ export function MergedComment({ comments }: { comments: ApplicationComment[] }) 
               <time className="font-mono tabular-nums text-ink-faint">
                 {dateFormatter.format(new Date(comment.createdAt))}:{' '}
               </time>
-              {comment.body}
+              {comment.source === 'ANALYZER' ? (
+                <AnalysisComment text={comment.body} />
+              ) : (
+                comment.body
+              )}
             </span>
           </span>
         ))

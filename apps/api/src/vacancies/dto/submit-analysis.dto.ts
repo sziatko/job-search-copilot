@@ -13,6 +13,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { IsTagNames } from '../../tags/dto/tag-vacancies.dto';
 
 /** `POST /vacancies/:id/analysis` — the id is the path's. */
 export class SubmitAnalysisDto {
@@ -29,6 +30,10 @@ export class SubmitAnalysisDto {
   @IsNotEmpty()
   @MaxLength(MAX_LENGTH.note)
   estimationComment!: string;
+
+  /** Names to put on the vacancy; a bad one rejects the analysis too. */
+  @IsTagNames()
+  tags?: string[];
 }
 
 export class SubmitAnalysisItemDto extends SubmitAnalysisDto {

@@ -2,10 +2,11 @@ import type { VacancyStatus } from '@prisma/client';
 import { ApplicationService } from '../applications/application.service';
 import { forUser, type Unscoped } from '../db/for-user';
 import { PIPELINE_STATUSES, statusAfterAnalysis } from '../domain/status';
+import { parseTagName } from '../domain/tags';
 import { VacancyIntakeService } from '../intake/vacancy-intake.service';
 import { VacancyService } from '../vacancies/vacancy.service';
 import { ANALYSIS_BATCH_MAX } from '../vacancies/vacancy.types';
-import { SEED_VACANCIES } from './data';
+import { SEED_TAGS, SEED_VACANCIES } from './data';
 
 const DAY = 86_400_000;
 const MINUTE = 60_000;
@@ -14,7 +15,7 @@ const MINUTE = 60_000;
 const DISPOSABLE_DB = /_(e2e|test|demo)$/;
 
 /**
- * Makes `userId`'s data the seed (ADR-0037): deletes that user's vacancies, then writes
+ * Makes `userId`'s data the seed (ADR-0037): deletes that user's vacancies and tags, then writes
  * SEED_VACANCIES through the services as that user, so the journal and the comments are
  * the ones the app itself writes. Users, sessions and other users' vacancies are left
  * alone. Then every date is moved back
@@ -35,6 +36,7 @@ export async function resetToSeed(
   }
 
   await db.vacancy.deleteMany();
+  await db.tag.deleteMany();
   const vacancies = new VacancyService(prisma);
   const applications = new ApplicationService(prisma);
   await new VacancyIntakeService(prisma).intakeMany(
@@ -83,6 +85,7 @@ export async function resetToSeed(
           vacancyId: ids[i],
           salaryInApplication: v.salary,
           usedTailoredResume: v.tailored,
+          sentCoverLetter: v.coverLetter,
           comment: note,
         });
       } else if ((PIPELINE_STATUSES as readonly VacancyStatus[]).includes(to)) {
@@ -93,6 +96,16 @@ export async function resetToSeed(
       record(i, to, note);
     }
   }
+
+  await db.tag.createMany({
+    data: SEED_TAGS.map(({ name, tone }) => ({ ...parseTagName(name), tone, userId })),
+  });
+  const tagIds = Object.fromEntries((await db.tag.findMany()).map((tag) => [tag.name, tag.id]));
+  await db.vacancyTag.createMany({
+    data: SEED_VACANCIES.flatMap((v, i) =>
+      v.tags.map(({ name }) => ({ vacancyId: ids[i], tagId: tagIds[name], userId })),
+    ),
+  });
 
   const [changes, comments] = await Promise.all([
     db.statusChange.findMany({ orderBy: { id: 'asc' }, select: { id: true, vacancyId: true } }),

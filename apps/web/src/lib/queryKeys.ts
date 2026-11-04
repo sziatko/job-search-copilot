@@ -22,6 +22,8 @@ export const queryKeys = {
   vacancySearch: (term: string, statuses: readonly string[]) =>
     ['vacancy-search', term, statuses] as const,
   applicationSearch: (term: string) => ['application-search', term] as const,
+  /** The user's tags, `GET /tags`. */
+  tags: () => ['tags'] as const,
   /** `GET /stats` — the dashboard's numbers and /applications' KPI strip. */
   stats: () => ['stats'] as const,
   dashboard: (...rest: ['review-queue'] | []) => ['dashboard', ...rest] as const,
@@ -52,4 +54,14 @@ export const staleAfter = {
   /** An application's edit or a comment touches where the application's fields and
    * comments show. */
   edit: [queryKeys.applications(), queryKeys.vacancy(), queryKeys.applicationCompany()],
+  /** A tag on or off a vacancy, renamed, toned or deleted, touches where its chips show,
+   * and the tags' counts. */
+  tagWrite: [
+    queryKeys.vacancies(),
+    queryKeys.applications(),
+    queryKeys.vacancy(),
+    queryKeys.vacancyCompany(),
+    queryKeys.applicationCompany(),
+    queryKeys.tags(),
+  ],
 };

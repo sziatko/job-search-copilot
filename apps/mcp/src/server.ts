@@ -1,7 +1,13 @@
-import { ApplicationService, VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
+import {
+  ApplicationService,
+  TagService,
+  VacancyIntakeService,
+  VacancyService,
+} from '@job-search-copilot/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerApplicationTools } from './applications/applications.tools';
 import { registerIntakeTools } from './intake/intake.tools';
+import { registerTagTools } from './tags/tags.tools';
 import { registerVacancyTools } from './vacancies/vacancies.tools';
 
 /**
@@ -39,6 +45,10 @@ export const SERVER_INSTRUCTIONS = [
     'already has is refused as an error: it carries no event.',
   'Comments are append-only notes with a source (ANALYZER, USER, AGENT). Write each ' +
     'one as a note of its own; never repeat an earlier one.',
+  "Tags are the user's and the machines' shared marks on a vacancy: neither `status` nor " +
+    '`recommendation`, and writing one moves neither. list_tags first, reuse an existing ' +
+    'name; a new name creates a tag. Send them as `tags` with an analysis, or through ' +
+    "tag_vacancies. Renaming, the tone and deleting are the user's, not a tool's.",
 ].join('\n\n');
 
 export interface ServerContext {
@@ -48,6 +58,7 @@ export interface ServerContext {
   vacancies?: VacancyService;
   applications?: ApplicationService;
   intake?: VacancyIntakeService;
+  tags?: TagService;
 }
 
 /** Builds the MCP server with all tools registered, without connecting a transport.
@@ -59,6 +70,7 @@ export function createServer({
   vacancies = new VacancyService(),
   applications = new ApplicationService(),
   intake = new VacancyIntakeService(),
+  tags = new TagService(),
 }: ServerContext): McpServer {
   const server = new McpServer(
     { name: 'job-search-copilot', version: '0.1.0' },
@@ -68,6 +80,7 @@ export function createServer({
   registerVacancyTools(server, vacancies, userId);
   registerApplicationTools(server, applications, userId);
   registerIntakeTools(server, intake, userId);
+  registerTagTools(server, tags, userId);
 
   return server;
 }

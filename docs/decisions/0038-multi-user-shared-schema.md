@@ -45,16 +45,16 @@ to `AUTH_ALLOWED_EMAILS`.
   `@ts-expect-error` lines, checked by `npm run typecheck` (`tsconfig.spec.json` — the
   build leaves specs out); `isolation.spec.ts` runs every public method as another user
   and checks the owner's rows are untouched.
-- `forUser` scopes `Vacancy`, `Comment` and `StatusChange` and throws on any other
-  model, so a relation read from one (`user.findUnique({ include: { vacancies } })`)
+- `forUser` scopes `Vacancy`, `Comment`, `StatusChange`, `Tag` and `VacancyTag` and throws
+  on any other model, so a relation read from one (`user.findUnique({ include: { vacancies } })`)
   cannot reach past it.
 - Ids stay sequential integers, so they hint at the total row count across users.
   Acceptable for allowlisted accounts.
 - Deleting a user deletes their vacancies, comments and journal.
 
 ## What this constrains — breaks if you change it
-- A query on `Vacancy`, `Comment` or `StatusChange` on the raw client (not `forUser`)
-  reads every user's rows. The guard is the `Unscoped` type: a service typed
+- A query on `Vacancy`, `Comment`, `StatusChange`, `Tag` or `VacancyTag` on the raw client
+  (not `forUser`) reads every user's rows. The guard is the `Unscoped` type: a service typed
   `PrismaClient` again compiles, and only the spec's `@ts-expect-error` lines notice. A
   new service gets its line there.
 - A model `forUser` scopes gains a new relation: a nested `create` through it is

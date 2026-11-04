@@ -33,6 +33,10 @@ export const RecordApplicationItemSchema = z.object({
     .boolean()
     .optional()
     .describe('True when the resume was tailored to this posting.'),
+  sentCoverLetter: z
+    .boolean()
+    .optional()
+    .describe('True when a cover letter went with the application.'),
   comment: z
     .string()
     .max(MAX_LENGTH.note)
@@ -54,8 +58,8 @@ export function toRecordInput({
   ...rest
 }: RecordApplicationItem): RecordApplicationInput {
   if (vacancyId != null && !company && !title) {
-    const { salaryInApplication, usedTailoredResume, comment, status } = rest;
-    return { vacancyId, salaryInApplication, usedTailoredResume, comment, status };
+    const { salaryInApplication, usedTailoredResume, sentCoverLetter, comment, status } = rest;
+    return { vacancyId, salaryInApplication, usedTailoredResume, sentCoverLetter, comment, status };
   }
   if (vacancyId == null && company && title) {
     return { company, title, ...rest };

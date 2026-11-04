@@ -42,8 +42,8 @@ an API key — [ADR-0035](decisions/0035-mcp-over-http-oauth-resource-server.md)
 [ADR-0039](decisions/0039-api-keys-per-user.md)).
 
 `apps/web` sits in an app shell, routed by `@tanstack/react-router`: `/` dashboard,
-`/vacancies`, `/vacancies/$id`, `/applications`, `/inbox`, `/profile`, plus `/login` and
-`/consent` (the OAuth consent page) ([ADR-0024](decisions/0024-web-shell-and-theme.md)).
+`/vacancies`, `/vacancies/$id`, `/applications`, `/inbox`, `/profile`, `/settings`, plus
+`/login` and `/consent` (the OAuth consent page) ([ADR-0024](decisions/0024-web-shell-and-theme.md)).
 
 Rationale for this split: [ADR-0001](decisions/0001-monorepo-npm-workspaces.md)
 (monorepo), [ADR-0002](decisions/0002-core-shared-domain-layer.md) (core as the
@@ -106,7 +106,7 @@ sibling folder.
 **A file is split by job, not by length**: one that holds several sections, its own
 data writes beside its markup, or a near-copy of a sibling. A page's sections are files
 beside it (`pages/vacancy/Header.tsx`, `Timeline.tsx`, …); its queries and mutations
-are a hook there (`useProfile.ts`). A large file of one uniform kind (`icons.tsx`,
+are a hook there (`useSettings.ts`). A large file of one uniform kind (`icons.tsx`,
 `router.tsx`) stays whole.
 
 **The UI is built from `components/ui`.** Markup starts from a primitive there, and a
@@ -153,7 +153,7 @@ apps/mcp  record_application { company, title, ... }
       → already in the pipeline? AlreadyAppliedError
       → writeStatus(APPLIED), then writeStatus(status) if recorded further along
         (each a StatusChange row + the status / statusChangedAt cache)
-      → set salary / tailored-CV flag; add the comment as a USER Comment
+      → set salary / tailored-CV and cover-letter flags; add the comment as a USER Comment
   → returns { application, resolution, vacancyCreated }   (the vacancy, as /applications reads it)
 ```
 
@@ -273,13 +273,15 @@ The load-bearing assumptions. Each links to the section or ADR that owns it.
     live in a separate private repo cloned into the gitignored `skills/`.
 11. **Every domain query is scoped to its user.** `Vacancy`
     has a `userId`; core's services take it as their first argument and query only
-    through `forUser(db, userId)`, which adds the owner to every `Vacancy`, `Comment`
-    and `StatusChange` query and throws on any other model. The services hold the raw
-    client as `Unscoped` (`$extends` only), so a query on it does not compile — one
-    would read every user's rows. Another user's row answers like a missing one (404,
-    never 403).
+    through `forUser(db, userId)`, which adds the owner to every `Vacancy`, `Comment`,
+    `StatusChange`, `Tag` and `VacancyTag` query and throws on any other model. The
+    services hold the raw client as `Unscoped` (`$extends` only), so a query on it does
+    not compile — one would read every user's rows. Another user's row answers like a
+    missing one (404, never 403). A tag link cannot cross users even past `forUser`: its
+    two foreign keys share one `userId`.
     → [ADR-0038](decisions/0038-multi-user-shared-schema.md),
-    [ADR-0039](decisions/0039-api-keys-per-user.md)
+    [ADR-0039](decisions/0039-api-keys-per-user.md),
+    [ADR-0042](decisions/0042-tags-written-by-anyone.md)
 12. **The web UI is built from `components/ui`; a page never imports another page.** A
     page's markup comes from the primitives there, which own their styles; no new
     component class goes into `index.css`. Nothing fails when a page styles a

@@ -2,12 +2,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { RequestHandler } from 'msw';
+import { HttpResponse, http, type RequestHandler } from 'msw';
 import { createElement } from 'react';
 import { toast } from 'sonner';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { routeTree } from '@/router';
-import { buildHandlers, type FakeVacancy, fakeVacancy, holdGet } from '@/test/msw/handlers';
+import {
+  API_URL,
+  buildHandlers,
+  type FakeVacancy,
+  fakeVacancy,
+  holdGet,
+} from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import {
   expectLoadedPage,
@@ -51,6 +57,7 @@ const applied = () =>
     fullText: 'We build things.',
     status: 'APPLIED',
     salaryInApplication: '150 PLN/h',
+    sentCoverLetter: true,
     timeline: [
       { status: 'NOT_REVIEWED', createdAt: '2026-09-01T00:00:00.000Z' },
       { status: 'APPLIED', createdAt: '2026-09-03T00:00:00.000Z' },
@@ -93,6 +100,7 @@ describe('VacancyPage', () => {
     const details = await card(/^details$/i);
     // What the user entered when applying, not necessarily the listing's figure.
     expect(details.getByText('150 PLN/h')).toBeInTheDocument();
+    expect(details.getByText('Cover letter sent').nextSibling).toHaveTextContent('Yes');
     expect(details.getByText('example.com')).toBeInTheDocument();
 
     // The company's others, this one left out.
@@ -104,6 +112,57 @@ describe('VacancyPage', () => {
       'href',
       '/vacancies/2',
     );
+  });
+
+  it('shows the tags in the header', async () => {
+    renderAt('/vacancies/1', [fakeVacancy({ tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] })]);
+
+    expect(
+      within(await screen.findByRole('list', { name: 'Tags' })).getByText('Remote'),
+    ).toBeInTheDocument();
+  });
+
+  it('adds a tag through the dialog, waits for the server, and removes it by its ×', async () => {
+    const rows = [fakeVacancy({ id: 1 })];
+    // In `first`: the fake `renderAt` builds knows no tag no row carries.
+    renderAt(
+      '/vacancies/1',
+      rows,
+      ...buildHandlers(rows, [{ id: 1, name: 'Remote', tone: 'GOOD' }]),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Add tag' }));
+    const modal = within(await screen.findByRole('dialog', { name: 'Add a tag' }));
+    await user.click(await modal.findByRole('button', { name: 'Remote' }));
+
+    const tags = within(await screen.findByRole('list', { name: 'Tags' }));
+    expect(tags.getByText('Remote')).toBeInTheDocument();
+    expect(rows[0].tags.map((tag) => tag.name)).toEqual(['Remote']);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add tag' })).toHaveFocus());
+
+    await user.click(tags.getByRole('button', { name: 'Remove tag Remote' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('list', { name: 'Tags' })).not.toBeInTheDocument(),
+    );
+    expect(rows[0].tags).toEqual([]);
+  });
+
+  it("quotes the server when it refuses a tag, and the header's tags stay", async () => {
+    const remote = { id: 1, name: 'Remote', tone: 'GOOD' } as const;
+    renderAt(
+      '/vacancies/1',
+      [fakeVacancy({ id: 1, tags: [remote] })],
+      http.post(`${API_URL}/vacancies/tags`, () =>
+        HttpResponse.json({ message: 'That vacancy is gone' }, { status: 404 }),
+      ),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove tag Remote' }));
+
+    expect(await screen.findByText('That vacancy is gone')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove tag Remote' })).toBeInTheDocument();
   });
 
   it('asks for the other vacancies by company, whatever its spelling (ADR-0032)', async () => {

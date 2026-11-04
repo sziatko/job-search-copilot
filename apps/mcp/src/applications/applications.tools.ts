@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { BATCH_MAX, PAGING_NOTE, pagination } from '../common/schemas';
 import { json, ref, toolError, withDomainErrors } from '../common/tool-result';
-import { VacancyStatusEnum } from '../vacancies/vacancies.schemas';
+import { TAGS_NOTE, VacancyStatusEnum } from '../vacancies/vacancies.schemas';
 import {
   PipelineStatusEnum,
   RecordApplicationItemSchema,
@@ -76,15 +76,18 @@ export function registerApplicationTools(
       description:
         'List the vacancies in the pipeline (APPLIED … REJECTED), the last status move ' +
         "first. `id` is the vacancy's id. Optional filters: `status`, one pipeline " +
-        'status; `search`, a single free-text term matched against company OR title; ' +
+        'status; `search`, a single free-text term matched against company OR title, or the ' +
+        'id when it is a number (`123`, `#123`); ' +
         'and/or `company` / `title`, matched independently — giving more than one of ' +
         '`search`/`company`/`title` narrows to rows matching all of them (AND), not any ' +
         'one (OR). Each is ILIKE %term%, case-insensitive. `applyUrl` finds the one ' +
         'application with that posting link — raw is fine, it is normalized as saved (a ' +
         'LinkedIn link from an email matches). Each item carries status, ' +
-        'statusChangedAt, appliedAt (null if the vacancy skipped APPLIED), salary / CV, ' +
-        'company / title / applyUrl / matchScore / recommendation, and `comments` — ' +
-        '[{ id, createdAt, body, source }], oldest first, source ANALYZER | USER | AGENT. ' +
+        'statusChangedAt, appliedAt (null if the vacancy skipped APPLIED), salary / CV / ' +
+        'cover letter, ' +
+        `company / title / applyUrl / matchScore / recommendation, ${TAGS_NOTE}, and ` +
+        '`comments` — [{ id, createdAt, body, source }], oldest first, source ANALYZER | ' +
+        'USER | AGENT. ' +
         PAGING_NOTE,
       inputSchema: {
         status: PipelineStatusEnum.optional(),
@@ -162,20 +165,22 @@ export function registerApplicationTools(
       description:
         'Correct the application form data of a vacancy: `salaryInApplication` (what the ' +
         "applicant entered in the form — not the posting's salary; a blank string clears " +
-        'it) and/or `usedTailoredResume`. A field left out is untouched. Moves no status ' +
-        'and adds no comment — use update_vacancy_status or add_comment. `id` is the ' +
+        'it), `usedTailoredResume`, `sentCoverLetter`. A field left out is untouched. Moves ' +
+        'no status and adds no comment — use update_vacancy_status or add_comment. `id` is the ' +
         'vacancy\'s (from list_applications); an unknown id reports "not found". Returns ' +
         '{ success: true, application: { id, company, title } }.',
       inputSchema: {
         id: z.number().int(),
         salaryInApplication: z.string().max(MAX_LENGTH.name).optional(),
         usedTailoredResume: z.boolean().optional(),
+        sentCoverLetter: z.boolean().optional(),
       },
     },
-    withDomainErrors(async ({ id, salaryInApplication, usedTailoredResume }) => {
+    withDomainErrors(async ({ id, salaryInApplication, usedTailoredResume, sentCoverLetter }) => {
       const application = await applications.update(userId, id, {
         salaryInApplication,
         usedTailoredResume,
+        sentCoverLetter,
       });
       return json({ success: true, application: ref(application) });
     }),

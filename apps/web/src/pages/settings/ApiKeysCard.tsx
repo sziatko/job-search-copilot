@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHead, CardTitle } from '@/components/ui/Card';
 import { Input, Label } from '@/components/ui/Field';
-import { useApiKeys } from './useProfile';
+import { useApiKeys } from './useSettings';
 
 /**
  * The signed-in user's API keys, for n8n and MCP (ADR-0039): each acts as this user.

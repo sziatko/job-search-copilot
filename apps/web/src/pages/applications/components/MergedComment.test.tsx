@@ -46,6 +46,35 @@ describe('MergedComment', () => {
     );
   });
 
+  it("bolds the analyzer's markers, and leaves a user's as typed", () => {
+    const { container } = render(
+      <MergedComment
+        comments={[
+          comment(1, '2026-09-10T10:00:00Z', '**Stack: 85%**', 'ANALYZER'),
+          comment(2, '2026-09-12T10:00:00Z', '**My note**', 'USER'),
+        ]}
+      />,
+    );
+
+    expect([...container.querySelectorAll('strong')].map((el) => el.textContent)).toEqual([
+      'Stack: 85%',
+    ]);
+    expect(partsOf(container)).toEqual([
+      ['ANALYZER', 'Sep 10: Stack: 85%'],
+      ['USER', 'Sep 12: **My note**'],
+    ]);
+  });
+
+  it('keeps the line breaks inside a comment', () => {
+    render(
+      <MergedComment comments={[comment(1, '2026-09-14T10:00:00Z', 'First\nSecond', 'USER')]} />,
+    );
+
+    const part = screen.getByText(/first/i);
+    expect(part.textContent).toBe('Sep 14: First\nSecond');
+    expect(part.parentElement?.parentElement).toHaveClass('whitespace-pre-line');
+  });
+
   it('renders a lone comment with no separator', () => {
     const { container } = render(
       <MergedComment comments={[comment(1, '2026-09-14T10:00:00Z', 'Only one', 'USER')]} />,

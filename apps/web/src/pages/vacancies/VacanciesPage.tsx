@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListCount, ListFrame } from '@/components/ui/ListFrame';
 import { View } from '@/components/ui/View';
+import { AddTagModal } from '@/components/vacancies/AddTagModal';
 import { ApplyDialog } from '@/components/vacancies/ApplyDialog';
 import { CompanyHistoryModal } from '@/components/vacancies/CompanyHistoryModal';
 import { ConfirmDialog } from '@/components/vacancies/ConfirmDialog';
@@ -25,15 +26,20 @@ export function VacanciesPage() {
     pendingDecline,
     pendingSave,
     pendingApply,
+    pendingTag,
     statusFilter,
     setStatusFilter,
     requestActionChange,
+    requestAddTag,
+    removeTag,
+    confirmAddTag,
     confirmDecline,
     confirmSave,
     confirmApply,
     cancelDecline,
     cancelSave,
     cancelApply,
+    cancelAddTag,
   } = useVacancies();
 
   // Which company's history is open, if any — and which of its rows was clicked,
@@ -76,6 +82,8 @@ export function VacanciesPage() {
             rowErrors={rowErrors}
             onActionChange={requestActionChange}
             onShowCompanyHistory={(company, vacancyId) => setCompanyHistory({ company, vacancyId })}
+            onAddTag={requestAddTag}
+            onRemoveTag={removeTag}
           />
         )}
       </ListFrame>
@@ -112,6 +120,10 @@ export function VacanciesPage() {
           context={STATUS_CONTEXT.vacancies.options}
           onClose={() => setSearching(false)}
         />
+      )}
+
+      {pendingTag && (
+        <AddTagModal assigned={pendingTag.tags} onAdd={confirmAddTag} onClose={cancelAddTag} />
       )}
 
       {pendingApply && (

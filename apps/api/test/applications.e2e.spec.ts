@@ -64,6 +64,7 @@ describe('Applications (e2e)', () => {
           vacancyId,
           salaryInApplication: '150 PLN/h',
           usedTailoredResume: true,
+          sentCoverLetter: true,
           comment: 'Adapted CV.',
         })
         .expect(201);
@@ -73,6 +74,7 @@ describe('Applications (e2e)', () => {
       expect(res.body.application.company).toBe('Acme');
       expect(res.body.application.matchScore).toBe(80);
       expect(res.body.application.salaryInApplication).toBe('150 PLN/h');
+      expect(res.body.application.sentCoverLetter).toBe(true);
       expect(res.body.application.id).toBe(vacancyId);
       expect(res.body.application.appliedAt).toBe(res.body.application.statusChangedAt);
       expect(notes(res.body.application)).toEqual([ANALYZED, ['USER', 'Adapted CV.']]);
@@ -266,15 +268,22 @@ describe('Applications (e2e)', () => {
 
       const res = await api
         .patch(`/api/v1/applications/${id}`)
-        .send({ usedTailoredResume: true, comment: 'New', status: 'OFFER' })
+        .send({ usedTailoredResume: true, sentCoverLetter: true, comment: 'New', status: 'OFFER' })
         .expect(200);
       expect(res.body).toMatchObject({
         salaryInApplication: '100 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         // not a field of this DTO — stripped by whitelist, so the status stays
         status: 'APPLIED',
       });
       expect(notes(res.body)).toEqual([ANALYZED, ['USER', 'Old'], ['USER', 'New']]);
+    });
+
+    it('400s on a flag sent as null: it has no empty value to clear to', async () => {
+      const id = await recordOne();
+      await api.patch(`/api/v1/applications/${id}`).send({ usedTailoredResume: null }).expect(400);
+      await api.patch(`/api/v1/applications/${id}`).send({ sentCoverLetter: null }).expect(400);
     });
 
     it('clears a field sent as null', async () => {
@@ -290,6 +299,7 @@ describe('Applications (e2e)', () => {
       await api.patch('/api/v1/applications/999999').send({ comment: 'x' }).expect(404);
       const id = await recordOne();
       await api.patch(`/api/v1/applications/${id}`).send({ usedTailoredResume: 'yes' }).expect(400);
+      await api.patch(`/api/v1/applications/${id}`).send({ sentCoverLetter: 'yes' }).expect(400);
     });
   });
 });

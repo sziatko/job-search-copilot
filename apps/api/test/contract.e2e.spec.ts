@@ -10,6 +10,7 @@ import {
   recordApplicationResponseSchema,
 } from '@/lib/applications/types';
 import { statsSchema } from '@/lib/stats/types';
+import { tagListSchema, tagRefSchema } from '@/lib/tags/types';
 import {
   vacancyDetailSchema,
   vacancyListItemSchema,
@@ -131,6 +132,46 @@ describe('Web↔API contract (e2e)', () => {
     }
   });
 
+  // Review focus 7: the row is replaced by this answer, so without `tags` it loses its chips.
+  it('PATCH /vacancies/:id/status: carries the tags', async () => {
+    await api
+      .post('/api/v1/vacancies/tags')
+      .send({ items: [{ vacancyId: full, add: ['Remote'] }] })
+      .expect(204);
+
+    const res = await api
+      .patch(`/api/v1/vacancies/${full}/status`)
+      .send({ status: 'SAVED_FOR_LATER' })
+      .expect(200);
+
+    expect(vacancyListItemSchema.parse(res.body).tags).toEqual([
+      { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' },
+    ]);
+  });
+
+  it('GET, POST and PATCH /tags: their schemas', async () => {
+    const created = await api
+      .post('/api/v1/tags')
+      .send({ name: 'On-site', tone: 'WARN' })
+      .expect(201);
+    expect(tagRefSchema.parse(created.body).tone).toBe('WARN');
+
+    const list = await api.get('/api/v1/tags').expect(200);
+    expect(tagListSchema.parse(list.body)).toEqual([
+      { id: created.body.id, name: 'On-site', tone: 'WARN', vacancyCount: 0 },
+    ]);
+
+    const updated = await api
+      .patch(`/api/v1/tags/${created.body.id}`)
+      .send({ name: 'Onsite', tone: 'BAD' })
+      .expect(200);
+    expect(tagRefSchema.parse(updated.body)).toEqual({
+      id: created.body.id,
+      name: 'Onsite',
+      tone: 'BAD',
+    });
+  });
+
   it('the applications endpoints and /stats: their schemas', async () => {
     // An analysed one in APPLIED, an unanalysed one set straight past it (no appliedAt).
     const recorded = await api
@@ -168,9 +209,14 @@ describe('Web↔API contract (e2e)', () => {
     applicationListItemSchema.parse(moved.body);
     const edited = await api
       .patch(`/api/v1/applications/${full}`)
-      .send({ salaryInApplication: null, usedTailoredResume: true, comment: 'Edited.' })
+      .send({
+        salaryInApplication: null,
+        usedTailoredResume: true,
+        sentCoverLetter: true,
+        comment: 'Edited.',
+      })
       .expect(200);
-    applicationListItemSchema.parse(edited.body);
+    expect(applicationListItemSchema.parse(edited.body).sentCoverLetter).toBe(true);
 
     const stats = await api.get('/api/v1/stats').expect(200);
     expect(statsSchema.parse(stats.body).recent.length).toBeGreaterThan(0);

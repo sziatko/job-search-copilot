@@ -2,6 +2,8 @@ import {
   AlreadyAnalysedError,
   DomainError,
   RateLimitedError,
+  TagNameTakenError,
+  TagNotFoundError,
   VacancyNotFoundError,
 } from '@job-search-copilot/core';
 import {
@@ -17,6 +19,8 @@ import type { Response } from 'express';
 const STATUS_OF = new Map<unknown, HttpStatus>([
   [AlreadyAnalysedError, HttpStatus.CONFLICT],
   [VacancyNotFoundError, HttpStatus.NOT_FOUND],
+  [TagNotFoundError, HttpStatus.NOT_FOUND],
+  [TagNameTakenError, HttpStatus.CONFLICT],
   // Thrown by ApiKeyGuard's verifyApiKey: filters catch a guard's exceptions too.
   [RateLimitedError, HttpStatus.TOO_MANY_REQUESTS],
 ]);

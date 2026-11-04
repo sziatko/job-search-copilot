@@ -1,13 +1,14 @@
 import { DetailsLink } from '@/components/ui/DetailsLink';
 import { ScorePill } from '@/components/ui/ScorePill';
 import { type Column, Table } from '@/components/ui/Table';
-import { DateCell, RoleMeta, RoleTitle } from '@/components/ui/TableCells';
+import { ApplyFlagsCell, DateCell, RoleMeta, RoleTitle } from '@/components/ui/TableCells';
 import { Tag } from '@/components/ui/Tag';
 import { daysSinceLastMove } from '@/lib/applications/constants';
 import type { ApplicationListItem } from '@/lib/applications/types';
 import type { VacancyListItem } from '@/lib/vacancies/types';
 import { CopyVacancyButton } from './CopyVacancyButton';
 import { StatusTag } from './StatusTag';
+import { VacancyTags } from './VacancyTags';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 
@@ -21,8 +22,8 @@ export function countLine(shown: number, total: number) {
 
 /**
  * The vacancy rows of a modal — the company modal's and the search modal's: date (with
- * /applications' ⏳), vacancy, score, status, CV, Copy / Details (in a new tab: a modal's
- * context would be lost to an in-place navigation).
+ * /applications' ⏳), vacancy, score, status, CV / CL, Copy / Details (in a new tab: a
+ * modal's context would be lost to an in-place navigation).
  */
 export function ModalVacancyTable({
   items,
@@ -31,7 +32,7 @@ export function ModalVacancyTable({
   currentId,
 }: {
   items: readonly VacancyListItem[];
-  /** The pipeline rows among `items`, for the ⏳ mark and the CV column — joined by id. */
+  /** The pipeline rows among `items`, for the ⏳ mark and the CV / CL column — joined by id. */
   applications: readonly ApplicationListItem[] | undefined;
   loading: boolean;
   /** The row to mark Current and scroll to — the one whose button opened the modal. */
@@ -65,6 +66,7 @@ export function ModalVacancyTable({
             </Tag>
           )}
           <RoleMeta company={item.company} id={item.id} />
+          <VacancyTags tags={item.tags} dense />
         </>
       ),
     },
@@ -74,14 +76,18 @@ export function ModalVacancyTable({
       cell: (item) => <ScorePill score={item.hasAnalysis ? item.matchScore : null} />,
     },
     { header: 'Status', cell: (item) => <StatusTag status={item.status} /> },
-    // /applications' CV column; a row never applied to has no CV.
+    // /applications' CV / CL column; a row never applied to has neither.
     {
-      header: 'CV',
-      cell: (item) => (
-        <div className="text-small text-ink-muted">
-          {applicationsByVacancy.get(item.id)?.usedTailoredResume ? '✓' : '—'}
-        </div>
-      ),
+      header: 'CV / CL',
+      cell: (item) => {
+        const application = applicationsByVacancy.get(item.id);
+        return (
+          <ApplyFlagsCell
+            resume={application?.usedTailoredResume}
+            letter={application?.sentCoverLetter}
+          />
+        );
+      },
     },
     {
       header: 'Actions',

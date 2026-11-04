@@ -11,6 +11,7 @@ import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { InboxPage, inboxTabSchema } from './pages/inbox/InboxPage';
 import { LoginPage } from './pages/login/LoginPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
+import { SettingsPage } from './pages/settings/SettingsPage';
 import { VacanciesPage } from './pages/vacancies/VacanciesPage';
 import { VacancyPage } from './pages/vacancy/VacancyPage';
 
@@ -89,6 +90,11 @@ const PROFILE_META: RouteMeta = {
   rail: false,
 };
 
+const SETTINGS_META: RouteMeta = {
+  title: 'Settings',
+  rail: false,
+};
+
 const indexRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/',
@@ -148,6 +154,13 @@ const profileRoute = createRoute({
   staticData: PROFILE_META,
 });
 
+const settingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/settings',
+  component: SettingsPage,
+  staticData: SETTINGS_META,
+});
+
 // The /applications status filter. Parsed / validated by zod on every navigation —
 // see the note above on why it is lenient.
 const applicationsSearchSchema = z.object({
@@ -171,6 +184,7 @@ export const routeTree = rootRoute.addChildren([
     applicationsRoute,
     inboxRoute,
     profileRoute,
+    settingsRoute,
   ]),
   loginRoute,
   consentRoute,

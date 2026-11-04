@@ -27,6 +27,7 @@ export function ApplyDialog({
   const [usedTailoredResume, setUsedTailoredResume] = useState(
     initial?.usedTailoredResume ?? false,
   );
+  const [sentCoverLetter, setSentCoverLetter] = useState(initial?.sentCoverLetter ?? false);
   const [comment, setComment] = useState('');
   const salaryId = useId();
   const commentId = useId();
@@ -34,13 +35,13 @@ export function ApplyDialog({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onConfirm({ salary, usedTailoredResume, comment });
+    onConfirm({ salary, usedTailoredResume, sentCoverLetter, comment });
   }
 
   function handleTextareaKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onConfirm({ salary, usedTailoredResume, comment });
+      onConfirm({ salary, usedTailoredResume, sentCoverLetter, comment });
     }
   }
 
@@ -68,6 +69,12 @@ export function ApplyDialog({
             label="Used a tailored resume"
             checked={usedTailoredResume}
             onChange={(e) => setUsedTailoredResume(e.target.checked)}
+          />
+
+          <Checkbox
+            label="Sent a cover letter"
+            checked={sentCoverLetter}
+            onChange={(e) => setSentCoverLetter(e.target.checked)}
           />
 
           <div>

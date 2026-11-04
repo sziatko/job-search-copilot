@@ -38,6 +38,16 @@ afterAll(() => {
 const LONG = 'A very long analysis comment '.repeat(5);
 
 describe('ExpandableText', () => {
+  it('keeps line breaks both clamped and expanded', () => {
+    render(<ExpandableText>{`First line\n${LONG}`}</ExpandableText>);
+    const block = screen.getByText(/first line/i);
+    expect(block).toHaveClass('whitespace-pre-line', 'line-clamp-2');
+
+    fireEvent.click(screen.getByRole('button', { name: /show more/i }));
+    expect(block).toHaveClass('whitespace-pre-line');
+    expect(block).not.toHaveClass('line-clamp-2');
+  });
+
   it('shows no control when the text fits', () => {
     render(<ExpandableText>short</ExpandableText>);
     expect(screen.queryByRole('button')).toBeNull();

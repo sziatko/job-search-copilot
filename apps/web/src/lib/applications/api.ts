@@ -24,7 +24,7 @@ export type ApplicationPage = CursorPage<ApplicationListItem>;
 export async function listApplicationsPage(
   params: {
     filter?: ApplicationStatusFilter;
-    /** Free text over company OR title. */
+    /** Free text over company OR title, or an id (`123`, `#123`). */
     search?: string;
     /** This name's company, whatever its spelling (ADR-0032) — the company modal. */
     sameCompanyAs?: string;

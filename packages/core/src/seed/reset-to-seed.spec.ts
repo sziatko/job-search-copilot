@@ -4,7 +4,7 @@ import { createUser } from '../../tests/user';
 import { ApplicationService } from '../applications/application.service';
 import { createPrismaClient, getPrisma } from '../db/prisma-client';
 import { OPEN_PIPELINE_STATUSES } from '../domain/status';
-import { SEED_VACANCIES } from './data';
+import { SEED_TAGS, SEED_VACANCIES } from './data';
 import { resetToSeed } from './reset-to-seed';
 
 const prisma = getPrisma();
@@ -35,6 +35,32 @@ async function counts() {
 }
 
 describe('resetToSeed', () => {
+  it("deletes the user's tags and leaves another user's", async () => {
+    const other = await createUser();
+    const tag = { name: 'Leftover', nameKey: 'leftover' };
+    await prisma.tag.createMany({ data: [userId, other].map((id) => ({ ...tag, userId: id })) });
+
+    await resetToSeed(prisma, userId);
+
+    const seeded = await prisma.tag.findMany({ where: { userId }, select: { name: true } });
+    expect(seeded.map((row) => row.name).sort()).toEqual(SEED_TAGS.map((t) => t.name).sort());
+    expect(await prisma.tag.count({ where: { userId: other } })).toBe(1);
+  }, 120_000);
+
+  it('gives every tone a vacancy, as the seed says', async () => {
+    await resetToSeed(prisma, userId);
+
+    const tags = await prisma.tag.findMany({
+      where: { userId },
+      select: { tone: true, _count: { select: { vacancies: true } } },
+    });
+    expect(new Set(tags.map((tag) => tag.tone)).size).toBe(5);
+    for (const tag of tags) expect(tag._count.vacancies).toBeGreaterThan(0);
+    expect(await prisma.vacancyTag.count({ where: { userId } })).toBe(
+      SEED_VACANCIES.flatMap((v) => v.tags).length,
+    );
+  }, 120_000);
+
   it("makes the user's data the seed, the same on a second run", async () => {
     await prisma.vacancy.create({
       data: {

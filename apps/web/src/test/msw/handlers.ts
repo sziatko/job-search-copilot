@@ -5,6 +5,7 @@ import {
   type UpdateApplicationInput,
 } from '@/lib/applications/types';
 import type { Stats } from '@/lib/stats/types';
+import { type TagRef, type TagTone, tagKey } from '@/lib/tags/types';
 import type { VacancyDetail, VacancyListItem, VacancyStatus } from '@/lib/vacancies/types';
 
 export const API_URL = 'http://localhost:3000/api/v1';
@@ -20,7 +21,12 @@ const RECOMMENDATION_RANK = { APPLY: 0, APPLY_WITH_CAVEATS: 1, SKIP: 2, null: 3 
 export type FakeVacancy = VacancyListItem &
   Pick<
     ApplicationListItem,
-    'statusChangedAt' | 'appliedAt' | 'comments' | 'salaryInApplication' | 'usedTailoredResume'
+    | 'statusChangedAt'
+    | 'appliedAt'
+    | 'comments'
+    | 'salaryInApplication'
+    | 'usedTailoredResume'
+    | 'sentCoverLetter'
   > &
   // Only GET /vacancies/:id reads these; `asDetail` fills them when a test does not.
   Partial<Pick<VacancyDetail, 'fullText' | 'timeline'>>;
@@ -37,11 +43,13 @@ export function fakeVacancy(overrides: Partial<FakeVacancy> = {}): FakeVacancy {
     recommendation: 'APPLY',
     estimationComment: 'Strong match.',
     status: 'NOT_REVIEWED',
+    tags: [],
     statusChangedAt: '2026-09-01T00:00:00.000Z',
     appliedAt: null,
     comments: [],
     salaryInApplication: null,
     usedTailoredResume: false,
+    sentCoverLetter: false,
     ...overrides,
   };
 }
@@ -153,7 +161,8 @@ export function vacanciesResolver(rows: FakeVacancy[]) {
       // without this the modal's tests would pass while doing nothing.
       (!search ||
         row.company.toLowerCase().includes(search.toLowerCase()) ||
-        row.title.toLowerCase().includes(search.toLowerCase()));
+        row.title.toLowerCase().includes(search.toLowerCase()) ||
+        row.id === Number(search.replace(/^#/, '')));
     // The cursor is a place in the whole order, not in the filtered rows: a cursor row
     // that has since left the filter still marks where the next page starts, as it
     // does on the server.
@@ -204,10 +213,79 @@ export function holdGet(path: string, when: (url: URL) => boolean = () => true) 
 
 /** Builds handlers backed by one mutable in-memory table, mirroring what the real API
  * does closely enough for the pages' own logic to be tested against — a fake server,
- * not a fake fetch. Both pages' endpoints read and write the same `rows`. */
-export function buildHandlers(rows: FakeVacancy[]) {
+ * not a fake fetch. Both pages' endpoints read and write the same `rows`. The tag table is
+ * `tags` plus what the rows carry. */
+export function buildHandlers(rows: FakeVacancy[], tags: TagRef[] = []) {
   const find = (id: unknown) => rows.find((row) => row.id === Number(id));
+  const tagTable = new Map([...tags, ...rows.flatMap((row) => row.tags)].map((t) => [t.id, t]));
+  const findTag = (name: string) =>
+    [...tagTable.values()].find((tag) => tagKey(tag.name) === tagKey(name));
+  const addTag = (name: string, tone: TagTone) => {
+    const tag = { id: Math.max(1000, ...tagTable.keys()) + 1, name: name.trim(), tone };
+    tagTable.set(tag.id, tag);
+    return tag;
+  };
   return [
+    http.get(`${API_URL}/tags`, () =>
+      HttpResponse.json(
+        [...tagTable.values()]
+          .sort((a, b) => tagKey(a.name).localeCompare(tagKey(b.name)))
+          .map((tag) => ({
+            ...tag,
+            vacancyCount: rows.filter((row) => row.tags.some(({ id }) => id === tag.id)).length,
+          })),
+      ),
+    ),
+    http.post(`${API_URL}/tags`, async ({ request }) => {
+      const { name, tone } = (await request.json()) as { name: string; tone: TagTone };
+      if (findTag(name)) {
+        return HttpResponse.json({ message: `A tag "${name}" already exists` }, { status: 409 });
+      }
+      return HttpResponse.json(addTag(name, tone), { status: 201 });
+    }),
+    http.patch(`${API_URL}/tags/:id`, async ({ params, request }) => {
+      const id = Number(params.id);
+      if (!tagTable.has(id)) {
+        return HttpResponse.json({ message: `Tag ${id} not found` }, { status: 404 });
+      }
+      const { name, tone } = (await request.json()) as { name: string; tone: TagTone };
+      const taken = findTag(name);
+      if (taken && taken.id !== id) {
+        return HttpResponse.json({ message: `Tag "${name}" already exists` }, { status: 409 });
+      }
+      const updated = { id, name: name.trim(), tone };
+      tagTable.set(id, updated);
+      for (const row of rows) {
+        row.tags = row.tags.map((tag) => (tag.id === id ? updated : tag));
+      }
+      return HttpResponse.json(updated);
+    }),
+    http.delete(`${API_URL}/tags/:id`, ({ params }) => {
+      const id = Number(params.id);
+      if (!tagTable.delete(id)) {
+        return HttpResponse.json({ message: `Tag ${id} not found` }, { status: 404 });
+      }
+      for (const row of rows) {
+        row.tags = row.tags.filter((tag) => tag.id !== id);
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post(`${API_URL}/vacancies/tags`, async ({ request }) => {
+      const { items } = (await request.json()) as {
+        items: { vacancyId: number; add?: string[]; remove?: string[] }[];
+      };
+      for (const { vacancyId, add = [], remove = [] } of items) {
+        const row = find(vacancyId);
+        if (!row) return HttpResponse.json({ message: 'Vacancy not found' }, { status: 404 });
+        const gone = remove.map(tagKey);
+        const kept = row.tags.filter((tag) => !gone.includes(tagKey(tag.name)));
+        const added = add
+          .map((name) => findTag(name) ?? addTag(name, 'NEUTRAL'))
+          .filter((tag) => !kept.some(({ id }) => id === tag.id));
+        row.tags = [...kept, ...added].sort((a, b) => tagKey(a.name).localeCompare(tagKey(b.name)));
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
     http.get(`${API_URL}/vacancies`, vacanciesResolver(rows)),
     http.get(`${API_URL}/vacancies/:id`, ({ params }) => {
       const row = find(params.id);
@@ -230,6 +308,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
         vacancyId: number;
         salaryInApplication?: string;
         usedTailoredResume?: boolean;
+        sentCoverLetter?: boolean;
         comment?: string;
       };
       const row = find(body.vacancyId);
@@ -245,6 +324,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
       moveTo(row, 'APPLIED');
       row.salaryInApplication = body.salaryInApplication?.trim() || null;
       row.usedTailoredResume = body.usedTailoredResume ?? false;
+      row.sentCoverLetter = body.sentCoverLetter ?? false;
       addComment(row, body.comment);
       return HttpResponse.json({
         application: asApplication(row),
@@ -273,7 +353,8 @@ export function buildHandlers(rows: FakeVacancy[]) {
             : row.status !== 'REJECTED' && row.status !== 'OFFER' && !isTimedOut(row))) &&
         (!search ||
           row.company.toLowerCase().includes(search) ||
-          row.title.toLowerCase().includes(search));
+          row.title.toLowerCase().includes(search) ||
+          row.id === Number(search.replace(/^#/, '')));
       const sorted = [...rows].sort(
         (a, b) =>
           new Date(b.statusChangedAt).getTime() - new Date(a.statusChangedAt).getTime() ||
@@ -314,6 +395,7 @@ export function buildHandlers(rows: FakeVacancy[]) {
         value === undefined ? current : value?.trim() || null;
       row.salaryInApplication = text(body.salaryInApplication, row.salaryInApplication);
       row.usedTailoredResume = body.usedTailoredResume ?? row.usedTailoredResume;
+      row.sentCoverLetter = body.sentCoverLetter ?? row.sentCoverLetter;
       addComment(row, body.comment);
       return HttpResponse.json(asApplication(row));
     }),

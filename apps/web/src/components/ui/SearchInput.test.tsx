@@ -15,7 +15,7 @@ describe('SearchInput', () => {
     const onChange = vi.fn();
     render(<SearchInput value="" onChange={onChange} />);
 
-    await user.type(screen.getByRole('searchbox', { name: 'Search company or role' }), 'acme');
+    await user.type(screen.getByRole('searchbox', { name: 'Search company, role or #id' }), 'acme');
     expect(onChange).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(200);

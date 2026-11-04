@@ -38,6 +38,7 @@ describe('router', () => {
     expect(screen.getByRole('link', { name: /application tracker/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^dashboard$/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^inbox$/i })).toHaveAttribute('href', '/inbox');
+    expect(screen.getByRole('link', { name: /^settings$/i })).toHaveAttribute('href', '/settings');
   });
 
   it('shows the brand logo in the sidebar', async () => {
@@ -85,7 +86,7 @@ describe('router', () => {
       // Neither row matches the old term, so a page still filtering on it lists nothing.
       expect(await screen.findByText(company)).toBeInTheDocument();
       expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
-      expect(screen.queryByPlaceholderText(/search company or role/i)).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/search company, role or #id/i)).not.toBeInTheDocument();
       expect(asked.length).toBeGreaterThan(0);
       expect(asked.every((query) => !query.has('search'))).toBe(true);
     } finally {

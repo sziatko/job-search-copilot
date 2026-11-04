@@ -16,9 +16,9 @@ data only: the e2e seed, reset nightly by `resetToSeed`.
 
 ### `/profile` page
 
-Only the Passkeys and API keys cards are real; the rest is a `ComingSoon` panel. Needs a
-candidate-profile store, where the master resumes would live ([Tailor a resume from the
-vacancy page](#tailor-a-resume-from-the-vacancy-page)).
+The candidate profile is a `ComingSoon` panel there. It needs a store, where the master
+resumes would live ([Tailor a resume from the vacancy
+page](#tailor-a-resume-from-the-vacancy-page)).
 
 ### Tailor a resume from the vacancy page
 
@@ -79,10 +79,8 @@ similar title or text (`pg_trgm` `similarity()` is installed), the analyzer read
 and decides whether it is the same offer. Today it already notices some and writes a
 "duplicate" comment, nothing more. Wanted: the analyzer does not skip a duplicate on its
 own — the user picks which one to apply through (LinkedIn over justjoin.it, say). It
-scores the posting as usual and marks it with a tag "duplicate of #id" ([Tags on
-vacancies](#tags-on-vacancies)), the comment saying the other one's status (applied,
-rejected, not yet acted on); the user skips it. That makes the analyzer a tag writer,
-which [Tags on vacancies](#tags-on-vacancies) rules out today — decide there. Open: when
+scores the posting as usual and marks it with a tag "duplicate of #id", the comment saying
+the other one's status (applied, rejected, not yet acted on); the user skips it. Open: when
 the other one is already applied to, is a `SKIP` from the analyzer fine after all?
 Optional, if exact copies dominate: a hash of the normalised `fullText` in an indexed
 column, which intake can treat as a sure duplicate — only when the text arrives, and
@@ -109,14 +107,6 @@ A range for the date and the score, checkboxes for the recommendation and the st
 take one `recommendation` and no ranges today, so the API grows too. It would join the
 controls of `SearchModal`.
 
-### Search by vacancy id
-
-The lists are too long to scroll for one vacancy. Pasting an id into the search finds it
-at once. Today `search` matches company and title only (`textFilters` in
-`packages/core/src/db/like.ts`); a term that is a whole number (maybe `#123` too) also
-matches `id` exactly. `textFilters` serves both the vacancies and the applications
-lists, so `SearchModal` gets it on both.
-
 ### Sort by column
 
 A click on a column header sorts by it, a second click flips the direction. Wanted
@@ -127,28 +117,11 @@ knows only `newest` and `recommended`, so the API takes a sort key and a directi
 default stays as it is. Overlaps [Filters per column](#filters-per-column-in-a-modal)
 above; keyset paging (Improvements) needs each new sort key to page correctly.
 
-### Tags on vacancies
+### Filter by tag, and a tag with a date
 
-The user's own marks ("waiting for a reply", "asked a recruiter", anything): free labels
-beside the two axes, never set by the analyzer or a machine move (invariant 3). A `Tag`
-per user (name, a colour from a fixed set of tokens) and a vacancy–tag link table, both
-through `forUser` (invariant 11). The web: chips under the company / title in the lists
-and on the vacancy page, × on a chip removes it; an "Add tag" button opens a modal —
-search the user's tags, pick one, or create one by typing a new name. Options to weigh:
-rename / delete a tag (a list in `/profile`); filter a list by tag (joins [Filters per
-column](#filters-per-column-in-a-modal)); a tag with an optional date ("chase on 3
-Nov"), shown on the dashboard when due; MCP tools to tag, so a skill can mark "waiting
-for a reply" after an email.
-
-### "Sent a cover letter" on an application
-
-A checkbox in `ApplyDialog`, beside "Used a tailored resume" and built the same way: its
-own boolean on `Vacancy` next to `usedTailoredResume` (a migration, default `false`),
-through `core`'s application inputs, the REST DTOs, the web's zod schemas and the MCP's
-`record_application` / `update_application`. Shown where the resume flag is: a fact in
-`Facts.tsx`, a mark in `ApplicationsTable`. The dialog also edits an application, so the
-flag can be set later. A skill that records applications gets the new field and a
-re-upload.
+Tags exist ([ADR-0042](decisions/0042-tags-written-by-anyone.md)); two uses are not built.
+Filter a list by tag, which joins [Filters per column](#filters-per-column-in-a-modal). A tag
+with an optional date ("chase on 3 Nov"), shown on the dashboard when due.
 
 ### Live updates over WebSocket
 
@@ -176,13 +149,27 @@ also answer [`core` dev-loop friction](#core-dev-loop-friction) below.
 
 ## Improvements and fixes
 
-### Line breaks in a list's comment cell
+### Odd input is a 500 on REST
 
-First in the next phase. The analysis comment is several lines (flags first, then a line
-per score area), and the vacancy page keeps them (`whitespace-pre-line` in
-`Comments.tsx`), but `ExpandableText` in `components/ui` collapses them: in the lists
-the expanded comment is one block. The same class on its text block fixes it; check the
-two-line clamp still detects overflow.
+Found by the review of phase 9.1, each answers a 500 where a 400 or a 404 belongs. A path id
+past Int4, on every `ParseIntPipe` route. `id` in `POST /vacancies/analysis`, which has no
+`@Max` as `vacancyId` in `tag-vacancies.dto.ts` has. A NUL character (`\u0000`) in any free
+string, tag names and `company` alike: Postgres refuses it. And `[[{…}]]` passes
+`@ValidateNested({ each: true })` with every field unread: `TagVacanciesDto` adds
+`@IsObject({ each: true })`, the other nested DTOs do not. No data is at risk.
+
+### A rejected item in `save_vacancies_batch`
+
+Its error does not say which item stopped the batch, so the caller sends all of it again,
+every `fullText` included; that is safe by `applyUrl`, only costly. Checking the names at the
+top of `saveMany` would stop a bad name before anything is written. A resend also misses the
+first row when `applyUrl` is not http (`z.url()` takes `mailto:`): `save()` keys such a row on
+a `tracker://` URL with the date in it, so past UTC midnight it makes a second vacancy.
+
+### Focus after removing a tag by keyboard
+
+× on a chip removes the button that had the focus, and it falls to `body`, so a keyboard user
+starts the page again. It belongs on the next chip, or on `Add tag`.
 
 ### Security leftovers
 

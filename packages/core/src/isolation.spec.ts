@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createUser } from '../tests/user';
 import { ApplicationService } from './applications/application.service';
 import { getPrisma } from './db/prisma-client';
-import { VacancyNotFoundError } from './domain/errors';
+import { TagNotFoundError, VacancyNotFoundError } from './domain/errors';
 import { VacancyIntakeService } from './intake/vacancy-intake.service';
 import { StatsService } from './stats/stats.service';
+import { TagService } from './tags/tag.service';
 import { VacancyService } from './vacancies/vacancy.service';
 import type { SaveVacancyInput } from './vacancies/vacancy.types';
 
@@ -15,6 +16,7 @@ const vacancies = new VacancyService();
 const applications = new ApplicationService();
 const intake = new VacancyIntakeService();
 const stats = new StatsService();
+const tags = new TagService();
 
 const analysis = { matchScore: 80, recommendation: 'APPLY', estimationComment: 'Good.' };
 
@@ -26,14 +28,16 @@ let a: string;
 let b: string;
 /** A's vacancies: one NEW (intake), one analysed, one applied to. */
 const ids = { queued: 0, analysed: 0, applied: 0 };
+/** A's tag, on the analysed vacancy. */
+let aTag = 0;
 const QUEUED_URL = 'https://example.com/a/queued';
 const ANALYSED_URL = 'https://example.com/a/analysed';
 
-/** Everything A owns, comments and journal included. */
+/** Everything A owns, comments, journal and tags included. */
 function snapshotOfA() {
   return prisma.vacancy.findMany({
     where: { userId: a },
-    include: { comments: true, statusChanges: true },
+    include: { comments: true, statusChanges: true, tags: { include: { tag: true } } },
     orderBy: { id: 'asc' },
   });
 }
@@ -49,6 +53,8 @@ beforeEach(async () => {
     await vacancies.save(a, posting('https://example.com/a/applied', 'QA Lead'))
   ).vacancy.id;
   await applications.record(a, { vacancyId: ids.applied, comment: 'Applied.' });
+  aTag = (await tags.create(a, { name: 'Remote', tone: 'GOOD' })).id;
+  await tags.tagVacancies(a, [{ vacancyId: ids.analysed, add: ['Remote'] }]);
   before = await snapshotOfA();
 });
 
@@ -199,6 +205,43 @@ const cases: [string, () => Promise<unknown>][] = [
           { url: 'https://example.com/b/repost', company: 'ACME', title: 'Frontend Dev' },
         ]),
       ).toEqual({ new: ['https://example.com/b/repost'] }),
+  ],
+  ['TagService.list', async () => expect(await tags.list(b)).toEqual([])],
+  [
+    "TagService.create — A's name is free for B",
+    async () => expect(await tags.create(b, { name: 'Remote' })).toMatchObject({ tone: 'NEUTRAL' }),
+  ],
+  [
+    'TagService.update',
+    () =>
+      expect(tags.update(b, aTag, { name: 'Hacked', tone: 'BAD' })).rejects.toBeInstanceOf(
+        TagNotFoundError,
+      ),
+  ],
+  [
+    'TagService.delete',
+    () => expect(tags.delete(b, aTag)).rejects.toBeInstanceOf(TagNotFoundError),
+  ],
+  [
+    "TagService.tagVacancies — A's vacancy, adding",
+    () =>
+      expect(
+        tags.tagVacancies(b, [{ vacancyId: ids.analysed, add: ['Remote'] }]),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError),
+  ],
+  [
+    "TagService.tagVacancies — A's vacancy, removing",
+    () =>
+      expect(
+        tags.tagVacancies(b, [{ vacancyId: ids.analysed, remove: ['Remote'] }]),
+      ).rejects.toBeInstanceOf(VacancyNotFoundError),
+  ],
+  [
+    "VacancyService.save — B's tags go on B's row, and are B's",
+    async () => {
+      await vacancies.save(b, { ...posting(ANALYSED_URL, 'Backend Dev'), tags: ['Remote'] });
+      expect(await tags.list(b)).toMatchObject([{ name: 'Remote', vacancyCount: 1 }]);
+    },
   ],
   [
     'StatsService.get',

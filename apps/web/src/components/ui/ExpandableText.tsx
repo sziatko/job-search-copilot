@@ -4,8 +4,9 @@ import { Button } from './Button';
 /**
  * A table cell's long text, clamped to two lines, with a "Show more" toggle that
  * appears only when the text actually overflows — a comment that already fits would
- * otherwise get a button that does nothing. `children` as a function renders by state:
- * the merged comments' separators change when expanded.
+ * otherwise get a button that does nothing. Line breaks count in both states: clamped
+ * too, or `a\nb\nc` would fit on one line and never offer the button. `children` as a
+ * function renders by state: the merged comments' separators change when expanded.
  */
 export function ExpandableText({
   children,
@@ -32,7 +33,10 @@ export function ExpandableText({
 
   return (
     <div className="max-w-85 text-small text-ink-soft">
-      <div ref={measureRef} className={expanded ? '' : 'line-clamp-2'}>
+      <div
+        ref={measureRef}
+        className={expanded ? 'whitespace-pre-line' : 'whitespace-pre-line line-clamp-2'}
+      >
         {typeof children === 'function' ? children(expanded) : children}
       </div>
       {clampable && (

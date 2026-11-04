@@ -1,5 +1,6 @@
 import type { Recommendation, VacancyStatus } from '@prisma/client';
 import type { PipelineStatus } from '../domain/status';
+import type { TagRef } from '../tags/tag.types';
 import type { VacancyComment } from '../vacancies/vacancy.types';
 
 /**
@@ -10,6 +11,7 @@ export interface RecordApplicationByIdInput {
   vacancyId: number;
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   /** Added as a comment in the caller's source (USER, or AGENT from an API key); a
    * blank one adds none. */
   comment?: string | null;
@@ -29,6 +31,7 @@ export interface RecordApplicationByVacancyInput {
   applyUrl?: string | null;
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   /** Added as a comment in the caller's source (USER, or AGENT from an API key); a
    * blank one adds none. */
   comment?: string | null;
@@ -59,14 +62,15 @@ export interface RecordManyApplicationsResult {
 export interface UpdateApplicationInput {
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   comment?: string | null;
 }
 
 export interface ListApplicationsFilters {
   /** One pipeline status; absent = all of them. */
   status?: PipelineStatus;
-  /** Matches Vacancy.company OR .title, ILIKE '%term%', case-insensitive. The
-   * search modal's term. */
+  /** Matches Vacancy.company OR .title, ILIKE '%term%', case-insensitive, OR the id
+   * when the term is `123` or `#123`. The search modal's term. */
   search?: string;
   /** Matches Vacancy.company, ILIKE '%term%', case-insensitive. Independent of
    * `search` — combined with `title` (and `search`, if also given) via AND, not OR. */
@@ -127,10 +131,13 @@ export interface ApplicationListItem {
   comments: VacancyComment[];
   salaryInApplication: string | null;
   usedTailoredResume: boolean;
+  sentCoverLetter: boolean;
   company: string;
   title: string;
   applyUrl: string;
   /** Both null when the vacancy has no analysis (a vacancy record_application created). */
   matchScore: number | null;
   recommendation: Recommendation | null;
+  /** By name. */
+  tags: TagRef[];
 }

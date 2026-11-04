@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { recordApplication } from '@/lib/applications/api';
 import { type ApplyDetails, isPipelineStatus } from '@/lib/applications/types';
 import { queryKeys, staleAfter } from '@/lib/queryKeys';
+import { writeVacancyTags } from '@/lib/tags/api';
+import { type TagRef, withTagWrite } from '@/lib/tags/types';
 import { useInfiniteList } from '@/lib/useInfiniteList';
 import { useRowMutation } from '@/lib/useRowMutation';
 import { updateVacancyStatus, type VacancyPage } from './api';
@@ -53,6 +55,7 @@ export function useVacancyRows(
   const [pendingDecline, setPendingDecline] = useState<PendingVacancy | null>(null);
   const [pendingSave, setPendingSave] = useState<PendingVacancy | null>(null);
   const [pendingApply, setPendingApply] = useState<PendingVacancy | null>(null);
+  const [pendingTag, setPendingTag] = useState<VacancyListItem | null>(null);
 
   const actionMutation = useMutation({
     ...rowMutation({
@@ -99,7 +102,7 @@ export function useVacancyRows(
     setPendingSave(null);
   }
 
-  // Applying records the application (the dialog's salary / tailored-resume /
+  // Applying records the application (the dialog's salary / tailored-resume / cover-letter /
   // comment) and moves the vacancy to APPLIED in the same transaction — so this path
   // does not call updateVacancyStatus.
   const applyMutation = useMutation({
@@ -109,6 +112,7 @@ export function useVacancyRows(
           vacancyId: id,
           salaryInApplication: details.salary || undefined,
           usedTailoredResume: details.usedTailoredResume,
+          sentCoverLetter: details.sentCoverLetter,
           comment: details.comment || undefined,
         }),
       patch: (item) => ({ ...item, status: VACANCY_ACTION.APPLIED }),
@@ -126,6 +130,22 @@ export function useVacancyRows(
     setPendingApply(null);
   }
 
+  // A row write too, so it disables the row's status controls: two optimistic writes to one
+  // row could undo each other on a rollback.
+  const tagMutation = useMutation(
+    rowMutation({
+      mutationFn: writeVacancyTags,
+      patch: withTagWrite,
+      invalidates: staleAfter.tagWrite,
+    }),
+  );
+
+  function confirmAddTag(tag: TagRef) {
+    if (!pendingTag) return;
+    tagMutation.mutate({ id: pendingTag.id, add: tag });
+    setPendingTag(null);
+  }
+
   return {
     loading,
     loadError,
@@ -137,12 +157,17 @@ export function useVacancyRows(
     pendingDecline,
     pendingSave,
     pendingApply,
+    pendingTag,
     requestActionChange,
+    requestAddTag: setPendingTag,
+    removeTag: (id: number, tag: TagRef) => tagMutation.mutate({ id, remove: tag }),
+    confirmAddTag,
     confirmDecline,
     confirmSave,
     confirmApply,
     cancelDecline: () => setPendingDecline(null),
     cancelSave: () => setPendingSave(null),
     cancelApply: () => setPendingApply(null),
+    cancelAddTag: () => setPendingTag(null),
   };
 }

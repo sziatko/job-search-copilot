@@ -1,4 +1,4 @@
-import { VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
+import { TagService, VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { VacanciesController } from './vacancies.controller';
@@ -16,6 +16,11 @@ import { VacanciesController } from './vacancies.controller';
     {
       provide: VacancyIntakeService,
       useFactory: (prisma: PrismaService) => new VacancyIntakeService(prisma.client),
+      inject: [PrismaService],
+    },
+    {
+      provide: TagService,
+      useFactory: (prisma: PrismaService) => new TagService(prisma.client),
       inject: [PrismaService],
     },
   ],

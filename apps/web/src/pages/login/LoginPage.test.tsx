@@ -92,7 +92,7 @@ describe('the shell', () => {
           user: { id: 'u1', email: 'jane@example.com', name: 'Jane Doe', emailVerified: true },
         }),
       ),
-      http.get(`${AUTH_URL}/passkey/list-user-passkeys`, () => HttpResponse.json([])),
+      ...buildHandlers([]),
     );
     renderAt('/profile');
 
@@ -101,7 +101,7 @@ describe('the shell', () => {
   });
 });
 
-describe('passkeys on /profile', () => {
+describe('passkeys on /settings', () => {
   it('lists the passkeys and removes one', async () => {
     let keys = [{ id: 'pk1', name: 'Laptop', createdAt: '2026-10-01T00:00:00.000Z' }];
     let deleted: unknown;
@@ -113,7 +113,7 @@ describe('passkeys on /profile', () => {
         return HttpResponse.json({ status: true });
       }),
     );
-    renderAt('/profile');
+    renderAt('/settings');
 
     expect(await screen.findByText('Laptop')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add a passkey/i })).toBeEnabled();

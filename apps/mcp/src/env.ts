@@ -11,7 +11,7 @@ loadEnv({ path: path.resolve(__dirname, '../../../.env'), quiet: true });
 
 /**
  * The stdio entrypoint's env, validated at boot (invariant 8); http.ts validates its own.
- * `JSC_API_KEY`: a key from /profile, whose owner the tools act as (ADR-0039).
+ * `JSC_API_KEY`: a key from /settings, whose owner the tools act as (ADR-0039).
  */
 export function stdioEnv() {
   const parsed = z

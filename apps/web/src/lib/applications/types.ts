@@ -5,6 +5,7 @@
 // bare literals elsewhere — map over `*.options`.
 import { z } from 'zod';
 import { cursorPageSchema } from '@/lib/api';
+import { tagRefSchema } from '@/lib/tags/types';
 import {
   STATUS_CONTEXT,
   type VacancyComment,
@@ -65,11 +66,13 @@ export const applicationListItemSchema = z.object({
   comments: z.array(applicationCommentSchema),
   salaryInApplication: z.string().nullable(),
   usedTailoredResume: z.boolean(),
+  sentCoverLetter: z.boolean(),
   company: z.string(),
   title: z.string(),
   applyUrl: z.string(),
   /** Null when the vacancy has no analysis (a row record_application created). */
   matchScore: z.number().nullable(),
+  tags: z.array(tagRefSchema),
   /** How many vacancies (core's SAME_COMPANY_STATUSES) share this row's company —
    * derived by the list endpoint only, so optional: the PATCH / POST responses parse through this schema
    * too and carry none (the /vacancies schema's trap, ADR-0025). */
@@ -89,6 +92,7 @@ export type RecordApplicationResponse = z.infer<typeof recordApplicationResponse
 export interface UpdateApplicationInput {
   salaryInApplication?: string | null;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   comment?: string;
 }
 
@@ -96,6 +100,7 @@ export interface RecordApplicationInput {
   vacancyId: number;
   salaryInApplication?: string;
   usedTailoredResume?: boolean;
+  sentCoverLetter?: boolean;
   comment?: string;
 }
 
@@ -103,5 +108,6 @@ export interface RecordApplicationInput {
 export interface ApplyDetails {
   salary: string;
   usedTailoredResume: boolean;
+  sentCoverLetter: boolean;
   comment: string;
 }

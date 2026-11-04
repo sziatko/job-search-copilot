@@ -184,7 +184,7 @@ describe('OAuth authorization server (e2e)', () => {
     expect(payload.sub).toEqual(expect.any(String));
   });
 
-  // /profile's "Connected apps": Revoke must end the grant, not only hide the consent.
+  // /settings's "Connected apps": Revoke must end the grant, not only hide the consent.
   it('revoking a consent ends its refresh grant, and only the owner can revoke it', async () => {
     const server = app.getHttpServer();
     const { client_id, cookie, tokens } = await connect('openid offline_access');

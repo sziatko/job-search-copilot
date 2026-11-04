@@ -29,7 +29,7 @@ function token(audience = mcpUrl) {
 /** The key owners `apiKey` made, deleted in `afterAll`. */
 const owners: string[] = [];
 
-/** What /profile's "Create" does: an API key for a new user, through the API's auth. */
+/** What /settings's "Create" does: an API key for a new user, through the API's auth. */
 async function apiKey(): Promise<string> {
   const prisma = getPrisma();
   const user = await prisma.user.create({
@@ -122,7 +122,7 @@ describe('MCP over HTTP', () => {
       }),
     );
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(17);
     await client.close();
   });
 
@@ -133,7 +133,7 @@ describe('MCP over HTTP', () => {
         requestInit: { headers: { Authorization: `Bearer ${await apiKey()}` } },
       }),
     );
-    expect((await client.listTools()).tools).toHaveLength(15);
+    expect((await client.listTools()).tools).toHaveLength(17);
     await client.close();
   });
 

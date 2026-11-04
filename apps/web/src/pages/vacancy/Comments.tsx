@@ -1,6 +1,7 @@
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Meta } from '@/components/ui/Meta';
 import { TONE_FILL, type Tone } from '@/components/ui/tone';
+import { AnalysisComment } from '@/components/vacancies/AnalysisComment';
 import type { CommentSource, VacancyComment } from '@/lib/vacancies/types';
 import { dateTimeFormatter } from './format';
 
@@ -39,7 +40,11 @@ export function Comments({ comments }: { comments: VacancyComment[] }) {
                 </Meta>
               </div>
               <div className="mt-1 whitespace-pre-line text-small leading-5 text-ink-soft">
-                {comment.body}
+                {comment.source === 'ANALYZER' ? (
+                  <AnalysisComment text={comment.body} />
+                ) : (
+                  comment.body
+                )}
               </div>
             </div>
           </li>

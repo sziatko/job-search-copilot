@@ -8,6 +8,7 @@ import {
   InvalidApplicationInputError,
   VacancyNotFoundError,
 } from '../domain/errors';
+import { TagService } from '../tags/tag.service';
 import { VacancyService } from '../vacancies/vacancy.service';
 import { ApplicationService } from './application.service';
 
@@ -71,6 +72,24 @@ async function seedVacancy(
 }
 
 describe('ApplicationService', () => {
+  it("list, getById and every write carry the vacancy's tags", async () => {
+    const { application } = await applications.record(userId, { company: 'Acme', title: 'Dev' });
+    const { id } = application;
+    expect(application.tags).toEqual([]);
+    await new TagService().tagVacancies(userId, [{ vacancyId: id, add: ['Remote', 'poland'] }]);
+    const expected = [
+      { id: expect.any(Number), name: 'poland', tone: 'NEUTRAL' },
+      { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' },
+    ];
+
+    expect((await applications.list(userId)).items[0].tags).toEqual(expected);
+    expect((await applications.getById(userId, id))?.tags).toEqual(expected);
+    expect((await applications.update(userId, id, { comment: 'Hi.' })).tags).toEqual(expected);
+    expect(
+      (await applications.updateStatus(userId, id, 'INTERVIEW', undefined, 'USER')).tags,
+    ).toEqual(expected);
+  });
+
   describe('record — by id (web path)', () => {
     it('moves the vacancy to APPLIED and sets salary / CV / comment', async () => {
       const vacancy = await seedVacancy({ status: 'SAVED_FOR_LATER' });
@@ -79,6 +98,7 @@ describe('ApplicationService', () => {
         vacancyId: vacancy.id,
         salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         comment: '  Adapted CV.  ',
       });
 
@@ -90,6 +110,7 @@ describe('ApplicationService', () => {
         matchScore: 80,
         salaryInApplication: '150 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         status: 'APPLIED',
       });
       expect(notes(result.application)).toEqual([ANALYZED, ['USER', 'Adapted CV.']]);
@@ -332,6 +353,29 @@ describe('ApplicationService', () => {
       expect((await applications.list(userId, { search: 'acme' })).total).toBe(1);
       expect((await applications.list(userId, { search: 'lead' })).total).toBe(1);
       expect((await applications.list(userId, { search: 'engineer' })).total).toBe(1);
+    });
+
+    it('search finds an application by its id, with or without the #', async () => {
+      const companies = async (search: string) =>
+        (await applications.list(userId, { search })).items.map((item) => item.company);
+      expect(await companies(String(acmeId))).toEqual(['Acme']);
+      expect(await companies(`#${acmeId}`)).toEqual(['Acme']);
+    });
+
+    it('search by a number at or past the top of Int4 is not a 500', async () => {
+      expect((await applications.list(userId, { search: '2147483647' })).total).toBe(0);
+      expect((await applications.list(userId, { search: '2147483648' })).total).toBe(0);
+      expect((await applications.list(userId, { search: '99999999999' })).total).toBe(0);
+    });
+
+    it("search finds nothing by another user's id", async () => {
+      const other = await createUser();
+      expect((await applications.list(other, { search: String(acmeId) })).total).toBe(0);
+    });
+
+    it('search by a triage vacancy id finds no application', async () => {
+      const triage = await seedVacancy({ company: 'Triage Two', status: 'SAVED_FOR_LATER' });
+      expect((await applications.list(userId, { search: String(triage.id) })).total).toBe(0);
     });
 
     it('filters by company alone, case-insensitively', async () => {
@@ -647,16 +691,21 @@ describe('ApplicationService', () => {
         salaryInApplication: '100 PLN/h',
       });
 
-      const edited = await applications.update(userId, vacancy.id, { usedTailoredResume: true });
+      const edited = await applications.update(userId, vacancy.id, {
+        usedTailoredResume: true,
+        sentCoverLetter: true,
+      });
       expect(edited).toMatchObject({
         salaryInApplication: '100 PLN/h',
         usedTailoredResume: true,
+        sentCoverLetter: true,
         status: 'APPLIED',
       });
       expect(notes(edited)).toEqual([ANALYZED]);
 
       const cleared = await applications.update(userId, vacancy.id, { salaryInApplication: '  ' });
       expect(cleared?.salaryInApplication).toBeNull();
+      expect(cleared?.sentCoverLetter).toBe(true); // left out, so untouched
     });
 
     it('adds a non-blank comment as a USER row, and moves nothing', async () => {

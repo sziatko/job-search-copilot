@@ -18,7 +18,7 @@ export async function listVacanciesPage(
     /** Any of these. */
     status?: readonly VacancyStatus[];
     recommendation?: Recommendation;
-    /** Free text over company OR title, filtered server-side (ADR-0025). */
+    /** Free text over company OR title, or an id (`123`, `#123`), filtered server-side (ADR-0025). */
     search?: string;
     /** With (`true`) or without (`false`) posting text; both when absent. */
     hasText?: boolean;

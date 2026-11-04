@@ -47,7 +47,7 @@ test('a passkey: add, sign out, sign in with it, remove', async ({ page }) => {
   });
   const removeButtons = page.getByRole('button', { name: 'Remove' });
 
-  await page.goto('/profile');
+  await page.goto('/settings');
   await expect(page.getByText('No passkeys yet.')).toBeVisible();
   await page.getByRole('button', { name: 'Add a passkey' }).click();
   await expect(removeButtons).toHaveCount(1);
@@ -58,13 +58,13 @@ test('a passkey: add, sign out, sign in with it, remove', async ({ page }) => {
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('banner').getByRole('heading', { level: 1 })).toHaveText('Dashboard');
 
-  await page.getByRole('navigation').getByRole('link', { name: 'Profile & forms' }).click();
+  await page.getByRole('navigation').getByRole('link', { name: 'Settings' }).click();
   await removeButtons.click();
   await expect(page.getByText('No passkeys yet.')).toBeVisible();
 });
 
 test('an API key: create, list, revoke', async ({ db, page }) => {
-  await page.goto('/profile');
+  await page.goto('/settings');
   await expect(page.getByText(/No API keys yet/)).toBeVisible();
   await page.getByLabel('Key name').fill('Made-up n8n');
   await page.getByRole('button', { name: 'Create a key' }).click();

@@ -1,4 +1,9 @@
-import { type CommentSource, VacancyIntakeService, VacancyService } from '@job-search-copilot/core';
+import {
+  type CommentSource,
+  TagService,
+  VacancyIntakeService,
+  VacancyService,
+} from '@job-search-copilot/core';
 import {
   Body,
   Controller,
@@ -17,6 +22,7 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Response } from 'express';
 import { ApiKeyGuard, CallerSource, CurrentUserId } from '../auth/api-key.guard';
+import { TagVacanciesDto } from '../tags/dto/tag-vacancies.dto';
 import { IntakeVacanciesDto } from './dto/intake-vacancies.dto';
 import { ListVacanciesQueryDto } from './dto/list-vacancies.dto';
 import { MarkUnavailableDto } from './dto/mark-unavailable.dto';
@@ -33,6 +39,7 @@ export class VacanciesController {
   constructor(
     private readonly vacancies: VacancyService,
     private readonly intakeService: VacancyIntakeService,
+    private readonly tags: TagService,
   ) {}
 
   /**
@@ -105,6 +112,16 @@ export class VacanciesController {
     @CallerSource() source: CommentSource,
   ) {
     return this.vacancies.markUnavailable(userId, dto.items, source);
+  }
+
+  /**
+   * Adds and removes tags by name (ADR-0042), all or none → 204. A new name creates the tag.
+   * An unknown vacancy → 404, a bad name or over the limit → 422.
+   */
+  @Post('tags')
+  @HttpCode(204)
+  tagVacancies(@CurrentUserId() userId: string, @Body() dto: TagVacanciesDto) {
+    return this.tags.tagVacancies(userId, dto.items);
   }
 
   /** `{ items, total, nextCursor }`; paged by `cursor` (ADR-0030). */

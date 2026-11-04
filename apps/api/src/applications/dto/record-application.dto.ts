@@ -20,6 +20,10 @@ export class RecordApplicationDto {
   @IsBoolean()
   usedTailoredResume?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  sentCoverLetter?: boolean;
+
   /** Added as a comment on the vacancy: USER, or AGENT from an API key. */
   @IsOptional()
   @IsString()
