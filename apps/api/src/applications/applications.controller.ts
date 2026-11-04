@@ -5,7 +5,6 @@ import {
   Get,
   NotFoundException,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -16,6 +15,7 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Response } from 'express';
 import { ApiKeyGuard, CallerSource, CurrentUserId } from '../auth/api-key.guard';
+import { ParseIdPipe } from '../common/row-id';
 import { ListApplicationsQueryDto } from './dto/list-applications.dto';
 import { RecordApplicationDto } from './dto/record-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
@@ -56,7 +56,7 @@ export class ApplicationsController {
   }
 
   @Get(':id')
-  async getById(@CurrentUserId() userId: string, @Param('id', ParseIntPipe) id: number) {
+  async getById(@CurrentUserId() userId: string, @Param('id', new ParseIdPipe()) id: number) {
     const application = await this.applications.getById(userId, id);
     if (!application) {
       throw new NotFoundException(`Application ${id} not found`);
@@ -67,7 +67,7 @@ export class ApplicationsController {
   @Patch(':id/status')
   updateStatus(
     @CurrentUserId() userId: string,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', new ParseIdPipe()) id: number,
     @Body() dto: UpdateApplicationStatusDto,
     @CallerSource() source: CommentSource,
   ) {
@@ -77,7 +77,7 @@ export class ApplicationsController {
   @Patch(':id')
   update(
     @CurrentUserId() userId: string,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', new ParseIdPipe()) id: number,
     @Body() dto: UpdateApplicationDto,
     @CallerSource() source: CommentSource,
   ) {

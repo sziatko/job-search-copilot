@@ -6,7 +6,6 @@ import {
   Get,
   HttpCode,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   UseGuards,
@@ -14,6 +13,7 @@ import {
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { ApiKeyGuard, CurrentUserId } from '../auth/api-key.guard';
+import { ParseIdPipe } from '../common/row-id';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 
@@ -42,7 +42,7 @@ export class TagsController {
   @Patch(':id')
   update(
     @CurrentUserId() userId: string,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', new ParseIdPipe()) id: number,
     @Body() dto: UpdateTagDto,
   ) {
     return this.tags.update(userId, id, dto);
@@ -51,7 +51,7 @@ export class TagsController {
   /** Takes the tag off its vacancies too. An unknown id → 404. */
   @Delete(':id')
   @HttpCode(204)
-  delete(@CurrentUserId() userId: string, @Param('id', ParseIntPipe) id: number) {
+  delete(@CurrentUserId() userId: string, @Param('id', new ParseIdPipe()) id: number) {
     return this.tags.delete(userId, id);
   }
 }

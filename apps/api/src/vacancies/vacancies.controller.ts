@@ -11,7 +11,6 @@ import {
   HttpCode,
   NotFoundException,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -22,6 +21,7 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Response } from 'express';
 import { ApiKeyGuard, CallerSource, CurrentUserId } from '../auth/api-key.guard';
+import { ParseIdPipe } from '../common/row-id';
 import { TagVacanciesDto } from '../tags/dto/tag-vacancies.dto';
 import { IntakeVacanciesDto } from './dto/intake-vacancies.dto';
 import { ListVacanciesQueryDto } from './dto/list-vacancies.dto';
@@ -85,7 +85,7 @@ export class VacanciesController {
   @HttpCode(200)
   submitAnalysis(
     @CurrentUserId() userId: string,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', new ParseIdPipe()) id: number,
     @Body() dto: SubmitAnalysisDto,
   ) {
     return this.vacancies.submitAnalysis(userId, { id, ...dto });
@@ -131,7 +131,7 @@ export class VacanciesController {
   }
 
   @Get(':id')
-  async getById(@CurrentUserId() userId: string, @Param('id', ParseIntPipe) id: number) {
+  async getById(@CurrentUserId() userId: string, @Param('id', new ParseIdPipe()) id: number) {
     const vacancy = await this.vacancies.getById(userId, id);
     if (!vacancy) {
       throw new NotFoundException(`Vacancy ${id} not found`);
@@ -142,7 +142,7 @@ export class VacanciesController {
   @Patch(':id/status')
   updateStatus(
     @CurrentUserId() userId: string,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', new ParseIdPipe()) id: number,
     @Body() dto: UpdateVacancyStatusDto,
     @CallerSource() source: CommentSource,
   ) {

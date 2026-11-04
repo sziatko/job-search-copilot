@@ -149,14 +149,12 @@ also answer [`core` dev-loop friction](#core-dev-loop-friction) below.
 
 ## Improvements and fixes
 
-### Odd input is a 500 on REST
+### A body nested thousands of levels deep
 
-Found by the review of phase 9.1, each answers a 500 where a 400 or a 404 belongs. A path id
-past Int4, on every `ParseIntPipe` route. `id` in `POST /vacancies/analysis`, which has no
-`@Max` as `vacancyId` in `tag-vacancies.dto.ts` has. A NUL character (`\u0000`) in any free
-string, tag names and `company` alike: Postgres refuses it. And `[[{…}]]` passes
-`@ValidateNested({ each: true })` with every field unread: `TagVacanciesDto` adds
-`@IsObject({ each: true })`, the other nested DTOs do not. No data is at risk.
+Left over from the odd-input fixes: a JSON body nested about 3000 levels overflows
+`plainToInstance`, which should answer a 500 (seen in a direct call, not over HTTP). The guard
+runs first, so only a signed-in caller reaches it, and nothing is written. A depth limit in the
+body parser would close it.
 
 ### A rejected item in `save_vacancies_batch`
 

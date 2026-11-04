@@ -1,5 +1,4 @@
 import { MAX_LENGTH } from '@job-search-copilot/core';
-import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -9,8 +8,8 @@ import {
   IsUrl,
   Matches,
   MaxLength,
-  ValidateNested,
 } from 'class-validator';
+import { IsNestedItems } from '../../common/is-nested-items';
 
 /** An http(s) link with its scheme, the only kind core stores (`normalizeApplyUrl`).
  * Limit: validator's 2083-character cap applies; set `validate_length: false` if a
@@ -53,7 +52,6 @@ export class IntakeVacanciesDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
-  @ValidateNested({ each: true })
-  @Type(() => IntakeEntryDto)
+  @IsNestedItems(() => IntakeEntryDto)
   entries!: IntakeEntryDto[];
 }

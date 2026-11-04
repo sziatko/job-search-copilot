@@ -33,7 +33,7 @@ export function escapeLikePattern(value: string): string {
 const contains = (term: string) =>
   ({ contains: escapeLikePattern(term), mode: 'insensitive' }) as const;
 
-const INT4_MAX = 2_147_483_647;
+export const INT4_MAX = 2_147_483_647;
 
 /** The vacancy id a search term names, `123` or `#123`. A number past Int4 names none:
  * Postgres would refuse it as an id, a 500 for what is only a search that finds nothing. */
