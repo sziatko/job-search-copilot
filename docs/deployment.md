@@ -127,3 +127,13 @@ run on it. A new migration runs first on a fresh pull, then deploys.
     docker compose ps
     docker compose logs -f jsc-api
     docker compose logs jsc-migrate      # the last migration run
+
+`jsc-api` logs "Rate limiting could not determine a client IP" once per process, and it is
+harmless. `jsc-mcp-http` fetches the JWKS directly (`AUTH_URL`), past Caddy, so that request has
+no `X-Forwarded-For` and takes Better Auth's shared bucket for its path. A client through Caddy
+has a bucket of its own: without `trusted_proxies` Caddy sets the header to the one remote address,
+and Better Auth takes an IP only from a header holding exactly one.
+
+> **Breaks if you change it:** a CDN or a proxy in front of Caddy, or `trusted_proxies` in the
+> Caddyfile, puts several addresses in the header, and every client shares one bucket per path.
+> Then `advanced.ipAddress.trustedProxies` in `createAuth` has to name that proxy.

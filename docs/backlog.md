@@ -192,14 +192,6 @@ prod until a manual re-run. GitHub emails a failure, not a cancel. Options: a re
 around the pull; a check that the deployed `JSC_TAG` is `main`'s head (a scheduled
 workflow, or the uptime check above), which catches a cancel and a failure alike.
 
-### Better Auth rate limits share one bucket
-
-The api logs "Rate limiting could not determine a client IP": behind Caddy it resolves
-no client IP, so each path's limit is one bucket for everyone — `/oauth2/token` (the
-OAuth provider's 20 a minute) for every MCP client's refresh, and the sign-in paths for
-every visitor. Set `advanced.ipAddress.ipAddressHeaders` (`x-forwarded-for`, which Caddy
-sets) or `trustedProxies` in `createAuth`.
-
 ### `core` dev-loop friction
 
 A `core` edit needs a rebuild and an app restart. Candidates: tsconfig `paths` → `src`
