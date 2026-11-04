@@ -5,7 +5,8 @@ import { CHIP_COLOR, type ChipColor } from './tone';
 
 /** A label the user owns, such as a vacancy's tag: `Tag`'s shape in any colour, that can
  * wrap a long name and, with `onRemove`, carries a × button named by `removeLabel`, off under
- * `removeDisabled`. `dense` is its size in a table row. */
+ * `removeDisabled`: `aria-disabled`, not `disabled`, as focus cannot stay on a disabled button and
+ * a write puts it on the next ×. `dense` is its size in a table row. */
 export function Chip({
   color,
   dense = false,
@@ -29,9 +30,9 @@ export function Chip({
         <button
           type="button"
           aria-label={removeLabel}
-          disabled={removeDisabled}
-          onClick={onRemove}
-          className="flex-none cursor-pointer hover:text-ink disabled:opacity-50 [&_svg]:size-3"
+          aria-disabled={removeDisabled}
+          onClick={removeDisabled ? undefined : onRemove}
+          className="flex-none cursor-pointer hover:text-ink aria-disabled:opacity-50 [&_svg]:size-3"
         >
           <IconCross />
         </button>

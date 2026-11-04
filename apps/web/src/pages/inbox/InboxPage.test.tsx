@@ -81,7 +81,10 @@ describe('InboxPage tags', () => {
     await rowOf('Acme').findByRole('button', { name: 'Remove tag Contract' });
     await waitFor(() => expect(rows[0].tags.map((tag) => tag.name)).toEqual(['Contract']));
     await waitFor(() =>
-      expect(rowOf('Acme').getByRole('button', { name: 'Remove tag Contract' })).toBeEnabled(),
+      expect(rowOf('Acme').getByRole('button', { name: 'Remove tag Contract' })).toHaveAttribute(
+        'aria-disabled',
+        'false',
+      ),
     );
 
     await user.click(rowOf('Acme').getByRole('button', { name: 'Remove tag Contract' }));

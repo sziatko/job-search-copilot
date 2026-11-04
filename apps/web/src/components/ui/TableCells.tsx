@@ -100,6 +100,7 @@ export function AddTagButton({ saving, onClick }: { saving: boolean; onClick: ()
   return (
     <button
       type="button"
+      data-add-tag
       aria-disabled={saving}
       onClick={saving ? undefined : onClick}
       className={META_BUTTON}

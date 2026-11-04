@@ -166,11 +166,6 @@ top of `saveMany` would stop a bad name before anything is written. A resend als
 first row when `applyUrl` is not http (`z.url()` takes `mailto:`): `save()` keys such a row on
 a `tracker://` URL with the date in it, so past UTC midnight it makes a second vacancy.
 
-### Focus after removing a tag by keyboard
-
-× on a chip removes the button that had the focus, and it falls to `body`, so a keyboard user
-starts the page again. It belongs on the next chip, or on `Add tag`.
-
 ### Security leftovers
 
 Found by the 2026-10-27 security review and left as they are. The API parses JSON bodies

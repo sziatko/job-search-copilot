@@ -211,7 +211,10 @@ describe('VacanciesPage / useVacancies', () => {
 
       await waitFor(() => {
         expect(rowOf('Acme').getByRole('button', { name: 'Apply' })).toBeDisabled();
-        expect(rowOf('Acme').getByRole('button', { name: 'Remove tag Remote' })).toBeDisabled();
+        expect(rowOf('Acme').getByRole('button', { name: 'Remove tag Remote' })).toHaveAttribute(
+          'aria-disabled',
+          'true',
+        );
         expect(rowOf('Acme').getByRole('button', { name: 'Add tag' })).toHaveAttribute(
           'aria-disabled',
           'true',
@@ -224,6 +227,82 @@ describe('VacanciesPage / useVacancies', () => {
       await waitFor(() =>
         expect(rowOf('Acme').getByRole('button', { name: 'Apply' })).toBeEnabled(),
       );
+    });
+
+    it('moves focus from a removed tag to the next ×, then the previous, then Add tag', async () => {
+      const THIRD = { id: 3, name: 'Zurich', tone: 'BLUE' } as const;
+      mswServer.use(
+        ...buildHandlers([vacancy({ id: 7, company: 'Acme', tags: [LINKEDIN, REMOTE, THIRD] })]),
+      );
+      renderVacancies();
+      await screen.findByText('Acme');
+      const user = userEvent.setup();
+      const button = (name: string) => rowOf('Acme').getByRole('button', { name });
+      const settled = (name: string) =>
+        waitFor(() => expect(button(name)).toHaveAttribute('aria-disabled', 'false'));
+
+      await user.click(button('Remove tag LinkedIn'));
+      expect(button('Remove tag Remote')).toHaveFocus();
+      await settled('Remove tag Remote');
+
+      await user.click(button('Remove tag Zurich'));
+      expect(button('Remove tag Remote')).toHaveFocus();
+      await settled('Remove tag Remote');
+
+      await user.click(button('Remove tag Remote'));
+      expect(button('Add tag')).toHaveFocus();
+    });
+
+    it('sends no second write for a × clicked while one runs', async () => {
+      const writes = recordTagWrites();
+      mswServer.use(
+        ...buildHandlers([vacancy({ id: 7, company: 'Acme', tags: [LINKEDIN, REMOTE] })]),
+      );
+      let release = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      mswServer.use(
+        http.post(TAGS_URL, async () => {
+          await held;
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      renderVacancies();
+      await screen.findByText('Acme');
+      const user = userEvent.setup();
+
+      await user.click(rowOf('Acme').getByRole('button', { name: 'Remove tag LinkedIn' }));
+      const next = rowOf('Acme').getByRole('button', { name: 'Remove tag Remote' });
+      await waitFor(() => expect(next).toHaveAttribute('aria-disabled', 'true'));
+      expect(next).toHaveFocus();
+      await user.click(next);
+
+      await waitFor(() => expect(writes).toHaveLength(1));
+      expect(writes).toEqual([{ items: [{ vacancyId: 7, remove: ['LinkedIn'] }] }]);
+      expect(chips('Acme')).toEqual(['Remote']);
+      release();
+      await waitFor(() => expect(next).toHaveAttribute('aria-disabled', 'false'));
+    });
+
+    it('leaves focus on a live control when the write fails', async () => {
+      mswServer.use(...buildHandlers([vacancy({ id: 7, company: 'Acme', tags: [REMOTE] })]));
+      mswServer.use(
+        http.post(TAGS_URL, () =>
+          HttpResponse.json({ message: 'That vacancy is gone' }, { status: 404 }),
+        ),
+      );
+      renderVacancies();
+      await screen.findByText('Acme');
+      const user = userEvent.setup();
+
+      await user.click(rowOf('Acme').getByRole('button', { name: 'Remove tag Remote' }));
+
+      await rowOf('Acme').findByText(/That vacancy is gone/);
+      await waitFor(() => expect(chips('Acme')).toEqual(['Remote']));
+      const addTag = rowOf('Acme').getByRole('button', { name: 'Add tag' });
+      expect(addTag).toHaveFocus();
+      await waitFor(() => expect(addTag).toHaveAttribute('aria-disabled', 'false'));
     });
 
     it('creates a new toned tag, then links it, and the row shows it', async () => {

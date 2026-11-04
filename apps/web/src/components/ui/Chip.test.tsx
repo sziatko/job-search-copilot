@@ -18,14 +18,20 @@ describe('Chip', () => {
     expect(screen.getByText('Remote')).toBeInTheDocument();
   });
 
-  it('turns the × off under removeDisabled', () => {
+  it('turns the × off under removeDisabled, and it can still hold focus', async () => {
+    const onRemove = vi.fn();
     render(
-      <Chip color="green" onRemove={() => {}} removeLabel="Remove tag Remote" removeDisabled>
+      <Chip color="green" onRemove={onRemove} removeLabel="Remove tag Remote" removeDisabled>
         Remote
       </Chip>,
     );
+    const remove = screen.getByRole('button', { name: 'Remove tag Remote' });
 
-    expect(screen.getByRole('button', { name: 'Remove tag Remote' })).toBeDisabled();
+    expect(remove).toHaveAttribute('aria-disabled', 'true');
+    remove.focus();
+    expect(remove).toHaveFocus();
+    await userEvent.click(remove);
+    expect(onRemove).not.toHaveBeenCalled();
   });
 
   it('is smaller only when dense', () => {
