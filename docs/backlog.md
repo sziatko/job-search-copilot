@@ -149,6 +149,13 @@ also answer [`core` dev-loop friction](#core-dev-loop-friction) below.
 
 ## Improvements and fixes
 
+### A tag name of invisible characters
+
+`parseTagName` rejects spaces, tabs and NBSP, but `trim` and `\s` miss zero-width and filler
+characters such as U+200B, so such a name is accepted and the chip looks nameless. Seen in a direct
+call on core's `dist/`, not over HTTP. The check belongs there, since every write of a name passes
+through it; it must reject only and not strip, or an emoji joined by a ZWJ breaks.
+
 ### A body nested thousands of levels deep
 
 Left over from the odd-input fixes: a JSON body nested about 3000 levels overflows
@@ -206,7 +213,7 @@ and Dependabot opens npm PRs only for security fixes. Either `npm` in `dependabo
 
 ### Node 26
 
-Once it is LTS. One PR: the three Dockerfiles' `node:24-alpine`, `ci.yml`'s
+Once it is LTS. One PR: the three Dockerfiles' `node:24-alpine`, `verify.yml`'s
 `node-version`, local dev. Dependabot ignores Node majors (`dependabot.yml`), so nothing
 will remind.
 

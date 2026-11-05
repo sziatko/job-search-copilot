@@ -15,7 +15,7 @@ updates:
     directories: [/apps/api, /apps/mcp, /apps/web]
     schedule:
       interval: weekly
-    # A Node major moves CI and local dev too (ci.yml's node-version), so it is a
+    # A Node major moves CI and local dev too (verify.yml's node-version), so it is a
     # planned change, not a bot PR.
     ignore:
       - dependency-name: node

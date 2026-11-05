@@ -25,13 +25,13 @@ a Windows / Docker Desktop host. CI must prove a change sound before it merges.
   dependencies and the compiled output (the web's is nginx serving static files).
 - Local dev only: the `postgres/postgres` defaults are not for a deployed environment.
 
-## Decision — CI (`.github/workflows/ci.yml`)
-On a push to `main` and every PR: Ubuntu, Node 24, a Postgres service, then `npm ci`
-→ `prisma generate` → `prisma migrate deploy` → `lint` → `typecheck` → `test` →
-`build`. On a PR a second job runs the Playwright suite
-([ADR-0037](0037-e2e-playwright.md)). `images.yml` builds the three `production` stages
-on every PR, so a Dockerfile regression fails there; publishing and deploying them:
-[ADR-0041](0041-one-origin-images-from-ghcr.md).
+## Decision — CI (`.github/workflows/`)
+`verify.yml`: Ubuntu, Node 24, a Postgres service, then `npm ci` → `prisma generate` →
+`prisma migrate deploy` → `lint` → `typecheck` → `test` → `test:scripts` → `build`. A PR
+runs it and the Playwright suite ([ADR-0037](0037-e2e-playwright.md)) through `ci.yml`; which
+change gets what, and the check that merges: [ADR-0043](0043-one-merge-gate-by-kind-of-change.md). `images.yml` builds the three
+`production` stages on a code PR, so a Dockerfile regression fails there; publishing and deploying
+them: [ADR-0041](0041-one-origin-images-from-ghcr.md).
 
 ## Why this and not the alternatives
 - **No polling** — edits on a Windows bind mount silently stop rebuilding.

@@ -1,11 +1,12 @@
 name: Images
 
-# The production images (each Dockerfile's `production` stage). A pull request builds
-# them only, so a Dockerfile regression fails there. A push to main or a phase-* branch
-# also publishes them to GHCR: `sha-<commit>`, plus `latest` on main. phase-* too: a
-# phase can be deployed by hand (deploy.sh, under main's compose.prod.yml) before it
-# merges. The packages are public — the server pulls with no login, so nothing secret
-# goes into an image. A push to main then deploys them (`deploy`).
+# The production images (each Dockerfile's `production` stage), when the change is code
+# (scripts/change-kind.mjs). A pull request builds them only, so a Dockerfile regression
+# fails there. A push to main or a phase-* branch also publishes them to GHCR:
+# `sha-<commit>`, plus `latest` on main. A phase-* branch builds whatever changed: a phase
+# can be deployed by hand (deploy.sh, under main's compose.prod.yml) before it merges. The
+# packages are public — the server pulls with no login, so nothing secret goes into an
+# image. A code push to main then passes `verify` and deploys them (`deploy`).
 on:
   push:
     branches: [main, 'phase-*']
@@ -14,7 +15,31 @@ on:
 # Every action is pinned to a commit (Dependabot moves the pins): this job holds a token
 # that can push packages, and a tag can be moved.
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      kind: ${{ steps.kind.outputs.kind }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # `before` is right for a squash: it is the merge-base. After a force-push to a phase-*
+      # branch it can be unreachable: this job fails, and nothing builds or deploys.
+      - id: kind
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        # Two lines: inside `echo "kind=$(…)"` a failed script would pass as an empty kind.
+        run: |
+          kind=$(node scripts/change-kind.mjs kind "$BASE_SHA" "$HEAD_SHA")
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: changes
+    if: needs.changes.outputs.kind == 'code' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,21 +80,33 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
 
+  # main's check: a pull request's run is on its merge ref, and main can have moved since.
+  verify:
+    needs: changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.kind == 'code'
+    uses: ./.github/workflows/verify.yml
+
   # Runs the server's deploy.sh with this commit (docs/deployment.md). The key can do
   # nothing else: authorized_keys pins it to that script. Its secrets live in the
   # `production` environment, which only main may use — a workflow on another branch
-  # cannot read them, whatever its `if:`. One deploy at a time, in merge order.
+  # cannot read them, whatever its `if:`. One deploy at a time.
   deploy:
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [changes, build, verify]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.kind == 'code'
     environment: production
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     concurrency:
       group: deploy
       cancel-in-progress: false
     timeout-minutes: 20
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Deploy
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -78,7 +115,19 @@ jobs:
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           # user@host
           TARGET: ${{ secrets.DEPLOY_SSH_TARGET }}
+        # An older merge must not deploy over a newer one, whose run deploys this code too. Only
+        # newer code has such a run: docs or tests since must not leave this commit undeployed.
+        # The repo is public, so the fetch needs no token.
+        # Limit: if the newer merge fails `verify`, neither deploys and production stays behind;
+        # main's red run says so. Past that: deploy.sh by hand with this commit's sha.
         run: |
+          git fetch -q origin main
+          tip=$(git rev-parse origin/main)
+          since=$(node scripts/change-kind.mjs kind "$GITHUB_SHA" "$tip")
+          if [ "$tip" != "$GITHUB_SHA" ] && [ "$since" = code ]; then
+            echo "main moved on to $tip, with code: its run deploys this commit too, if it passes"
+            exit 0
+          fi
           install -m 600 /dev/null ~/deploy_key
           echo "$SSH_KEY" > ~/deploy_key
           echo "$KNOWN_HOSTS" > ~/known_hosts

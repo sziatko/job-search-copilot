@@ -1,8 +1,9 @@
 name: CI
 
+# Every pull request gets what its change needs (scripts/change-kind.mjs), and `gate` is the
+# one required check. Jobs that skip, not workflow `paths`: a required workflow that a filter
+# skips stays pending forever.
 on:
-  push:
-    branches: [main]
   pull_request:
 
 # Reads the repo, writes nothing to GitHub.
@@ -10,129 +11,62 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      kind: ${{ steps.kind.outputs.kind }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - id: kind
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # Two lines: inside `echo "kind=$(…)"` a failed script would pass as an empty kind.
+        run: |
+          kind=$(node scripts/change-kind.mjs kind "$BASE_SHA" "$HEAD_SHA")
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+
   verify:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.kind != 'docs'
+    uses: ./.github/workflows/verify.yml
 
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: job_search_copilot_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      # vitest configs read process.env when no .env.test file is present (CI has none).
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/job_search_copilot_test
-      # Auth — fake values, as in .env.test.example.
-      BETTER_AUTH_SECRET: test-secret-at-least-32-characters-long
-      BETTER_AUTH_URL: http://localhost:3000
-      WEB_ORIGIN: http://localhost:5173
-      GOOGLE_CLIENT_ID: test-google-client-id
-      GOOGLE_CLIENT_SECRET: test-google-client-secret
-      LINKEDIN_CLIENT_ID: test-linkedin-client-id
-      LINKEDIN_CLIENT_SECRET: test-linkedin-client-secret
-      AUTH_ALLOWED_EMAILS: me@example.com
-      PASSKEY_RP_ID: localhost
-      MCP_PUBLIC_URL: http://localhost:3001/mcp
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-
-      - name: Generate Prisma client
-        run: npm run generate --workspace=@job-search-copilot/core
-
-      - name: Apply migrations to the test database
-        working-directory: packages/core
-        run: npx prisma migrate deploy
-
-      - run: npm run lint
-
-      - run: npm run typecheck
-
-      - run: npm test
-
-      - run: npm run build
-
-  # Playwright over the real api, web and DB (ADR-0037). Pull requests only: minutes,
-  # not seconds, and a push to main has passed it on its PR. In the image the visual
-  # tests' baselines come from (e2e/Dockerfile — keep the two tags equal).
   e2e:
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: needs.changes.outputs.kind != 'docs'
+    uses: ./.github/workflows/e2e.yml
+
+  # After `changes` only, so a docs PR gets its status too, and well before `gate` is green.
+  review-status:
+    needs: changes
     runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
-      options: --ipc=host
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          # A superuser: the snapshot restore sets session_replication_role.
-          # prepare-db.ts creates job_search_copilot_e2e and migrates it.
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          KIND: ${{ needs.changes.outputs.kind }}
+          ACTOR: ${{ github.actor }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/review-status.mjs ci
 
-    env:
-      # Every variable of .env.e2e (gitignored, so CI has none) — fake values.
-      # In a container job a service is reached by its name, not localhost.
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/job_search_copilot_e2e
-      BETTER_AUTH_SECRET: e2e-secret-at-least-32-characters-long
-      BETTER_AUTH_URL: http://localhost:3100
-      WEB_ORIGIN: http://localhost:5174
-      GOOGLE_CLIENT_ID: e2e-google-client-id
-      GOOGLE_CLIENT_SECRET: e2e-google-client-secret
-      LINKEDIN_CLIENT_ID: e2e-linkedin-client-id
-      LINKEDIN_CLIENT_SECRET: e2e-linkedin-client-secret
-      AUTH_ALLOWED_EMAILS: me@example.com
-      PASSKEY_RP_ID: localhost
-      MCP_PUBLIC_URL: http://localhost:3001/mcp
-
+  gate:
+    if: always()
+    needs: [changes, verify, e2e]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The image's own Node and Chromium: no setup-node, no `playwright install`.
-      - run: npm ci
-
-      - name: Generate Prisma client
-        run: npm run generate --workspace=@job-search-copilot/core
-
-      # The e2e files and the api read core's dist/.
-      - name: Build core
-        run: npm run build --workspace=@job-search-copilot/core
-
-      - run: npm run test:e2e
-
-      # What `npm run test:visual` runs in its container (docker-compose.yml `visual`).
-      - name: Visual tests
-        run: npx playwright test -c e2e
-        env:
-          E2E_VISUAL: '1'
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 14
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/change-kind.mjs gate
