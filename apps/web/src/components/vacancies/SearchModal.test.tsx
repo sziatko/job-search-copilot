@@ -117,7 +117,7 @@ describe('SearchModal', () => {
         statusChangedAt: new Date(Date.now() - 45 * DAY).toISOString(),
         usedTailoredResume: true,
         sentCoverLetter: true,
-        tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }],
+        tags: [{ id: 1, name: 'Remote', tone: 'GREEN' }],
       }),
     ]);
     await screen.findByText('Beta Corp');

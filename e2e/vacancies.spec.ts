@@ -158,7 +158,7 @@ test('a tag: created on a row, kept on a reload, reused on another, removed', as
 
   await row.getByRole('button', { name: 'Add tag' }).click();
   await dialog.getByLabel('Tag name').fill(name);
-  await dialog.getByRole('radio', { name: 'Warning' }).check();
+  await dialog.getByRole('radio', { name: 'Amber' }).check();
   await dialog.getByRole('button', { name: `Create “${name}”` }).click();
   await expect(dialog).toBeHidden();
   await expect(row.getByRole('button', { name: `Remove tag ${name}` })).toBeVisible();
@@ -246,4 +246,37 @@ test('a long company history scrolls inside the dialog, which stays on screen', 
   await expect(dialog.getByText(`${count} vacancies, newest first`)).toBeVisible();
   await expect(dialog).toBeInViewport({ ratio: 1 });
   await expect(dialog.getByRole('button', { name: 'Close' })).toBeInViewport();
+});
+
+test("a row's badges share one top", async ({ page }) => {
+  await page.goto('/vacancies');
+  const { row } = await firstRow(page);
+  const cells = row.getByRole('cell');
+  const badges = {
+    score: cells.nth(2).locator('span').first(),
+    recommendation: cells.nth(3).locator('span').first(),
+    status: cells.nth(5).locator('span').first(),
+    action: cells.nth(6).getByRole('button').first(),
+  };
+  const tops: Record<string, number> = {};
+  for (const [name, badge] of Object.entries(badges)) {
+    tops[name] = (await badge.boundingBox())?.y ?? Number.NaN;
+  }
+  expect(Math.abs(tops.recommendation - tops.score), JSON.stringify(tops)).toBeLessThan(0.5);
+  expect(Math.abs(tops.status - tops.score), JSON.stringify(tops)).toBeLessThan(0.5);
+  expect(Math.abs(tops.action - tops.score), JSON.stringify(tops)).toBeLessThan(0.5);
+});
+
+test('the meta buttons are one size', async ({ page }) => {
+  await page.goto('/vacancies');
+  // The seed's companies hold a handful of vacancies each, so the count has one digit.
+  const row = rows(page)
+    .filter({ has: page.getByRole('button', { name: /other vacanc/ }) })
+    .first();
+  const history = await row.getByRole('button', { name: /other vacanc/ }).boundingBox();
+  const addTag = await row.getByRole('button', { name: 'Add tag' }).boundingBox();
+  if (!history || !addTag) throw new Error('a meta button is not on screen');
+  const sizes = JSON.stringify({ history, addTag });
+  expect(Math.abs(history.height - addTag.height), sizes).toBeLessThanOrEqual(1);
+  expect(Math.abs(history.width - addTag.width), sizes).toBeLessThanOrEqual(1);
 });

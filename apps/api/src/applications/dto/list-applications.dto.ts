@@ -7,6 +7,7 @@ import {
 } from '@job-search-copilot/core';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsRowId } from '../../common/row-id';
 
 export class ListApplicationsQueryDto {
   @IsOptional()
@@ -39,7 +40,6 @@ export class ListApplicationsQueryDto {
   /** The paging (ADR-0030): the previous page's `nextCursor`. */
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
+  @IsRowId()
   cursor?: number;
 }

@@ -17,6 +17,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsRowId } from '../../common/row-id';
 
 export class ListVacanciesQueryDto {
   @IsOptional()
@@ -61,8 +62,7 @@ export class ListVacanciesQueryDto {
   /** The paging (ADR-0030): the previous page's `nextCursor`. */
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
+  @IsRowId()
   cursor?: number;
 
   @IsOptional()

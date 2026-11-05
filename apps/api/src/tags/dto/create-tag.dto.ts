@@ -7,7 +7,7 @@ export class CreateTagDto {
   @IsString()
   name!: string;
 
-  /** Default `NEUTRAL`. Not @IsOptional, which lets `null` through, a 500. */
+  /** Default `GREY`. Not @IsOptional, which lets `null` through, a 500. */
   @ValidateIf((dto) => dto.tone !== undefined)
   @IsEnum(TagTone)
   tone?: TagTone;

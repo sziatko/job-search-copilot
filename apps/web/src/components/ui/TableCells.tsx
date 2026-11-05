@@ -66,7 +66,7 @@ export function RoleMeta({
 /** A button on the meta line, shaped for its text rather than an icon button's 30px square,
  * which would stretch the row and push the line around as it appears. */
 const META_BUTTON =
-  'relative ml-2 inline-flex cursor-pointer items-center gap-1 rounded-sm border border-border-strong px-1 py-px align-middle text-caption font-bold text-ink-muted hover:border-accent-soft-border hover:bg-accent-soft hover:text-accent-ink aria-disabled:opacity-50 [&_svg]:size-3';
+  'relative ml-2 inline-flex h-5 min-w-8 cursor-pointer items-center justify-center gap-1 rounded-sm border border-border-strong px-1 align-middle text-caption font-bold text-ink-muted hover:border-accent-soft-border hover:bg-accent-soft hover:text-accent-ink aria-disabled:opacity-50 [&_svg]:size-3';
 
 /** Opens the company's other vacancies; none when the row is its company's only one. */
 export function CompanyHistoryButton({
@@ -100,6 +100,7 @@ export function AddTagButton({ saving, onClick }: { saving: boolean; onClick: ()
   return (
     <button
       type="button"
+      data-add-tag
       aria-disabled={saving}
       onClick={saving ? undefined : onClick}
       className={META_BUTTON}

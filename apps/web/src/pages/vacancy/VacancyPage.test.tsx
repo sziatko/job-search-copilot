@@ -115,7 +115,7 @@ describe('VacancyPage', () => {
   });
 
   it('shows the tags in the header', async () => {
-    renderAt('/vacancies/1', [fakeVacancy({ tags: [{ id: 1, name: 'Remote', tone: 'GOOD' }] })]);
+    renderAt('/vacancies/1', [fakeVacancy({ tags: [{ id: 1, name: 'Remote', tone: 'GREEN' }] })]);
 
     expect(
       within(await screen.findByRole('list', { name: 'Tags' })).getByText('Remote'),
@@ -128,7 +128,7 @@ describe('VacancyPage', () => {
     renderAt(
       '/vacancies/1',
       rows,
-      ...buildHandlers(rows, [{ id: 1, name: 'Remote', tone: 'GOOD' }]),
+      ...buildHandlers(rows, [{ id: 1, name: 'Remote', tone: 'GREEN' }]),
     );
     const user = userEvent.setup();
 
@@ -150,7 +150,7 @@ describe('VacancyPage', () => {
   });
 
   it("quotes the server when it refuses a tag, and the header's tags stay", async () => {
-    const remote = { id: 1, name: 'Remote', tone: 'GOOD' } as const;
+    const remote = { id: 1, name: 'Remote', tone: 'GREEN' } as const;
     renderAt(
       '/vacancies/1',
       [fakeVacancy({ id: 1, tags: [remote] })],
@@ -163,6 +163,28 @@ describe('VacancyPage', () => {
 
     expect(await screen.findByText('That vacancy is gone')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove tag Remote' })).toBeInTheDocument();
+    const addTag = screen.getByRole('button', { name: 'Add tag' });
+    expect(addTag).toHaveFocus();
+    expect(addTag).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('moves focus from a removed tag to the next ×, then Add tag', async () => {
+    const remote = { id: 1, name: 'Remote', tone: 'GREEN' } as const;
+    const contract = { id: 2, name: 'Contract', tone: 'GREY' } as const;
+    renderAt('/vacancies/1', [fakeVacancy({ id: 1, tags: [contract, remote] })]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Remove tag Contract' }));
+    const next = screen.getByRole('button', { name: 'Remove tag Remote' });
+    expect(next).toHaveFocus();
+    // Not optimistic: the chip stays until the refetch.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Remove tag Contract' })).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(next).toHaveAttribute('aria-disabled', 'false'));
+
+    await user.click(next);
+    expect(screen.getByRole('button', { name: 'Add tag' })).toHaveFocus();
   });
 
   it('asks for the other vacancies by company, whatever its spelling (ADR-0032)', async () => {

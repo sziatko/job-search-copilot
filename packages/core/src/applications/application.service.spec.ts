@@ -78,8 +78,8 @@ describe('ApplicationService', () => {
     expect(application.tags).toEqual([]);
     await new TagService().tagVacancies(userId, [{ vacancyId: id, add: ['Remote', 'poland'] }]);
     const expected = [
-      { id: expect.any(Number), name: 'poland', tone: 'NEUTRAL' },
-      { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' },
+      { id: expect.any(Number), name: 'poland', tone: 'GREY' },
+      { id: expect.any(Number), name: 'Remote', tone: 'GREY' },
     ];
 
     expect((await applications.list(userId)).items[0].tags).toEqual(expected);

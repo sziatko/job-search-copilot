@@ -1,5 +1,4 @@
 import { ANALYSIS_BATCH_MAX, MAX_LENGTH, Recommendation } from '@job-search-copilot/core';
-import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -11,8 +10,9 @@ import {
   Max,
   MaxLength,
   Min,
-  ValidateNested,
 } from 'class-validator';
+import { IsNestedItems } from '../../common/is-nested-items';
+import { IsRowId } from '../../common/row-id';
 import { IsTagNames } from '../../tags/dto/tag-vacancies.dto';
 
 /** `POST /vacancies/:id/analysis` — the id is the path's. */
@@ -37,8 +37,7 @@ export class SubmitAnalysisDto {
 }
 
 export class SubmitAnalysisItemDto extends SubmitAnalysisDto {
-  @IsInt()
-  @Min(1)
+  @IsRowId()
   id!: number;
 }
 
@@ -47,7 +46,6 @@ export class SubmitAnalysesDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(ANALYSIS_BATCH_MAX)
-  @ValidateNested({ each: true })
-  @Type(() => SubmitAnalysisItemDto)
+  @IsNestedItems(() => SubmitAnalysisItemDto)
   analyses!: SubmitAnalysisItemDto[];
 }

@@ -19,7 +19,7 @@ export interface TagSummary extends TagRef {
 
 export interface CreateTagInput {
   name: string;
-  /** Default `NEUTRAL`. */
+  /** Default `GREY`. */
   tone?: TagTone;
 }
 

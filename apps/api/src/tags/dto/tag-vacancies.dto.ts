@@ -1,18 +1,16 @@
 import { ANALYSIS_BATCH_MAX, TAGS_PER_VACANCY_MAX } from '@job-search-copilot/core';
 import { applyDecorators } from '@nestjs/common';
-import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsInt,
-  IsObject,
   IsString,
   Max,
   Min,
   ValidateIf,
-  ValidateNested,
 } from 'class-validator';
+import { IsNestedItems } from '../../common/is-nested-items';
 
 /**
  * Tag names in a write, optional. More than a vacancy can hold is a 400 here, before any
@@ -50,9 +48,6 @@ export class TagVacanciesDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(ANALYSIS_BATCH_MAX)
-  // @ValidateNested recurses into an array, so `[[{…}]]` would pass with no `vacancyId`.
-  @IsObject({ each: true })
-  @ValidateNested({ each: true })
-  @Type(() => TagVacanciesItemDto)
+  @IsNestedItems(() => TagVacanciesItemDto)
   items!: TagVacanciesItemDto[];
 }

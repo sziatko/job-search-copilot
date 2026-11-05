@@ -1,5 +1,6 @@
 import { MAX_LENGTH, PIPELINE_STATUSES, type PipelineStatus } from '@job-search-copilot/core';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsRowId } from '../../common/row-id';
 
 /**
  * The API only exposes the by-id path: the /vacancies page always knows the
@@ -7,8 +8,7 @@ import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'cl
  * path is MCP only.
  */
 export class RecordApplicationDto {
-  @IsInt()
-  @Min(1)
+  @IsRowId()
   vacancyId!: number;
 
   @IsOptional()

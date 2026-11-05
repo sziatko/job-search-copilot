@@ -12,9 +12,9 @@ import { routeTree } from '@/router';
 import { API_URL, buildHandlers, fakeVacancy, holdGet } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 
-const REMOTE: TagRef = { id: 1, name: 'Remote', tone: 'GOOD' };
-const RELOCATION: TagRef = { id: 2, name: 'Relocation', tone: 'WARN' };
-const UNUSED: TagRef = { id: 3, name: 'Unused', tone: 'NEUTRAL' };
+const REMOTE: TagRef = { id: 1, name: 'Remote', tone: 'GREEN' };
+const RELOCATION: TagRef = { id: 2, name: 'Relocation', tone: 'AMBER' };
+const UNUSED: TagRef = { id: 3, name: 'Unused', tone: 'GREY' };
 
 function renderProfile() {
   const router = createRouter({
@@ -109,18 +109,18 @@ describe('/profile: editing a tag', () => {
     expect(screen.getByRole('button', { name: 'Edit tag Fully remote' })).toHaveFocus();
   });
 
-  it('picks a tone, and the dialog opens with it next time', async () => {
+  it('picks a colour, and the dialog opens with it next time', async () => {
     serveTags();
     const { user } = renderProfile();
 
     const dialog = await openEdit(user, 'Unused');
-    expect(within(dialog).getByRole('radio', { name: 'Neutral' })).toBeChecked();
-    await user.click(within(dialog).getByRole('radio', { name: 'Accent' }));
+    expect(within(dialog).getByRole('radio', { name: 'Grey' })).toBeChecked();
+    await user.click(within(dialog).getByRole('radio', { name: 'Blue' }));
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     const again = await openEdit(user, 'Unused');
-    expect(within(again).getByRole('radio', { name: 'Accent' })).toBeChecked();
+    expect(within(again).getByRole('radio', { name: 'Blue' })).toBeChecked();
     expect(within(again).getByRole('textbox', { name: 'Tag name' })).toHaveValue('Unused');
   });
 

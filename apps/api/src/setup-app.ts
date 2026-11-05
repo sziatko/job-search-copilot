@@ -3,6 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { DomainExceptionFilter } from './common/domain-exception.filter';
+import { RejectNulPipe } from './common/reject-nul.pipe';
 import type { Env } from './config/env.validation';
 
 /**
@@ -48,7 +49,7 @@ export function configureApp(app: NestExpressApplication, config: ConfigService<
     );
   }
 
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new RejectNulPipe(), new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new DomainExceptionFilter());
   // Forward SIGTERM/SIGINT to onModuleDestroy hooks (PrismaService.$disconnect).
   app.enableShutdownHooks();

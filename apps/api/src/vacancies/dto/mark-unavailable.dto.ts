@@ -1,20 +1,17 @@
 import { MAX_LENGTH } from '@job-search-copilot/core';
-import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
-  IsInt,
   IsNotEmpty,
   IsString,
   MaxLength,
-  Min,
-  ValidateNested,
 } from 'class-validator';
+import { IsNestedItems } from '../../common/is-nested-items';
+import { IsRowId } from '../../common/row-id';
 
 export class MarkUnavailableItemDto {
-  @IsInt()
-  @Min(1)
+  @IsRowId()
   id!: number;
 
   /** Why the posting is gone ("LinkedIn: no longer accepting applications"); the comment. */
@@ -29,7 +26,6 @@ export class MarkUnavailableDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
-  @ValidateNested({ each: true })
-  @Type(() => MarkUnavailableItemDto)
+  @IsNestedItems(() => MarkUnavailableItemDto)
   items!: MarkUnavailableItemDto[];
 }

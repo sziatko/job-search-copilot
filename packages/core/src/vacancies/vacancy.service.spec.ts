@@ -1206,12 +1206,12 @@ describe('VacancyService', () => {
 
     it('list, getById and a status change carry them by name, with id and tone', async () => {
       const { vacancy } = await service.save(userId, input({ tags: ['Remote', 'poland'] }));
-      const { id: dream } = await tagService.create(userId, { name: 'Dream', tone: 'GOOD' });
+      const { id: dream } = await tagService.create(userId, { name: 'Dream', tone: 'GREEN' });
       await tagService.tagVacancies(userId, [{ vacancyId: vacancy.id, add: ['dream'] }]);
       const expected = [
-        { id: dream, name: 'Dream', tone: 'GOOD' },
-        { id: expect.any(Number), name: 'poland', tone: 'NEUTRAL' },
-        { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL' },
+        { id: dream, name: 'Dream', tone: 'GREEN' },
+        { id: expect.any(Number), name: 'poland', tone: 'GREY' },
+        { id: expect.any(Number), name: 'Remote', tone: 'GREY' },
       ];
 
       expect((await service.list(userId)).items[0].tags).toEqual(expected);

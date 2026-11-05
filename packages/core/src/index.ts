@@ -18,7 +18,7 @@ export { APPLICATION_STATES } from './applications/application.types';
 export { verifyApiKey } from './auth/api-key';
 export type { Auth, AuthConfig } from './auth/create-auth';
 export { createAuth } from './auth/create-auth';
-export { escapeLikePattern } from './db/like';
+export { escapeLikePattern, INT4_MAX } from './db/like';
 export { createPrismaClient, getPrisma } from './db/prisma-client';
 export {
   AlreadyAnalysedError,

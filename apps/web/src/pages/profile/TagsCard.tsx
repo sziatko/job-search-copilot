@@ -96,7 +96,7 @@ export function TagsCard() {
             {tags.data.map((tag) => (
               <li key={tag.id} className="flex items-center justify-between gap-3">
                 <span className="flex min-w-0 flex-wrap items-center gap-2">
-                  <Chip tone={CHIP_TONE[tag.tone]}>{tag.name}</Chip>
+                  <Chip color={CHIP_TONE[tag.tone]}>{tag.name}</Chip>
                   <span className="text-ink-muted">{vacancies(tag.vacancyCount)}</span>
                 </span>
                 <span className="flex flex-none gap-2">

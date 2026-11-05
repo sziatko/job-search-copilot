@@ -1,20 +1,21 @@
 import type { ReactNode } from 'react';
 import { IconCross } from '../icons';
-import { Tag } from './Tag';
-import type { Tone } from './tone';
+import { tagClass } from './Tag';
+import { CHIP_COLOR, type ChipColor } from './tone';
 
-/** A label the user owns, such as a vacancy's tag: a `Tag` that can wrap a long name and,
- * with `onRemove`, carries a × button named by `removeLabel`, off under `removeDisabled`.
- * `dense` is its size in a table row. */
+/** A label the user owns, such as a vacancy's tag: `Tag`'s shape in any colour, that can
+ * wrap a long name and, with `onRemove`, carries a × button named by `removeLabel`, off under
+ * `removeDisabled`: `aria-disabled`, not `disabled`, as focus cannot stay on a disabled button and
+ * a write puts it on the next ×. `dense` is its size in a table row. */
 export function Chip({
-  tone,
-  dense,
+  color,
+  dense = false,
   children,
   onRemove,
   removeLabel,
   removeDisabled,
 }: {
-  tone: Tone;
+  color: ChipColor;
   dense?: boolean;
   children: ReactNode;
 } & (
@@ -22,20 +23,20 @@ export function Chip({
   | { onRemove?: undefined; removeLabel?: undefined; removeDisabled?: undefined }
 )) {
   return (
-    <Tag tone={tone} dense={dense} className="inline-flex max-w-full items-center gap-1">
+    <span className={`${tagClass(dense)} ${CHIP_COLOR[color]} max-w-full gap-1`}>
       {/* Unlike a status's word, a name can be wider than its cell. */}
       <span className="min-w-0 whitespace-normal wrap-anywhere">{children}</span>
       {onRemove && (
         <button
           type="button"
           aria-label={removeLabel}
-          disabled={removeDisabled}
-          onClick={onRemove}
-          className="flex-none cursor-pointer hover:text-ink disabled:opacity-50 [&_svg]:size-3"
+          aria-disabled={removeDisabled}
+          onClick={removeDisabled ? undefined : onRemove}
+          className="flex-none cursor-pointer hover:text-ink aria-disabled:opacity-50 [&_svg]:size-3"
         >
           <IconCross />
         </button>
       )}
-    </Tag>
+    </span>
   );
 }

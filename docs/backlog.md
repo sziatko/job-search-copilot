@@ -149,14 +149,12 @@ also answer [`core` dev-loop friction](#core-dev-loop-friction) below.
 
 ## Improvements and fixes
 
-### Odd input is a 500 on REST
+### A body nested thousands of levels deep
 
-Found by the review of phase 9.1, each answers a 500 where a 400 or a 404 belongs. A path id
-past Int4, on every `ParseIntPipe` route. `id` in `POST /vacancies/analysis`, which has no
-`@Max` as `vacancyId` in `tag-vacancies.dto.ts` has. A NUL character (`\u0000`) in any free
-string, tag names and `company` alike: Postgres refuses it. And `[[{…}]]` passes
-`@ValidateNested({ each: true })` with every field unread: `TagVacanciesDto` adds
-`@IsObject({ each: true })`, the other nested DTOs do not. No data is at risk.
+Left over from the odd-input fixes: a JSON body nested about 3000 levels overflows
+`plainToInstance`, which should answer a 500 (seen in a direct call, not over HTTP). The guard
+runs first, so only a signed-in caller reaches it, and nothing is written. A depth limit in the
+body parser would close it.
 
 ### A rejected item in `save_vacancies_batch`
 
@@ -165,11 +163,6 @@ every `fullText` included; that is safe by `applyUrl`, only costly. Checking the
 top of `saveMany` would stop a bad name before anything is written. A resend also misses the
 first row when `applyUrl` is not http (`z.url()` takes `mailto:`): `save()` keys such a row on
 a `tracker://` URL with the date in it, so past UTC midnight it makes a second vacancy.
-
-### Focus after removing a tag by keyboard
-
-× on a chip removes the button that had the focus, and it falls to `body`, so a keyboard user
-starts the page again. It belongs on the next chip, or on `Add tag`.
 
 ### Security leftovers
 
@@ -198,14 +191,6 @@ Seen 2026-10-30, three merges in two minutes: one deploy failed in `deploy.sh`'s
 prod until a manual re-run. GitHub emails a failure, not a cancel. Options: a retry
 around the pull; a check that the deployed `JSC_TAG` is `main`'s head (a scheduled
 workflow, or the uptime check above), which catches a cancel and a failure alike.
-
-### Better Auth rate limits share one bucket
-
-The api logs "Rate limiting could not determine a client IP": behind Caddy it resolves
-no client IP, so each path's limit is one bucket for everyone — `/oauth2/token` (the
-OAuth provider's 20 a minute) for every MCP client's refresh, and the sign-in paths for
-every visitor. Set `advanced.ipAddress.ipAddressHeaders` (`x-forwarded-for`, which Caddy
-sets) or `trustedProxies` in `createAuth`.
 
 ### `core` dev-loop friction
 

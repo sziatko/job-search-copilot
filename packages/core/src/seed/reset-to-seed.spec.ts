@@ -47,14 +47,14 @@ describe('resetToSeed', () => {
     expect(await prisma.tag.count({ where: { userId: other } })).toBe(1);
   }, 120_000);
 
-  it('gives every tone a vacancy, as the seed says', async () => {
+  it('gives every colour a vacancy, as the seed says', async () => {
     await resetToSeed(prisma, userId);
 
     const tags = await prisma.tag.findMany({
       where: { userId },
       select: { tone: true, _count: { select: { vacancies: true } } },
     });
-    expect(new Set(tags.map((tag) => tag.tone)).size).toBe(5);
+    expect(new Set(tags.map((tag) => tag.tone)).size).toBe(10);
     for (const tag of tags) expect(tag._count.vacancies).toBeGreaterThan(0);
     expect(await prisma.vacancyTag.count({ where: { userId } })).toBe(
       SEED_VACANCIES.flatMap((v) => v.tags).length,

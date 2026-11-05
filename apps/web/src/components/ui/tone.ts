@@ -6,7 +6,7 @@ export const TONE = {
   good: 'border-good-soft-border bg-good-soft text-good-ink',
   warn: 'border-warn-soft-border bg-warn-soft text-warn-ink',
   bad: 'border-bad-soft-border bg-bad-soft text-bad-ink',
-  neutral: 'border-border bg-surface-sunken text-ink-muted',
+  neutral: 'border-grey-soft-border bg-grey-soft text-grey-ink',
   accent: 'border-accent-soft-border bg-accent-soft text-accent-ink',
 } as const;
 
@@ -17,7 +17,7 @@ export const TONE_FILL = {
   good: 'bg-good-soft text-good-ink',
   warn: 'bg-warn-soft text-warn-ink',
   bad: 'bg-bad-soft text-bad-ink',
-  neutral: 'bg-surface-sunken text-ink-muted',
+  neutral: 'bg-grey-soft text-grey-ink',
   accent: 'bg-accent-soft text-accent-ink',
 } as const satisfies Record<Tone, string>;
 
@@ -38,3 +38,20 @@ export const TONE_DOT = {
   neutral: 'bg-border-strong',
   accent: 'bg-accent',
 } as const satisfies Record<Tone, string>;
+
+/** A tinted label in a colour with no meaning of its own, for a label the user owns: `Chip`.
+ * A status takes a `Tone`, so it cannot take one of these. */
+export const CHIP_COLOR = {
+  grey: 'border-grey-soft-border bg-grey-soft text-grey-ink',
+  green: 'border-green-soft-border bg-green-soft text-green-ink',
+  amber: 'border-amber-soft-border bg-amber-soft text-amber-ink',
+  red: 'border-red-soft-border bg-red-soft text-red-ink',
+  blue: 'border-blue-soft-border bg-blue-soft text-blue-ink',
+  teal: 'border-teal-soft-border bg-teal-soft text-teal-ink',
+  violet: 'border-violet-soft-border bg-violet-soft text-violet-ink',
+  pink: 'border-pink-soft-border bg-pink-soft text-pink-ink',
+  orange: 'border-orange-soft-border bg-orange-soft text-orange-ink',
+  lime: 'border-lime-soft-border bg-lime-soft text-lime-ink',
+} as const;
+
+export type ChipColor = keyof typeof CHIP_COLOR;

@@ -100,7 +100,7 @@ model Tag {
   user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
   nameKey   String
-  tone      TagTone      @default(NEUTRAL)
+  tone      TagTone      @default(GREY)
   vacancies VacancyTag[]
 
   @@unique([userId, nameKey])
@@ -123,11 +123,16 @@ model VacancyTag {
 }
 
 enum TagTone {
-  NEUTRAL
-  GOOD
-  WARN
-  BAD
-  ACCENT
+  GREY
+  GREEN
+  AMBER
+  RED
+  BLUE
+  TEAL
+  VIOLET
+  PINK
+  ORANGE
+  LIME
 }
 
 enum Recommendation {

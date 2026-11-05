@@ -1218,8 +1218,8 @@ describe('job-search-copilot MCP server', () => {
 
       const listed = JSON.parse(textOf(await call(client, 'list_tags', {})));
       expect(listed).toEqual([
-        { id: expect.any(Number), name: 'Poland', tone: 'NEUTRAL', vacancyCount: 1 },
-        { id: expect.any(Number), name: 'Remote', tone: 'NEUTRAL', vacancyCount: 2 },
+        { id: expect.any(Number), name: 'Poland', tone: 'GREY', vacancyCount: 1 },
+        { id: expect.any(Number), name: 'Remote', tone: 'GREY', vacancyCount: 2 },
       ]);
 
       const other = randomUUID();
