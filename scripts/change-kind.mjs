@@ -28,18 +28,22 @@ export function gateResult({ changes, verify, e2e }) {
   return verify.result === 'success' && e2e.result === 'success';
 }
 
-function kindBetween(base, head) {
+export function changedPaths(base, head) {
   // An empty side would mean HEAD to git, and a wrong diff with no error.
-  if (!base || !head) throw new Error(`kind needs <base> and <head>, got "${base}" "${head}"`);
-  // A push that creates a branch has no previous commit: the zeros are not a commit to diff.
-  if (/^0+$/.test(base)) return 'code';
+  if (!base || !head) throw new Error(`needs <base> and <head>, got "${base}" "${head}"`);
   // --no-renames: a rename from .ts to .md must list the .ts. -z: a path git would quote.
   const listed = execFileSync(
     'git',
     ['diff', '--name-only', '--no-renames', '-z', `${base}...${head}`],
     { encoding: 'utf8' },
   );
-  return changeKind(listed.split('\0').filter(Boolean));
+  return listed.split('\0').filter(Boolean);
+}
+
+export function kindBetween(base, head) {
+  // A push that creates a branch has no previous commit: the zeros are not a commit to diff.
+  if (/^0+$/.test(base)) return 'code';
+  return changeKind(changedPaths(base, head));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -55,3 +59,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     throw new Error(`unknown command "${command}", expected kind or gate`);
   }
 }
+// a code change
