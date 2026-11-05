@@ -26,6 +26,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         # Two lines: inside `echo "kind=$(…)"` a failed script would pass as an empty kind.
         run: |
+          exit 1
           kind=$(node scripts/change-kind.mjs kind "$BASE_SHA" "$HEAD_SHA")
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
 
