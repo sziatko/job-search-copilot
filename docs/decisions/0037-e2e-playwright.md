@@ -29,8 +29,9 @@ the seed is dated from a fixed "now" (`e2e/clock.ts`), the browser's clock is fi
 there and the api's clock starts there, so no date on a screenshot moves. Fonts are
 self-hosted (`@fontsource`), and every run's seed starts its ids at 1.
 
-It runs: the spec of the area being changed, when a covered feature is edited; the full
-set before a push or a PR; a CI job on pull requests.
+It runs: locally, the spec of the area being changed, when a covered feature is edited; the
+full set and the visual tests only in CI, on every pull request that is not docs alone
+([ADR-0043](0043-one-merge-gate-by-kind-of-change.md)).
 
 ## Why this and not the alternatives
 - **Cypress** — no multi-tab, no virtual WebAuthn authenticator; Playwright has both,
@@ -50,8 +51,9 @@ set before a push or a PR; a CI job on pull requests.
 - The seed is also the future public demo's: changing it changes the demo, and moves
   the e2e counts (they come from `e2e/seed.ts`, derived from `SEED_VACANCIES`).
 - A spec imports `test` / `expect` from `./fixtures`, never from `@playwright/test`.
-- An intended look change updates its baselines in the same commit
-  (`npm run test:visual:update`). The first visual run builds its image: minutes.
+- An intended look change updates its baselines in the same PR, from a CI run
+  ([`development.md` § Testing](../development.md#testing)). The local fallback's first run
+  builds its image: minutes.
 
 ## What this constrains — breaks if you change it
 - The restore and `emptyVacancies` wipe the tables and `resetToSeed` deletes one user's
@@ -62,7 +64,7 @@ set before a push or a PR; a CI job on pull requests.
 - The session cookie's name and signature follow Better Auth; an upgrade that changes
   either breaks e2e sign-in, and `apps/api/test/test-app.ts` with it.
 - Seed data stays made-up (invariant 10): the demo will publish it.
-- The Playwright image tag (`e2e/Dockerfile`, the `e2e` job in `ci.yml`) follows
+- The Playwright image tag (`e2e/Dockerfile`, the job in `.github/workflows/e2e.yml`) follows
   `@playwright/test`: a version bump changes all three, and retakes the baselines.
 - The api's clock in a visual run is `e2e/shifted-clock.mjs`, a `Date` subclass: code
   that calls `Date()` without `new` throws under it.

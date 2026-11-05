@@ -81,7 +81,9 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 | `npm test` / `npm run test:watch` | Vitest across all workspaces (needs the test DB) |
 | `npm run test:e2e` | Playwright end-to-end over its own api, web and `job_search_copilot_e2e` ([ADR-0037](decisions/0037-e2e-playwright.md)); not part of `npm test` |
 | `npm run test:visual` | the visual tests (`e2e/visual.spec.ts`) in the Playwright Linux image, through `docker compose run visual`; extra arguments go to Playwright |
-| `npm run test:visual:update` | the same, rewriting the baselines it differs from |
+| `npm run test:visual:update` | the same, rewriting the baselines it differs from; the fallback for [CI's run](#testing) |
+| `npm run test:scripts` | the tests of the scripts CI runs (`scripts/*.test.mjs`, `node --test`); not part of `npm test` |
+| `npm run review:attest` | after a PR's reviews, sets its `review` status; `-- --migration-checked` when a migration is in the diff ([ADR-0043](decisions/0043-one-merge-gate-by-kind-of-change.md)) |
 | `npm run screenshots` | retake the README's screenshots (`docs/screenshots/`) on the e2e seed, light and dark |
 | `npm run seed` | reset the e2e database to the made-up seed (refuses any DB not named `*_e2e` / `*_test` / `*_demo`) |
 | `npm run lint` / `npm run lint:fix` / `npm run format` | Biome |
@@ -93,12 +95,13 @@ restart or a rebuild: [`architecture.md` § Dev stack](architecture.md#dev-stack
 | `npm run db:pull` | replace the dev DB with a copy of the production one ([`deployment.md`](deployment.md#pull-the-production-database)) |
 | `npm run studio` | Prisma Studio |
 
-CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build against a
-Postgres service on a push to `main` and on every PR; on a PR a second job, `e2e`, runs
-`npm run test:e2e` and the visual tests in the Playwright image ([ADR-0037](decisions/0037-e2e-playwright.md)).
-`.github/workflows/images.yml` builds the three production images on a PR; on a push
-to `main` or a `phase-*` branch it also publishes them to GHCR as
-`ghcr.io/<owner>/jsc-{api,mcp,web}:sha-<commit>`, plus `latest` on `main`.
+CI gives a PR what its kind of change needs ([ADR-0043](decisions/0043-one-merge-gate-by-kind-of-change.md)).
+`.github/workflows/ci.yml` finds the kind and, unless it is docs alone, calls `verify.yml` (lint →
+typecheck → test → test:scripts → build against a Postgres service) and `e2e.yml`
+(`npm run test:e2e` and the visual tests in the Playwright image,
+[ADR-0037](decisions/0037-e2e-playwright.md)). `.github/workflows/images.yml` builds the three
+production images on a code PR; a code push to `main` and any push to a `phase-*` branch also
+publish them to GHCR as `ghcr.io/<owner>/jsc-{api,mcp,web}:sha-<commit>`, plus `latest` on `main`.
 
 Database and migration conventions:
 [`packages/core/prisma/README.md`](../packages/core/prisma/README.md).
@@ -134,10 +137,17 @@ job runs in): font rendering differs on Windows and macOS, so a baseline from th
 would never match. Like `test:e2e`, they read core's `dist/` (the stack's `core`
 watcher, or `npm run build --workspace=@job-search-copilot/core`).
 
-When a change is meant to look different: `npm run test:visual:update`, open the
-changed PNGs in the diff, and commit them with the change. `npm run test:visual --
+When a change is meant to look different, CI takes the new baselines, on the pushed branch:
+
+    gh workflow run e2e.yml --ref <branch> -f update_snapshots=true
+    rm -r e2e/visual.spec.ts-snapshots    # the artifact holds the whole folder
+    gh run download <run id> -n visual-baselines -D e2e/visual.spec.ts-snapshots
+
+Open the changed PNGs in the diff and commit them on that branch.
+`npm run test:visual:update` does the same locally, slowly. `npm run test:visual --
 -g dashboard` narrows a run. A failed run's diffs are in `playwright-report/`
-(`npx playwright show-report`). A new page, dialog or empty state gets a test there.
+(`npx playwright show-report`), and in CI in the `playwright-report` artifact. A new page,
+dialog or empty state gets a test there.
 
 ## Standards
 
@@ -145,7 +155,8 @@ What enforces what; the reasoning stays in the doc each row links.
 
 | Layer | Enforced by | What it holds |
 | --- | --- | --- |
-| Merge gate | The `verify` and `e2e` jobs of `.github/workflows/ci.yml`, required by the GitHub ruleset on `main` | A pull request merges only with both green ([what they run](#scripts-repo-root)), unless an admin bypasses the ruleset. |
+| Merge gate | The `gate` job of `.github/workflows/ci.yml`, required by the GitHub ruleset on `main` | A pull request merges only with what its kind of change needs from CI green ([what it runs](#scripts-repo-root)). |
+| Merge gate | The `review` commit status (`scripts/review-status.mjs`), required by the same ruleset | Code merges only at a reviewed SHA, or with only tests or docs since one; this stops forgetting, not a deliberate bypass ([ADR-0043](decisions/0043-one-merge-gate-by-kind-of-change.md)). |
 | Guard test | `packages/core/src/isolation.spec.ts` | User B, handed user A's ids and data, finds and changes nothing of A's ([invariant 11](architecture.md#system-invariants)). |
 | Guard test | `packages/core/src/db/for-user.spec.ts` | `forUser` scopes or refuses every operation, and `npm run typecheck` holds each service to the raw client as `Unscoped`. |
 | Guard test | `apps/api/test/contract.e2e.spec.ts` | Every response the web parses passes the web's own zod schema against the real API ([invariant 5](architecture.md#system-invariants)). |
@@ -155,7 +166,7 @@ What enforces what; the reasoning stays in the doc each row links.
 | Database | `UNIQUE` constraints | `(userId, applyUrl)` keeps one row per posting per user, so a lost race cannot analyse a vacancy twice ([Analyze-once](domain-model.md#analyze-once)). |
 | Database | The `jsc_app` role | On the server the api and the MCP server change rows only, no DDL ([the database roles](deployment.md#the-database-roles)). |
 | No tool | The [invariants](architecture.md#system-invariants), the [ADRs](decisions/) and the [doc rules](README.md#writing-docs-and-comments) | What the rows above do not cover holds only because an author or a reviewer reads them. |
-| Local | Hooks and review agents, in `.claude/AGENT-SETUP.md` | The owner's Claude Code setup, which a plain clone does not bring, adds a lint on edit and the reviews before a PR. |
+| Local | Hooks and review agents, in `.claude/AGENT-SETUP.md` | The owner's Claude Code setup, which a plain clone does not bring, adds a lint on edit and the reviews behind the `review` status. |
 
 **Code that deletes data checks its target first** (the database name), as
 `vitest.test-db.ts`, `resetToSeed` and `e2e/db.ts` do; never trust an env fallback.
