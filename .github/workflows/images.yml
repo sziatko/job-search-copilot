@@ -97,12 +97,18 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.kind == 'code'
     environment: production
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     concurrency:
       group: deploy
       cancel-in-progress: false
     timeout-minutes: 20
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Deploy
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -111,13 +117,15 @@ jobs:
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           # user@host
           TARGET: ${{ secrets.DEPLOY_SSH_TARGET }}
-        # A queued deploy of an older merge must not run over a newer one, which deploys this
-        # code too. The repo is public, so no token. Two lines: a failed ls-remote stops the
-        # job rather than reading as another commit.
+        # An older merge must not deploy over a newer one, whose run deploys this code too. Only
+        # newer code has such a run: docs or tests since must not leave this commit undeployed.
+        # The repo is public, so the fetch needs no token.
         run: |
-          tip=$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" refs/heads/main)
-          if [ "${tip%%[[:space:]]*}" != "$GITHUB_SHA" ]; then
-            echo "main moved on to ${tip%%[[:space:]]*}: its own run deploys this code too"
+          git fetch -q origin main
+          tip=$(git rev-parse origin/main)
+          since=$(node scripts/change-kind.mjs kind "$GITHUB_SHA" "$tip")
+          if [ "$tip" != "$GITHUB_SHA" ] && [ "$since" = code ]; then
+            echo "main moved on to $tip, with code: its own run deploys this commit too"
             exit 0
           fi
           install -m 600 /dev/null ~/deploy_key
