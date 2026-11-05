@@ -21,7 +21,8 @@ OAuth metadata at `/.well-known/oauth-authorization-server/api/auth` ([ADR-0008]
 `ValidationPipe({ whitelist: true, transform: true })` strips unknown fields and
 coerces types. JSON bodies up to 5 MB (intake carries posting text); no form bodies.
 Free strings are capped by `MAX_LENGTH` (core), the same caps as MCP's inputs. A NUL character
-in a body or query string, and a row id past Int4, are a `400`.
+in a body or query string, and a row id past Int4, are a `400`. One exception: a `vacancyId` past
+Int4 in `POST /vacancies/tags` is a `404`, like any vacancy you do not have.
 
 **Auth** ([ADR-0034](decisions/0034-auth-better-auth-in-core.md)). Every route wants a
 session cookie, else `401`; Better Auth serves `/api/auth/*`. `/health` and the

@@ -134,6 +134,7 @@ no `X-Forwarded-For` and takes Better Auth's shared bucket for its path. A clien
 has a bucket of its own: without `trusted_proxies` Caddy sets the header to the one remote address,
 and Better Auth takes an IP only from a header holding exactly one.
 
-> **Breaks if you change it:** a CDN or a proxy in front of Caddy, or `trusted_proxies` in the
-> Caddyfile, puts several addresses in the header, and every client shares one bucket per path.
-> Then `advanced.ipAddress.trustedProxies` in `createAuth` has to name that proxy.
+> **Breaks if you change it:** behind a CDN or another proxy, the one address in the header is that
+> proxy's, so its clients share a bucket and nothing warns. `trusted_proxies` in the Caddyfile alone
+> puts several addresses there, and every client shares one bucket per path. It takes both:
+> `trusted_proxies`, and `advanced.ipAddress.trustedProxies` in `createAuth` naming that proxy.

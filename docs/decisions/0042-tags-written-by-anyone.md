@@ -43,6 +43,11 @@ tag and another user's vacancy cannot exist at the database level.
 - A new machine name is `GREY`, and a tag the user renamed comes back under its old name
   if a machine repeats it. The way round is the skill's rule: take names from `list_tags`.
 - Rename, tone and delete are not in MCP: an LLM does not rebuild the user's tags.
+- Naming the colours (`…_ten_tag_colours`) renames enum values in one migration and one deploy,
+  against rule 3 of `prisma/README.md`: accepted for a one-user app. Until a service is replaced it
+  and the database disagree: the old api and MCP clients fail on a row with tags, the analyzer's
+  path, and a new web bundle cannot parse the old api's tones. That deploy, which a merge starts,
+  waits until the analyzer is not running.
 
 ## What this constrains — breaks if you change it
 - `attachTags` (`domain/tags.ts`) never lets a P2002 reach an interactive transaction, which
