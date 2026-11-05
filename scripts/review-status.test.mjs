@@ -5,12 +5,25 @@ import { attestRefusal, decide } from './review-status.mjs';
 const sha = 'abc1234def5678abc1234def5678abc1234def56';
 const code = { kind: 'code', actor: 'someone' };
 
-test('decide: a head that is already a success is kept, even after a new CI run', () => {
-  assert.equal(decide({ ...code, headStatus: 'success' }).state, 'keep');
+const reviewed = { state: 'success', description: 'reviewed: ponytail, code, security' };
+
+test('decide: a reviewed head is kept, even after a new CI run', () => {
+  assert.equal(decide({ ...code, headStatus: reviewed }).state, 'keep');
   assert.equal(
-    decide({ ...code, headStatus: 'success', reviewedSha: sha, kindSince: 'code' }).state,
+    decide({ ...code, headStatus: reviewed, reviewedSha: sha, kindSince: 'code' }).state,
     'keep',
   );
+});
+
+test('decide: another success on the head is decided again, it depended on the base', () => {
+  for (const description of ['not needed', 'inherited from abc1234']) {
+    const headStatus = { state: 'success', description };
+    assert.deepEqual(decide({ ...code, headStatus }), {
+      state: 'pending',
+      description: 'needs review',
+    });
+    assert.equal(decide({ kind: 'docs', actor: 'someone', headStatus }).description, 'not needed');
+  }
 });
 
 test('decide: docs and tests need no review', () => {
@@ -32,7 +45,7 @@ test('decide: a bot needs no review, a human on the same PR does', () => {
 
 test('decide: code with no review asks for one', () => {
   assert.deepEqual(decide(code), { state: 'pending', description: 'needs review' });
-  assert.deepEqual(decide({ ...code, headStatus: 'pending' }), {
+  assert.deepEqual(decide({ ...code, headStatus: { state: 'pending', description: 'x' } }), {
     state: 'pending',
     description: 'needs review',
   });

@@ -8,7 +8,8 @@
 // with no integration is satisfied by anyone who can set it, a job named `review` in a PR's own
 // workflow included, and CI runs the PR's copy of this script with write access. A fork PR has a
 // read-only token, so CI cannot post on it, even for docs: the owner runs `attest` there.
-// Past that: reviews in CI.
+// Retargeting a PR runs nothing, so `gate` and `review` stay from the old base: push a commit
+// after it. Past that: reviews in CI, and `edited` in ci.yml's trigger types.
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { changedPaths, kindBetween } from './change-kind.mjs';
@@ -18,10 +19,12 @@ const MIGRATIONS = 'packages/core/prisma/migrations/';
 
 // A kind nobody expected asks for a review: `docs` and `tests` are the only ways out.
 const isCode = (kind) => kind !== 'docs' && kind !== 'tests';
+const isReview = (status) => status?.state === 'success' && status.description.startsWith(REVIEWED);
 
 export function decide({ kind, actor, headStatus, reviewedSha, kindSince }) {
-  // CI can land after `attest`, or be re-run: it must not take a review back.
-  if (headStatus === 'success') return { state: 'keep', description: 'already a success' };
+  // CI can land after `attest`, or be re-run: it must not take a review back. Only a review:
+  // `not needed` and `inherited` hold for one base, and the same SHA can open another PR.
+  if (isReview(headStatus)) return { state: 'keep', description: 'already reviewed' };
   if (!isCode(kind) || actor === 'dependabot[bot]') {
     return { state: 'success', description: 'not needed' };
   }
@@ -69,10 +72,7 @@ function newestReviewed(pr) {
   return commits
     .split('\n')
     .reverse()
-    .find((sha) => {
-      const status = reviewStatus(sha);
-      return status?.state === 'success' && status.description.startsWith(REVIEWED);
-    });
+    .find((sha) => isReview(reviewStatus(sha)));
 }
 
 function ci({ KIND: kind, ACTOR: actor, PR: pr, HEAD_SHA: head }) {
@@ -80,7 +80,7 @@ function ci({ KIND: kind, ACTOR: actor, PR: pr, HEAD_SHA: head }) {
   const { state, description } = decide({
     kind,
     actor,
-    headStatus: reviewStatus(head)?.state,
+    headStatus: reviewStatus(head),
     reviewedSha,
     kindSince: reviewedSha && kindBetween(reviewedSha, head),
   });
@@ -103,7 +103,8 @@ function attest(flags) {
     gateConclusions: gh(
       `repos/{owner}/{repo}/commits/${head}/check-runs?check_name=gate`,
       '--jq',
-      '.check_runs[].conclusion',
+      // A run still going has no conclusion: without a word for it, the filter below drops it.
+      '.check_runs[] | .conclusion // "in_progress"',
     )
       .split('\n')
       .filter(Boolean),

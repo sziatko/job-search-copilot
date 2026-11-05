@@ -64,9 +64,12 @@ phase can be deployed by hand ([ADR-0041](0041-one-origin-images-from-ghcr.md)).
   reviews in CI.
 - A fork PR has a read-only token, so its status is never posted, even for docs: the owner runs
   `review:attest` on it. The same goes for a Dependabot run if its token cannot post `statuses`.
-- `actor` is `github.actor`, so a human re-run or commit on a bot's PR asks for a review: the safe
-  side.
+- `actor` is `github.actor`, so a human commit on a bot's PR asks for a review: the safe side.
 - A force-push takes the reviewed commit off the PR's list, so the review is asked for again.
+- Retargeting a PR runs nothing, so `gate` and `review` stay from the old base, until a new commit.
+  Past that: `edited` in `ci.yml`'s trigger types, at a full run per title edit.
+- If a newer code merge fails `verify`, neither it nor the older one deploys, and production stays
+  behind with `main` red. Past that: `deploy.sh` by hand.
 - A docs or tests commit on `main` has no images: a deploy by hand needs a code commit's SHA.
 
 ## What this constrains — breaks if you change it
@@ -83,7 +86,8 @@ phase can be deployed by hand ([ADR-0041](0041-one-origin-images-from-ghcr.md)).
 - `change-kind.mjs` importing an npm package → `changes` runs before `npm ci`, and every PR fails.
 - `github.sha` in place of `pull_request.head.sha` when posting → the status lands on the merge ref
   and the commit that merges has none.
-- `decide`'s `keep` removed → CI landing after `attest`, or a re-run, takes the review back.
+- `decide`'s `keep` removed → CI landing after `attest`, or a re-run, takes the review back. Widened to
+  any success → a `not needed` from one base passes the same SHA on another.
 - The `reviewed` prefix of the status's description is how `newestReviewed` finds a review:
   `inherited` and `not needed` must not start with it, or they count as one.
 - `deploy` without `verify` in its `needs`, or without its check of what is newer on `main` → a failing `main`

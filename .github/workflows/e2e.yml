@@ -76,16 +76,10 @@ jobs:
 
       # What `npm run test:visual` runs in its container (docker-compose.yml `visual`).
       - name: Visual tests
-        if: ${{ !inputs.update_snapshots }}
-        run: npx playwright test -c e2e
+        run: npx playwright test -c e2e ${UPDATE:+--update-snapshots}
         env:
           E2E_VISUAL: '1'
-
-      - name: New baselines
-        if: ${{ inputs.update_snapshots }}
-        run: npx playwright test -c e2e --update-snapshots
-        env:
-          E2E_VISUAL: '1'
+          UPDATE: ${{ inputs.update_snapshots && 'yes' || '' }}
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ inputs.update_snapshots }}

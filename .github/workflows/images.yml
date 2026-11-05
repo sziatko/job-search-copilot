@@ -84,8 +84,6 @@ jobs:
   verify:
     needs: changes
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.kind == 'code'
-    permissions:
-      contents: read
     uses: ./.github/workflows/verify.yml
 
   # Runs the server's deploy.sh with this commit (docs/deployment.md). The key can do
@@ -120,12 +118,14 @@ jobs:
         # An older merge must not deploy over a newer one, whose run deploys this code too. Only
         # newer code has such a run: docs or tests since must not leave this commit undeployed.
         # The repo is public, so the fetch needs no token.
+        # Limit: if the newer merge fails `verify`, neither deploys and production stays behind;
+        # main's red run says so. Past that: deploy.sh by hand with this commit's sha.
         run: |
           git fetch -q origin main
           tip=$(git rev-parse origin/main)
           since=$(node scripts/change-kind.mjs kind "$GITHUB_SHA" "$tip")
           if [ "$tip" != "$GITHUB_SHA" ] && [ "$since" = code ]; then
-            echo "main moved on to $tip, with code: its own run deploys this commit too"
+            echo "main moved on to $tip, with code: its run deploys this commit too, if it passes"
             exit 0
           fi
           install -m 600 /dev/null ~/deploy_key

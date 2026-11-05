@@ -81,7 +81,8 @@ A merge of code into `main` deploys itself: `images.yml`'s `deploy` job, after t
 are pushed and `verify` has passed on that commit, runs the server's
 [`deploy.sh`](../deploy.sh) with its sha. A merge of docs or tests alone builds and deploys
 nothing ([ADR-0043](decisions/0043-one-merge-gate-by-kind-of-change.md)). If newer code is on `main` when the job's turn comes,
-it stops: that merge deploys this code too. Docs or tests since do not stop it. By hand, the same,
+it stops: that merge deploys this code too. Docs or tests since do not stop it. Limit: if that merge
+fails `verify`, neither deploys and production stays behind. Past that: by hand. By hand, the same,
 with the sha of a commit that has images (a docs or tests commit on `main` has none):
 
     /srv/jsc/deploy.sh <commit sha>
