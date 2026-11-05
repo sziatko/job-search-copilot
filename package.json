@@ -25,6 +25,7 @@
     "screenshots": "playwright test -c e2e --project screenshots",
     "test:db:migrate": "dotenv -e .env.test -- npm run migrate:deploy --workspace=@job-search-copilot/core",
     "db:pull": "node scripts/db-pull.mjs",
+    "review:attest": "node scripts/review-status.mjs attest",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",

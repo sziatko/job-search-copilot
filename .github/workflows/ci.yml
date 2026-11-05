@@ -39,6 +39,27 @@ jobs:
     if: needs.changes.outputs.kind != 'docs'
     uses: ./.github/workflows/e2e.yml
 
+  # After `changes` only, so a docs PR gets its status too, and well before `gate` is green.
+  review-status:
+    needs: changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          KIND: ${{ needs.changes.outputs.kind }}
+          ACTOR: ${{ github.actor }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/review-status.mjs ci
+
   gate:
     if: always()
     needs: [changes, verify, e2e]
