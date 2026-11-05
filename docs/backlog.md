@@ -149,6 +149,12 @@ also answer [`core` dev-loop friction](#core-dev-loop-friction) below.
 
 ## Improvements and fixes
 
+### A Dependabot security update that fails on the submodule
+
+A security update of `minimatch` failed with `Cloning of submodule failed` for the private `.claude`
+submodule, and the update was not applied. Dependabot has no access to that repo. Runs after the
+submodule was added had passed, so the clone may not be the whole cause: read the run's log first.
+
 ### A tag name of invisible characters
 
 `parseTagName` rejects spaces, tabs and NBSP, but `trim` and `\s` miss zero-width and filler
