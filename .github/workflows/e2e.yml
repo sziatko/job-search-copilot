@@ -1,9 +1,20 @@
 name: E2E
 
 # Playwright over the real api, web and DB (ADR-0037). In the image the visual tests'
-# baselines come from (e2e/Dockerfile — keep the two tags equal).
+# baselines come from (e2e/Dockerfile — keep the two tags equal). New baselines, as an
+# artifact to read and commit:
+#   gh workflow run e2e.yml --ref <branch> -f update_snapshots=true
 on:
   workflow_call:
+    inputs:
+      update_snapshots:
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        type: boolean
+        default: false
 
 # Reads the repo, writes nothing to GitHub.
 permissions:
@@ -60,13 +71,28 @@ jobs:
       - name: Build core
         run: npm run build --workspace=@job-search-copilot/core
 
-      - run: npm run test:e2e
+      - if: ${{ !inputs.update_snapshots }}
+        run: npm run test:e2e
 
       # What `npm run test:visual` runs in its container (docker-compose.yml `visual`).
       - name: Visual tests
+        if: ${{ !inputs.update_snapshots }}
         run: npx playwright test -c e2e
         env:
           E2E_VISUAL: '1'
+
+      - name: New baselines
+        if: ${{ inputs.update_snapshots }}
+        run: npx playwright test -c e2e --update-snapshots
+        env:
+          E2E_VISUAL: '1'
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ inputs.update_snapshots }}
+        with:
+          name: visual-baselines
+          path: e2e/visual.spec.ts-snapshots/
+          retention-days: 7
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
