@@ -99,6 +99,30 @@ test('Apply through the dialog turns the select into the pipeline one', async ({
   await expect(page.getByText('68k EUR / year', { exact: true })).toBeVisible();
 });
 
+test("Apply from an analysed filtered-out vacancy overrules the analyzer's SKIP", async ({
+  page,
+  db,
+}) => {
+  const { id } = await pick(db, { status: 'FILTERED_OUT', recommendation: 'SKIP' });
+  await page.goto(`/vacancies/${id}`);
+  await expect(statusSelect(page)).toHaveValue('FILTERED_OUT');
+
+  await statusSelect(page).selectOption({ label: 'Applied' });
+  const dialog = page.getByRole('dialog', { name: 'Mark as applied' });
+  await dialog.getByRole('button', { name: 'OK' }).click();
+  await expect(page.getByText('Application submitted!')).toBeVisible();
+  await expect(statusSelect(page)).toHaveValue('APPLIED');
+  await expect(statusSelect(page).getByRole('option')).toHaveText([
+    'Applied',
+    'Action needed',
+    'Interview',
+    'Awaiting',
+    'Offer',
+    'Rejected',
+  ]);
+  expect((await db.vacancy.findUniqueOrThrow({ where: { id } })).status).toBe('APPLIED');
+});
+
 test("an application's pipeline select moves it on", async ({ page, db }) => {
   const { id } = await pick(db, { status: 'APPLIED' });
   await page.goto(`/vacancies/${id}`);

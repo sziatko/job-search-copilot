@@ -56,7 +56,8 @@ const VACANCY_ACTIONS = (Object.keys(ROW_BUTTONS) as RowAction[]).filter(
 );
 
 /** The status buttons a row gets — the lifecycle the UI enforces (ADR-0033); the
- * vacancy page's select offers the same. A NEW row leaves only for FILTERED_OUT (its
+ * vacancy page's select offers the same, and on FILTERED_OUT the /vacancies actions
+ * after them (`StatusControl`). A NEW row leaves only for FILTERED_OUT (its
  * other exit is an analysis); a FILTERED_OUT one goes back to the queue only while it
  * has no analysis (the server refuses it otherwise). Any other row gets every /vacancies
  * action but its own — a triage repeat carries no event, and the server refuses it — a

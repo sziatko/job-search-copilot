@@ -127,6 +127,11 @@ test DB, so every delete, count and lookup a test makes filters by its user: a b
 `count()` or `findFirst()` sees another file's rows, and passes only when the file runs
 alone. Why: [ADR-0015](decisions/0015-testing-strategy.md).
 
+On Windows, run the tests from a cwd with an upper-case drive letter (`C:\…`). From a
+lower-case one (`c:\…`, what VS Code hands its terminals) Node loads `react` and
+`react-dom` under two path spellings, two React copies, and most web tests fail with
+`Cannot read properties of null (reading 'useContext')`.
+
 `apps/web/src/styles.test.ts` holds the web's styling rules (`components/ui/README.md`,
 "Styling a new page") by reading every source file as text, comments included.
 
