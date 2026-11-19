@@ -345,31 +345,79 @@ describe('VacancyPage', () => {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'FILTERED_OUT');
     await waitFor(() => expect(rows[0].status).toBe('FILTERED_OUT'));
     expect(writes).toEqual(['PATCH /api/v1/vacancies/1/status']);
-    // Unanalysed, so it can go back to the queue.
-    await waitFor(() => expect(statusOptions()).toEqual(['Filtered out', 'New']));
+    // Unanalysed, so it can go back to the queue — or on to triage.
+    await waitFor(() => expect(statusOptions()).toEqual(['Filtered out', 'New', ...TRIAGE]));
   });
+
+  /** The /vacancies actions' labels, in the select's order. */
+  const TRIAGE = ['Not reviewed', 'Saved for later', 'Declined', 'Unavailable', 'Applied'];
+  const skipped = { status: 'FILTERED_OUT', recommendation: 'SKIP', matchScore: 20 } as const;
 
   it('puts an unanalysed FILTERED_OUT vacancy back in the queue', async () => {
     const rows = [fakeVacancy({ id: 1, status: 'FILTERED_OUT', ...unanalysed })];
     renderAt('/vacancies/1', rows);
 
     expect(await screen.findByRole('combobox')).toHaveValue('FILTERED_OUT');
-    expect(statusOptions()).toEqual(['Filtered out', 'New']);
+    expect(statusOptions()).toEqual(['Filtered out', 'New', ...TRIAGE]);
     expect(screen.getByRole('combobox', { name: 'Status' })).toBeEnabled();
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'NEW');
     await waitFor(() => expect(rows[0].status).toBe('NEW'));
   });
 
-  it('offers an analysed FILTERED_OUT vacancy nowhere to go', async () => {
-    renderAt('/vacancies/1', [
-      fakeVacancy({ id: 1, status: 'FILTERED_OUT', recommendation: 'SKIP', matchScore: 20 }),
-    ]);
+  it('offers an analysed FILTERED_OUT vacancy the /vacancies actions, never the queue', async () => {
+    renderAt('/vacancies/1', [fakeVacancy({ id: 1, ...skipped })]);
 
-    // The server refuses NEW on an analysed row, as on /inbox.
+    // The server refuses NEW on an analysed row.
     expect(await screen.findByRole('combobox')).toHaveValue('FILTERED_OUT');
-    expect(statusOptions()).toEqual(['Filtered out']);
-    expect(screen.getByRole('combobox', { name: 'Status' })).toBeDisabled();
+    expect(statusOptions()).toEqual(['Filtered out', ...TRIAGE]);
+    expect(screen.getByRole('combobox', { name: 'Status' })).toBeEnabled();
+  });
+
+  it('applies to an analysed FILTERED_OUT vacancy through the apply dialog', async () => {
+    const rows = [fakeVacancy({ id: 1, ...skipped })];
+    const writes = recordWrites();
+    renderAt('/vacancies/1', rows);
+
+    await userEvent.selectOptions(await screen.findByRole('combobox'), 'APPLIED');
+    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+
+    await waitFor(() => expect(rows[0].status).toBe('APPLIED'));
+    expect(writes).toEqual(['POST /api/v1/applications']);
+    expect(await screen.findByRole('option', { name: 'Action needed' })).toBeInTheDocument();
+  });
+
+  it('declines an analysed FILTERED_OUT vacancy only once confirmed', async () => {
+    const rows = [fakeVacancy({ id: 1, ...skipped })];
+    const writes = recordWrites();
+    renderAt('/vacancies/1', rows);
+
+    await userEvent.selectOptions(await screen.findByRole('combobox'), 'DECLINED');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(writes).toEqual([]);
+    expect(rows[0].status).toBe('FILTERED_OUT');
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'DECLINED');
+    await userEvent.click(screen.getByRole('button', { name: 'Decline' }));
+    await waitFor(() => expect(rows[0].status).toBe('DECLINED'));
+    expect(writes).toEqual(['PATCH /api/v1/vacancies/1/status']);
+  });
+
+  it('saves an analysed FILTERED_OUT vacancy for later with the comment', async () => {
+    const rows = [fakeVacancy({ id: 1, ...skipped })];
+    const writes = recordWrites();
+    renderAt('/vacancies/1', rows);
+
+    await userEvent.selectOptions(await screen.findByRole('combobox'), 'SAVED_FOR_LATER');
+    const dialog = within(screen.getByRole('dialog'));
+    await userEvent.type(dialog.getByRole('textbox', { name: 'Comment' }), 'Worth a look.');
+    await userEvent.click(dialog.getByRole('button', { name: 'Save for later' }));
+
+    const comments = await card(/^comments/i);
+    expect(await comments.findByText('Worth a look.')).toBeInTheDocument();
+    expect(writes).toEqual(['PATCH /api/v1/vacancies/1/status']);
+    expect(rows[0].status).toBe('SAVED_FOR_LATER');
   });
 
   it('offers a triage vacancy the /vacancies actions, as before', async () => {

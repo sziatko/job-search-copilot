@@ -143,7 +143,9 @@ including back to `NOT_REVIEWED`; the one DB rule is "an analysed row is never `
 which `writeStatus` refuses first as `AnalysedNotNewError`, REST `422`). The web draws
 it as each row's buttons (`actionsFor` in `VacancyTable`; the vacancy page's status
 select offers the same): a `NEW` row gets Filter out only, a `FILTERED_OUT` one Back to
-queue only without an analysis, the rest the `/vacancies` actions:
+queue only without an analysis, the rest the `/vacancies` actions. The vacancy page adds
+the `/vacancies` actions to `FILTERED_OUT`'s select: there the user overrules the
+analyzer's `SKIP`, or records an application made elsewhere; `/inbox` only sorts.
 
 ```
      analysis, not SKIP               ┌─▶ SAVED_FOR_LATER ─┬─▶ APPLIED ─▶ ACTION_NEEDED ⇄ AWAITING ─▶ INTERVIEW ─▶ AWAITING ─┬─▶ OFFER
@@ -152,7 +154,7 @@ NEW ─────────────────▶ NOT_REVIEWED ──�
  │ │ back to the queue                └─▶ UNAVAILABLE ◀── (from SAVED_FOR_LATER too)
  │ │ (no analysis only)
  ▼ │
-FILTERED_OUT ◀── analysis SKIP, or the user
+FILTERED_OUT ◀── analysis SKIP, or the user   (its page: any /vacancies action)
 ```
 
 `NEW`'s only exits: an analysis (by the rule), or the user's `FILTERED_OUT`. A

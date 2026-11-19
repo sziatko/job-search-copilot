@@ -25,7 +25,8 @@ const TRIAGE_OPTIONS = Object.values(VACANCY_ACTION).map((value) => ({
  * dialog, Declined confirms first, Saved for later asks for an optional comment; from
  * APPLIED on, the /applications pipeline select. NEW and FILTERED_OUT come before
  * triage: their select offers what the row buttons do (`actionsFor`), under the status
- * itself.
+ * itself. FILTERED_OUT's adds the /vacancies actions after them: here the user overrules
+ * the analyzer's SKIP, or records an application made elsewhere; /inbox only sorts.
  */
 export function StatusControl({
   vacancy,
@@ -54,10 +55,16 @@ export function StatusControl({
     else page.moveTriage(next);
   }
 
+  const rowOptions = [status, ...actionsFor(vacancy)].map((value) => ({
+    value,
+    label: STATUS_LABELS[value],
+  }));
   const options: readonly SelectOption<RowAction>[] =
-    status === ROW_ACTION.NEW || status === ROW_ACTION.FILTERED_OUT
-      ? [status, ...actionsFor(vacancy)].map((value) => ({ value, label: STATUS_LABELS[value] }))
-      : TRIAGE_OPTIONS;
+    status === ROW_ACTION.NEW
+      ? rowOptions
+      : status === ROW_ACTION.FILTERED_OUT
+        ? [...rowOptions, ...TRIAGE_OPTIONS]
+        : TRIAGE_OPTIONS;
 
   return (
     <>
@@ -65,8 +72,7 @@ export function StatusControl({
         label="Status"
         value={status}
         options={options}
-        // An analysed FILTERED_OUT vacancy has nowhere to go.
-        disabled={page.statusSaving || options.length === 1}
+        disabled={page.statusSaving}
         onChange={change}
       />
       {pending === 'apply' && (
