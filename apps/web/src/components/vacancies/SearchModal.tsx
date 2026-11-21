@@ -56,10 +56,10 @@ export function SearchModal({
     placeholderData: keepPreviousData,
   });
 
-  // The ⏳ mark and the CV / CL column: both endpoints' `search` matches the same way, so the
-  // pipeline rows among the results are these applications. Only asked when a pipeline
-  // row can be among them.
-  // One page of 500: a term matching more applications loses the oldest marks.
+  // The ⏳ mark, the Salary and the CV / CL columns: both endpoints' `search` matches the
+  // same way, so the pipeline rows among the results are these applications. Only asked
+  // when a pipeline row can be among them.
+  // One page of 500: a term matching more applications loses the oldest marks and salaries.
   const applications = useQuery({
     queryKey: queryKeys.applicationSearch(term),
     queryFn: () => listApplicationsPage({ search: term, limit: 500 }),

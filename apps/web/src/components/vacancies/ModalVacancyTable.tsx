@@ -35,7 +35,10 @@ export function ModalVacancyTable({
   currentId,
 }: {
   items: readonly VacancyListItem[];
-  /** The pipeline rows among `items`, for the ⏳ mark and the CV / CL column — joined by id. */
+  /**
+   * The pipeline rows among `items`, for the ⏳ mark, the Salary and the CV / CL columns —
+   * joined by id.
+   */
   applications: readonly ApplicationListItem[] | undefined;
   loading: boolean;
   /** The row to mark Current and scroll to — the one whose button opened the modal. */

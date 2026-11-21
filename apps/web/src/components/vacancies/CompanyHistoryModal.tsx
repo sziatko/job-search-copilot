@@ -39,8 +39,9 @@ export function CompanyHistoryModal({
     staleTime: 0,
   });
 
-  // This company's applications, every spelling (ADR-0032), for the ⏳ mark and the
-  // CV / CL column. One page of 500: a company with more applications loses the oldest marks.
+  // This company's applications, every spelling (ADR-0032), for the ⏳ mark, the Salary and
+  // the CV / CL columns. One page of 500: a company with more applications loses the oldest
+  // marks and salaries.
   const applications = useQuery({
     queryKey: queryKeys.applicationCompany(company),
     queryFn: () => listApplicationsPage({ sameCompanyAs: company, limit: 500 }),
