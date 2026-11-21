@@ -91,6 +91,7 @@ export function ModalVacancyTable({
     // /applications' CV / CL column; a row never applied to has neither.
     {
       header: 'CV / CL',
+      width: 80, // /applications' width, which keeps the header on one line
       cell: (item) => {
         const application = applicationsByVacancy.get(item.id);
         return (
