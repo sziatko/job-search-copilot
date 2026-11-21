@@ -13,9 +13,10 @@ export interface Column<T> {
 }
 
 const CELL = 'border-b border-border px-4 py-3 align-top text-body';
-// `shadow-header`, not a bottom border: index.css says why.
+// `shadow-header`, not a bottom border: index.css says why. A header stays on one line:
+// it is the column's minimum width, and in a fixed layout `width` must leave it room.
 const HEADER =
-  'sticky top-0 z-10 bg-surface px-4 py-2 text-left text-overline uppercase text-ink-faint shadow-header';
+  'sticky top-0 z-10 bg-surface px-4 py-2 text-left text-overline uppercase text-ink-faint shadow-header whitespace-nowrap';
 // A list page's box: it runs to the window's bottom (its card fills the view — see
 // `View`'s `fill`), 320px at the least. `contain-size` keeps the rows out of its intrinsic
 // height, so the card sizes to that floor rather than to every loaded row. The stable
