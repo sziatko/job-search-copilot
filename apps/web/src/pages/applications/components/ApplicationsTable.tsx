@@ -110,7 +110,7 @@ export function ApplicationsTable({
     },
     {
       header: 'CV / CL',
-      width: 80,
+      width: 96, // room for the header on one line, whatever the font renders it at
       cell: (item) => (
         <ApplyFlagsCell resume={item.usedTailoredResume} letter={item.sentCoverLetter} />
       ),

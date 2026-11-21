@@ -20,10 +20,13 @@ export function countLine(shown: number, total: number) {
     : `${total} vacancies, newest first`;
 }
 
+/** The width of a modal that holds this table — wide enough for its seven columns. */
+export const MODAL_TABLE_WIDTH = 'max-w-6xl';
+
 /**
  * The vacancy rows of a modal — the company modal's and the search modal's: date (with
- * /applications' ⏳), vacancy, score, status, CV / CL, Copy / Details (in a new tab: a
- * modal's context would be lost to an in-place navigation).
+ * /applications' ⏳), vacancy, score, status, salary, CV / CL, Copy / Details (in a new
+ * tab: a modal's context would be lost to an in-place navigation).
  */
 export function ModalVacancyTable({
   items,
@@ -32,7 +35,10 @@ export function ModalVacancyTable({
   currentId,
 }: {
   items: readonly VacancyListItem[];
-  /** The pipeline rows among `items`, for the ⏳ mark and the CV / CL column — joined by id. */
+  /**
+   * The pipeline rows among `items`, for the ⏳ mark, the Salary and the CV / CL columns —
+   * joined by id.
+   */
   applications: readonly ApplicationListItem[] | undefined;
   loading: boolean;
   /** The row to mark Current and scroll to — the one whose button opened the modal. */
@@ -76,6 +82,15 @@ export function ModalVacancyTable({
       cell: (item) => <ScorePill score={item.hasAnalysis ? item.matchScore : null} />,
     },
     { header: 'Status', cell: (item) => <StatusTag status={item.status} /> },
+    // /applications' Salary column; a row never applied to has none.
+    {
+      header: 'Salary',
+      cell: (item) => (
+        <div className="font-mono text-small tabular-nums">
+          {applicationsByVacancy.get(item.id)?.salaryInApplication ?? '—'}
+        </div>
+      ),
+    },
     // /applications' CV / CL column; a row never applied to has neither.
     {
       header: 'CV / CL',

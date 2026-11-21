@@ -1365,7 +1365,7 @@ describe('VacanciesPage / useVacancies', () => {
       expect(modal.getAllByText('Current')).toHaveLength(1);
     });
 
-    it('shows whether a tailored CV and a cover letter went with each application', async () => {
+    it('shows the salary, the tailored CV and the cover letter of each application', async () => {
       mswServer.use(
         ...buildHandlers([
           vacancy({ id: 1, company: 'Acme', title: 'Backend Engineer' }),
@@ -1375,6 +1375,7 @@ describe('VacanciesPage / useVacancies', () => {
             title: 'Data Engineer',
             status: 'APPLIED',
             usedTailoredResume: true,
+            salaryInApplication: '120 PLN/h',
           }),
           vacancy({
             id: 3,
@@ -1392,13 +1393,16 @@ describe('VacanciesPage / useVacancies', () => {
         .setup()
         .click(screen.getByRole('button', { name: /other vacancies at Acme/i }));
       const modal = within(await screen.findByRole('dialog'));
-      // Date, Vacancy, Score, Status, CV / CL, Actions.
-      const flags = (title: string) =>
-        (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[4];
+      // Date, Vacancy, Score, Status, Salary, CV / CL, Actions.
+      const cells = (title: string) =>
+        (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells;
       // The ✓ waits for the applications query, which lands after the rows.
-      await waitFor(() => expect(flags('Data Engineer')).toHaveTextContent('✓ / —'));
-      expect(flags('Frontend Lead')).toHaveTextContent('— / ✓');
-      expect(flags('Backend Engineer')).toHaveTextContent('— / —'); // never applied to
+      await waitFor(() => expect(cells('Data Engineer')[5]).toHaveTextContent('✓ / —'));
+      expect(cells('Data Engineer')[4]).toHaveTextContent('120 PLN/h');
+      expect(cells('Frontend Lead')[4]).toHaveTextContent('—'); // applied, no salary given
+      expect(cells('Frontend Lead')[5]).toHaveTextContent('— / ✓');
+      expect(cells('Backend Engineer')[4]).toHaveTextContent('—'); // never applied to
+      expect(cells('Backend Engineer')[5]).toHaveTextContent('— / —');
     });
 
     it('opens Details in a new tab, where the table opens it in place', async () => {

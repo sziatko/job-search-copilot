@@ -142,9 +142,9 @@ describe('SearchModal', () => {
     expect(
       within(await row('Data Engineer').findByText('⏳')).getByText('45 days since last update'),
     ).toBeInTheDocument();
-    // Date, Vacancy, Score, Status, CV / CL, Actions.
+    // Date, Vacancy, Score, Status, Salary, CV / CL, Actions.
     const flags = (title: string) =>
-      (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[4];
+      (modal.getByText(title).closest('tr') as HTMLTableRowElement).cells[5];
     expect(flags('Data Engineer')).toHaveTextContent('✓ / ✓');
     expect(flags('Backend Engineer')).toHaveTextContent('— / —');
 

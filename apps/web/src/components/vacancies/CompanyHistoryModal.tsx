@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { listApplicationsPage } from '@/lib/applications/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { listVacanciesPage } from '@/lib/vacancies/api';
-import { countLine, ModalVacancyTable } from './ModalVacancyTable';
+import { countLine, MODAL_TABLE_WIDTH, ModalVacancyTable } from './ModalVacancyTable';
 
 /**
  * Every vacancy of one company (as core's SAME_COMPANY_STATUSES counts it) with its
@@ -39,8 +39,9 @@ export function CompanyHistoryModal({
     staleTime: 0,
   });
 
-  // This company's applications, every spelling (ADR-0032), for the ⏳ mark and the
-  // CV / CL column. One page of 500: a company with more applications loses the oldest marks.
+  // This company's applications, every spelling (ADR-0032), for the ⏳ mark, the Salary and
+  // the CV / CL columns. One page of 500: a company with more applications loses the oldest
+  // marks and salaries.
   const applications = useQuery({
     queryKey: queryKeys.applicationCompany(company),
     queryFn: () => listApplicationsPage({ sameCompanyAs: company, limit: 500 }),
@@ -50,7 +51,7 @@ export function CompanyHistoryModal({
   const items = data?.items ?? [];
 
   return (
-    <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName="max-w-3xl">
+    <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName={MODAL_TABLE_WIDTH}>
       <DialogTitle id={titleId}>All vacancies at {company}</DialogTitle>
       <DialogSub>{isPending ? 'Loading…' : countLine(items.length, data?.total ?? 0)}</DialogSub>
 

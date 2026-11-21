@@ -11,7 +11,7 @@ import { isPipelineStatus } from '@/lib/applications/types';
 import { queryKeys } from '@/lib/queryKeys';
 import { listVacanciesPage } from '@/lib/vacancies/api';
 import { type VacancyStatus, vacancyStatusSchema } from '@/lib/vacancies/types';
-import { countLine, ModalVacancyTable } from './ModalVacancyTable';
+import { countLine, MODAL_TABLE_WIDTH, ModalVacancyTable } from './ModalVacancyTable';
 
 /** All with Hide Filtered out on: the whole table but what was screened out. */
 const ALL_BUT_FILTERED_OUT = vacancyStatusSchema.exclude(['FILTERED_OUT']).options;
@@ -56,10 +56,10 @@ export function SearchModal({
     placeholderData: keepPreviousData,
   });
 
-  // The ⏳ mark and the CV / CL column: both endpoints' `search` matches the same way, so the
-  // pipeline rows among the results are these applications. Only asked when a pipeline
-  // row can be among them.
-  // One page of 500: a term matching more applications loses the oldest marks.
+  // The ⏳ mark, the Salary and the CV / CL columns: both endpoints' `search` matches the
+  // same way, so the pipeline rows among the results are these applications. Only asked
+  // when a pipeline row can be among them.
+  // One page of 500: a term matching more applications loses the oldest marks and salaries.
   const applications = useQuery({
     queryKey: queryKeys.applicationSearch(term),
     queryFn: () => listApplicationsPage({ search: term, limit: 500 }),
@@ -73,7 +73,7 @@ export function SearchModal({
     <Modal
       onClose={onClose}
       labelledBy={titleId}
-      maxWidthClassName="max-w-3xl"
+      maxWidthClassName={MODAL_TABLE_WIDTH}
       initialFocus={searchRef}
     >
       <DialogTitle id={titleId}>Search vacancies</DialogTitle>
