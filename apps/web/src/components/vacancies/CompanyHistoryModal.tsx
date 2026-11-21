@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { listApplicationsPage } from '@/lib/applications/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { listVacanciesPage } from '@/lib/vacancies/api';
-import { countLine, ModalVacancyTable } from './ModalVacancyTable';
+import { countLine, MODAL_TABLE_WIDTH, ModalVacancyTable } from './ModalVacancyTable';
 
 /**
  * Every vacancy of one company (as core's SAME_COMPANY_STATUSES counts it) with its
@@ -50,7 +50,7 @@ export function CompanyHistoryModal({
   const items = data?.items ?? [];
 
   return (
-    <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName="max-w-3xl">
+    <Modal onClose={onClose} labelledBy={titleId} maxWidthClassName={MODAL_TABLE_WIDTH}>
       <DialogTitle id={titleId}>All vacancies at {company}</DialogTitle>
       <DialogSub>{isPending ? 'Loading…' : countLine(items.length, data?.total ?? 0)}</DialogSub>
 
