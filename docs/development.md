@@ -209,8 +209,8 @@ What enforces what; the reasoning stays in the doc each row links.
   toBeInTheDocument" (the drive letter's case). Run it from PowerShell, or from the
   default working directory.
 - **`allowScripts` in the root `package.json` names exact versions.** An update that
-  moves `prisma`, `@prisma/engines` or `@swc/core` blocks its install script until the
-  entry is moved to the new version; `npm install-scripts ls` lists what is blocked.
+  moves one of its packages blocks that package's install script until the entry is
+  moved to the new version; `npm install-scripts ls` lists what is blocked.
 - **`overrides.effect` in the root `package.json`** lifts `@prisma/config`'s exact pin
   (`3.20.0`, a ReDoS advisory) to a patched 3.x. Drop it once a Prisma release pins a
   patched `effect` itself (`npm view @prisma/config dependencies.effect`).

@@ -217,7 +217,7 @@ Nothing reminds of a new major: `dependabot.yml` watches only GitHub Actions and
 and Dependabot opens npm PRs only for security fixes. Either `npm` in `dependabot.yml`
 (weekly, grouped, majors in their own PR) or an `npm outdated` pass now and then.
 
-Behind on 2026-11-21, one migration per PR: `typescript` 7, `msw` 3, `jsdom` 31,
+Behind, one migration per PR: `typescript` 7, `msw` 3, `jsdom` 31,
 `@testing-library/jest-dom` 8, `dotenv` 18, `unplugin-swc` 2; `prisma` 8 once it is
 stable (`latest` is an RC).
 

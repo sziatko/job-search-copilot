@@ -42,7 +42,7 @@
     "effect": "3.22.5"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.12",
+    "@biomejs/biome": "^2.6.8",
     "@modelcontextprotocol/inspector": "^2.9.0",
     "@playwright/test": "^1.64.0",
     "dotenv-cli": "^11.0.0",
