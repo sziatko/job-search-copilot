@@ -205,8 +205,15 @@ What enforces what; the reasoning stays in the doc each row links.
   covers its files. In a ban's `group`, `*` matches one path segment: `pkg/*` lets
   `pkg/dist/index` through, so a package is banned as `pkg` and `pkg/**`.
 - **Vitest from Git Bash after `cd /c/...`** fails every web file with "Vitest failed
-  to find the runner" (the drive letter's case). Run it from PowerShell, or from the
+  to find the runner", or most web tests with "Invalid Chai property:
+  toBeInTheDocument" (the drive letter's case). Run it from PowerShell, or from the
   default working directory.
+- **`allowScripts` in the root `package.json` names exact versions.** An update that
+  moves `prisma`, `@prisma/engines` or `@swc/core` blocks its install script until the
+  entry is moved to the new version; `npm install-scripts ls` lists what is blocked.
+- **`overrides.effect` in the root `package.json`** lifts `@prisma/config`'s exact pin
+  (`3.20.0`, a ReDoS advisory) to a patched 3.x. Drop it once a Prisma release pins a
+  patched `effect` itself (`npm view @prisma/config dependencies.effect`).
 - **Vitest's first run can fail with "Failed to start forks worker"** — a cold-start
   timeout, not a test failure; the rerun passes.
 - **A full visual run is slow on Windows** (vite dev over the bind mount), and the first
