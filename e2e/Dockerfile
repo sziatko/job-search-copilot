@@ -3,7 +3,7 @@
 # The visual tests' machine (ADR-0037): the Playwright image, its tag the version of
 # @playwright/test in package-lock.json. CI's e2e job (.github/workflows/e2e.yml) runs in the
 # same image, so a baseline taken here matches there. Source comes from the bind-mount in docker-compose.yml.
-FROM mcr.microsoft.com/playwright:v1.64.0-noble
+FROM mcr.microsoft.com/playwright:v1.65.1-noble
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY packages/core/package.json packages/core/package.json
