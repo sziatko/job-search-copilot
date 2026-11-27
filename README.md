@@ -19,22 +19,22 @@ review fast. New parts come as I need them — see the [roadmap](#roadmap).
 <details>
 <summary>More screens</summary>
 
-**Analyzed vacancies** — score, recommendation and the review, with one-click triage.
+**Analyzed vacancies** — score, recommendation and the review, tags, and one-click triage.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/vacancies-dark.png">
   <img alt="The vacancies table" src="docs/screenshots/vacancies-light.png">
 </picture>
 
-**One vacancy** — the status history, the posting, comments from me and from Claude.
+**One vacancy** — the status history, the posting, tags, comments from me and from Claude.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/vacancy-dark.png">
   <img alt="A vacancy page" src="docs/screenshots/vacancy-light.png">
 </picture>
 
-**Application tracker** — every application by pipeline stage, with the ones gone quiet
-for 30 days.
+**Application tracker** — every application by pipeline stage, with the salary, whether a
+tailored CV and a cover letter went out, and the ones gone quiet for 30 days.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/applications-dark.png">
@@ -92,17 +92,23 @@ feed the app instead.
 
 - **Dashboard** — counters, a funnel from logged to interview, where the rest dropped
   out, and the top recommended vacancies not yet reviewed.
-- **Vacancy tables** — infinite scroll, search, status filters, one-click triage, and
-  a company's other vacancies in a modal.
-- **Application tracker** — pipeline stages, salary and tailored-CV notes, comments,
-  and a 30-day timeout for applications nobody answered.
+- **Vacancy tables** — infinite scroll, search by company, title or `#id`, status
+  filters, one-click triage, and a company's other vacancies, with their salaries, in a
+  modal.
+- **Tags** — in ten colours, added by hand on any row or vacancy page, or by Claude
+  with its analysis.
+- **Overruling the analyzer** — a vacancy Claude filtered out can still be applied to or
+  saved from its page.
+- **Application tracker** — pipeline stages, salary, tailored-CV and cover-letter
+  flags, comments that keep their line breaks, and a 30-day timeout for applications
+  nobody answered.
 - **MCP server** — tools so Claude can save vacancies scored in a chat, read the
   queue, submit analyses, record applications and move statuses. Over stdio, or Streamable HTTP with OAuth 2.1.
 - **REST API** — documented with Swagger UI; every route closed unless marked
   otherwise.
 - **Sign-in** — Google, LinkedIn or a passkey; sign-up limited to an allowlist.
 - **Several users** — each sees only their own vacancies; per-user API keys for n8n and
-  MCP.
+  MCP. Passkeys, API keys and the apps connected over MCP are managed on a Settings page.
 - Light and dark theme; works on a phone.
 
 ## Architecture
@@ -114,7 +120,7 @@ An npm-workspaces monorepo:
 | [`packages/core`](packages/core/README.md) | The domain layer and the only database client: Prisma schema and migrations, the services, the status rules, auth (Better Auth) and API keys. |
 | `apps/api` | NestJS REST API (`/api/v1`) for the web app and n8n. |
 | `apps/mcp` | The MCP server: the same services as tools, over stdio and Streamable HTTP. |
-| `apps/web` | React SPA: dashboard, tables, the vacancy page, the inbox, the profile. |
+| `apps/web` | React SPA: dashboard, tables, the vacancy page, the inbox, settings. |
 
 ```
 n8n ─────────▶ apps/api ◀── apps/web
@@ -184,7 +190,7 @@ The repo is set up so an AI agent can work on it for weeks without losing the th
   tailoring a resume from a vacancy page.
 - **Collectors inside the app**, instead of hand-built n8n workflows.
 - **A company exclusion list** and company aliases.
-- A UI for the status journal, per-column filters, live updates.
+- A UI for the status journal, per-column filters (a tag too), live updates.
 
 The full list: [`docs/backlog.md`](docs/backlog.md).
 
